@@ -61,6 +61,8 @@ hatchling reads `VERSION`, the only version source once releases are tagged. A f
 
 As in `ddwg-film`, the proof sets hold the portable gates, static analysis, the Python and Node suites and source integrity, which ETHOS projects into GitHub Actions and GitLab CI on Apple-silicon runners. The sample film's build needs the models and the browser build and stays a local acceptance.
 
+The repository was formed by `ethos adopt --create` without a `main`. ETHOS alpha.21's closeout creates that absent release branch at the candidate head, so this Change binds alpha.21 before its archive and the first tag lands on a tree that declares the runtime that proved it. Binding alpha.20 and moving in a later Change was rejected because it would prove and land twice for one release.
+
 ## Risks / Trade-offs
 
 - [A moved test weakens] → It keeps every assertion; only values that named DDWG take the sample's.

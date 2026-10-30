@@ -25,6 +25,10 @@
 - [x] 4.2 Write the README with the layout a film provides, `LICENSE`, `NOTICE`, `CHANGELOG.md` and `.ethos/release.toml`; verify `ethos lane repair-paradigm --json` reports no gap.
 - [x] 4.3 Project the portable gates into GitHub Actions and GitLab CI, and verify the projections validate.
 
+## 5. First release
+
+- [ ] 5.1 Rebind the toolchain to ETHOS `0.2.0-alpha.21` with the Mise declaration published with that release, checked against its `SHA256SUMS`, and lock it again with native `mise lock`; verify `mise install --locked` and that `ethos status` reports the lane ready under the alpha.21 runtime.
+
 ## Workflow follow-up
 
 - Archive the Change, prove the archived head once, land it and close out.
