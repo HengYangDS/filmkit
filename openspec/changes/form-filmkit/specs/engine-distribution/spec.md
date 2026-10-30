@@ -1,3 +1,7 @@
+## Purpose
+
+Let a film depend on one pinned engine release: a package built from a release tag that carries every tool the engine runs, and a README that states what the film must provide.
+
 ## ADDED Requirements
 
 ### Requirement: A film installs a pinned engine release

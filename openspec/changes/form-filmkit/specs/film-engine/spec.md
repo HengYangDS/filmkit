@@ -1,3 +1,7 @@
+## Purpose
+
+Build any film from its own declaration and content: the engine finds the film it runs in and takes every film-specific value from that film, never from itself.
+
 ## ADDED Requirements
 
 ### Requirement: The engine finds the film it builds

@@ -1,3 +1,7 @@
+## Purpose
+
+Prove the engine end to end with a short bilingual film that the repository carries, builds and verifies, and that the engine's tests load instead of any production film.
+
 ## ADDED Requirements
 
 ### Requirement: The repository builds a sample film
