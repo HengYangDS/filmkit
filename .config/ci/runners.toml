@@ -1,0 +1,11 @@
+# Native runner prerequisites for the installed source-verification model.
+# These declarations own references; they do not prove host availability.
+[[runner]]
+forge = "github"
+executables = ["mise", "mkdir"]
+references = ["github"]
+
+[[runner]]
+forge = "gitlab"
+executables = ["mise", "mkdir"]
+references = ["gitlab"]
