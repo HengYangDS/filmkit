@@ -1,7 +1,7 @@
 /** Exercise how the real-browser checks find and launch their headless browser, without starting one. */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -53,6 +53,30 @@ test("otherwise the newest supplied macOS arm64 build runs", async () => {
     );
   } finally {
     await rm(folder, { recursive: true, force: true });
+  }
+});
+
+test("without FILM_CHROMIUM_PATH the build is the one supplied below the film the check runs in", async () => {
+  const film = await mkdtemp(join(tmpdir(), "film-root-")),
+    before = process.cwd();
+  try {
+    process.chdir(film);
+    await withEnvironment({ FILM_CHROMIUM_PATH: undefined }, async () => {
+      await assert.rejects(browserPath(), /No supplied browser/);
+      const builds = join(film, "build/runtime/tool-cache/browsers/chrome-headless-shell");
+      await mkdir(join(builds, "mac_arm-152.0.7977.30"), { recursive: true });
+      assert.equal(
+        await browserPath(),
+        join(
+          await realpath(builds),
+          "mac_arm-152.0.7977.30",
+          "chrome-headless-shell-mac-arm64/chrome-headless-shell",
+        ),
+      );
+    });
+  } finally {
+    process.chdir(before);
+    await rm(film, { recursive: true, force: true });
   }
 });
 

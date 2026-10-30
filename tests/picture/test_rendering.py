@@ -59,7 +59,8 @@ def root(tmp_path, monkeypatch):
     """A repository root with both editions' current inputs and the real composition."""
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
-    (root / "node_modules").mkdir()
+    supported = {"name": "hyperframes", "version": picture_rendering.RENDERER_VERSION}
+    put(root / "node_modules" / picture_rendering.RENDERER_PACKAGE, supported)
     shutil.copytree(COMPOSITION, root / picture_rendering.COMPOSITION)
     for path, source in picture_rendering.staged_members():
         if not (root / source).exists():
@@ -388,6 +389,21 @@ def test_failed_rendering_stops_its_remaining_workers(staged, tmp_path, monkeypa
         if worker.with_suffix(".pid").exists():
             with contextlib.suppress(ProcessLookupError):
                 os.kill(int(worker.with_suffix(".pid").read_text()), signal.SIGKILL)
+
+
+def test_another_renderer_version_refuses_staging_and_rendering(
+    staged, root, tmp_path, monkeypatch
+):
+    manifest = root / "node_modules" / picture_rendering.RENDERER_PACKAGE
+    manifest.write_text(json.dumps({"name": "hyperframes", "version": "0.9.0"}))
+    versions = r"installs HyperFrames 0\.9\.0; the engine renders with HyperFrames 0\.8\.150"
+    with pytest.raises(PictureError, match=versions):
+        picture_rendering.stage_picture(staged, None, DURATION, 3840, 2160)
+    fake = renderer(tmp_path, "open(__file__ + '.ran', 'w').close()")
+    with pytest.raises(PictureError, match=versions):
+        render(monkeypatch, staged, fake, 60)
+    assert not Path(f"{fake}.ran").exists()
+    assert not staged.render_receipt.exists()
 
 
 def test_rendering_refuses_a_stale_stage_before_running(staged, root, tmp_path, monkeypatch):

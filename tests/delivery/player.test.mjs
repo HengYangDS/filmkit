@@ -256,7 +256,7 @@ test("the player check refuses a malformed invocation before opening a browser",
     assert.equal(result.status, 2, args.join(" "));
     assert.equal(result.stdout, "", args.join(" "));
     assert.ok(
-      result.stderr.includes("Usage: node src/filmkit/delivery/player-check.mjs"),
+      result.stderr.includes("Usage: python -m filmkit.tools player-check"),
       args.join(" "),
     );
   }

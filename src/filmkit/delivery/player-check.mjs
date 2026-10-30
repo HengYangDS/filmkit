@@ -8,8 +8,8 @@
  * Requests outside the destination are refused and recorded; screenshots are written beside the receipt.
  * cover: paints window.renderCover() from a staged UHD document and compares its pixels with the tracked cover.
  * No human hearing or complete-film playback is claimed.
- * Usage: node src/filmkit/delivery/player-check.mjs players <binding.json> <receipt.json>
- *        node src/filmkit/delivery/player-check.mjs cover <stage-dir> <cover.png> <output.png> */
+ * Usage: python -m filmkit.tools player-check players <binding.json> <receipt.json>
+ *        python -m filmkit.tools player-check cover <stage-dir> <cover.png> <output.png> */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
@@ -22,8 +22,8 @@ import { inflateSync } from "node:zlib";
 import { launchBrowser } from "../picture/headless-browser.mjs";
 
 const USAGE =
-  "Usage: node src/filmkit/delivery/player-check.mjs players <binding.json> <receipt.json>\n" +
-  "       node src/filmkit/delivery/player-check.mjs cover <stage-dir> <cover.png> <output.png>";
+  "Usage: python -m filmkit.tools player-check players <binding.json> <receipt.json>\n" +
+  "       python -m filmkit.tools player-check cover <stage-dir> <cover.png> <output.png>";
 const LANGUAGES = { zh: "zh-CN", en: "en" };
 /* A film's file prefix: lowercase words joined by hyphens. */
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;

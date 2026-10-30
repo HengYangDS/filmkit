@@ -1,5 +1,5 @@
 /* Exercise every frame of the composition headlessly on one timeline and report layout, legibility and pacing.
- * Usage: node src/filmkit/picture/frame-audit.mjs <timeline.json> [step-seconds] [--from s] [--to s] [--at s]
+ * Usage: python -m filmkit.tools frame-audit <timeline.json> [step-seconds] [--from s] [--to s] [--at s]
  * --from and --to limit the frames exercised to one stretch of the film, such as the scenes being rebuilt; --at
  * reports one frame in detail. TRACE=<file> writes the label trace that filmkit.picture.sync_audit reads; MARKS=<file> writes the
  * firm marks and repeated members of each voiced frame, with whether a legible name stands at each, for its seat
@@ -29,7 +29,7 @@ import { openComposition, readTimeline } from "./headless-composition.mjs";
 import { containerFill, FRAME, seatMarks } from "./seat-marks.mjs";
 
 const USAGE =
-  "Usage: node src/filmkit/picture/frame-audit.mjs <timeline.json> [step-seconds] [--from s] [--to s] [--at s]";
+  "Usage: python -m filmkit.tools frame-audit <timeline.json> [step-seconds] [--from s] [--to s] [--at s]";
 /* A malformed invocation stops before any frame is exercised, so it can never read as a clean report. */
 function refuse(problem) {
   console.error(`${problem}\n${USAGE}`);

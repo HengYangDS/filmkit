@@ -1,16 +1,13 @@
 /** The headless browser the film's real-browser checks drive: the chrome-headless-shell that the supply task installs
- * below build/runtime/tool-cache, launched through the repository's locked puppeteer-core. FILM_CHROMIUM_PATH names
- * another browser. */
+ * below the film's build/runtime/tool-cache, launched through the film's locked puppeteer-core. The checks run at the
+ * film's root; FILM_CHROMIUM_PATH names another browser. */
 import { readdir } from "node:fs/promises";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 
 import puppeteer from "puppeteer-core";
 
-/* The supplied browser builds, below the repository root three levels above this module. */
-const BROWSERS = fileURLToPath(
-  new URL("../../../build/runtime/tool-cache/browsers/chrome-headless-shell", import.meta.url),
-);
+/* The supplied browser builds, below the root of the film, the folder a check runs in. */
+const BROWSERS = "build/runtime/tool-cache/browsers/chrome-headless-shell";
 
 /** The newest macOS arm64 chrome-headless-shell in a folder of builds, or none. */
 export async function newestBrowser(folder) {
@@ -24,7 +21,7 @@ export async function newestBrowser(folder) {
 /** The browser to run: FILM_CHROMIUM_PATH, or the newest supplied chrome-headless-shell. */
 export async function browserPath() {
   if (process.env.FILM_CHROMIUM_PATH) return process.env.FILM_CHROMIUM_PATH;
-  const supplied = await newestBrowser(BROWSERS);
+  const supplied = await newestBrowser(resolve(BROWSERS));
   if (!supplied) throw Error("No supplied browser; run the supply task or set FILM_CHROMIUM_PATH");
   return supplied;
 }

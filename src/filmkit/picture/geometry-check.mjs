@@ -635,7 +635,7 @@ export async function inspectWorkspace(workspace, { step = 2 } = {}) {
 
 if (import.meta.main) {
   const USAGE =
-    "Usage: node src/filmkit/picture/geometry-check.mjs <workspace> <receipt.json> [step-frames]";
+    "Usage: python -m filmkit.tools geometry-check <workspace> <receipt.json> [step-frames]";
   // A malformed invocation stops before the browser opens, so it can never write a passing receipt.
   const refuse = (problem) => {
     console.error(`${problem}\n${USAGE}`);

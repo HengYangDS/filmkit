@@ -12,11 +12,12 @@
 - [x] 2.2 Write the bilingual sample film in `examples/sample-film`: declaration, scripts, casts, voice contracts, pages, covers and composition; verify that the engine loads it with `FILMKIT_ROOT` set to it.
 - [x] 2.3 Read the staged fonts from the declaration, the pronunciation contract from the scripts and the listening plan's analyst readings from a file the film declares; verify by focused tests that a stage holds exactly the declared fonts in order and that the listening plan derives from the film's own contract and readings.
 - [x] 2.4 Point the engine's tests at the sample film; verify both suites pass with no other film present.
-- [ ] 2.5 Add the tools command that stages the Node tools below the film's `build/` and runs them with the film's packages, and refuse an unsupported renderer version; verify by the suites.
+- [x] 2.5 Add the tools command that stages the Node tools below the film's `build/` and runs them with the film's packages, and refuse an unsupported renderer version; verify by the suites.
 
 ## 3. Sample film build
 
 - [ ] 3.1 Build the sample film end to end after the supply step and verify both editions.
+- [ ] 3.2 Replace the golden narration receipts with the sample film's own takes; verify that the speech-plan tests reproduce their fingerprints.
 
 ## 4. Distribution
 

@@ -8,10 +8,11 @@
  * identifies a mark across frames: an arc gives the corners of its circle, a text the corners of its box, and
  * `toScreen` maps them to the screen. The stand-in estimates text metrics; geometry-check.mjs measures real ones. */
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import vm from "node:vm";
 
-const COMPOSITION = fileURLToPath(new URL("../../../picture/film.js", import.meta.url));
+/* The composition, below the root of the film, the folder an audit runs in. */
+const COMPOSITION = "picture/film.js";
 
 /** The timeline as staging hands it to the composition: the edition of its language and no render offset, unless
  * the timeline gives them. */
@@ -261,7 +262,8 @@ export function canvasStandIn(deliver) {
  * film's own camera of a segment at t; and `origin()`, called while a paint is handed over, the innermost line of a
  * scene body in film.js that made it, as `film.js:<line>`, or null. */
 export function openComposition(timeline) {
-  const source = readFileSync(COMPOSITION, "utf8");
+  const composition = resolve(COMPOSITION),
+    source = readFileSync(composition, "utf8");
   // The scene whose body each line of film.js lies in, so a paint can be traced to the scene line that made it.
   const sceneOfLine = [];
   let open = null;
@@ -298,7 +300,7 @@ export function openComposition(timeline) {
       },
     },
   });
-  vm.runInContext(source, context, { filename: COMPOSITION });
+  vm.runInContext(source, context, { filename: composition });
   const palette = Object.freeze({ ...vm.runInContext("P", context) });
   let cameraOf;
   return {

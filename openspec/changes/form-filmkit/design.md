@@ -23,7 +23,7 @@
 
 ### Snapshot import
 
-The engine's Python modules and Node tools and the tests that exercise the engine come from `ddwg-film` at `37549a9`, each verified against its blob there. History stays in `ddwg-film`, whose commit the import names. Tests that check one film's content stay with that film: the DDWG composition's Node suite, the golden narration receipts copied from DDWG takes, the release manifest checks and the checks of the DDWG scripts and players.
+The engine's Python modules and Node tools and the tests that exercise the engine come from `ddwg-film` at `37549a9`, each verified against its blob there. History stays in `ddwg-film`, whose commit the import names. Tests that check one film's content stay with that film: the DDWG composition's Node suite, the check of DDWG's retained receipts, the release manifest checks and the checks of the DDWG scripts and players. The speech-plan tests need golden receipts of real takes; the DDWG takes they were written against come with them until the sample film's own takes replace them, so that no DDWG recording remains in the engine's tests.
 
 ### Finding the film
 
@@ -39,7 +39,7 @@ Other paths stay conventions that the README states: `content/film.toml`, the co
 
 ### Node tools
 
-The wheel carries the Node tools as package data. `python -m filmkit.tools <tool> [arguments]` copies them, keeping their folders, into `build/runtime/tool-cache/filmkit/<version>/` below the film, replacing any copy whose bytes differ, and runs the named tool there with Node at the film's root. Their static imports then resolve `puppeteer-core` from the film's `node_modules`, exactly as they do in the film's repository today. Alternatives:
+The wheel carries the Node tools as package data. `python -m filmkit.tools <tool> [arguments]` copies them, keeping their folders, into `build/runtime/tool-cache/filmkit/<version>/` below the film, replacing any copy whose bytes differ, and runs the named tool there with Node at the film's root. Their static imports then resolve `puppeteer-core` from the film's `node_modules`, exactly as they do in the film's repository today; the composition and the supplied browser builds resolve from the film's root, the folder the tools run in, and a browser check receives the browser the renderer uses. Alternatives:
 
 - an npm package from the same tag, rejected because the film's two locks would have to agree on one engine version through two install channels;
 - resolving imports through `createRequire` from the film root, rejected because it loads the packages' CommonJS builds instead of the ES modules the tools use now;
@@ -47,7 +47,7 @@ The wheel carries the Node tools as package data. `python -m filmkit.tools <tool
 
 ### Renderer version
 
-The engine renders with HyperFrames 0.8.150 and checks the digest of the Chrome Headless Shell 152.0.7977.30 build that this renderer pins. The film owns its npm lock, because the renderer's dependency tree decides its stages and renders, so the engine reads the installed renderer's version and refuses any other before staging, rendering or a browser check, naming both versions.
+The engine renders with HyperFrames 0.8.150 and checks the digest of the Chrome Headless Shell 152.0.7977.30 build that this renderer pins. The film owns its npm lock, because the renderer's dependency tree decides its stages and renders, so the engine reads the installed renderer's version and refuses any other before staging, rendering or running a Node tool, naming both versions.
 
 ### Sample film
 

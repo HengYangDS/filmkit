@@ -6,7 +6,8 @@ copied timeline engine and fonts; its stage.json binds it to the current inputs.
 the locked HyperFrames renderer on the complete UHD stage with the supplied browser, telemetry,
 update checks and self-installs off, and records a receipt; validation binds the rendered
 picture to that receipt, the stage and the current inputs. A stage, render or receipt that
-differs from this contract raises `PictureError`.
+differs from this contract raises `PictureError`, as does a film whose installed renderer is not
+the version the engine renders with.
 """
 
 from __future__ import annotations
@@ -48,8 +49,11 @@ STAGE_SIZES = {(rendition.width, rendition.height) for rendition in RENDITIONS.v
 TIMELINE_ENGINE = Path("gsap/dist/gsap.min.js")
 # Seconds a renderer's process group has to exit after SIGTERM before SIGKILL ends it.
 STOP_GRACE_SECONDS = 10
-# The locked renderer's command, below the film's npm packages.
+# The locked renderer's command and package manifest, below the film's npm packages, and the
+# renderer version the engine renders with.
 RENDERER = Path(".bin/hyperframes")
+RENDERER_PACKAGE = Path("hyperframes/package.json")
+RENDERER_VERSION = "0.8.150"
 # The tools and models the supply task installs, below the repository root.
 TOOL_CACHE = Path("build/runtime/tool-cache")
 # The browser build that the locked renderer pins, as the supply task installs it, and the
@@ -173,6 +177,19 @@ def picture_html(
     return html
 
 
+def require_renderer() -> None:
+    """Refuse a film whose npm packages install another renderer version than the engine's."""
+    manifest = repository.node_modules() / RENDERER_PACKAGE
+    try:
+        installed = json.loads(manifest.read_text())["version"]
+    except (OSError, ValueError, KeyError, TypeError):
+        installed = None
+    if installed != RENDERER_VERSION:
+        found = f"HyperFrames {installed}" if installed else "no HyperFrames"
+        msg = f"The film installs {found}; the engine renders with HyperFrames {RENDERER_VERSION}"
+        raise PictureError(msg)
+
+
 def npm_package(path: Path) -> Path:
     """A file of the film's npm packages, as a path from the film's root."""
     return Path(os.path.relpath(repository.node_modules() / path, repository.ROOT))
@@ -213,6 +230,7 @@ def stage_picture(
     start: float = 0,
 ) -> None:
     """Materialize the authored picture in one ignored native render workspace."""
+    require_renderer()
     if (
         not 1 <= duration <= DURATION
         or not 0 <= start <= DURATION - duration
@@ -420,6 +438,7 @@ def render_picture(edition: Edition, deadline: int) -> None:
     `STOP_GRACE_SECONDS`, SIGKILL. A render that does not exit 0 within its deadline, or
     whose stage changed meanwhile, raises `PictureError` after its receipt is written.
     """
+    require_renderer()
     stage = edition.picture_stage
     require_current_stage(edition, stage)
     picture = edition.picture

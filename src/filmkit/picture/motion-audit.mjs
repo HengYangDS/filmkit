@@ -1,6 +1,6 @@
 /* Motion and transition audit of the picture: ghosts and residue, double exposure, stalls, pops and jumps, type scale
  * and camera framing, measured headlessly from the composition.
- * Usage: node src/filmkit/picture/motion-audit.mjs <timeline.json> [fps] [--from s] [--to s] [--out report.json]
+ * Usage: python -m filmkit.tools motion-audit <timeline.json> [fps] [--from s] [--to s] [--out report.json]
  * Every mark a scene paints is recorded with its ink level (opacity times its colour's rise above the ground), its
  * screen box, its box in its own drawing coordinates (its identity across frames) and, for words, the size shown. */
 import { writeFileSync } from "node:fs";
@@ -10,7 +10,7 @@ import { inkLevel } from "./geometry-check.mjs";
 import { openComposition, readTimeline } from "./headless-composition.mjs";
 
 const USAGE =
-  "Usage: node src/filmkit/picture/motion-audit.mjs <timeline.json> [fps] [--from s] [--to s] [--out report.json]";
+  "Usage: python -m filmkit.tools motion-audit <timeline.json> [fps] [--from s] [--to s] [--out report.json]";
 /* A malformed invocation stops before any frame is exercised, so it can never read as a clean report. */
 function refuse(problem) {
   console.error(`${problem}\n${USAGE}`);
