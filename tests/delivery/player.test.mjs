@@ -14,6 +14,7 @@ import {
   bindingProblems,
   changedMembers,
   compareImages,
+  coverReport,
   decodePng,
   deliveryMembers,
   digestFile,
@@ -234,6 +235,24 @@ test("cover comparison counts differing pixels and the largest channel differenc
     differing_pixels: null,
     max_difference: null,
     identical: false,
+  });
+});
+
+test("a painting without a tracked cover is reported uncompared and does not pass", () => {
+  const painted = encodePng(6, 5, 4, opaque(pattern(6, 5, 3))),
+    tracked = encodePng(6, 5, 3, pattern(6, 5, 3));
+  assert.deepEqual(coverReport(painted, null), {
+    sha256: sha(painted),
+    cover_sha256: null,
+    sizes: [[6, 5], null],
+    differing_pixels: null,
+    max_difference: null,
+    identical: false,
+  });
+  assert.deepEqual(coverReport(painted, tracked), {
+    sha256: sha(painted),
+    cover_sha256: sha(tracked),
+    ...compareImages(decodePng(painted), decodePng(tracked)),
   });
 });
 

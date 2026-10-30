@@ -6,7 +6,8 @@
  * captioned viewing edition playing by default without a text track (captions are drawn in the picture), both
  * editions' duration and dimensions with decoding at three seek points, a chapter jump and the rendered transcript.
  * Requests outside the destination are refused and recorded; screenshots are written beside the receipt.
- * cover: paints window.renderCover() from a staged UHD document and compares its pixels with the tracked cover.
+ * cover: paints window.renderCover() from a staged UHD document and compares its pixels with the tracked cover; a
+ * painting with no tracked cover yet is written, reported uncompared and fails, so the painting can become the cover.
  * No human hearing or complete-film playback is claimed.
  * Usage: python -m filmkit.tools player-check players <binding.json> <receipt.json>
  *        python -m filmkit.tools player-check cover <stage-dir> <cover.png> <output.png> */
@@ -397,7 +398,27 @@ export async function checkPlayers(bindingPath, receiptPath) {
   return report;
 }
 
-/** Paint the cover from a staged UHD document, write it, and compare its pixels with the tracked cover. */
+/** Report a painted cover against the tracked cover's bytes. A painting without a tracked cover is uncompared and does
+ * not pass, so a first painting is never taken for a match. */
+export function coverReport(painted, tracked) {
+  const image = decodePng(painted);
+  if (tracked === null)
+    return {
+      sha256: digest(painted),
+      cover_sha256: null,
+      sizes: [[image.width, image.height], null],
+      differing_pixels: null,
+      max_difference: null,
+      identical: false,
+    };
+  return {
+    sha256: digest(painted),
+    cover_sha256: digest(tracked),
+    ...compareImages(image, decodePng(tracked)),
+  };
+}
+
+/** Paint the cover from a staged UHD document, write it, and compare its pixels with the tracked cover, if any. */
 export async function paintCover(stage, cover, output) {
   const browser = await launchBrowser({
     args: ["--allow-file-access-from-files"],
@@ -415,16 +436,13 @@ export async function paintCover(stage, cover, output) {
       window.renderCover();
       return document.getElementById("picture").toDataURL("image/png");
     });
-    const painted = Buffer.from(data.split(",")[1], "base64"),
-      tracked = await readFile(cover);
+    const painted = Buffer.from(data.split(",")[1], "base64");
     await writeFile(output, painted);
-    return {
-      output,
-      sha256: digest(painted),
-      cover,
-      cover_sha256: digest(tracked),
-      ...compareImages(decodePng(painted), decodePng(tracked)),
-    };
+    const tracked = await readFile(cover).catch((error) => {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    });
+    return { output, cover, ...coverReport(painted, tracked) };
   } finally {
     await browser.close();
   }

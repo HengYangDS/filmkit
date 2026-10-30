@@ -42,6 +42,8 @@ Every other file is named by the declaration, a script or a cast: the entry page
 
 Each script declares the edition's title, author, language, duration, frame rate, credits duration, chapters, release metadata, pause policy and pronunciation contract, and its segments, each split into utterance groups that end at sentence punctuation. Both editions declare the same duration, author and chapter count, at 60 fps. The engine refuses a declaration or a script that differs from this contract before any work, naming each failing field. [`examples/sample-film`](examples/sample-film) is a complete film to follow.
 
+A new film names its covers before they exist. It narrates and stages its picture without them; `filmkit.tools player-check cover <stage> <cover> <painting>` paints each edition's cover from the staged picture, reports a painting with no tracked cover as uncompared and fails, and the painting is then tracked as the cover. Packaging refuses an edition whose cover is missing, naming its field.
+
 ## Installing the engine in a film
 
 A film pins a release tag in its Python project and locks it:
@@ -51,7 +53,7 @@ A film pins a release tag in its Python project and locks it:
 dependencies = ["filmkit"]
 
 [tool.uv.sources]
-filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.1.0" }
+filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.1.1" }
 ```
 
 Its `package.json` declares the npm packages the engine runs, at these versions: `hyperframes` 0.8.150, the renderer, which the engine checks before it stages, renders or runs a tool; `gsap` 3.15.0, which each staged document loads; and `puppeteer-core` 25.12.0 and `@puppeteer/browsers` 3.2.3, which drive and install the browser build.

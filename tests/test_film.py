@@ -54,6 +54,14 @@ def test_a_missing_font_or_readings_file_refuses_naming_its_field(declared):
     assert f"review.readings: {film.FILM.review.readings}" in str(refusal.value)
 
 
+def test_a_declaration_names_covers_before_they_are_painted(declared):
+    for code in CODES:
+        cover = declared / film.FILM.editions[code].cover
+        cover.unlink(missing_ok=True)
+        assert not cover.exists()
+    assert film.load(declared) == film.FILM
+
+
 def test_fonts_that_share_a_file_name_refuse(declared):
     font = Path(film.FILM.picture.fonts[-1])
     shutil.copy2(declared / font, declared / font.name)

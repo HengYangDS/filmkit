@@ -3,7 +3,8 @@
 The engine takes every film-specific value from this declaration and the files it names; each
 edition's script declares the edition's title, author, language, duration, frame rate and
 chapters. A declaration that is malformed, incomplete or names a missing file is refused with
-each failing field.
+each failing field. A cover is the exception: the engine paints it from the staged picture, so
+a new film names its covers before they exist, and packaging requires them.
 """
 
 from __future__ import annotations
@@ -95,7 +96,7 @@ class Film(Declared):
 
 
 def named_files(film: Film) -> list[tuple[str, str]]:
-    """Each file the declaration names, with the field that names it."""
+    """Each file the declaration names except the covers, with the field that names it."""
     named = [
         ("entry", film.entry),
         ("source_manifest", film.source_manifest),
@@ -104,7 +105,6 @@ def named_files(film: Film) -> list[tuple[str, str]]:
     for code, edition in film.editions.items():
         field = f"editions.{code}.sources"
         named += [(field, f"{edition.sources}/{name}") for name in EDITION_FILES]
-        named.append((f"editions.{code}.cover", edition.cover))
     named += [("picture.fonts", font) for font in film.picture.fonts]
     if film.review.readings is not None:
         named.append(("review.readings", film.review.readings))

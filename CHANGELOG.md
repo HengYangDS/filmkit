@@ -4,6 +4,12 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-31
+
+### Fixed
+
+- A new film can name its covers before it paints them: the declaration loads without them, packaging refuses an edition whose cover is missing and names its field, and the cover check writes a painting that has no tracked cover yet and reports it as uncompared.
+
 ## [0.1.0] - 2026-10-30
 
 ### Added
@@ -15,5 +21,6 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/HengYangDS/filmkit/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/HengYangDS/filmkit/releases/tag/v0.1.0

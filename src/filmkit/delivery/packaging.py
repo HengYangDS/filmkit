@@ -2,10 +2,11 @@
 
 `package_metadata` derives the viewing package: the cover as PNG and JPEG, the subtitles,
 transcript and chapters, the edition's player and the language entry page, each recorded with
-its SHA-256 in the edition's viewing package. `package_film` muxes the rendered picture with the
-soundtrack and chapters into every rendition in `production.RENDITIONS`, attaches the cover and
-the QuickTime keys in the packaging work folder, checks the finished film and only then links it
-into place, recording its SHA-256 and commands in the edition's film package.
+its SHA-256 in the edition's viewing package. It refuses an edition whose declared cover has not
+been painted yet. `package_film` muxes the rendered picture with the soundtrack and chapters
+into every rendition in `production.RENDITIONS`, attaches the cover and the QuickTime keys in
+the packaging work folder, checks the finished film and only then links it into place, recording
+its SHA-256 and commands in the edition's film package.
 
 A film's release metadata comes from its script's "release": FFmpeg writes it as the iTunes
 item list (title, artist, collection, genre, year, comments, synopsis, copyright and media
@@ -203,6 +204,12 @@ def package_metadata(edition: Edition) -> None:
     """Derive the viewing package from the current source-bound timeline."""
     output = edition.artifacts
     source_cover = repository.ROOT / edition.cover
+    if not source_cover.is_file():
+        msg = (
+            f"The declaration names an unpainted cover, editions.{edition.code}.cover: "
+            f"{edition.cover}; paint it from the staged picture with the cover check"
+        )
+        raise PackagingError(msg)
     target_cover = output / COVER_PNG
     if not target_cover.exists() or sha(target_cover) != sha(source_cover):
         shutil.copy2(source_cover, target_cover)

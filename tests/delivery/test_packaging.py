@@ -1,6 +1,7 @@
 """The delivery index, the player, the viewing members and the packaged films."""
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -44,6 +45,14 @@ def test_the_runtime_and_viewing_members_follow_the_edition():
         "chapters.ffmeta",
         "index.html",
     )
+
+
+def test_an_edition_whose_cover_is_not_painted_refuses_naming_its_field(tmp_path, monkeypatch):
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    edition = production.Edition("zh")
+    with pytest.raises(PackagingError, match=rf"editions\.zh\.cover: {re.escape(edition.cover)}"):
+        delivery_packaging.package_metadata(edition)
+    assert not (tmp_path / "build").exists()
 
 
 def test_delivery_index_uses_sibling_languages_and_preserves_language_players(
