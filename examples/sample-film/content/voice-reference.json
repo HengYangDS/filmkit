@@ -3,7 +3,7 @@
   "reference_text_sha256": "56bb01f22625ec420f058a31c72813b0507f659a969eb8f7ee2183bb501143f3",
   "reference_mode": "icl",
   "narration_language": "Chinese",
-  "full_narration_seed": 4677,
+  "full_narration_seed": 4680,
   "full_narration_temperature": 0.46,
   "full_narration_max_tokens": 1900,
   "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
@@ -17,5 +17,22 @@
     "receipt": "build/evidence/editions/zh/ear-first/narration-receipt.json",
     "alignment": "build/evidence/editions/zh/ear-first/alignment.json"
   },
-  "retakes": {}
+  "retakes": {
+    "01": {
+      "groups": {
+        "1": {
+          "seed": 147223,
+          "text_sha256": "659dea0468e7081652d558d6dcec41c3c5777f28d90bc79b8b9dab149997d006"
+        }
+      }
+    },
+    "04": {
+      "groups": {
+        "1": {
+          "seed": 147226,
+          "text_sha256": "402a4fa4b23c694080fc468ff46e6f1237f9640103f0cfaef96e84ea4248367d"
+        }
+      }
+    }
+  }
 }

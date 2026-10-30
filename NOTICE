@@ -15,10 +15,13 @@ DDWG introduction films by Yang HENG (https://github.com/HengYangDS/ddwg-film), 
 under the Creative Commons Attribution 4.0 International License
 (SPDX-License-Identifier: CC-BY-4.0; https://creativecommons.org/licenses/by/4.0/).
 
-The fonts in examples/sample-film/assets/fonts/ are subsets of Noto Sans CJK SC,
-Copyright 2014-2021 Adobe, cut to the characters the sample film draws. They keep the SIL
-Open Font License 1.1 (SPDX-License-Identifier: OFL-1.1), whose text and copyright notice
-lie beside them in noto-sans-cjk-ofl.txt.
+The fonts in examples/sample-film/assets/fonts/ keep the SIL Open Font License 1.1
+(SPDX-License-Identifier: OFL-1.1). noto-sans-cjk-sc-subset-regular.otf and
+noto-sans-cjk-sc-subset-bold.otf are subsets of Noto Sans CJK SC, Copyright 2014-2021 Adobe,
+cut to the characters the sample film draws; the license text and copyright notice lie beside
+them in noto-sans-cjk-ofl.txt. ibm-plex-sans-regular.ttf and ibm-plex-sans-bold.ttf are
+unmodified copies of IBM Plex Sans, Copyright 2017 IBM Corp. with Reserved Font Name "Plex";
+IBM Plex is a trademark of IBM Corp. Their license text lies beside them in ibm-plex-ofl.txt.
 
 THIRD-PARTY SOFTWARE AND MODELS
 

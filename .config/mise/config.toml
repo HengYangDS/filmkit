@@ -60,15 +60,17 @@ run = [
 ]
 
 [tasks."sample:picture"]
-description = "Stage each sample edition's picture, check its geometry, render it and validate it"
+description = "Stage each sample edition's picture, check its geometry and its cover, render it and validate it"
 dir = "{{config_root}}/examples/sample-film"
 run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.tools geometry-check build/runtime/work/final-delivery-zh-uhd build/evidence/editions/zh/picture-geometry.json 2",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.tools player-check cover build/runtime/work/final-delivery-zh-uhd assets/cover/sample-reel-cover.png build/runtime/work/cover-zh.png",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language en",
   "uv run --python 3.12 --frozen --offline python -m filmkit.tools geometry-check build/runtime/work/final-delivery-en-uhd build/evidence/editions/en/picture-geometry.json 2",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.tools player-check cover build/runtime/work/final-delivery-en-uhd assets/cover/sample-reel-cover-en.png build/runtime/work/cover-en.png",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language en",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language en",
 ]

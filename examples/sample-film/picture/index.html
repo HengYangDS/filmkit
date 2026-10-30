@@ -17,7 +17,8 @@
   <script src="film.js"></script>
   <script>
     window.__filmReady = Promise.all([
-      document.fonts.load('30px Sample'), document.fonts.load('700 30px SampleBold')
+      document.fonts.load('30px Sample'), document.fonts.load('700 30px SampleBold'),
+      document.fonts.load('30px SampleLatin'), document.fonts.load('700 30px SampleLatinBold')
     ]).then(() => document.fonts.ready).then(() => window.renderFrame(0));
     const playhead = {
       value: 0,

@@ -48,7 +48,7 @@
     "assembly_mode": "native-speech-designed-pauses",
     "pacing_profile": "Ear-first copy spoken at the voice's native rate from the clear reference derived from the unmodified identity root. Speech is never time-stretched or pitch-shifted. No native pause inside a thought outlasts the declared inner cap, and each one lasts at least the floor of its punctuation, so a sentence end inside a thought is heard as a longer break than a clause mark and a clause mark as a longer one than a comma; a long run of speech takes a breath at the comma nearest its middle. Designed quiet separates complete thoughts and paragraphs, longer after longer ones, each thought boundary outlasts the longest pause inside its thought by at least a fifth, and the coda settles on its own longer pause after every thought; the remaining runtime opens the picture between paragraphs and chapters within declared bounds.",
     "designed_pauses": {
-      "thought": 0.46,
+      "thought": 0.7,
       "question": 0.8,
       "opening": 2.0,
       "paragraph": 1.2,
@@ -81,7 +81,7 @@
     "provider_notes": {
       "native": "Identity-root ICL reference and fixed seed; natural punctuation only; no instruction tokens, pitch or tempo transform, or music."
     },
-    "coda_thought_pause_seconds": 1.25,
+    "coda_thought_pause_seconds": 0.8,
     "inner_pause_cap_seconds": 0.33,
     "inner_pause_floors_seconds": {
       "。？！": 0.28,
@@ -130,10 +130,11 @@
       ],
       "utterance_groups": [
         "构建时，先照着脚本录下旁白。",
-        "再把录音拼成完整的音轨，按说话的时间配上字幕。"
+        "再把录音拼成完整的音轨，按说话的时间配上字幕。",
+        "每段旁白都用固定的种子生成，所以每次重建，录出来的声音都一样。"
       ],
-      "text": "构建时，先照着脚本录下旁白。再把录音拼成完整的音轨，按说话的时间配上字幕。",
-      "spoken_text": "构建时，先照着脚本录下旁白。再把录音拼成完整的音轨，按说话的时间配上字幕。"
+      "text": "构建时，先照着脚本录下旁白。再把录音拼成完整的音轨，按说话的时间配上字幕。每段旁白都用固定的种子生成，所以每次重建，录出来的声音都一样。",
+      "spoken_text": "构建时，先照着脚本录下旁白。再把录音拼成完整的音轨，按说话的时间配上字幕。每段旁白都用固定的种子生成，所以每次重建，录出来的声音都一样。"
     },
     {
       "id": "03",
@@ -164,10 +165,11 @@
       ],
       "utterance_groups": [
         "最后，每部成片都要和它的源文件逐项核对。",
+        "核对覆盖录音、音轨、字幕、画面和打包记录，每一项都必须和生成它的输入一致。",
         "全部对得上，这次重建才算完成。"
       ],
-      "text": "最后，每部成片都要和它的源文件逐项核对。全部对得上，这次重建才算完成。",
-      "spoken_text": "最后，每部成片都要和它的源文件逐项核对。全部对得上，这次重建才算完成。"
+      "text": "最后，每部成片都要和它的源文件逐项核对。核对覆盖录音、音轨、字幕、画面和打包记录，每一项都必须和生成它的输入一致。全部对得上，这次重建才算完成。",
+      "spoken_text": "最后，每部成片都要和它的源文件逐项核对。核对覆盖录音、音轨、字幕、画面和打包记录，每一项都必须和生成它的输入一致。全部对得上，这次重建才算完成。"
     }
   ]
 }

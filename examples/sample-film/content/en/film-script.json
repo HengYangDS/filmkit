@@ -48,7 +48,7 @@
     "assembly_mode": "native-speech-designed-pauses",
     "pacing_profile": "Ear-first copy spoken at the voice's native rate from the unmodified identity root. Speech is never time-stretched or pitch-shifted. No native pause inside a thought outlasts the declared inner cap. Designed quiet separates complete thoughts and paragraphs, longer after longer ones, each thought boundary outlasts the longest pause inside its thought by at least three fifths, and the coda settles on its own longer pause after every thought; the remaining runtime opens the picture between paragraphs and chapters within declared bounds.",
     "designed_pauses": {
-      "thought": 0.59,
+      "thought": 0.75,
       "question": 0.65,
       "opening": 2.0,
       "paragraph": 1.03,
@@ -81,7 +81,7 @@
     "provider_notes": {
       "native": "Identity-root ICL reference and fixed seed; natural punctuation only; no instruction tokens, pitch or tempo transform, or music."
     },
-    "coda_thought_pause_seconds": 0.9,
+    "coda_thought_pause_seconds": 0.75,
     "inner_pause_cap_seconds": 0.28,
     "inner_pause_caps_seconds": {
       ",": 0.12
@@ -124,10 +124,11 @@
       ],
       "utterance_groups": [
         "The build first narrates the script. ",
-        "It joins the recordings into one soundtrack and times the captions to the speech."
+        "It joins the recordings into one soundtrack and times the captions to the speech. ",
+        "Each part is narrated from a fixed seed, so every rebuild produces the same voice."
       ],
-      "text": "The build first narrates the script. It joins the recordings into one soundtrack and times the captions to the speech.",
-      "spoken_text": "The build first narrates the script. It joins the recordings into one soundtrack and times the captions to the speech."
+      "text": "The build first narrates the script. It joins the recordings into one soundtrack and times the captions to the speech. Each part is narrated from a fixed seed, so every rebuild produces the same voice.",
+      "spoken_text": "The build first narrates the script. It joins the recordings into one soundtrack and times the captions to the speech. Each part is narrated from a fixed seed, so every rebuild produces the same voice."
     },
     {
       "id": "03",
@@ -158,10 +159,11 @@
       ],
       "utterance_groups": [
         "Last, each film is checked against its sources. ",
+        "The check covers the recordings, the soundtrack, the captions, the picture and the packages, and each must match the inputs it was made from. ",
         "Only when everything matches is the rebuild complete."
       ],
-      "text": "Last, each film is checked against its sources. Only when everything matches is the rebuild complete.",
-      "spoken_text": "Last, each film is checked against its sources. Only when everything matches is the rebuild complete."
+      "text": "Last, each film is checked against its sources. The check covers the recordings, the soundtrack, the captions, the picture and the packages, and each must match the inputs it was made from. Only when everything matches is the rebuild complete.",
+      "spoken_text": "Last, each film is checked against its sources. The check covers the recordings, the soundtrack, the captions, the picture and the packages, and each must match the inputs it was made from. Only when everything matches is the rebuild complete."
     }
   ]
 }

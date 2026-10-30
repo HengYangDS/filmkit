@@ -39,10 +39,15 @@ const units = (value) => value.replace(/[^\p{L}\p{N}]/gu, "").toLowerCase();
 let layout = { texts: [] };
 let sceneId = null;
 
+/* Any text with a Chinese character is set in Noto Sans CJK SC, Latin-only text in IBM Plex Sans. */
+const CHINESE = /[\u3000-\u303f\u3400-\u9fff\uf900-\ufaff\uff00-\uffef]/u;
+const family = (value, bold) =>
+  CHINESE.test(value) ? (bold ? "SampleBold" : "Sample") : bold ? "SampleLatinBold" : "SampleLatin";
+
 /* Paint one text and record its bounds, colour, opacity, role and scene. */
 function text(value, x, y, { size, bold = false, color = P.ink, alpha = 1, role = "label" }) {
   if (alpha <= 0) return;
-  ctx.font = `${bold ? "700 " : ""}${size}px ${bold ? "SampleBold" : "Sample"}`;
+  ctx.font = `${bold ? "700 " : ""}${size}px ${family(value, bold)}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
   const metrics = ctx.measureText(value);
@@ -137,7 +142,7 @@ function cue(s, key, share) {
 const shown = (t, at) => ramp(t, at, 0.35);
 
 function sourcesScene(s, t, alpha) {
-  text(L("一部影片的源文件", "A film's sources"), 960, 260, {
+  text(L("一部影片的源文件", "A film’s sources"), 960, 260, {
     size: NOTE,
     color: P.muted,
     alpha,
@@ -146,7 +151,7 @@ function sourcesScene(s, t, alpha) {
     [L("脚本", "Script"), L("要说的话", "What is said"), cue(s, L("脚本", "script"), 0.4)],
     [
       L("参考录音", "Reference recording"),
-      L("旁白的嗓音", "The narrator's voice"),
+      L("旁白的嗓音", "The narrator’s voice"),
       cue(s, L("参考录音", "reference"), 0.6),
     ],
     [

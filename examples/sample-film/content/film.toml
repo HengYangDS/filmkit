@@ -24,11 +24,14 @@ cover = "assets/cover/sample-reel-cover-en.png"
 caption_terms = ["reference recording", "build folder"]
 
 # The fonts the picture stages below fonts/, in this order: Noto Sans CJK SC, subset to the
-# characters the film draws.
+# characters the film draws, for any text with a Chinese character, and IBM Plex Sans, unmodified,
+# for Latin-only text.
 [picture]
 fonts = [
   "assets/fonts/noto-sans-cjk-sc-subset-regular.otf",
   "assets/fonts/noto-sans-cjk-sc-subset-bold.otf",
+  "assets/fonts/ibm-plex-sans-regular.ttf",
+  "assets/fonts/ibm-plex-sans-bold.ttf",
 ]
 
 [review]

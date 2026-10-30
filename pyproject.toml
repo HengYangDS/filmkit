@@ -27,4 +27,10 @@ pattern = "^(?P<version>\\S+)$"
 packages = ["src/filmkit"]
 
 [dependency-groups]
-dev = ["coverage==7.16.2", "pytest==9.1.1", "pytest-cov==7.1.0", "pytest-reportlog==1.0.0"]
+dev = [
+  "coverage==7.16.2",
+  "fonttools==4.68.0",
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "pytest-reportlog==1.0.0",
+]

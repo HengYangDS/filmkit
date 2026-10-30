@@ -83,6 +83,8 @@ mise run sample:build
 
 The build writes only below `examples/sample-film/build/`. Its text is written for this repository and is no film's source.
 
+Packaging refuses to extend films bound to other inputs. A film sets a reviewed round's films aside with `filmkit.review.round set-aside`; to rebuild the unreviewed sample after a change, first delete each edition's two films below `build/artifacts/film/<edition>/` and its `build/evidence/editions/<edition>/film-package.json`.
+
 ## Development
 
 `mise run bootstrap` prepares the locked Python and npm environments, and `mise run check` runs the Node and Python suites and the Markdown format check. The repository is governed by [ETHOS](https://github.com/HengYangDS/ethos); its portable proof runs in GitHub Actions and GitLab CI, and the sample film's build stays a local acceptance because it needs the speech models and the browser build. [CHANGELOG.md](CHANGELOG.md) records each release.
