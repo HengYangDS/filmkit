@@ -4,3 +4,6 @@ profile_id = "filmkit"
 material_paths = [
     "**",
 ]
+
+[proof]
+gate_registry = "system/gates.toml"
