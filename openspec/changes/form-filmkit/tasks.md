@@ -21,8 +21,8 @@
 
 ## 4. Distribution
 
-- [ ] 4.1 Build the package with hatchling from `VERSION` 0.1.0 with the Node tools inside; verify that a film project locks the package from a local tag and runs a Node tool through it.
-- [ ] 4.2 Write the README with the layout a film provides, `LICENSE`, `NOTICE`, `CHANGELOG.md` and `.ethos/release.toml`; verify `ethos lane repair-paradigm --json` reports no gap.
+- [x] 4.1 Build the package with hatchling from `VERSION` 0.1.0 with the Node tools inside; verify that a film project locks the package from a Git source at a lane commit and runs a Node tool through it.
+- [x] 4.2 Write the README with the layout a film provides, `LICENSE`, `NOTICE`, `CHANGELOG.md` and `.ethos/release.toml`; verify `ethos lane repair-paradigm --json` reports no gap.
 - [ ] 4.3 Project the portable gates into GitHub Actions and GitLab CI, and verify the projections validate.
 
 ## Workflow follow-up

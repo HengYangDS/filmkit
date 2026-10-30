@@ -1,0 +1,54 @@
+filmkit
+Copyright 2026 Yang HENG
+
+LICENSES
+
+The code is licensed under the MIT License (SPDX-License-Identifier: MIT); see LICENSE.
+Every tracked file is code unless it is named below. The sample film's text, in
+examples/sample-film/content/ and examples/sample-film/picture/, is written for this
+repository and is licensed with the code.
+
+The sample film's narrator reference recordings,
+examples/sample-film/assets/audio/narration-reference-clear.wav and
+examples/sample-film/assets/audio/en/narration-reference.wav, are unchanged copies from the
+DDWG introduction films by Yang HENG (https://github.com/HengYangDS/ddwg-film), licensed
+under the Creative Commons Attribution 4.0 International License
+(SPDX-License-Identifier: CC-BY-4.0; https://creativecommons.org/licenses/by/4.0/).
+
+The fonts in examples/sample-film/assets/fonts/ are subsets of Noto Sans CJK SC,
+Copyright 2014-2021 Adobe, cut to the characters the sample film draws. They keep the SIL
+Open Font License 1.1 (SPDX-License-Identifier: OFL-1.1), whose text and copyright notice
+lie beside them in noto-sans-cjk-ofl.txt.
+
+THIRD-PARTY SOFTWARE AND MODELS
+
+The repository includes no third-party code. A build installs the following under their
+own licenses, which the licenses above do not cover:
+
+- HyperFrames 0.8.150, puppeteer-core 25.12.0 and @puppeteer/browsers 3.2.3, from npm,
+  under the Apache License 2.0;
+- GSAP 3.15.0, from npm, under its standard no-charge license
+  (https://gsap.com/standard-license); the build copies its minified script into each
+  staged picture document;
+- Chrome Headless Shell 152.0.7977.30, which the supply step installs, under the licenses
+  of Chromium and its components;
+- mlx-audio 0.5.8 and MLX under the MIT License, with the other Python packages that
+  uv.lock pins, each under its own license;
+- the speech models that the supply step downloads, each under the Apache License 2.0:
+  mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16 at revision a6eb4f68,
+  mlx-community/Qwen3-ASR-0.6B-bf16 at revision eae2b51f and
+  mlx-community/Qwen3-ForcedAligner-0.6B-bf16 at revision 53c8c0e4;
+- FFmpeg, ExifTool and rsync, host tools that Homebrew installs and the build runs as
+  separate programs.
+
+THE NARRATOR
+
+The narrator is a synthetic voice, not a clone of any person's voice. Its identity
+recording was generated from a text description of a voice with Qwen3-TTS VoiceDesign
+through mlx-audio and selected by the author; the reference recordings that the sample
+film's casts name were spoken in that voice by the Qwen3-TTS Base model, which also
+narrates both editions.
+
+The sample film's listening-plan reading of "recording" is the CMUdict pronunciation,
+Copyright (C) 1993-2015 Carnegie Mellon University, under its BSD-style license, and its
+Chinese readings follow the macOS dictionaries.
