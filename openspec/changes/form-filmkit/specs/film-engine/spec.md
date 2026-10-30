@@ -16,7 +16,7 @@ The engine SHALL build the film whose declaration `content/film.toml` lies in th
 
 ### Requirement: A film declares its parameters
 
-A film SHALL declare, in one declaration, its file prefix, delivery folder, entry page, source manifest, each edition's sources folder, cover and caption terms, the fonts its picture uses, and its review prompt, floors and scored dimensions. The engine SHALL refuse an invalid or incomplete declaration before any work, naming each failing field.
+A film SHALL declare, in one declaration, its file prefix, delivery folder, entry page, source manifest, each edition's sources folder, cover and caption terms, the fonts its picture uses, and its review prompt, floors, scored dimensions and listening-plan readings. The engine SHALL refuse an invalid or incomplete declaration before any work, naming each failing field.
 
 #### Scenario: An invalid declaration refuses before work
 
@@ -27,6 +27,12 @@ A film SHALL declare, in one declaration, its file prefix, delivery folder, entr
 
 - **WHEN** the engine stages a film's picture
 - **THEN** the stage holds each declared font, and no other font, below `fonts/` in the declared order
+
+#### Scenario: The listening plan takes the film's own readings
+
+- **WHEN** the listening plan is derived for a film that declares its readings
+- **THEN** each English heteronym occurrence takes the part of speech the film records for it
+- **AND** an occurrence the film records no part of speech for, or a recorded one that names no current occurrence, refuses the plan
 
 ### Requirement: Each script declares its edition
 

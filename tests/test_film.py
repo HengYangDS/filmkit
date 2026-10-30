@@ -45,6 +45,23 @@ def test_a_missing_script_refuses_naming_its_edition(declared):
         film.load(declared)
 
 
+def test_a_missing_font_or_readings_file_refuses_naming_its_field(declared):
+    (declared / film.FILM.picture.fonts[-1]).unlink()
+    (declared / film.FILM.review.readings).unlink()
+    with pytest.raises(FilmError) as refusal:
+        film.load(declared)
+    assert f"picture.fonts: {film.FILM.picture.fonts[-1]}" in str(refusal.value)
+    assert f"review.readings: {film.FILM.review.readings}" in str(refusal.value)
+
+
+def test_fonts_that_share_a_file_name_refuse(declared):
+    font = Path(film.FILM.picture.fonts[-1])
+    shutil.copy2(declared / font, declared / font.name)
+    rewrite(declared, f'"{font}",', f'"{font}",\n  "{font.name}",')
+    with pytest.raises(FilmError, match=r"(?s)picture\.fonts.*stage two fonts as one file"):
+        film.load(declared)
+
+
 def test_invalid_fields_refuse_naming_each_field(declared):
     rewrite(declared, f'slug = "{film.FILM.slug}"', 'slug = "Two Words"')
     rewrite(declared, "overall_minimum = 90", "overall_minimum = 190")

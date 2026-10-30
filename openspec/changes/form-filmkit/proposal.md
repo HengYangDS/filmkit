@@ -8,7 +8,7 @@ The film engine `filmkit` lives inside the `ddwg-film` repository and finds that
 
 - Import the engine package, its Python modules and Node tools, with the engine's tests from `ddwg-film` at `37549a9`, without history and without that film's content or its film-specific tests.
 - Find the film from `FILMKIT_ROOT` or from the working directory, instead of from the engine's location, and find the film's npm packages as Node does, in the nearest `node_modules` at or above the film.
-- Take the staged fonts from the film's declaration and the pronunciation contract from each script.
+- Take the staged fonts from the film's declaration, the pronunciation contract from the scripts, and the listening plan's analyst readings, which record the part of speech of each of the film's English heteronym occurrences, from a file the film declares.
 - Run the Node tools through an engine command that stages them below the film's `build/`, where they resolve the film's npm packages, and refuse a renderer whose version the engine does not support.
 - Add a short bilingual sample film that the tests load and that builds end to end.
 - Build the package with hatchling from `VERSION` 0.1.0 so that a film installs it from a release tag; add the README, licenses, notices, changelog, release declaration and CI projection, without publishing.
@@ -30,5 +30,5 @@ None.
 
 - New repository `filmkit`, governed by ETHOS `0.2.0-alpha.20`. Its forge remotes, GitHub `HengYangDS/filmkit` and GitLab `dig/misc/tools/filmkit`, are added only when the user confirms the push.
 - Dependencies match `ddwg-film`: Python `mlx-audio`, `numpy`, `pillow` and `pydantic`; for the tests and the sample film, the npm renderer `hyperframes`, `puppeteer-core`, `@puppeteer/browsers` and `gsap`.
-- **BREAKING** for a film that adopts the release: it declares its fonts, runs the Node checks through the engine command, and declares the renderer's npm packages itself.
+- **BREAKING** for a film that adopts the release: it declares its fonts and its listening-plan readings, runs the Node checks through the engine command, and declares the renderer's npm packages itself.
 - Out of scope: publishing or tagging before the user confirms; moving `ddwg-film` onto the release, which its own Change does; the ETHOS film; any change to a film's output bytes.

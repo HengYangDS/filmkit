@@ -16,6 +16,7 @@ import pytest
 import filmkit.media as media
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
+from filmkit.film import FILM
 from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
 from filmkit.specification import DURATION, FPS
@@ -171,6 +172,17 @@ def test_staging_twice_writes_the_same_complete_document(code):
         assert repository.sha(stage / member["path"]) == member["sha256"]
 
 
+def test_a_stage_holds_exactly_the_declared_fonts_in_order(staged):
+    stage = staged.picture_stage
+    declared = [Path(font) for font in FILM.picture.fonts]
+    binding = json.loads((stage / "stage.json").read_text())
+    fonts = [(member["path"], member["source"]) for member in binding["members"][3:]]
+    assert fonts == [(f"fonts/{font.name}", str(font)) for font in declared]
+    assert sorted(path.name for path in (stage / "fonts").iterdir()) == sorted(
+        font.name for font in declared
+    )
+
+
 def test_staging_reads_each_bound_input_once(root, monkeypatch):
     # The stage inlines the very timeline whose bytes it binds.
     edition = Edition("zh")
@@ -258,9 +270,9 @@ def test_a_changed_template_or_copied_member_refuses_the_stage(staged, root):
     with pytest.raises(PictureError, match="template_sha256"):
         picture_rendering.validate_picture_binding(edition, receipt)
     template.write_text(original)
-    font = edition.picture_stage / "fonts/IBMPlexSans-Bold.ttf"
-    font.write_text("another font")
-    with pytest.raises(PictureError, match=re.escape("fonts/IBMPlexSans-Bold.ttf")):
+    staged_font = f"fonts/{Path(FILM.picture.fonts[-1]).name}"
+    (edition.picture_stage / staged_font).write_text("another font")
+    with pytest.raises(PictureError, match=re.escape(staged_font)):
         picture_rendering.validate_picture_binding(edition, receipt)
     # A record that drops its members cannot pass by checking none of them.
     record = edition.picture_stage / "stage.json"

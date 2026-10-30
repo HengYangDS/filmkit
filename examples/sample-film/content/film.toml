@@ -23,9 +23,20 @@ cover = "assets/cover/sample-reel-cover-en.png"
 # A term that reads as one name stays on one caption line.
 caption_terms = ["reference recording", "build folder"]
 
+# The fonts the picture stages below fonts/, in this order: Noto Sans CJK SC, subset to the
+# characters the film draws.
+[picture]
+fonts = [
+  "assets/fonts/noto-sans-cjk-sc-subset-regular.otf",
+  "assets/fonts/noto-sans-cjk-sc-subset-bold.otf",
+]
+
 [review]
 # The reviewer prompt: a str.format template that each round fills for each edition.
 prompt = "content/review/prompt.md"
+# The listening plan's analyst readings: the part of speech of each English heteronym occurrence,
+# keyed by segment and offset in the script.
+readings = "content/review/readings.json"
 # The verifier's floor: the overall score and every dimension at least this.
 overall_minimum = 90
 dimension_minimum = 90

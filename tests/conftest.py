@@ -1,19 +1,28 @@
-"""Fixtures shared by the narration tests, and the speech runtime and host tool gates."""
+"""Fixtures shared by the narration tests, and the speech runtime and host tool gates.
+
+The engine's tests build the sample film: FILMKIT_ROOT names it here, before any engine module
+loads the declaration of the film it builds, so no test reads another film's sources.
+"""
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
 import wave
+from pathlib import Path
 from typing import NamedTuple
 
 import numpy as np
 import pytest
 
-import filmkit.delivery.documents_folder as delivery_documents_folder
-from filmkit.narration.thought_groups import join_quiet
-from filmkit.narration.voice_model import MODEL, NATIVE_DECODER, REVISION
+SAMPLE_FILM = Path(__file__).resolve().parents[1] / "examples/sample-film"
+os.environ["FILMKIT_ROOT"] = str(SAMPLE_FILM)
+
+import filmkit.delivery.documents_folder as delivery_documents_folder  # noqa: E402
+from filmkit.narration.thought_groups import join_quiet  # noqa: E402
+from filmkit.narration.voice_model import MODEL, NATIVE_DECODER, REVISION  # noqa: E402
 
 # Test modules whose code under test imports the MLX speech runtime at module load.
 SPEECH_RUNTIME_MODULES = [

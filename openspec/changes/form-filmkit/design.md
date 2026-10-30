@@ -31,7 +31,11 @@ The film is the folder that `FILMKIT_ROOT` names, or else the nearest folder at 
 
 ### What the film declares
 
-The declaration gains `[picture] fonts`, the font files the picture stages in order, replacing the engine's list of four names. Each script already names its pronunciation contract, which replaces the fixed path in the listening plan. Other paths stay conventions that the README states: `content/film.toml`, the composition `picture/index.html`, `film.js` and `film.css`, the release manifest `content/release.json`, and the `build/` layout. A film that declares its current fonts in their current order stages byte-identical documents and members.
+The declaration gains `[picture] fonts`, the font files the picture stages in order, replacing the engine's list of four names. Each script already names its pronunciation contract, which replaces the fixed path in the listening plan; the plan still reads one contract for both editions, so it refuses scripts that name different ones, and merging per-edition contracts is deferred until a film needs it.
+
+The listening plan's analyst readings are the film's review data, not the engine's: the context readings of Chinese words that the contract's targets do not cover, the English heteronyms with a reading for each part of speech, the variants the dictionary targets lack, and the part of speech of each heteronym occurrence, keyed by segment and offset in that film's script. The declaration names their file as `[review] readings`; without it the plan adds no analyst readings. The engine keeps only how the plan is derived and how a reading is written in the contract's lexical-stress shape.
+
+Other paths stay conventions that the README states: `content/film.toml`, the composition `picture/index.html`, `film.js` and `film.css`, the release manifest `content/release.json`, and the `build/` layout. A film that declares its current fonts in their current order stages byte-identical documents and members, and one that declares its current readings derives the same listening plan.
 
 ### Node tools
 
@@ -67,7 +71,7 @@ As in `ddwg-film`, the proof sets hold the portable gates, static analysis, the 
 ## Migration Plan
 
 1. Form and land `filmkit` 0.1.0 locally; publish after the user confirms.
-2. In `ddwg-film`, a Change replaces `src/filmkit` with the release, declares the fonts, runs the Node checks through the engine command, rebuilds both editions and compares them under the reproduction standard.
+2. In `ddwg-film`, a Change replaces `src/filmkit` with the release, declares the fonts and a readings file that carries the four tables its engine copy holds (the Mandarin readings, heteronyms, variants and grammar), runs the Node checks through the engine command, rebuilds both editions and compares them under the reproduction standard. Derived from those tables, its listening plan and staged members are byte-identical to the current ones.
 3. The ETHOS film depends on a 0.1 release from its first commit.
 
 ## Open Questions

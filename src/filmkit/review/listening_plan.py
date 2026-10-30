@@ -1,11 +1,11 @@
 """Derive the pronunciation listening plan of both editions.
 
-The plan lists every dictionary target occurrence of the voice-performance contract
-and every current English heteronym with the part of speech its clause gives it, so
-a reviewer and the later human listening check each one in context. A heteronym
-occurrence takes the reading GRAMMAR records for it, or the derivation refuses, so an
-edit that moves or adds one is re-read before the next review. A refusal raises
-`ReviewError`, which the command reports.
+The plan lists every dictionary target occurrence of the scripts' pronunciation contract
+and every English heteronym of the film's readings with the part of speech its clause gives
+it, so a reviewer and the later human listening check each one in context. A heteronym
+occurrence takes the part of speech the film's readings record for it, or the derivation
+refuses, so an edit that moves or adds one is re-read before the next review. A refusal
+raises `ReviewError`, which the command reports.
 
 Usage: python -m filmkit.review.listening_plan --out <file>
 """
@@ -18,8 +18,11 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from pydantic import Field
+
 import filmkit.repository as repository
 import filmkit.sources as sources
+from filmkit.film import FILM, Declared
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
 
@@ -28,6 +31,10 @@ if TYPE_CHECKING:
 
 BASIS = (
     "Analyst-stated CMU-convention reading; not read from the pinned dictionary; listening confirms"
+)
+MANDARIN_BASIS = (
+    "Analyst-stated Hanyu Pinyin reading in context; not read from the pinned "
+    "dictionary; listening confirms"
 )
 READING = "See target dictionary reading and admissible lexical-stress variants"
 PLAN_AUTHORITY = (
@@ -48,122 +55,42 @@ def arpabet(phones: str, primary: int, secondary=(), weak=()) -> dict:
     }
 
 
-# Current English heteronyms whose reading depends on part of speech or tense.
-HETERONYMS = {
-    "lead": {"noun": arpabet("L IY1 D", 1), "verb": arpabet("L IY1 D", 1)},
-    "leads": {"noun": arpabet("L IY1 D Z", 1), "verb": arpabet("L IY1 D Z", 1)},
-    "read": {"present": arpabet("R IY1 D", 1)},
-    "reads": {"present": arpabet("R IY1 D Z", 1)},
-    "close": {"verb": arpabet("K L OW1 Z", 1)},
-    "present": {
-        "adjective": arpabet("P R EH1 Z AH0 N T", 1, weak=[2]),
-        "verb": arpabet("P R IY0 Z EH1 N T", 2, weak=[1]),
-    },
-    "permit": {"verb": arpabet("P ER0 M IH1 T", 2, weak=[1])},
-    "permits": {"verb": arpabet("P ER0 M IH1 T S", 2, weak=[1])},
-    "conflict": {
-        "noun": arpabet("K AA1 N F L IH0 K T", 1, weak=[2]),
-        "verb": arpabet("K AH0 N F L IH1 K T", 2, weak=[1]),
-    },
-    "conflicts": {"noun": arpabet("K AA1 N F L IH0 K T S", 1, weak=[2])},
-    "subject": {"noun": arpabet("S AH1 B JH IH0 K T", 1, weak=[2])},
-    "delegate": {"verb": arpabet("D EH1 L AH0 G EY2 T", 1, secondary=[3], weak=[2])},
-    "delegated": {"verb": arpabet("D EH1 L AH0 G EY2 T IH0 D", 1, secondary=[3], weak=[2, 4])},
-    "separate": {"adjective": arpabet("S EH1 P ER0 IH0 T", 1, weak=[2, 3])},
-    "separates": {"verb": arpabet("S EH1 P ER0 EY2 T S", 1, secondary=[3], weak=[2])},
-    "produce": {"verb": arpabet("P R AH0 D UW1 S", 2, weak=[1])},
-    "duplicates": {"verb": arpabet("D UW1 P L AH0 K EY2 T S", 1, secondary=[3], weak=[2])},
-    "digest": {"noun": arpabet("D AY1 JH EH0 S T", 1, weak=[2])},
-    "update": {"noun": arpabet("AH1 P D EY2 T", 1, secondary=[2])},
-    "coordinates": {"verb": arpabet("K OW0 AO1 R D AH0 N EY2 T S", 2, secondary=[4], weak=[1, 3])},
-    "recording": {"verb": arpabet("R AH0 K AO1 R D IH0 NG", 2, weak=[1, 3])},
-    "contracts": {"noun": arpabet("K AA1 N T R AE2 K T S", 1, secondary=[2])},
-}
-# Variants that the dictionary-sourced homograph targets lack for the current text.
-EXTRA_VARIANTS = {"uses": {"verb": arpabet("Y UW1 Z IH0 Z", 1, weak=[2])}}
-# The part of speech of each heteronym occurrence, read from its clause and keyed by
-# "<segment>:<offset>" in the English segment text. A script edit that moves or adds
-# an occurrence makes the plan refuse until its entry here is recorded again.
-GRAMMAR = {
-    "lead": {
-        "11:1139": "noun",
-        "13:917": "noun",
-        "14:680": "noun",
-        "20:35": "noun",
-        "20:131": "noun",
-        "25:658": "verb",
-        "29:841": "noun",
-    },
-    "leads": {"23:242": "verb"},
-    "reads": {"18:674": "present", "21:597": "present"},
-    "close": {"04:843": "verb"},
-    "present": {"05:393": "adjective", "22:606": "verb", "23:271": "adjective"},
-    "permit": {"13:851": "verb"},
-    "permits": {"12:857": "verb", "20:113": "verb"},
-    "conflict": {"03:970": "noun", "13:502": "noun", "22:95": "verb", "29:197": "verb"},
-    "conflicts": {"29:96": "noun"},
-    "subject": {
-        "03:698": "noun",
-        "04:175": "noun",
-        "05:360": "noun",
-        "05:596": "noun",
-        "05:828": "noun",
-        "06:590": "noun",
-        "14:658": "noun",
-        "16:325": "noun",
-        "17:404": "noun",
-        "18:177": "noun",
-        "23:636": "noun",
-        "25:462": "noun",
-        "25:794": "noun",
-        "26:789": "noun",
-    },
-    "delegate": {"03:57": "verb", "19:8": "verb", "19:221": "verb"},
-    "delegated": {"19:140": "verb"},
-    "separate": {"07:251": "adjective"},
-    "separates": {"07:551": "verb", "07:718": "verb"},
-    "produce": {"02:391": "verb", "24:16": "verb"},
-    "duplicates": {"26:807": "verb"},
-    "update": {"23:235": "noun"},
-    "coordinates": {"13:922": "verb"},
-    "recording": {"29:1103": "verb"},
-    "contracts": {"03:478": "noun"},
-    "record": {
-        "03:1011": "noun",
-        "04:1010": "noun",
-        "15:724": "verb",
-        "15:776": "noun",
-        "21:979": "noun",
-        "27:783": "noun",
-        "29:1172": "noun",
-    },
-    "records": {"03:527": "noun", "03:640": "noun"},
-    "use": {
-        "01:67": "verb",
-        "05:276": "verb",
-        "09:101": "noun",
-        "11:1101": "noun",
-        "12:261": "noun",
-        "12:351": "noun",
-        "12:392": "noun",
-        "12:463": "noun",
-        "12:513": "noun",
-        "12:668": "noun",
-        "12:842": "noun",
-        "12:877": "noun",
-        "12:962": "noun",
-        "13:782": "noun",
-        "13:1106": "noun",
-        "14:1117": "noun",
-        "16:510": "noun",
-        "25:895": "noun",
-        "29:377": "verb",
-        "29:681": "noun",
-        "30:168": "noun",
-    },
-    "uses": {"18:649": "verb"},
-    "project": {"27:430": "noun"},
-}
+class Reading(Declared):
+    """An analyst-stated reading: its ARPAbet phones and its stressed and weak syllables."""
+
+    phones: str = Field(min_length=1)
+    primary: int
+    secondary: tuple[int, ...] = ()
+    weak: tuple[int, ...] = ()
+
+    def stress(self) -> dict:
+        """The reading in the contract's lexical-stress shape."""
+        return arpabet(self.phones, self.primary, self.secondary, self.weak)
+
+
+class Readings(Declared):
+    """The film's analyst readings for its listening plan.
+
+    `mandarin` holds Chinese words whose reading depends on context and that the contract's
+    targets do not cover, each with the reading its sentence gives it; `heteronyms` holds
+    the English heteronyms with a reading for each part of speech or tense; `variants` holds
+    the variants that the dictionary-sourced homograph targets lack; `grammar` holds the
+    part of speech of each heteronym occurrence, keyed by "<segment>:<offset>" in the
+    English segment text. A script edit that moves or adds an occurrence makes the plan
+    refuse until its entry is recorded again.
+    """
+
+    mandarin: dict[str, str] = {}
+    heteronyms: dict[str, dict[str, Reading]] = {}
+    variants: dict[str, dict[str, Reading]] = {}
+    grammar: dict[str, dict[str, str]] = {}
+
+
+def film_readings() -> Readings:
+    """The analyst readings the film declares, or none when it declares no readings file."""
+    if FILM.review.readings is None:
+        return Readings()
+    return Readings.model_validate_json((repository.ROOT / FILM.review.readings).read_bytes())
 
 
 def occurrences(term: str, text: str, code: str) -> Iterator[tuple[int, int]]:
@@ -179,74 +106,13 @@ def occurrences(term: str, text: str, code: str) -> Iterator[tuple[int, int]]:
         yield match.start(), match.end()
 
 
-# Chinese words whose reading depends on context and that the dictionary targets do not
-# cover, each with the reading its sentence gives it.
-MANDARIN_READINGS = {
-    "偏好": "piānhào",
-    "补一次数": "bǔ yí cì shù",
-    "降级": "jiàngjí",
-    "偏差": "piānchā",
-    "沉没": "chénmò",
-    "漂亮": "piàoliang",
-    "漂移": "piāoyí",
-    "重新": "chóngxīn",
-    "塞进": "sāijìn",
-    "阻塞": "zǔsè",
-    "不了": "bùliǎo",
-    "标识": "biāozhì or biāoshí (both in current use; either is accepted)",
-    "处置": "chǔzhì",
-    "处理": "chǔlǐ",
-    "调用": "diàoyòng",
-    "调查": "diàochá",
-    "相应": "xiāngyìng",
-    "长期": "chángqī",
-    "更长": "gèng cháng",
-    "重大": "zhòngdà",
-    "模型": "móxíng",
-    "模拟": "mónǐ",
-    "模式": "móshì",
-    "模板": "múbǎn",
-    "成长": "chéngzhǎng",
-    "差距": "chājù",
-    "校准": "jiàozhǔn",
-    "暴露": "bàolù",
-    "了解": "liǎojiě",
-    "懂行": "dǒngháng",
-    "行为": "xíngwéi",
-    "划清": "huàqīng",
-    "划不出": "huà bu chū",
-    "一字不差": "yí zì bú chà",
-    "差异": "chāyì",
-    "角色": "juésè",
-    "目的": "mùdì",
-    "得不偿失": "dé bù cháng shī",
-    "要求": "yāoqiú",
-    "变更": "biàngēng",
-    "充分": "chōngfèn",
-    "充当": "chōngdāng",
-    "答应": "dāying",
-    "钻空子": "zuān kòngzi",
-    "格调": "gédiào",
-    "该尽的": "gāi jìn de",
-    "应对": "yìngduì",
-    "假定": "jiǎdìng",
-    "强制性": "qiángzhìxìng",
-    "供应商": "gōngyìngshāng",
-    "运行": "yùnxíng",
-}
-MANDARIN_BASIS = (
-    "Analyst-stated Hanyu Pinyin reading in context; not read from the pinned "
-    "dictionary; listening confirms"
-)
-
-
-def analyst_contract(contract: dict) -> dict:
-    """The pronunciation contract with the analyst-stated readings and variants."""
+def analyst_contract(contract: dict, readings: Readings) -> dict:
+    """The pronunciation contract with the film's analyst-stated readings and variants."""
     chinese = contract["languages"]["Chinese"]
     if not any(source["id"] == "analyst-mandarin" for source in contract["sources"]):
         contract["sources"].append({"id": "analyst-mandarin", "qualification": MANDARIN_BASIS})
     known = {target["term"] for target in chinese["targets"]}
-    for term, reading in MANDARIN_READINGS.items():
+    for term, reading in readings.mandarin.items():
         if term not in known:
             chinese["targets"].append(
                 {
@@ -261,22 +127,24 @@ def analyst_contract(contract: dict) -> dict:
     known = {target["term"] for target in english["targets"]}
     if not any(source["id"] == "analyst-inference" for source in contract["sources"]):
         contract["sources"].append({"id": "analyst-inference", "qualification": BASIS})
-    for term, variants in HETERONYMS.items():
+    for term, variants in readings.heteronyms.items():
         if term not in known:
             english["targets"].append(
                 {
                     "term": term,
                     "kind": "contextual-homograph",
-                    "lexical_stress": variants,
+                    "lexical_stress": {
+                        part: reading.stress() for part, reading in variants.items()
+                    },
                     "source": "analyst-inference",
                 }
             )
     # A variant the target already holds keeps its own source; only an added one is the
     # analyst's inference.
     for target in english["targets"]:
-        for variant, reading in EXTRA_VARIANTS.get(target["term"], {}).items():
+        for variant, reading in readings.variants.get(target["term"], {}).items():
             if variant not in target["lexical_stress"]:
-                target["lexical_stress"][variant] = reading
+                target["lexical_stress"][variant] = reading.stress()
                 target["variant_sources"] = {
                     **target.get("variant_sources", {}),
                     variant: "analyst-inference",
@@ -284,11 +152,13 @@ def analyst_contract(contract: dict) -> dict:
     return contract
 
 
-def target_entries(code: str, target: dict, segments: list[dict]) -> list[dict]:
+def target_entries(
+    code: str, target: dict, segments: list[dict], grammar: dict[str, dict[str, str]]
+) -> list[dict]:
     """Every occurrence of one pronunciation target in a script, with its clause.
 
     A heteronym's lexical stress maps each part of speech to a reading; an occurrence
-    takes the reading of the part of speech GRAMMAR records for it, or is refused.
+    takes the reading of the part of speech that `grammar` records for it, or is refused.
     """
     term, stress = target["term"], target.get("lexical_stress", {})
     heteronym = (
@@ -326,7 +196,7 @@ def target_entries(code: str, target: dict, segments: list[dict]) -> list[dict]:
                 reading = stress
                 if heteronym:
                     key = f"{segment['id']}:{start}"
-                    entry["grammar"] = GRAMMAR.get(term, {}).get(key)
+                    entry["grammar"] = grammar.get(term, {}).get(key)
                     if entry["grammar"] not in stress:
                         msg = f"{term} at {key}: record its part of speech before rebinding"
                         raise ReviewError(msg)
@@ -339,25 +209,33 @@ def target_entries(code: str, target: dict, segments: list[dict]) -> list[dict]:
 def listening_plan(out: Path) -> dict:
     """Derive the pronunciation listening plan from the contract and current scripts.
 
-    content/voice-performance.json stays unchanged: its hash is part of every
-    recording's fingerprint, and the narrator consumes only its normalization (none).
-    The derived, planned-not-listened plan for the human listener lists every
-    dictionary-sourced target, the context-dependent Chinese readings the targets do
-    not cover, the current English heteronyms with analyst-stated
-    CMU-convention readings, and each occurrence in the current spoken text with its
-    clause and, for a heteronym, the part of speech read from that clause (GRAMMAR),
-    bound to the current script, cast and reference hashes. An occurrence without a
-    recorded part of speech, or a recorded one that names no current occurrence, is
-    refused, so a script edit cannot silently inherit a stale reading.
+    Both editions' scripts name one pronunciation contract, which stays unchanged: its
+    hash is part of every recording's fingerprint, and the narrator consumes only its
+    normalization. The derived, planned-not-listened plan for the human listener lists
+    every dictionary-sourced target, the context-dependent Chinese readings the targets
+    do not cover, the film's English heteronyms with analyst-stated CMU-convention
+    readings, and each occurrence in the current spoken text with its clause and, for a
+    heteronym, the part of speech the film's readings record for that clause, bound to
+    the current script, cast and reference hashes. An occurrence without a recorded part
+    of speech, or a recorded one that names no current occurrence, is refused, so a script
+    edit cannot silently inherit a stale reading.
     """
-    contract_path = repository.ROOT / "content/voice-performance.json"
+    scripts = {code: repository.read(Edition(code).script) for code in CODES}
+    named = {script.get("pronunciation_contract") for script in scripts.values()}
+    if len(named) != 1 or None in named:
+        names = sorted(map(str, named))
+        msg = f"the editions' scripts name different pronunciation contracts: {names}"
+        raise ReviewError(msg)
+    contract_file = named.pop()
+    contract_path = repository.ROOT / contract_file
     manifest = repository.ROOT / sources.MANIFEST
-    contract = analyst_contract(repository.read(contract_path)["pronunciation"])
+    readings = film_readings()
+    contract = analyst_contract(repository.read(contract_path)["pronunciation"], readings)
     entries, bindings = [], []
     for code in CODES:
         edition = Edition(code)
         language, script_path, cast_path = edition.language, edition.script, edition.cast
-        script, cast = repository.read(script_path), repository.read(cast_path)
+        script, cast = scripts[code], repository.read(cast_path)
         bindings.append(
             {
                 "locale": code,
@@ -377,7 +255,7 @@ def listening_plan(out: Path) -> dict:
             }
         )
         for target in contract["languages"][language]["targets"]:
-            entries += target_entries(code, target, script["segments"])
+            entries += target_entries(code, target, script["segments"], readings.grammar)
     current = {
         (entry["target_owner_term"], f"{entry['section']}:{entry['display_span'][0]}")
         for entry in entries
@@ -385,7 +263,7 @@ def listening_plan(out: Path) -> dict:
     }
     stale = {
         term: sorted(key for key in keys if (term, key) not in current)
-        for term, keys in GRAMMAR.items()
+        for term, keys in readings.grammar.items()
     }
     stale = {term: keys for term, keys in stale.items() if keys}
     if stale:
@@ -395,10 +273,7 @@ def listening_plan(out: Path) -> dict:
         out,
         {
             "status": "planned-not-listened",
-            "derived_from": {
-                "path": "content/voice-performance.json",
-                "sha256": repository.sha(contract_path),
-            },
+            "derived_from": {"path": contract_file, "sha256": repository.sha(contract_path)},
             "authority": PLAN_AUTHORITY,
             "sources": contract["sources"],
             "control_boundary": contract["control_boundary"],

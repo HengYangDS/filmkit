@@ -9,9 +9,17 @@ each failing field.
 from __future__ import annotations
 
 import tomllib
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationError,
+    field_validator,
+)
 
 import filmkit.repository as repository
 
@@ -44,23 +52,45 @@ class EditionDeclaration(Declared):
     caption_terms: tuple[str, ...] = ()
 
 
+class Picture(Declared):
+    """The font files the picture stages below fonts/, in their order."""
+
+    fonts: tuple[str, ...] = Field(min_length=1)
+
+    @field_validator("fonts")
+    @classmethod
+    def distinct_names(cls, fonts: tuple[str, ...]) -> tuple[str, ...]:
+        """Refuse two fonts of one file name, which would stage as one file."""
+        names = [PurePosixPath(font).name for font in fonts]
+        if len(set(names)) != len(names):
+            message = "fonts stage below fonts/ by file name, and these stage two fonts as one file"
+            raise ValueError(message)
+        return fonts
+
+
 class Review(Declared):
-    """The reviewer prompt, the verifier's floors and the scored dimensions in record order."""
+    """The reviewer prompt, the verifier's floors, the scored dimensions and the plan readings.
+
+    The dimensions keep their record order. The readings file holds the listening plan's
+    analyst readings; without one the plan adds none.
+    """
 
     prompt: str
     overall_minimum: Floor
     dimension_minimum: Floor
     dimensions: dict[str, str] = Field(min_length=1)
+    readings: str | None = None
 
 
 class Film(Declared):
-    """A bilingual film: its file prefix, delivery folder, entry page, sources and review."""
+    """A bilingual film: its file prefix, delivery folder, entry page, sources, fonts and review."""
 
     slug: Name
     documents_folder: Name
     entry: str
     source_manifest: str
     editions: dict[Literal["zh", "en"], EditionDeclaration] = Field(min_length=2)
+    picture: Picture
     review: Review
 
 
@@ -75,6 +105,9 @@ def named_files(film: Film) -> list[tuple[str, str]]:
         field = f"editions.{code}.sources"
         named += [(field, f"{edition.sources}/{name}") for name in EDITION_FILES]
         named.append((f"editions.{code}.cover", edition.cover))
+    named += [("picture.fonts", font) for font in film.picture.fonts]
+    if film.review.readings is not None:
+        named.append(("review.readings", film.review.readings))
     return named
 
 

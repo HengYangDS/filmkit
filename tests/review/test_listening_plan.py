@@ -7,21 +7,26 @@ import pytest
 
 import filmkit.repository as repository
 import filmkit.review.listening_plan as review_listening_plan
+from filmkit.film import FILM
 from filmkit.production import Edition
 from filmkit.review import ReviewError
+from filmkit.review.listening_plan import Readings
+
+CONTRACT = "content/voice-performance.json"
 
 
 def test_the_listening_plan_derives_for_the_current_scripts(tmp_path):
-    # Every heteronym occurrence of the current scripts has its part of speech recorded,
-    # so a script edit cannot reach the review with a stale reading table.
+    # Every heteronym occurrence of the current scripts has its part of speech recorded in
+    # the film's readings, so a script edit cannot reach the review with a stale reading table.
     plan = review_listening_plan.listening_plan(tmp_path / "plan.json")
     assert plan["occurrences"]["zh"] > 0
     assert plan["occurrences"]["en"] > 0
+    written = json.loads((tmp_path / "plan.json").read_text())
+    contract = repository.read(Edition("zh").script)["pronunciation_contract"]
+    assert written["derived_from"] == {"path": contract, "sha256": repository.sha(contract)}
 
 
-def test_listening_plan_binds_each_occurrence_and_refuses_unrecorded_readings(
-    root, put, monkeypatch
-):
+def test_listening_plan_binds_each_occurrence_and_refuses_unrecorded_readings(root, put):
     noun, verb = (
         review_listening_plan.arpabet("Y UW1 S", 1),
         review_listening_plan.arpabet("Y UW1 Z", 1),
@@ -45,7 +50,7 @@ def test_listening_plan_binds_each_occurrence_and_refuses_unrecorded_readings(
         "acceptance": ["Listen to each occurrence in its clause."],
         "languages": {"Chinese": {"targets": chinese}, "English": {"targets": english}},
     }
-    put(root / "content/voice-performance.json", {"pronunciation": contract})
+    put(root / CONTRACT, {"pronunciation": contract})
     scripts = {
         "zh": ["先看调度。", "再改调度表，重新跑。"],
         "en": ["We use data. ", "Data takes the lead."],
@@ -53,7 +58,7 @@ def test_listening_plan_binds_each_occurrence_and_refuses_unrecorded_readings(
     for code, groups in scripts.items():
         script, cast = Edition(code).script, Edition(code).cast
         segment = {"id": "01", "text": "".join(groups), "utterance_groups": groups}
-        put(root / script, {"segments": [segment]})
+        put(root / script, {"pronunciation_contract": CONTRACT, "segments": [segment]})
         put(
             root / cast,
             {
@@ -64,12 +69,12 @@ def test_listening_plan_binds_each_occurrence_and_refuses_unrecorded_readings(
         )
     put(root / "content/source-manifest.json", {"members": []})
     lead = {"noun": review_listening_plan.arpabet("L IY1 D", 1)}
-    monkeypatch.setattr(review_listening_plan, "HETERONYMS", {"lead": lead})
-    monkeypatch.setattr(review_listening_plan, "EXTRA_VARIANTS", {})
-    monkeypatch.setattr(review_listening_plan, "MANDARIN_READINGS", {"重新": "chóngxīn"})
-    monkeypatch.setattr(
-        review_listening_plan, "GRAMMAR", {"use": {"01:3": "verb"}, "lead": {"01:28": "noun"}}
-    )
+    readings = {
+        "mandarin": {"重新": "chóngxīn"},
+        "heteronyms": {"lead": {"noun": {"phones": "L IY1 D", "primary": 1}}},
+        "grammar": {"use": {"01:3": "verb"}, "lead": {"01:28": "noun"}},
+    }
+    put(root / FILM.review.readings, readings)
     out = root / "plan.json"
     assert review_listening_plan.listening_plan(out) == {
         "output": "plan.json",
@@ -100,38 +105,40 @@ def test_listening_plan_binds_each_occurrence_and_refuses_unrecorded_readings(
         repository.sha(root / "content/film-script.json"),
         repository.sha(root / "content/en/film-script.json"),
     ]
-    assert plan["derived_from"]["sha256"] == repository.sha(root / "content/voice-performance.json")
+    assert plan["derived_from"] == {"path": CONTRACT, "sha256": repository.sha(root / CONTRACT)}
 
-    monkeypatch.setattr(review_listening_plan, "GRAMMAR", {"lead": {"01:28": "noun"}})
+    put(root / FILM.review.readings, {**readings, "grammar": {"lead": {"01:28": "noun"}}})
     with pytest.raises(ReviewError, match="use at 01:3: record its part of speech"):
         review_listening_plan.listening_plan(out)
-    monkeypatch.setattr(
-        review_listening_plan,
-        "GRAMMAR",
-        {"use": {"01:3": "verb"}, "lead": {"01:28": "noun", "01:40": "verb"}},
-    )
+    grammar = {"use": {"01:3": "verb"}, "lead": {"01:28": "noun", "01:40": "verb"}}
+    put(root / FILM.review.readings, {**readings, "grammar": grammar})
     stale = re.escape("no current occurrence: {'lead': ['01:40']}")
     with pytest.raises(ReviewError, match=stale):
         review_listening_plan.listening_plan(out)
     # The command reports its refusals, and lets any other fault show in full.
     with pytest.raises(SystemExit, match=f"listening plan: recorded parts of speech name {stale}"):
         review_listening_plan.main(["--out", str(out)])
-    put(root / "content/voice-performance.json", "{")
+    put(root / CONTRACT, "{")
     with pytest.raises(json.JSONDecodeError):
         review_listening_plan.main(["--out", str(out)])
 
 
-def test_an_extra_variant_is_labelled_only_where_it_is_added(monkeypatch):
+def test_scripts_that_name_different_contracts_refuse_the_plan(root, put):
+    for code in ("zh", "en"):
+        script = {"pronunciation_contract": f"content/{code}-contract.json", "segments": []}
+        put(root / Edition(code).script, script)
+    with pytest.raises(ReviewError, match="different pronunciation contracts"):
+        review_listening_plan.listening_plan(root / "plan.json")
+
+
+def test_an_extra_variant_is_labelled_only_where_it_is_added():
     # A dictionary reading is kept as its source states it; only an added variant is the
     # analyst's inference.
     noun = review_listening_plan.arpabet("Y UW1 S IH0 Z", 1, weak=[2])
     dictionary = {**review_listening_plan.arpabet("Y UW1 Z IH0 Z", 1, weak=[2]), "basis": "CMU"}
     added = review_listening_plan.arpabet("Y UW1 Z IH0 Z", 1, weak=[2])
-    monkeypatch.setattr(review_listening_plan, "HETERONYMS", {})
-    monkeypatch.setattr(review_listening_plan, "MANDARIN_READINGS", {})
-    monkeypatch.setattr(
-        review_listening_plan, "EXTRA_VARIANTS", {"uses": {"verb": added}, "users": {"verb": added}}
-    )
+    variant = {"verb": {"phones": "Y UW1 Z IH0 Z", "primary": 1, "weak": [2]}}
+    readings = Readings.model_validate({"variants": {"uses": variant, "users": variant}})
     targets = [
         {"term": "uses", "kind": "contextual-homograph", "lexical_stress": {"noun": noun}},
         {
@@ -144,9 +151,9 @@ def test_an_extra_variant_is_labelled_only_where_it_is_added(monkeypatch):
         "sources": [],
         "languages": {"Chinese": {"targets": []}, "English": {"targets": targets}},
     }
-    extended, kept = review_listening_plan.analyst_contract(contract)["languages"]["English"][
-        "targets"
-    ]
+    extended, kept = review_listening_plan.analyst_contract(contract, readings)["languages"][
+        "English"
+    ]["targets"]
     assert extended["lexical_stress"] == {"noun": noun, "verb": added}
     assert extended["variant_sources"] == {"verb": "analyst-inference"}
     assert kept["lexical_stress"] == {"noun": noun, "verb": dictionary}
@@ -157,4 +164,4 @@ def test_an_occurrence_outside_every_thought_is_refused():
     target = {"term": "调度", "kind": "contextual-mandarin-word", "target_reading": "diàodù"}
     segment = {"id": "07", "text": "先看调度。", "utterance_groups": ["先看"]}
     with pytest.raises(ReviewError, match="07: 调度 at 2 lies outside every thought"):
-        review_listening_plan.target_entries("zh", target, [segment])
+        review_listening_plan.target_entries("zh", target, [segment], {})

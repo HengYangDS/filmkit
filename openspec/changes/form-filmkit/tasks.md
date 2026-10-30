@@ -10,8 +10,8 @@
 
 - [x] 2.1 Find the film from `FILMKIT_ROOT` or the working directory and its npm packages from the nearest `node_modules`; verify by `tests/test_repository.py`, which loads no film, that the engine binds the film it runs below and refuses outside any film, naming the folder where the search began.
 - [x] 2.2 Write the bilingual sample film in `examples/sample-film`: declaration, scripts, casts, voice contracts, pages, covers and composition; verify that the engine loads it with `FILMKIT_ROOT` set to it.
-- [ ] 2.3 Point the engine's tests at the sample film; verify both suites pass with no other film present.
-- [ ] 2.4 Read the staged fonts from the declaration and the pronunciation contract from each script; verify by the suite that a stage holds exactly the declared fonts in order.
+- [x] 2.3 Read the staged fonts from the declaration, the pronunciation contract from the scripts and the listening plan's analyst readings from a file the film declares; verify by focused tests that a stage holds exactly the declared fonts in order and that the listening plan derives from the film's own contract and readings.
+- [ ] 2.4 Point the engine's tests at the sample film; verify both suites pass with no other film present.
 - [ ] 2.5 Add the tools command that stages the Node tools below the film's `build/` and runs them with the film's packages, and refuse an unsupported renderer version; verify by the suites.
 
 ## 3. Sample film build

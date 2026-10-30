@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 import filmkit.media as media
 import filmkit.repository as repository
 import filmkit.sources as sources
+from filmkit.film import FILM
 from filmkit.production import RENDITIONS
 from filmkit.repository import content_sha, read, sha, write
 from filmkit.specification import DURATION, FPS
@@ -45,13 +46,6 @@ PICTURE_SIZE = (RENDITIONS["uhd"].width, RENDITIONS["uhd"].height)
 STAGE_SIZES = {(rendition.width, rendition.height) for rendition in RENDITIONS.values()}
 # The timeline engine a stage copies, below the film's npm packages.
 TIMELINE_ENGINE = Path("gsap/dist/gsap.min.js")
-# The fonts a stage copies from assets/fonts, in their order.
-FONTS = (
-    "NotoSansCJKsc-Regular.otf",
-    "NotoSansCJKsc-Bold.otf",
-    "IBMPlexSans-Regular.ttf",
-    "IBMPlexSans-Bold.ttf",
-)
 # Seconds a renderer's process group has to exit after SIGTERM before SIGKILL ends it.
 STOP_GRACE_SECONDS = 10
 # The locked renderer's command, below the film's npm packages.
@@ -188,13 +182,13 @@ def staged_members() -> tuple[tuple[str, Path], ...]:
     """The members a stage copies beside its document: each place in the stage and its source.
 
     Sources are paths from the film's root; the timeline engine's leaves the root when the
-    film's npm packages lie above it.
+    film's npm packages lie above it. The declared fonts follow below fonts/, in their order.
     """
     return (
         ("film.js", COMPOSITION_SCRIPT),
         ("film.css", STYLE),
         ("gsap.min.js", npm_package(TIMELINE_ENGINE)),
-        *((f"fonts/{name}", Path("assets/fonts") / name) for name in FONTS),
+        *((f"fonts/{Path(font).name}", Path(font)) for font in FILM.picture.fonts),
     )
 
 
