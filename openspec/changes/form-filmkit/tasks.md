@@ -13,6 +13,7 @@
 - [x] 2.3 Read the staged fonts from the declaration, the pronunciation contract from the scripts and the listening plan's analyst readings from a file the film declares; verify by focused tests that a stage holds exactly the declared fonts in order and that the listening plan derives from the film's own contract and readings.
 - [x] 2.4 Point the engine's tests at the sample film; verify both suites pass with no other film present.
 - [x] 2.5 Add the tools command that stages the Node tools below the film's `build/` and runs them with the film's packages, and refuse an unsupported renderer version; verify by the suites.
+- [x] 2.6 Cover the engine's picture tools and the sample's composition with JavaScript tests on the sample film, ported from `ddwg-film`'s engine-generic picture tests, and fix what they find; verify, as the behavior gate measures it, that every engine and sample script is exercised and line coverage meets c8's 90% threshold.
 
 ## 3. Sample film build
 
