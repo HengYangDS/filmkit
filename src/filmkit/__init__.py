@@ -1,2 +1,1 @@
-def hello() -> str:
-    return "Hello from filmkit!"
+"""Rebuild narrated bilingual explainer films from their declaration, scripts and composition."""
