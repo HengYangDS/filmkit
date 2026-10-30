@@ -31,6 +31,73 @@ run = [
 description = "Apply the Markdown formatter to the files it owns"
 run = "npm run format:markdown"
 
+# The sample film's pipeline, run in its folder, where the engine finds the film; its npm packages
+# are this repository's. Only sample:supply reaches the network; HF_ENDPOINT names a Hugging Face
+# mirror where the hub is unreachable. sample:build runs every stage in order.
+[tasks."sample:supply"]
+description = "Install the pinned browser build and speech models below the sample film's tool cache"
+dir = "{{config_root}}/examples/sample-film"
+run = "uv run --python 3.12 --frozen --offline python -m filmkit.supply"
+
+[tasks."sample:narrate"]
+description = "Narrate both editions of the sample film from their casts' seeds, then align and transcribe them"
+dir = "{{config_root}}/examples/sample-film"
+run = [
+  "uv run --python 3.12 --frozen --offline python -m filmkit.narration.narrate --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.narration.narrate --language en",
+]
+
+[tasks."sample:sound"]
+description = "Select each sample edition's recordings, assemble its soundtrack and write its captions"
+dir = "{{config_root}}/examples/sample-film"
+run = [
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce select --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce assemble --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce refresh-captions --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce select --language en",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce assemble --language en",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce refresh-captions --language en",
+]
+
+[tasks."sample:picture"]
+description = "Stage each sample edition's picture, check its geometry, render it and validate it"
+dir = "{{config_root}}/examples/sample-film"
+run = [
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.tools geometry-check build/runtime/work/final-delivery-zh-uhd build/evidence/editions/zh/picture-geometry.json 2",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language en",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.tools geometry-check build/runtime/work/final-delivery-en-uhd build/evidence/editions/en/picture-geometry.json 2",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language en",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language en",
+]
+
+[tasks."sample:package"]
+description = "Package each sample edition's viewing members and both of its films"
+dir = "{{config_root}}/examples/sample-film"
+run = [
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce package-metadata --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce package-film --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce package-metadata --language en",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce package-film --language en",
+]
+
+[tasks."sample:verify"]
+description = "Verify both sample editions' films and every input they bind; a rebuild carries no review"
+dir = "{{config_root}}/examples/sample-film"
+run = "uv run --python 3.12 --frozen --offline python -m filmkit.delivery.verification --technical-only --language all"
+
+[tasks."sample:build"]
+description = "Build and verify both sample editions from their sources and the supplied inputs"
+run = [
+  { task = "sample:narrate" },
+  { task = "sample:sound" },
+  { task = "sample:picture" },
+  { task = "sample:package" },
+  { task = "sample:verify" },
+]
+
 # The ETHOS gates resolve these only from this lock, never from PATH: Node for the picture checks,
 # Python and uv for the suite. Python stays on the 3.12 line that the films select.
 [tools]
