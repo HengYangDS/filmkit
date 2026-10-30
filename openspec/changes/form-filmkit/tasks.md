@@ -17,7 +17,7 @@
 ## 3. Sample film build
 
 - [x] 3.1 Build the sample film end to end after the supply step and verify both editions.
-- [ ] 3.2 Replace the golden narration receipts with the sample film's own takes; verify that the speech-plan tests reproduce their fingerprints.
+- [x] 3.2 Replace the golden narration receipts with the sample film's own takes; verify that the speech-plan tests reproduce their fingerprints.
 
 ## 4. Distribution
 

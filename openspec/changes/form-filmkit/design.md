@@ -23,7 +23,7 @@
 
 ### Snapshot import
 
-The engine's Python modules and Node tools and the tests that exercise the engine come from `ddwg-film` at `37549a9`, each verified against its blob there. History stays in `ddwg-film`, whose commit the import names. Tests that check one film's content stay with that film: the DDWG composition's Node suite, the check of DDWG's retained receipts, the release manifest checks and the checks of the DDWG scripts and players. The speech-plan tests need golden receipts of real takes; the DDWG takes they were written against come with them until the sample film's own takes replace them, so that no DDWG recording remains in the engine's tests.
+The engine's Python modules and Node tools and the tests that exercise the engine come from `ddwg-film` at `37549a9`, each verified against its blob there. History stays in `ddwg-film`, whose commit the import names. Tests that check one film's content stay with that film: the DDWG composition's Node suite, the check of DDWG's retained receipts, the release manifest checks and the checks of the DDWG scripts and players. The speech-plan tests need golden receipts of real takes; they hold the sample film's own takes of its first segment, so that no DDWG recording remains in the engine's tests.
 
 ### Finding the film
 
