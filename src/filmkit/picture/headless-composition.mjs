@@ -258,9 +258,9 @@ export function canvasStandIn(deliver) {
 }
 
 /** Load film.js on `timeline`. Returns `palette`, the film's colours; `render(t, onPaint)`, which renders the frame
- * at t, hands each of its paints to `onPaint` and returns the layout film.js publishes; `camera(segment, t)`, the
- * film's own camera of a segment at t; and `origin()`, called while a paint is handed over, the innermost line of a
- * scene body in film.js that made it, as `film.js:<line>`, or null. */
+ * at t, hands each of its paints to `onPaint` and returns the layout film.js publishes; `framed`, whether film.js
+ * defines a camera `cameraOf`; `camera(segment, t)`, that camera of a segment at t; and `origin()`, called while a
+ * paint is handed over, the innermost line of a scene body in film.js that made it, as `film.js:<line>`, or null. */
 export function openComposition(timeline) {
   const composition = resolve(COMPOSITION),
     source = readFileSync(composition, "utf8");
@@ -302,9 +302,11 @@ export function openComposition(timeline) {
   });
   vm.runInContext(source, context, { filename: composition });
   const palette = Object.freeze({ ...vm.runInContext("P", context) });
+  const framed = vm.runInContext('typeof cameraOf === "function"', context);
   let cameraOf;
   return {
     palette,
+    framed,
     render(t, paints = () => {}) {
       onPaint = paints;
       try {

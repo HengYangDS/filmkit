@@ -172,7 +172,7 @@ for (let i = Math.round(from * fps); i * dt < to; i++) {
     const next = faint
       ? run
         ? { ...run, end: t, low: Math.min(run.low, v.level), high: Math.max(run.high, v.level) }
-        : { start: t, end: t, low: v.level, high: v.level }
+        : { start: t, end: t, low: v.level, high: v.level, color: v.color }
       : null;
     if (run && !faint) faintRuns.push({ key, ...run });
     // A sudden change of colour on a visible mark (more than 60 levels in one channel within one frame) is a snap.
@@ -345,7 +345,7 @@ for (let i = Math.round(from * fps); i * dt < to; i++) {
   }
   const speaking = speakingAt(t);
   const shown = segments.findLast((v) => v.start <= t);
-  if (shown && t < timeline.duration - timeline.credits_duration) {
+  if (film.framed && shown && t < timeline.duration - timeline.credits_duration) {
     const c = film.camera(shown, t),
       list = cameras.get(shown.id) ?? [];
     list.push([t, c.k, c.ox - c.k * c.ax, c.oy - c.k * c.ay]);
@@ -440,17 +440,18 @@ for (const e of episodes) {
   };
 }
 
-/* Rests in the faint band longer than 0.7 s: residue or ghosts (a slow fade crossing the band is reported too). */
+/* Rests in the faint band longer than 0.7 s, each in the colour it entered the band in: residue or ghosts (a slow
+ * fade crossing the band is reported too). */
 const rests = faintRuns
   .map((v) => ({ ...v, seconds: round(v.end - v.start + dt) }))
   .filter((v) => v.seconds >= 0.7)
   .map((v) => {
-    const [scene, kind, text, color] = v.key.split("|");
+    const [scene, kind, text] = v.key.split("|");
     return {
       scene,
       kind,
       text,
-      color,
+      color: v.color,
       start: round(v.start),
       seconds: v.seconds,
       low: Math.round(v.low),

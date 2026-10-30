@@ -446,8 +446,15 @@ export function instrument() {
     extend(ctx, arcPoints(ctx, x, y, r, r, 0, a0, a1, anticlockwise));
     of(ctx).last = [x + r * Math.cos(a1), y + r * Math.sin(a1)];
   });
+  // As on a canvas, the path continues from where the ellipse ends.
   wrap("ellipse", (ctx, x, y, rx, ry, rotation, a0, a1, anticlockwise) => {
     extend(ctx, arcPoints(ctx, x, y, rx, ry, rotation, a0, a1, anticlockwise));
+    const ex = rx * Math.cos(a1),
+      ey = ry * Math.sin(a1);
+    of(ctx).last = [
+      x + ex * Math.cos(rotation) - ey * Math.sin(rotation),
+      y + ex * Math.sin(rotation) + ey * Math.cos(rotation),
+    ];
   });
   wrap("quadraticCurveTo", (ctx, cx, cy, x, y) => {
     const [x0, y0] = of(ctx).last,
