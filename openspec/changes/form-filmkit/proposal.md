@@ -28,7 +28,7 @@ None.
 
 ## Impact
 
-- New repository `filmkit`, governed by ETHOS `0.2.0-alpha.20`. Its forge remotes, GitHub `HengYangDS/filmkit` and GitLab `dig/misc/tools/filmkit`, are added only when the user confirms the push.
+- New repository `filmkit`, governed by ETHOS `0.2.0-alpha.21`. Its forge remotes, GitHub `HengYangDS/filmkit` and GitLab `dig/misc/tools/filmkit`, are added only when the user confirms the push.
 - Dependencies match `ddwg-film`: Python `mlx-audio`, `numpy`, `pillow` and `pydantic`; for the tests and the sample film, the npm renderer `hyperframes`, `puppeteer-core`, `@puppeteer/browsers` and `gsap`.
 - **BREAKING** for a film that adopts the release: it declares its fonts and its listening-plan readings, runs the Node checks through the engine command, and declares the renderer's npm packages itself.
 - Out of scope: publishing or tagging before the user confirms; moving `ddwg-film` onto the release, which its own Change does; the ETHOS film; any change to a film's output bytes.

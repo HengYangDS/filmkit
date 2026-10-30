@@ -27,7 +27,7 @@
 
 ## 5. First release
 
-- [ ] 5.1 Rebind the toolchain to ETHOS `0.2.0-alpha.21` with the Mise declaration published with that release, checked against its `SHA256SUMS`, and lock it again with native `mise lock`; verify `mise install --locked` and that `ethos status` reports the lane ready under the alpha.21 runtime.
+- [x] 5.1 Rebind the toolchain to ETHOS `0.2.0-alpha.21` with the Mise declaration published with that release, checked against its `SHA256SUMS`, and lock it again with native `mise lock`; verify `mise install --locked` and that `ethos status` reports the lane ready under the alpha.21 runtime.
 
 ## Workflow follow-up
 
