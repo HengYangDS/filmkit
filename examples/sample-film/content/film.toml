@@ -1,0 +1,46 @@
+# The sample film that this repository's tests load and its local acceptance builds. The engine
+# takes every film-specific value from this declaration and the files it names; each edition's
+# script declares its title, author, language, duration, frame rate and chapters. Paths are below
+# this folder.
+
+# The prefix of every delivered file.
+slug = "sample-reel"
+# The folder in ~/Documents that a delivery would fill.
+documents_folder = "sample-reel"
+# The page that leads to each edition's player.
+entry = "content/index.html"
+# The commit and digest of the document the film explains.
+source_manifest = "content/source-manifest.json"
+
+# Each edition's folder of script, cast and player, and its 16:9 cover.
+[editions.zh]
+sources = "content"
+cover = "assets/cover/sample-reel-cover.png"
+
+[editions.en]
+sources = "content/en"
+cover = "assets/cover/sample-reel-cover-en.png"
+# A term that reads as one name stays on one caption line.
+caption_terms = ["reference recording", "build folder"]
+
+[review]
+# The reviewer prompt: a str.format template that each round fills for each edition.
+prompt = "content/review/prompt.md"
+# The verifier's floor: the overall score and every dimension at least this.
+overall_minimum = 90
+dimension_minimum = 90
+
+# The scored dimensions in record order, with what each one asks reviewers to judge.
+[review.dimensions]
+subject_and_faithfulness = """\
+  the rebuild of a film from its sources remains the subject; every statement follows the cited \
+  README; the stages appear in the order they run."""
+narration_and_language = """\
+  natural delivery with audible phrase tails and distinct thought pauses; idiomatic language in \
+  each edition; consistent terms."""
+picture_and_sync = """\
+  each scene shows what the narration names as it is named; captions, cards and scene changes \
+  stay in sync; no collisions or clipping."""
+deliverable_craft = """\
+  cover, credits and metadata name the film and its author; subtitles and transcript match the \
+  speech; chapters and player work."""

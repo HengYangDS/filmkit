@@ -1,0 +1,173 @@
+{
+  "title": "示例影片 · 从源文件到成片",
+  "author": "Yang HENG",
+  "release": {
+    "year": 2026,
+    "collection": "示例影片 · 从源文件到成片",
+    "genre": "教育",
+    "description": "从源文件重建影片的示例；中文；纯 2D；仅旁白",
+    "comment": "filmkit 的示例影片，供测试和演示；内容依据 ddwg-film 的 README",
+    "synopsis": "这部一分钟的短片演示一部影片怎样从源文件重建出来：脚本、参考录音和画面合成是源文件；构建先录下旁白，再拼成音轨、配上字幕，接着渲染画面、打包成片，全程不联网；最后每部成片都和源文件逐项核对。",
+    "keywords": [
+      "示例影片",
+      "影片重建",
+      "旁白",
+      "字幕",
+      "核对"
+    ],
+    "tracks": {
+      "picture": "画面",
+      "narration": "中文旁白"
+    }
+  },
+  "language": "Chinese",
+  "duration": 60,
+  "fps": 60,
+  "source": "content/source-manifest.json",
+  "chapters": [
+    {
+      "id": "sources",
+      "title": "从源文件开始"
+    },
+    {
+      "id": "build",
+      "title": "一次离线构建"
+    },
+    {
+      "id": "check",
+      "title": "逐项核对"
+    }
+  ],
+  "credits_duration": 3,
+  "editorial_intent": {
+    "purpose": "Show a first-time viewer, in spoken Chinese, how a narrated film is rebuilt from its tracked sources: complete thoughts, the stages in the order they run, and nothing the cited source does not state."
+  },
+  "voice_performance": {
+    "performance_intent": "The DDWG narrator's reference, as ddwg-film selected it; clear, lively connected explanation; firm sentence endings; no theatrical delivery.",
+    "energy_curve": "Curious opening, purposeful explanatory body, firmer decisions, settled coda.",
+    "assembly_mode": "native-speech-designed-pauses",
+    "pacing_profile": "Ear-first copy spoken at the voice's native rate from the clear reference derived from the unmodified identity root. Speech is never time-stretched or pitch-shifted. No native pause inside a thought outlasts the declared inner cap, and each one lasts at least the floor of its punctuation, so a sentence end inside a thought is heard as a longer break than a clause mark and a clause mark as a longer one than a comma; a long run of speech takes a breath at the comma nearest its middle. Designed quiet separates complete thoughts and paragraphs, longer after longer ones, each thought boundary outlasts the longest pause inside its thought by at least a fifth, and the coda settles on its own longer pause after every thought; the remaining runtime opens the picture between paragraphs and chapters within declared bounds.",
+    "designed_pauses": {
+      "thought": 0.46,
+      "question": 0.8,
+      "opening": 2.0,
+      "paragraph": 1.2,
+      "chapter": 2.5,
+      "closing": 1.7
+    },
+    "thought_pause_range": [
+      0.41,
+      1.0
+    ],
+    "thought_boundary_ratio": 1.2,
+    "thought_boundary_margin_seconds": 0.04,
+    "thought_level_tolerance_db": 0.75,
+    "chapter_level_tolerance_db": 0.3,
+    "paragraph_pause_range": [
+      1.2,
+      2.7
+    ],
+    "designed_pause_limits": {
+      "opening": 9.0,
+      "paragraph": 3.4,
+      "chapter": 9.0
+    },
+    "designed_pause_weights": {
+      "opening": 2.0,
+      "paragraph": 1.0,
+      "chapter": 4.0
+    },
+    "tail_guard_seconds": 0.3,
+    "provider_notes": {
+      "native": "Identity-root ICL reference and fixed seed; natural punctuation only; no instruction tokens, pitch or tempo transform, or music."
+    },
+    "coda_thought_pause_seconds": 1.25,
+    "inner_pause_cap_seconds": 0.33,
+    "inner_pause_floors_seconds": {
+      "。？！": 0.28,
+      "；：": 0.18,
+      "，": 0.09,
+      "、": 0.08
+    },
+    "inner_breath": {
+      "longest_group_seconds": 7.5,
+      "pause_seconds": 0.22
+    }
+  },
+  "caption_timing": {
+    "tail_seconds": 0.25,
+    "short_cue_lead_seconds": 0.1
+  },
+  "pronunciation_contract": "content/voice-performance.json",
+  "timing_state": "Unrecorded ear-first script; timing is derived after narration.",
+  "segments": [
+    {
+      "id": "01",
+      "chapter": "sources",
+      "chapter_index": 0,
+      "chapter_title": "从源文件开始",
+      "title": "三类源文件",
+      "language": "Chinese",
+      "source_sections": [
+        "README:Layout"
+      ],
+      "utterance_groups": [
+        "这部短片演示一部影片怎样从源文件重建出来。",
+        "脚本写着要说的话，参考录音定下旁白的嗓音，画面合成决定每一帧画什么。"
+      ],
+      "text": "这部短片演示一部影片怎样从源文件重建出来。脚本写着要说的话，参考录音定下旁白的嗓音，画面合成决定每一帧画什么。",
+      "spoken_text": "这部短片演示一部影片怎样从源文件重建出来。脚本写着要说的话，参考录音定下旁白的嗓音，画面合成决定每一帧画什么。"
+    },
+    {
+      "id": "02",
+      "chapter": "build",
+      "chapter_index": 1,
+      "chapter_title": "一次离线构建",
+      "title": "旁白、音轨和字幕",
+      "language": "Chinese",
+      "source_sections": [
+        "README:Rebuilding the films"
+      ],
+      "utterance_groups": [
+        "构建时，先照着脚本录下旁白。",
+        "再把录音拼成完整的音轨，按说话的时间配上字幕。"
+      ],
+      "text": "构建时，先照着脚本录下旁白。再把录音拼成完整的音轨，按说话的时间配上字幕。",
+      "spoken_text": "构建时，先照着脚本录下旁白。再把录音拼成完整的音轨，按说话的时间配上字幕。"
+    },
+    {
+      "id": "03",
+      "chapter": "build",
+      "chapter_index": 1,
+      "chapter_title": "一次离线构建",
+      "title": "画面与成片",
+      "language": "Chinese",
+      "source_sections": [
+        "README:Rebuilding the films"
+      ],
+      "utterance_groups": [
+        "接着渲染每一帧画面，打包出成片。",
+        "这些步骤都不联网，产生的文件全都留在构建目录里。"
+      ],
+      "text": "接着渲染每一帧画面，打包出成片。这些步骤都不联网，产生的文件全都留在构建目录里。",
+      "spoken_text": "接着渲染每一帧画面，打包出成片。这些步骤都不联网，产生的文件全都留在构建目录里。"
+    },
+    {
+      "id": "04",
+      "chapter": "check",
+      "chapter_index": 2,
+      "chapter_title": "逐项核对",
+      "title": "核对成片",
+      "language": "Chinese",
+      "source_sections": [
+        "README:Rebuilding the films"
+      ],
+      "utterance_groups": [
+        "最后，每部成片都要和它的源文件逐项核对。",
+        "全部对得上，这次重建才算完成。"
+      ],
+      "text": "最后，每部成片都要和它的源文件逐项核对。全部对得上，这次重建才算完成。",
+      "spoken_text": "最后，每部成片都要和它的源文件逐项核对。全部对得上，这次重建才算完成。"
+    }
+  ]
+}

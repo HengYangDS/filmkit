@@ -1,0 +1,4 @@
+# Patterns resolve from this directory. `.gitignore` is the other ignore file.
+# The sample film's review prompt is a str.format template: a placeholder line continues the
+# list above it, so Markdown formatting would nest the inserted items and change every prompt.
+../../../examples/sample-film/content/review/prompt.md

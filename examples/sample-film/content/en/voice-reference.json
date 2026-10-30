@@ -1,0 +1,22 @@
+{
+  "reference_text": "ēthos connects human judgment with Agent action. Open Spec keeps formal intent. A Git reference changes only when its current state permits it.",
+  "reference_text_sha256": "0f118f128cd637c293eca6f215eeb3f8eeed34f60029dae64cd4ed350ece65fa",
+  "reference_mode": "icl",
+  "narration_language": "English",
+  "full_narration_seed": 4677,
+  "full_narration_temperature": 0.46,
+  "full_narration_max_tokens": 2100,
+  "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+  "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
+  "reference_language": "English",
+  "language": "English",
+  "provider": "mlx",
+  "reference_audio": "assets/audio/en/narration-reference.wav",
+  "reference_sha256": "a763e48e15c5dc8abeda9b47da53c47db628b9ea602c79e657ab04653d318786",
+  "scope": "The DDWG narrator's reference recording and its transcript, copied unchanged from ddwg-film at 37549a9, where the cast records how it was derived. Voiced audio is native model output: never time-stretched, pitch-shifted or recast.",
+  "performance_recording": {
+    "receipt": "build/evidence/editions/en/ear-first/narration-receipt.json",
+    "alignment": "build/evidence/editions/en/ear-first/alignment.json"
+  },
+  "retakes": {}
+}

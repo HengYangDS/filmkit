@@ -1,0 +1,26 @@
+# The sample film's sources whose bytes the engine owns: its writers rewrite the scripts and casts
+# as two-space JSON, the pages and the composition template hold the exact placeholders and
+# patterns the engine substitutes, and each narration text equals its script's segment texts
+# joined by one blank line. The suites load and check them in every proof.
+[[ownership]]
+id = "sample-film-sources"
+paths = [
+  "examples/sample-film/content/en/film-script.json",
+  "examples/sample-film/content/en/narration.md",
+  "examples/sample-film/content/en/player.html",
+  "examples/sample-film/content/en/voice-reference.json",
+  "examples/sample-film/content/film-script.json",
+  "examples/sample-film/content/index.html",
+  "examples/sample-film/content/narration.md",
+  "examples/sample-film/content/player.html",
+  "examples/sample-film/content/source-manifest.json",
+  "examples/sample-film/content/voice-performance.json",
+  "examples/sample-film/content/voice-reference.json",
+  "examples/sample-film/picture/index.html",
+]
+format_owner = "immutable-carrier"
+format_command = "not-applicable:engine-owned-sample-source"
+format_check = "ethos prove --full --execute --json"
+validation_owner = "native-behavior"
+validation_command = "ethos prove --full --execute --json"
+mutation_policy = "forbidden"

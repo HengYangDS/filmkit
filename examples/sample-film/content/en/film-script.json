@@ -1,0 +1,167 @@
+{
+  "title": "Sample Reel · From Sources to Film",
+  "author": "Yang HENG",
+  "release": {
+    "year": 2026,
+    "collection": "Sample Reel · From Sources to Film",
+    "genre": "Education",
+    "description": "An example of rebuilding a film from its sources; English; 2D; narration only",
+    "comment": "The filmkit sample film, for tests and demonstration; its content follows the ddwg-film README",
+    "synopsis": "A one-minute film that shows how a film is rebuilt from its sources: the script, a reference recording and the composition are the sources; the build narrates the script, joins the soundtrack, times the captions, renders the picture and packages the films without reaching the network; last, each film is checked against its sources.",
+    "keywords": [
+      "sample film",
+      "film rebuild",
+      "narration",
+      "captions",
+      "checks"
+    ],
+    "tracks": {
+      "picture": "Picture",
+      "narration": "English narration"
+    }
+  },
+  "language": "English",
+  "duration": 60,
+  "fps": 60,
+  "source": "content/source-manifest.json",
+  "chapters": [
+    {
+      "id": "sources",
+      "title": "Where a film begins"
+    },
+    {
+      "id": "build",
+      "title": "One offline build"
+    },
+    {
+      "id": "check",
+      "title": "Checked against its sources"
+    }
+  ],
+  "credits_duration": 3,
+  "editorial_intent": {
+    "purpose": "Show a first-time viewer, in natively authored spoken English, how a narrated film is rebuilt from its tracked sources: complete thoughts, the stages in the order they run, and nothing the cited source does not state."
+  },
+  "voice_performance": {
+    "performance_intent": "The DDWG narrator's reference, as ddwg-film selected it; clear, lively connected explanation; firm sentence endings; no theatrical delivery.",
+    "energy_curve": "Curious opening, purposeful explanatory body, firmer decisions, settled coda.",
+    "assembly_mode": "native-speech-designed-pauses",
+    "pacing_profile": "Ear-first copy spoken at the voice's native rate from the unmodified identity root. Speech is never time-stretched or pitch-shifted. No native pause inside a thought outlasts the declared inner cap. Designed quiet separates complete thoughts and paragraphs, longer after longer ones, each thought boundary outlasts the longest pause inside its thought by at least three fifths, and the coda settles on its own longer pause after every thought; the remaining runtime opens the picture between paragraphs and chapters within declared bounds.",
+    "designed_pauses": {
+      "thought": 0.59,
+      "question": 0.65,
+      "opening": 2.0,
+      "paragraph": 1.03,
+      "chapter": 2.0,
+      "closing": 1.5
+    },
+    "thought_pause_range": [
+      0.36,
+      1.0
+    ],
+    "thought_boundary_ratio": 1.62,
+    "thought_boundary_margin_seconds": 0.09,
+    "thought_level_tolerance_db": 0.75,
+    "chapter_level_tolerance_db": 0.3,
+    "paragraph_pause_range": [
+      1.0,
+      1.85
+    ],
+    "designed_pause_limits": {
+      "opening": 9.0,
+      "paragraph": 5.5,
+      "chapter": 9.0
+    },
+    "designed_pause_weights": {
+      "opening": 2.0,
+      "paragraph": 1.0,
+      "chapter": 2.5
+    },
+    "tail_guard_seconds": 0.3,
+    "provider_notes": {
+      "native": "Identity-root ICL reference and fixed seed; natural punctuation only; no instruction tokens, pitch or tempo transform, or music."
+    },
+    "coda_thought_pause_seconds": 0.9,
+    "inner_pause_cap_seconds": 0.28,
+    "inner_pause_caps_seconds": {
+      ",": 0.12
+    }
+  },
+  "caption_timing": {
+    "tail_seconds": 0.25,
+    "short_cue_lead_seconds": 0.1,
+    "hold_mode": "full-interval"
+  },
+  "pronunciation_contract": "content/voice-performance.json",
+  "timing_state": "Unrecorded ear-first script; timing is derived after narration.",
+  "segments": [
+    {
+      "id": "01",
+      "chapter": "sources",
+      "chapter_index": 0,
+      "chapter_title": "Where a film begins",
+      "title": "Three kinds of source",
+      "language": "English",
+      "source_sections": [
+        "README:Layout"
+      ],
+      "utterance_groups": [
+        "This short film shows how a film is rebuilt from its sources. ",
+        "The script holds what is said, a reference recording sets the narrator's voice, and the composition draws every frame."
+      ],
+      "text": "This short film shows how a film is rebuilt from its sources. The script holds what is said, a reference recording sets the narrator's voice, and the composition draws every frame.",
+      "spoken_text": "This short film shows how a film is rebuilt from its sources. The script holds what is said, a reference recording sets the narrator's voice, and the composition draws every frame."
+    },
+    {
+      "id": "02",
+      "chapter": "build",
+      "chapter_index": 1,
+      "chapter_title": "One offline build",
+      "title": "Narration, soundtrack and captions",
+      "language": "English",
+      "source_sections": [
+        "README:Rebuilding the films"
+      ],
+      "utterance_groups": [
+        "The build first narrates the script. ",
+        "It joins the recordings into one soundtrack and times the captions to the speech."
+      ],
+      "text": "The build first narrates the script. It joins the recordings into one soundtrack and times the captions to the speech.",
+      "spoken_text": "The build first narrates the script. It joins the recordings into one soundtrack and times the captions to the speech."
+    },
+    {
+      "id": "03",
+      "chapter": "build",
+      "chapter_index": 1,
+      "chapter_title": "One offline build",
+      "title": "Picture and films",
+      "language": "English",
+      "source_sections": [
+        "README:Rebuilding the films"
+      ],
+      "utterance_groups": [
+        "Then it renders every frame and packages the films. ",
+        "None of these steps reaches the network, and every file they make stays in the build folder."
+      ],
+      "text": "Then it renders every frame and packages the films. None of these steps reaches the network, and every file they make stays in the build folder.",
+      "spoken_text": "Then it renders every frame and packages the films. None of these steps reaches the network, and every file they make stays in the build folder."
+    },
+    {
+      "id": "04",
+      "chapter": "check",
+      "chapter_index": 2,
+      "chapter_title": "Checked against its sources",
+      "title": "Checking the films",
+      "language": "English",
+      "source_sections": [
+        "README:Rebuilding the films"
+      ],
+      "utterance_groups": [
+        "Last, each film is checked against its sources. ",
+        "Only when everything matches is the rebuild complete."
+      ],
+      "text": "Last, each film is checked against its sources. Only when everything matches is the rebuild complete.",
+      "spoken_text": "Last, each film is checked against its sources. Only when everything matches is the rebuild complete."
+    }
+  ]
+}

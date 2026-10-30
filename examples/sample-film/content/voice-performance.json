@@ -1,0 +1,59 @@
+{
+  "pronunciation": {
+    "schema_version": 1,
+    "status": "planned-not-listened",
+    "control_boundary": "Dictionary and occurrence targets are acceptance criteria. Native Qwen Base does not consume IPA or SSML. No normalization is proposed without an actually heard error.",
+    "sources": [
+      {
+        "id": "macos-dictionary",
+        "provider": "Installed public macOS DictionaryServices exact whole-word lookup",
+        "families": [
+          "The Standard Dictionary of Contemporary Chinese",
+          "Simplified Chinese-English"
+        ],
+        "qualification": "First returned single-character sense is not a universal reading."
+      }
+    ],
+    "languages": {
+      "Chinese": {
+        "language": "Chinese",
+        "normalization": [],
+        "targets": [
+          {
+            "term": "重建",
+            "kind": "contextual-mandarin-word",
+            "target_reading": "chóngjiàn",
+            "source": "macos-dictionary",
+            "status": "planned-not-listened"
+          },
+          {
+            "term": "得上",
+            "kind": "contextual-mandarin-word",
+            "target_reading": "de shàng",
+            "source": "macos-dictionary",
+            "status": "planned-not-listened"
+          }
+        ],
+        "sandhi": "Natural Mandarin connected-speech tone sandhi and weak grammatical syllables; never force isolated citation tones.",
+        "embedded_english_targets": [],
+        "target_scope": "Every Chinese segment; no Latin terms in the narration."
+      },
+      "English": {
+        "language": "English",
+        "normalization": [],
+        "targets": []
+      }
+    },
+    "acceptance": [
+      "Listen to every listed occurrence in its complete clause and a short waveform window, including the connected lead-in and natural phrase tail.",
+      "Bind actual script and spoken-text hashes, selected reference, generated WAV hash, exact time window, target, observation, listener/modality and decision.",
+      "ASR spelling, alignment, F0, dictionary targets and model praise alone cannot certify pronunciation or natural flow.",
+      "Qualify raw complete paragraphs, assembled within-chapter joins and chapter boundaries separately. No isolated-word splice or forced overall speed.",
+      "Full-film bilingual listening remains required after a pilot; targets are not a claim that all words were heard."
+    ],
+    "occurrence_plan": {
+      "count": 0,
+      "entries": []
+    }
+  }
+}
