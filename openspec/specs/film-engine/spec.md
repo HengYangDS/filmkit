@@ -22,11 +22,11 @@ The engine SHALL build the film whose declaration `content/film.toml` lies in th
 
 ### Requirement: A film declares its parameters
 
-A film SHALL declare, in one declaration, its file prefix, delivery folder, entry page, source manifest, each edition's sources folder, cover and caption terms, the fonts its picture uses, and its review prompt, floors, scored dimensions and listening-plan readings. The engine SHALL refuse an invalid or incomplete declaration before any work, naming each failing field.
+A film SHALL declare, in one declaration, its file prefix, delivery folder, entry page, source manifest, each edition's sources folder, cover and caption terms, the fonts its picture uses, and its review prompt, floors, scored dimensions and listening-plan readings. The engine SHALL refuse an invalid or incomplete declaration before any work, naming each failing field; a cover may be absent until the engine paints it.
 
 #### Scenario: An invalid declaration refuses before work
 
-- **WHEN** the declaration omits an edition, names a font or another file that is missing, gives a malformed file prefix or a review floor outside 0 to 100
+- **WHEN** the declaration omits an edition, names a font or another file that is missing other than a cover, gives a malformed file prefix or a review floor outside 0 to 100
 - **THEN** the engine refuses when it loads, before any synthesis, and names each failing field
 
 #### Scenario: The declared fonts are staged in their declared order
@@ -71,3 +71,19 @@ The engine SHALL run its Node tools for a film through an engine command that re
 
 - **WHEN** the film's installed renderer reports a version other than the one the engine supports
 - **THEN** the engine refuses before the renderer runs and names both versions
+
+### Requirement: A film paints its covers from its picture
+
+The engine SHALL paint each edition's cover from the edition's staged picture and compare it with the tracked cover. A film MAY name covers before it paints them; packaging SHALL refuse an edition whose cover is missing, naming the cover's field. A painted cover with no tracked cover to compare SHALL be written and reported as uncompared, and SHALL NOT pass the cover check.
+
+#### Scenario: A new film narrates before it paints its covers
+
+- **WHEN** a film's declaration names covers that do not exist yet
+- **THEN** the engine loads the declaration, narrates and stages the picture
+- **AND** packaging refuses each edition whose cover is missing and names `editions.<code>.cover`
+
+#### Scenario: A first cover is painted with nothing to compare
+
+- **WHEN** the cover check paints an edition's cover and the tracked cover does not exist
+- **THEN** it writes the painted cover and reports that no tracked cover was compared
+- **AND** it fails until the painted cover is tracked and identical to a new painting
