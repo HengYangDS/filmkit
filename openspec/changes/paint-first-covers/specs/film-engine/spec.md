@@ -4,7 +4,7 @@
 
 ### Requirement: A film declares its parameters
 
-A film SHALL declare, in one declaration, its file prefix, delivery folder, entry page, source manifest, each edition's sources folder, cover and caption terms, the fonts its picture uses, and its review prompt, floors, scored dimensions and listening-plan readings. The engine SHALL refuse an invalid or incomplete declaration before any work, naming each failing field. A cover is the one named file that may be absent when the declaration loads, because the engine paints it from the staged picture.
+A film SHALL declare, in one declaration, its file prefix, delivery folder, entry page, source manifest, each edition's sources folder, cover and caption terms, the fonts its picture uses, and its review prompt, floors, scored dimensions and listening-plan readings. The engine SHALL refuse an invalid or incomplete declaration before any work, naming each failing field; a cover may be absent until the engine paints it.
 
 #### Scenario: An invalid declaration refuses before work
 
