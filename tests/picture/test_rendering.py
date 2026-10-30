@@ -58,8 +58,9 @@ def root(tmp_path, monkeypatch):
     """A repository root with both editions' current inputs and the real composition."""
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
+    (root / "node_modules").mkdir()
     shutil.copytree(COMPOSITION, root / picture_rendering.COMPOSITION)
-    for path, source in picture_rendering.STAGED_MEMBERS:
+    for path, source in picture_rendering.staged_members():
         if not (root / source).exists():
             put(root / source, f"fixture {path}")
     put(root / "content/source-manifest.json", {"members": []})
@@ -164,7 +165,7 @@ def test_staging_twice_writes_the_same_complete_document(code):
     assert binding["inputs"] == inputs
     assert film == {**timeline, "render_offset": 0, "edition": code}
     assert [(member["path"], member["source"]) for member in binding["members"]] == [
-        (path, str(source)) for path, source in picture_rendering.STAGED_MEMBERS
+        (path, str(source)) for path, source in picture_rendering.staged_members()
     ]
     for member in binding["members"]:
         assert repository.sha(stage / member["path"]) == member["sha256"]

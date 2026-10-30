@@ -21,8 +21,8 @@ import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 from filmkit.narration.snapshots import ALIGNER, RECOGNIZER, VOICE, SnapshotError
 
-# The locked browser installer, below the repository root.
-BROWSER_INSTALLER = Path("node_modules/.bin/browsers")
+# The locked browser installer, below the film's npm packages.
+BROWSER_INSTALLER = Path(".bin/browsers")
 # The model snapshots the narration loads, in the order they are supplied.
 SNAPSHOTS = (VOICE, RECOGNIZER, ALIGNER)
 # Seconds one installer or download may take.
@@ -37,7 +37,11 @@ def supply_browser() -> dict:
     """Install the pinned browser build and check its executable's SHA-256."""
     product, version = picture_rendering.BROWSER
     folder = repository.ROOT / picture_rendering.TOOL_CACHE / "browsers"
-    installer = [str(repository.ROOT / BROWSER_INSTALLER), "install", f"{product}@{version}"]
+    installer = [
+        str(repository.node_modules() / BROWSER_INSTALLER),
+        "install",
+        f"{product}@{version}",
+    ]
     repository.run([*installer, "--path", str(folder)], timeout=DEADLINE)
     executable = picture_rendering.supplied_browser()
     if not executable.is_file() or repository.sha(executable) != picture_rendering.BROWSER_SHA256:

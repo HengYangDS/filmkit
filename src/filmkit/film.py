@@ -18,7 +18,7 @@ import filmkit.repository as repository
 if TYPE_CHECKING:
     from pathlib import Path
 
-DECLARATION = "content/film.toml"
+DECLARATION = repository.DECLARATION
 # The files every edition's sources folder holds.
 EDITION_FILES = ("film-script.json", "voice-reference.json", "player.html")
 # A lowercase name of words joined by hyphens.

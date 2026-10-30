@@ -15,6 +15,7 @@ from filmkit.supply import SupplyError
 def root(tmp_path, monkeypatch):
     """A repository root whose browser installer and model downloads are stand-ins."""
     monkeypatch.setattr(repository, "ROOT", tmp_path)
+    (tmp_path / "node_modules").mkdir()
     monkeypatch.delenv("FILM_CHROMIUM_PATH", raising=False)
     calls = []
     browser = b"browser build"
@@ -57,6 +58,7 @@ def test_the_supply_installs_and_checks_the_browser_and_every_model(root, capsys
     supply.main([])
     product, version = picture_rendering.BROWSER
     install = calls[0][1]
+    assert install[0] == str(folder / "node_modules/.bin/browsers")
     assert install[1:] == [
         "install",
         f"{product}@{version}",

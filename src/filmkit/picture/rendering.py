@@ -43,25 +43,19 @@ SOURCE_MANIFEST = sources.MANIFEST
 # The picture is rendered at the UHD master's frame; a stage may take either film's frame.
 PICTURE_SIZE = (RENDITIONS["uhd"].width, RENDITIONS["uhd"].height)
 STAGE_SIZES = {(rendition.width, rendition.height) for rendition in RENDITIONS.values()}
-# The members a stage copies beside its document: each place in the stage and its source.
-STAGED_MEMBERS = (
-    ("film.js", COMPOSITION_SCRIPT),
-    ("film.css", STYLE),
-    ("gsap.min.js", Path("node_modules/gsap/dist/gsap.min.js")),
-    *(
-        (f"fonts/{name}", Path("assets/fonts") / name)
-        for name in (
-            "NotoSansCJKsc-Regular.otf",
-            "NotoSansCJKsc-Bold.otf",
-            "IBMPlexSans-Regular.ttf",
-            "IBMPlexSans-Bold.ttf",
-        )
-    ),
+# The timeline engine a stage copies, below the film's npm packages.
+TIMELINE_ENGINE = Path("gsap/dist/gsap.min.js")
+# The fonts a stage copies from assets/fonts, in their order.
+FONTS = (
+    "NotoSansCJKsc-Regular.otf",
+    "NotoSansCJKsc-Bold.otf",
+    "IBMPlexSans-Regular.ttf",
+    "IBMPlexSans-Bold.ttf",
 )
 # Seconds a renderer's process group has to exit after SIGTERM before SIGKILL ends it.
 STOP_GRACE_SECONDS = 10
-# The locked renderer's command, below the repository root.
-RENDERER = Path("node_modules/.bin/hyperframes")
+# The locked renderer's command, below the film's npm packages.
+RENDERER = Path(".bin/hyperframes")
 # The tools and models the supply task installs, below the repository root.
 TOOL_CACHE = Path("build/runtime/tool-cache")
 # The browser build that the locked renderer pins, as the supply task installs it, and the
@@ -185,6 +179,25 @@ def picture_html(
     return html
 
 
+def npm_package(path: Path) -> Path:
+    """A file of the film's npm packages, as a path from the film's root."""
+    return Path(os.path.relpath(repository.node_modules() / path, repository.ROOT))
+
+
+def staged_members() -> tuple[tuple[str, Path], ...]:
+    """The members a stage copies beside its document: each place in the stage and its source.
+
+    Sources are paths from the film's root; the timeline engine's leaves the root when the
+    film's npm packages lie above it.
+    """
+    return (
+        ("film.js", COMPOSITION_SCRIPT),
+        ("film.css", STYLE),
+        ("gsap.min.js", npm_package(TIMELINE_ENGINE)),
+        *((f"fonts/{name}", Path("assets/fonts") / name) for name in FONTS),
+    )
+
+
 def copy_member(stage: Path, path: str, source: Path) -> dict:
     """Copy one member into the stage and bind its copy to its source by SHA-256."""
     destination = stage / path
@@ -221,7 +234,7 @@ def stage_picture(
     document = picture_html(edition, duration, width, height, start, timeline=timeline)
     target.mkdir(parents=True, exist_ok=True)
     (target / "index.html").write_text(document, encoding="utf-8")
-    members = [copy_member(target, path, source) for path, source in STAGED_MEMBERS]
+    members = [copy_member(target, path, source) for path, source in staged_members()]
     write(
         target / "stage.json",
         {
@@ -243,7 +256,7 @@ def stage_picture(
 
 def require_staged_members(members: object, stage: Path) -> None:
     """Refuse a stage unless it copies exactly the declared members, each as recorded."""
-    declared = [(path, str(source)) for path, source in STAGED_MEMBERS]
+    declared = [(path, str(source)) for path, source in staged_members()]
     if (
         not isinstance(members, list)
         or [(member.get("path"), member.get("source")) for member in members] != declared
@@ -417,7 +430,7 @@ def render_picture(edition: Edition, deadline: int) -> None:
     require_current_stage(edition, stage)
     picture = edition.picture
     command = [
-        str(repository.ROOT / RENDERER),
+        str(repository.node_modules() / RENDERER),
         "render",
         str(stage),
         "--output",

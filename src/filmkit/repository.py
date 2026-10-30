@@ -1,7 +1,10 @@
-"""The repository root and file access from it.
+"""The root of the film the engine builds, and file access from it.
 
-Tests rebind `ROOT`, so other modules read it through this module when they run instead of
-importing its value. Paths are taken below the root; an absolute path is used as given.
+The film's root is the folder that `FILMKIT_ROOT` names or, when it is unset, the nearest folder
+at or above the working directory that holds the film's declaration; outside any film the engine
+refuses to start. Tests rebind `ROOT`, so other modules read it through this module when they
+run instead of importing its value. Paths are taken below the root; an absolute path is used as
+given.
 """
 
 from __future__ import annotations
@@ -12,7 +15,51 @@ import os
 import subprocess
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+# The film's declaration, below its root.
+DECLARATION = "content/film.toml"
+# The variable that names the film's root, wherever the engine runs.
+ROOT_VARIABLE = "FILMKIT_ROOT"
+
+
+class FilmRootError(LookupError):
+    """No film declaration where the engine looked, or no npm packages above the film."""
+
+
+def film_root(start: Path | None = None) -> Path:
+    """The root of the film the engine builds.
+
+    That is the folder `FILMKIT_ROOT` names, or else the nearest folder at or above `start`,
+    the working directory by default, that holds the declaration. The refusal names the
+    folder where the search began.
+    """
+    named = os.environ.get(ROOT_VARIABLE)
+    if named:
+        root = Path(named).resolve()
+        if not (root / DECLARATION).is_file():
+            message = f"No film declaration {DECLARATION} in {root}, which {ROOT_VARIABLE} names"
+            raise FilmRootError(message)
+        return root
+    begin = (start or Path.cwd()).resolve()
+    for folder in (begin, *begin.parents):
+        if (folder / DECLARATION).is_file():
+            return folder
+    message = (
+        f"No film declaration {DECLARATION} at or above {begin}; "
+        f"run below a film or set {ROOT_VARIABLE} to its root"
+    )
+    raise FilmRootError(message)
+
+
+ROOT = film_root()
+
+
+def node_modules() -> Path:
+    """The film's npm packages: the nearest `node_modules` folder at or above its root."""
+    for folder in (ROOT, *ROOT.parents):
+        if (folder / "node_modules").is_dir():
+            return folder / "node_modules"
+    message = f"No node_modules folder at or above the film {ROOT}; install its npm packages"
+    raise FilmRootError(message)
 
 
 def read(path: str | Path) -> dict:
