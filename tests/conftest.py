@@ -17,12 +17,11 @@ from typing import NamedTuple
 import numpy as np
 import pytest
 
-SAMPLE_FILM = Path(__file__).resolve().parents[1] / "examples/sample-film"
-os.environ["FILMKIT_ROOT"] = str(SAMPLE_FILM)
+os.environ["FILMKIT_ROOT"] = str(Path(__file__).resolve().parents[1] / "examples/sample-film")
 
-import filmkit.delivery.documents_folder as delivery_documents_folder  # noqa: E402
-from filmkit.narration.thought_groups import join_quiet  # noqa: E402
-from filmkit.narration.voice_model import MODEL, NATIVE_DECODER, REVISION  # noqa: E402
+import filmkit.delivery.documents_folder as delivery_documents_folder
+from filmkit.narration.thought_groups import join_quiet
+from filmkit.narration.voice_model import MODEL, NATIVE_DECODER, REVISION
 
 # Test modules whose code under test imports the MLX speech runtime at module load.
 SPEECH_RUNTIME_MODULES = [

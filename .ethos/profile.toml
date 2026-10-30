@@ -1,9 +1,7 @@
 profile_id = "filmkit"
 
 [openspec]
-material_paths = [
-    "**",
-]
+material_paths = ["**"]
 
 [proof]
 gate_registry = "system/gates.toml"
