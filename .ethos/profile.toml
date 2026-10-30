@@ -1,0 +1,6 @@
+profile_id = "filmkit"
+
+[openspec]
+material_paths = [
+    "**",
+]
