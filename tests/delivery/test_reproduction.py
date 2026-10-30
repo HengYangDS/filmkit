@@ -188,13 +188,13 @@ def test_a_faithful_rebuild_passes_and_reports_every_layer(release):
         "pass"
     }
     assert [document["asset"] for document in zh["documents"]] == [
-        "ddwg-zh.srt",
-        "ddwg-zh.vtt",
-        "ddwg-zh-transcript.md",
-        "ddwg-zh-cover.png",
+        "sample-reel-zh.srt",
+        "sample-reel-zh.vtt",
+        "sample-reel-zh-transcript.md",
+        "sample-reel-zh-cover.png",
     ]
     uhd = zh["films"][0]
-    assert uhd["asset"] == "ddwg-zh-uhd.mp4"
+    assert uhd["asset"] == "sample-reel-zh-uhd.mp4"
     assert (uhd["frames"], uhd["audio"], uhd["container"]) == (6, "identical", "identical")
     assert uhd["psnr"]["identical_frames"] == 6
     assert uhd["psnr"]["minimum_db"] is None
@@ -230,7 +230,7 @@ def test_a_frame_below_its_floor_fails_naming_the_film_and_frame(release):
     film = release.compare()["editions"]["en"]["films"][1]
     assert film["verdict"] == "fail"
     assert film["psnr"]["below_floor"][0] == 0
-    with pytest.raises(SystemExit, match=r"en: ddwg-en-1080p-captioned\.mp4: picture"):
+    with pytest.raises(SystemExit, match=r"en: sample-reel-en-1080p-captioned\.mp4: picture"):
         reproduction.main(["--read-only"])
 
 
@@ -254,7 +254,10 @@ def test_different_decoded_audio_fails(release):
             lambda edition: (edition.picture_stage / "index.html").write_text("<html></html>"),
             "stage",
         ),
-        (lambda edition: (edition.artifacts / "ddwg-zh.vtt").write_text("WEBVTT\n"), "documents"),
+        (
+            lambda edition: (edition.artifacts / "sample-reel-zh.vtt").write_text("WEBVTT\n"),
+            "documents",
+        ),
     ],
 )
 def test_a_rebuilt_byte_that_differs_fails_naming_the_edition_and_layer(release, change, layer):
@@ -266,7 +269,7 @@ def test_a_rebuilt_byte_that_differs_fails_naming_the_edition_and_layer(release,
 
 
 def test_a_review_that_does_not_bind_the_published_films_fails(release):
-    path = release.folder / "ddwg-en-production-review.json"
+    path = release.folder / "sample-reel-en-production-review.json"
     review = json.loads(path.read_text())
     review["media"][0]["sha256"] = "0" * 64
     path.write_text(json.dumps(review))
@@ -278,9 +281,10 @@ def test_a_review_that_does_not_bind_the_published_films_fails(release):
 
 
 def test_a_published_asset_that_differs_from_the_manifest_refuses_before_any_layer(release):
-    (release.folder / "ddwg-zh.srt").write_text("edited\n")
+    (release.folder / "sample-reel-zh.srt").write_text("edited\n")
     with pytest.raises(
-        ReproductionError, match=r"published asset differs from the release manifest: ddwg-zh\.srt"
+        ReproductionError,
+        match=r"published asset differs from the release manifest: sample-reel-zh\.srt",
     ):
         release.compare()
 
@@ -317,7 +321,7 @@ def test_checksums_list_every_other_asset_for_shasum():
         ),
         (
             lambda manifest: manifest["editions"]["zh"]["picture_floor_db"].update(
-                {"ddwg-zh.srt": 30.0}
+                {"sample-reel-zh.srt": 30.0}
             ),
             "records a floor for an asset that is not a film",
         ),
@@ -345,8 +349,14 @@ def test_an_inconsistent_manifest_is_refused(release, change, message):
 def test_each_edition_publishes_its_films_documents_cover_and_review():
     edition = production.Edition("en")
     published = reproduction.members(edition)
-    assert published["ddwg-en-cover.png"] == ("document", edition.artifacts / packaging.COVER_PNG)
-    assert published["ddwg-en-production-review.json"] == ("review", edition.production_review)
+    assert published["sample-reel-en-cover.png"] == (
+        "document",
+        edition.artifacts / packaging.COVER_PNG,
+    )
+    assert published["sample-reel-en-production-review.json"] == (
+        "review",
+        edition.production_review,
+    )
     assert [name for name, (layer, _) in published.items() if layer == "film"] == [
         film.name for film in edition.films
     ]

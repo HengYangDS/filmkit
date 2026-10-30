@@ -16,7 +16,7 @@ from filmkit.delivery.packaging import PackagingError
 
 def test_the_player_transcript_keeps_chapters_segments_and_escaped_text():
     transcript = (
-        "# DDWG · Title\n\nYang HENG · English · 25 min\n\n## 01 Opening\n\n"
+        "# Sample Reel · Title\n\nYang HENG · English · 25 min\n\n## 01 Opening\n\n"
         "00:00:02.118 · First <scene>\n\nA & B < C.\n\n## 02 Next\n\n"
         "00:01:00.000 · Second\n\nMore.\n"
     )
@@ -28,18 +28,18 @@ def test_the_player_transcript_keeps_chapters_segments_and_escaped_text():
     english = (repository.ROOT / production.Edition("en").player).read_text()
     assert english.count("/*TRANSCRIPT*/") == 1
     assert '<a href="#transcript">Transcript</a>' in english
-    assert '<a href="ddwg-en-transcript.md">Transcript (Markdown)</a>' in english
+    assert '<a href="sample-reel-en-transcript.md">Transcript (Markdown)</a>' in english
 
 
 def test_the_runtime_and_viewing_members_follow_the_edition():
     minutes, seconds = divmod(specification.DURATION, 60)
     assert delivery_packaging.runtime_label() == f"{minutes:02d}:{seconds:02d}"
     assert delivery_packaging.viewing_members(production.Edition("en")) == (
-        "ddwg-cover.png",
-        "ddwg-cover.jpg",
-        "ddwg-en.srt",
-        "ddwg-en.vtt",
-        "ddwg-en-transcript.md",
+        "sample-reel-cover.png",
+        "sample-reel-cover.jpg",
+        "sample-reel-en.srt",
+        "sample-reel-en.vtt",
+        "sample-reel-en-transcript.md",
         "chapters.json",
         "chapters.ffmeta",
         "index.html",
@@ -128,9 +128,9 @@ def probe(
 @pytest.fixture
 def packaging_root(tmp_path, monkeypatch):
     """A root holding one edition's packaging inputs, with FFmpeg and ExifTool simulated."""
-    monkeypatch.setattr(repository, "ROOT", tmp_path)
     edition = production.Edition("zh")
-    script = json.loads((Path(__file__).parents[2] / edition.script).read_text())
+    script = repository.read(edition.script)
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
     (tmp_path / edition.script).parent.mkdir(parents=True)
     (tmp_path / edition.script).write_text(
         json.dumps({"title": script["title"], "release": script["release"]}, ensure_ascii=False)
@@ -140,7 +140,7 @@ def packaging_root(tmp_path, monkeypatch):
         (edition.picture, "picture"),
         (edition.soundtrack, "soundtrack"),
         (edition.artifacts / "chapters.ffmeta", ";FFMETADATA1\n"),
-        (edition.artifacts / "ddwg-cover.jpg", "cover"),
+        (edition.artifacts / delivery_packaging.COVER_JPEG, "cover"),
     ):
         path.write_text(body)
     calls = []
@@ -184,8 +184,8 @@ def test_each_film_is_encoded_finished_and_checked_in_work_before_it_is_linked_i
         "caption_owner",
     ]
     assert [member["path"] for member in package["editions"]] == [
-        "ddwg-zh-uhd.mp4",
-        "ddwg-zh-1080p-captioned.mp4",
+        "sample-reel-zh-uhd.mp4",
+        "sample-reel-zh-1080p-captioned.mp4",
     ]
     work = root / "build/runtime/work/final-film-packaging/zh"
     for member, film in zip(package["editions"], edition.films, strict=True):
@@ -211,9 +211,9 @@ def test_the_commands_carry_the_release_metadata(packaging_root):
     created = next(argument for argument in calls[0][0] if argument.startswith("creation_time="))
     inputs = [
         "-i",
-        f"{artifacts}/ddwg-final-picture.mp4",
+        f"{artifacts}/sample-reel-final-picture.mp4",
         "-i",
-        f"{artifacts}/ddwg-zh-narration.wav",
+        f"{artifacts}/sample-reel-zh-narration.wav",
         "-f",
         "ffmetadata",
         "-i",
@@ -230,14 +230,14 @@ def test_the_commands_carry_the_release_metadata(packaging_root):
     sound = ["-c:a", "aac", "-b:a", "256k", "-ar", "48000", "-ac", "2"]
     sound += ["-t", str(specification.DURATION)]
     tags = [
-        "title=DDWG · 数据部门工作指南",
+        "title=示例影片 · 从源文件到成片",
         "artist=Yang HENG",
         "album_artist=Yang HENG",
-        "album=DDWG · 数据部门工作指南",
+        "album=示例影片 · 从源文件到成片",
         "genre=教育",
         "date=2026",
-        "comment=中文介绍影片；示例均为示意；不声称已部署或已采用",
-        "description=数据部门工作指南；中文；纯 2D；仅旁白",
+        "comment=filmkit 的示例影片，供测试和演示；内容依据 ddwg-film 的 README",
+        "description=从源文件重建影片的示例；中文；纯 2D；仅旁白",
         "synopsis=" + release["synopsis"],
         "copyright=© 2026 Yang HENG",
         "media_type=9",
@@ -269,12 +269,12 @@ def test_the_commands_carry_the_release_metadata(packaging_root):
     attach += ["-map_chapters", "0", "-c", "copy", "-disposition:v:1", "attached_pic"]
     keys = [
         "-Keys:Author=Yang HENG",
-        "-Keys:Title=DDWG · 数据部门工作指南",
+        "-Keys:Title=示例影片 · 从源文件到成片",
         "-Keys:Artist=Yang HENG",
-        "-Keys:Album=DDWG · 数据部门工作指南",
+        "-Keys:Album=示例影片 · 从源文件到成片",
         "-Keys:Genre=教育",
-        "-Keys:Description=数据部门工作指南；中文；纯 2D；仅旁白",
-        "-Keys:Comment=中文介绍影片；示例均为示意；不声称已部署或已采用",
+        "-Keys:Description=从源文件重建影片的示例；中文；纯 2D；仅旁白",
+        "-Keys:Comment=filmkit 的示例影片，供测试和演示；内容依据 ddwg-film 的 README",
         "-Keys:Copyright=© 2026 Yang HENG",
         "-Keys:Keywords=" + ", ".join(release["keywords"]),
         "-Keys:Year=2026",
@@ -282,18 +282,18 @@ def test_the_commands_carry_the_release_metadata(packaging_root):
     ]
     expected = []
     for name, decoding, video, level, marks, deadline in (
-        ("ddwg-zh-uhd.mp4", [], ["-c:v:0", "copy"], "5.2", [], 600),
+        ("sample-reel-zh-uhd.mp4", [], ["-c:v:0", "copy"], "5.2", [], 600),
         (
-            "ddwg-zh-1080p-captioned.mp4",
+            "sample-reel-zh-1080p-captioned.mp4",
             hardware,
             scaled,
             "4.2",
             ["hd_video=2"],
-            2 * specification.DURATION,
+            max(delivery_packaging.DEADLINE_FLOOR, 2 * specification.DURATION),
         ),
     ):
         intermediate, finished = f"{work}/{name}", f"{work}/finished/{name}"
-        cover = ["-i", intermediate, "-i", f"{artifacts}/ddwg-cover.jpg", *attach]
+        cover = ["-i", intermediate, "-i", f"{artifacts}/sample-reel-cover.jpg", *attach]
         metadata = [arg for tag in [*tags, *marks, created] for arg in ("-metadata", tag)]
         encode = [*decoding, *inputs, *video, "-bsf:v:0", bitstream + level, *sound, *metadata]
         encode += [*streams, "-movflags", "+faststart", intermediate]
@@ -330,7 +330,7 @@ def test_a_failed_check_leaves_no_film_in_place_and_keeps_the_work(packaging_roo
         delivery_packaging.package_film(edition)
     assert not edition.film("uhd").exists()
     work = root / "build/runtime/work/final-film-packaging/zh"
-    assert (work / "finished/ddwg-zh-uhd.mp4").is_file()
+    assert (work / "finished/sample-reel-zh-uhd.mp4").is_file()
     assert json.loads(edition.film_package.read_text())["editions"] == []
     monkeypatch.setattr(media, "probe", lambda path: probe(kind=kind_of(path)))
     with pytest.raises(PackagingError, match="Preserve existing packaging input"):
@@ -363,7 +363,7 @@ def test_the_release_tags_come_from_the_script():
     release = repository.read(edition.script)["release"]
     tags = dict(delivery_packaging.release_tags(edition, uhd))
     assert tags == {
-        "title": "DDWG · 数据部门工作指南",
+        "title": "示例影片 · 从源文件到成片",
         "artist": "Yang HENG",
         "album_artist": "Yang HENG",
         "album": release["collection"],
@@ -407,7 +407,9 @@ def test_a_failed_encode_records_its_bindings_and_command(packaging_root, monkey
     assert failure["input_bindings"]["caption_owner"] == delivery_packaging.CAPTION_OWNER
     assert "editions" not in failure["input_bindings"]
     assert (failure["deadline_seconds"], failure["error_type"]) == (600, "TimeoutExpired")
-    assert failure["intermediate"] == "build/runtime/work/final-film-packaging/zh/ddwg-zh-uhd.mp4"
+    assert failure["intermediate"] == (
+        "build/runtime/work/final-film-packaging/zh/sample-reel-zh-uhd.mp4"
+    )
     assert failure["intermediate_sha256"] is None
     assert failure["completed_members"] == []
 

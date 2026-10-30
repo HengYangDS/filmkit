@@ -38,7 +38,7 @@ def edition(tmp_path, monkeypatch):
         "spoken_text": TEXT,
     }
     script = {
-        "title": "DDWG",
+        "title": "Sample Reel",
         "caption_timing": {"tail_seconds": 0.25, "short_cue_lead_seconds": 0.1},
         "release": release,
         "segments": [segment],
@@ -100,7 +100,9 @@ def test_a_current_edition_refreshes_its_cues_and_its_selection_binding(edition,
     assert receipt["caption_timing"].startswith("Nonoverlapping exact word-bound semantic cues")
     script_sha256 = sha256(repository.ROOT / edition.script)
     assert read(edition.narration_selected)["script_sha256"] == script_sha256
-    assert (edition.artifacts / "ddwg-zh.srt").read_text().startswith("1\n00:00:02,000 --> ")
+    assert (
+        (edition.artifacts / f"{edition.prefix}.srt").read_text().startswith("1\n00:00:02,000 --> ")
+    )
     assert json.loads(capsys.readouterr().out)["caption_count"] == 2
 
 

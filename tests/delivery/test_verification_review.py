@@ -20,8 +20,8 @@ def current_review(tmp_path, monkeypatch):
         ("content/film-script.json", "{}"),
         (str(picture_rendering.COMPOSITION_SCRIPT), "/* film */"),
         ("build/evidence/editions/zh/production-review.md", "# Review\n"),
-        ("build/artifacts/film/zh/ddwg-zh-uhd.mp4", "uhd"),
-        ("build/artifacts/film/zh/ddwg-zh-1080p-captioned.mp4", "viewing"),
+        ("build/artifacts/film/zh/sample-reel-zh-uhd.mp4", "uhd"),
+        ("build/artifacts/film/zh/sample-reel-zh-1080p-captioned.mp4", "viewing"),
     ):
         (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / name).write_text(body)
@@ -62,13 +62,13 @@ def test_a_published_review_is_read_beside_its_report_wherever_it_lies(current_r
     films = [release / film.name for film in files]
     for film, published in zip(files, films, strict=True):
         published.write_bytes(film.read_bytes())
-    (release / "ddwg-zh-production-review.md").write_text("# Review\n")
-    published = release / "ddwg-zh-production-review.json"
+    (release / "sample-reel-zh-production-review.md").write_text("# Review\n")
+    published = release / "sample-reel-zh-production-review.json"
     published.write_text(json.dumps(record))
     edition = production.Edition("zh")
     accepted = delivery_verification.verify_review(edition, films, record=published)
-    assert accepted["path"] == "build/artifacts/release/ddwg-zh-production-review.json"
-    (release / "ddwg-zh-production-review.md").write_text("# Another review\n")
+    assert accepted["path"] == "build/artifacts/release/sample-reel-zh-production-review.json"
+    (release / "sample-reel-zh-production-review.md").write_text("# Another review\n")
     with pytest.raises(VerificationError, match="Review report differs from its record"):
         delivery_verification.verify_review(edition, films, record=published)
 
@@ -80,7 +80,7 @@ def test_review_accepts_only_current_media_above_thresholds(current_review):
     # Every dimension at 90 qualifies; 95 overall is a later plan, not this gate.
     floor = check(scores=dict.fromkeys(review_record.DIMENSIONS, 90), overall=90.0)
     assert (floor["overall"], floor["minimum_dimension"]) == (90.0, 90)
-    low = {**record["scores"], "composition_and_typography": 89}
+    low = {**record["scores"], next(iter(review_record.DIMENSIONS)): 89}
     with pytest.raises(VerificationError, match="below the acceptance thresholds"):
         check(scores=low, overall=round(sum(low.values()) / len(low), 1))
     with pytest.raises(VerificationError, match="mean of its dimensions"):

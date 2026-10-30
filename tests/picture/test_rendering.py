@@ -130,14 +130,16 @@ def gone(pid, wait=5.0):
 
 def test_receipt_paths_name_their_place_below_any_checkout_root(tmp_path):
     root = tmp_path / "restored"
-    picture = root / "build/artifacts/film/zh/ddwg-final-picture.mp4"
+    picture = root / "build/artifacts/film/zh/sample-reel-final-picture.mp4"
     elsewhere = "/elsewhere/checkout/build/artifacts/film"
-    assert picture_rendering.recorded_at(f"{elsewhere}/zh/ddwg-final-picture.mp4", picture, root)
+    assert picture_rendering.recorded_at(
+        f"{elsewhere}/zh/sample-reel-final-picture.mp4", picture, root
+    )
     assert picture_rendering.recorded_at(str(picture), picture, root)
     assert not picture_rendering.recorded_at(
-        f"{elsewhere}/en/ddwg-final-picture.mp4", picture, root
+        f"{elsewhere}/en/sample-reel-final-picture.mp4", picture, root
     )
-    assert not picture_rendering.recorded_at("ddwg-final-picture.mp4", picture, root)
+    assert not picture_rendering.recorded_at("sample-reel-final-picture.mp4", picture, root)
 
 
 @pytest.mark.parametrize("code", ["zh", "en"])
@@ -244,7 +246,7 @@ def test_a_completed_render_binds_only_the_current_stage(staged):
         {"exit": 1},
         {"timed_out": True},
         {"output_sha256": "0" * 64},
-        {"output_path": "/elsewhere/build/artifacts/film/en/ddwg-final-picture.mp4"},
+        {"output_path": "/elsewhere/build/artifacts/film/en/sample-reel-final-picture.mp4"},
         {"command": ["hyperframes", "render", "/elsewhere/stage", "--output"]},
     ):
         with pytest.raises(PictureError):

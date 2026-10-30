@@ -28,13 +28,13 @@ def test_the_delivery_members_are_the_entry_page_then_each_editions_films_and_vi
             f"{code}/{name}"
             for code in CODES
             for name in (
-                f"ddwg-{code}-uhd.mp4",
-                f"ddwg-{code}-1080p-captioned.mp4",
-                "ddwg-cover.png",
-                "ddwg-cover.jpg",
-                f"ddwg-{code}.srt",
-                f"ddwg-{code}.vtt",
-                f"ddwg-{code}-transcript.md",
+                f"sample-reel-{code}-uhd.mp4",
+                f"sample-reel-{code}-1080p-captioned.mp4",
+                "sample-reel-cover.png",
+                "sample-reel-cover.jpg",
+                f"sample-reel-{code}.srt",
+                f"sample-reel-{code}.vtt",
+                f"sample-reel-{code}-transcript.md",
                 "chapters.json",
                 "chapters.ffmeta",
                 "index.html",
@@ -43,7 +43,7 @@ def test_the_delivery_members_are_the_entry_page_then_each_editions_films_and_vi
     ]
     sources = [source for source, _ in delivery_documents_folder.plan(root)]
     assert sources[0] == root / "build/artifacts/film/index.html"
-    assert sources[1] == root / "build/artifacts/film/zh/ddwg-zh-uhd.mp4"
+    assert sources[1] == root / "build/artifacts/film/zh/sample-reel-zh-uhd.mp4"
 
 
 @pytest.mark.rsync
@@ -52,12 +52,12 @@ def test_a_first_delivery_places_and_reads_back_every_member(film):
     report = delivery_documents_folder.deliver(root, destination)
     assert len(report["members"]) == 21
     assert report["members"][1] == {
-        "path": "zh/ddwg-zh-uhd.mp4",
-        "sha256": sha("current zh/ddwg-zh-uhd.mp4\n"),
-        "bytes": len("current zh/ddwg-zh-uhd.mp4\n"),
+        "path": "zh/sample-reel-zh-uhd.mp4",
+        "sha256": sha("current zh/sample-reel-zh-uhd.mp4\n"),
+        "bytes": len("current zh/sample-reel-zh-uhd.mp4\n"),
     }
     assert (report["all_match"], report["unexpected"], report["predecessors"]) == (True, [], None)
-    assert report["film"] == {"slug": "ddwg", "duration": 1500}
+    assert report["film"] == {"slug": "sample-reel", "duration": 60}
     assert report["destination"] == str(destination)
     assert json.loads((root / delivery_documents_folder.READBACK).read_text()) == report
     assert film.tree(destination) == {path: f"current {path}\n" for path in members(root)}
@@ -69,7 +69,7 @@ def test_a_first_delivery_places_and_reads_back_every_member(film):
 def test_a_delivery_keeps_what_it_replaces_or_removes_and_the_foreign_entries(film):
     root, destination = film
     delivery_documents_folder.deliver(root, destination)
-    film.write(destination / "zh/ddwg-zh (copy).srt", "copy\n")
+    film.write(destination / "zh/sample-reel-zh (copy).srt", "copy\n")
     film.write(destination / ".DS_Store", "finder\n")
     film.write(destination / "en/.DS_Store", "finder\n")
     film.write(destination / ".claude/state.json", "{}\n")
@@ -84,7 +84,7 @@ def test_a_delivery_keeps_what_it_replaces_or_removes_and_the_foreign_entries(fi
     kept = root / report["predecessors"]
     assert kept.is_relative_to(root / delivery_documents_folder.PREDECESSORS)
     assert film.tree(kept) == {
-        "zh/ddwg-zh (copy).srt": "copy\n",
+        "zh/sample-reel-zh (copy).srt": "copy\n",
         **{path: f"current {path}\n" for path in members(root)},
     }
     assert report["all_match"]
@@ -103,7 +103,7 @@ def test_a_dry_run_reports_the_changes_and_writes_nothing(film):
     root, destination = film
     report = delivery_documents_folder.deliver(root, destination, dry_run=True)
     assert report["dry_run"]
-    assert "zh/ddwg-zh-uhd.mp4" in "\n".join(report["changes"])
+    assert "zh/sample-reel-zh-uhd.mp4" in "\n".join(report["changes"])
     assert not destination.exists()
     assert not (root / delivery_documents_folder.READBACK).exists()
 
@@ -120,8 +120,10 @@ def test_missing_sources_refuse_before_any_change(film):
 def test_the_readback_refuses_a_member_that_differs_at_the_destination(film):
     root, destination = film
     delivery_documents_folder.deliver(root, destination)
-    (destination / "en/ddwg-en.vtt").write_text("WEBVTT\n")
-    with pytest.raises(DeliveryRefusedError, match=r"differs from its sources: en/ddwg-en\.vtt"):
+    (destination / "en/sample-reel-en.vtt").write_text("WEBVTT\n")
+    with pytest.raises(
+        DeliveryRefusedError, match=r"differs from its sources: en/sample-reel-en\.vtt"
+    ):
         delivery_documents_folder.readback(root, destination)
 
 

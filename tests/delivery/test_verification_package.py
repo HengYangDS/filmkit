@@ -11,7 +11,7 @@ from filmkit.delivery.verification import VerificationError
 
 def test_the_current_packages_pass(inputs):
     assert delivery_verification.verify_package(inputs.edition) == {
-        "films": ["ddwg-zh-1080p-captioned.mp4", "ddwg-zh-uhd.mp4"],
+        "films": ["sample-reel-zh-1080p-captioned.mp4", "sample-reel-zh-uhd.mp4"],
         "viewing_members": 8,
     }
 
@@ -27,7 +27,7 @@ def edition_repeated(inputs):
 
 
 def member_changed(inputs):
-    (inputs.edition.artifacts / "ddwg-zh.vtt").write_text("WEBVTT\n")
+    (inputs.edition.artifacts / "sample-reel-zh.vtt").write_text("WEBVTT\n")
 
 
 def cover_differs_from_its_source(inputs):
@@ -58,10 +58,10 @@ def viewing(*keys, value):
         (films("picture_sha256", value="0"), "Film package differs"),
         (films("cover_sha256", value="0"), "Film package differs"),
         (films("chapters_sha256", value="0"), "Film package differs"),
-        (films("editions", "1", "path", value="ddwg-zh-1080p.mp4"), "Film package differs"),
+        (films("editions", "1", "path", value="sample-reel-zh-1080p.mp4"), "Film package differs"),
         (edition_repeated, "Film package differs"),
         (film_changed, "Film package differs"),
-        (viewing("members", "3", "path", value="ddwg-zh.ass"), "declared viewing members"),
+        (viewing("members", "3", "path", value="sample-reel-zh.ass"), "declared viewing members"),
         (viewing("members", value=[]), "declared viewing members"),
         (viewing("script_sha256", value="0"), "Viewing package differs"),
         (viewing("timeline_sha256", value="0"), "Viewing package differs"),

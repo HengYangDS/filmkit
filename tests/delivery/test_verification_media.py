@@ -87,7 +87,7 @@ def decoded(tmp_path, monkeypatch):
 def test_a_delivered_film_meeting_its_contract_is_decoded_completely(decoded):
     film, check = decoded
     assert check() == {
-        "path": "build/artifacts/film/zh/ddwg-zh-uhd.mp4",
+        "path": "build/artifacts/film/zh/sample-reel-zh-uhd.mp4",
         "sha256": repository.sha(film),
         "bytes": film.stat().st_size,
         "dimensions": [3840, 2160],

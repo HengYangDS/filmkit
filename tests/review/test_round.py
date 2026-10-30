@@ -48,7 +48,9 @@ def test_set_aside_refuses_before_moving_then_reads_back_each_member(root, revie
         review_round.plan_set_aside(3, PURPOSE, reviews)
     review(reviews, "en")
     Edition("zh").picture.unlink()
-    with pytest.raises(ReviewError, match="missing build/artifacts/film/zh/ddwg-final-picture"):
+    with pytest.raises(
+        ReviewError, match="missing build/artifacts/film/zh/sample-reel-final-picture"
+    ):
         review_round.plan_set_aside(3, PURPOSE, reviews)
     assert Edition("zh").film("uhd").is_file()
     assert not (root / "build/artifacts/film/superseded").exists()
@@ -57,8 +59,8 @@ def test_set_aside_refuses_before_moving_then_reads_back_each_member(root, revie
     assert not (root / "build/artifacts/film/superseded").exists()
     sources = {
         code: [
-            f"build/artifacts/film/{code}/ddwg-{code}-uhd.mp4",
-            f"build/artifacts/film/{code}/ddwg-{code}-1080p-captioned.mp4",
+            f"build/artifacts/film/{code}/sample-reel-{code}-uhd.mp4",
+            f"build/artifacts/film/{code}/sample-reel-{code}-1080p-captioned.mp4",
             f"build/evidence/editions/{code}/film-package.json",
         ]
         for code in CODES
@@ -110,8 +112,12 @@ def test_set_aside_records_its_members_before_the_first_move(root, review, monke
     assert manifest["moved_at"] is None
     assert [member["path"] for member in manifest["members"]] == [
         f"build/artifacts/film/superseded/round-3/zh/{name}"
-        for name in ("ddwg-zh-uhd.mp4", "ddwg-zh-1080p-captioned.mp4", "film-package.json")
-    ] + ["build/artifacts/film/superseded/round-3/zh/ddwg-final-picture.mp4"]
+        for name in (
+            "sample-reel-zh-uhd.mp4",
+            "sample-reel-zh-1080p-captioned.mp4",
+            "film-package.json",
+        )
+    ] + ["build/artifacts/film/superseded/round-3/zh/sample-reel-final-picture.mp4"]
 
 
 def test_cli_defaults_the_round_directory_and_reports_refusals(root, review, capsys):
@@ -128,10 +134,10 @@ def test_cli_defaults_the_round_directory_and_reports_refusals(root, review, cap
                 "members": [
                     f"build/artifacts/film/superseded/round-3/{code}/{name}"
                     for name in (
-                        f"ddwg-{code}-uhd.mp4",
-                        f"ddwg-{code}-1080p-captioned.mp4",
+                        f"sample-reel-{code}-uhd.mp4",
+                        f"sample-reel-{code}-1080p-captioned.mp4",
                         "film-package.json",
-                        "ddwg-final-picture.mp4",
+                        "sample-reel-final-picture.mp4",
                     )
                 ],
             }
@@ -157,7 +163,7 @@ def test_the_command_reports_only_its_own_refusals(put):
 def test_bind_names_the_language_entry_and_each_packaged_member(root, put):
     put(root / "build/artifacts/film/index.html", "entry")
     for code in CODES:
-        names = ["ddwg-cover.png", f"ddwg-{code}.srt", "index.html"]
+        names = ["sample-reel-cover.png", f"sample-reel-{code}.srt", "index.html"]
         for name in names:
             put(root / "build/artifacts/film" / code / name, f"{code} {name}")
         put(
@@ -176,10 +182,10 @@ def test_bind_names_the_language_entry_and_each_packaged_member(root, put):
             f"{code}/{name}"
             for code in CODES
             for name in (
-                f"ddwg-{code}-uhd.mp4",
-                f"ddwg-{code}-1080p-captioned.mp4",
-                "ddwg-cover.png",
-                f"ddwg-{code}.srt",
+                f"sample-reel-{code}-uhd.mp4",
+                f"sample-reel-{code}-1080p-captioned.mp4",
+                "sample-reel-cover.png",
+                f"sample-reel-{code}.srt",
                 "index.html",
             )
         ],
@@ -263,49 +269,50 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
     uhd = Edition("zh").film("uhd")
     for expected in (
         f"- {uhd} (SHA-256 {repository.sha(uhd)})",
-        "business source /source/guidelines. ",
+        "and the read-only source /source/guidelines. ",
         (
-            "the seven documents in /source/guidelines/docs/ (charter, decide, data, deliver, "
-            "human-agent, communicate, evolve)."
+            "Canonical source: charter, decide, data, deliver, human-agent, communicate, "
+            "evolve in /source/guidelines."
         ),
         (
             "ROOT/build/evidence/reviews/round-4/zh-review.md and "
             "ROOT/build/evidence/reviews/round-4/review-zh.json "
             "(findings: minor R4-1; note R4-2, R4-3)."
         ),
-        "independently.\n- Repairs: 07.6 names all seven checks.\n- Pronunciation plan",
-        "Write only under ROOT/build/evidence/reviews/round-5/.",
-        "ROOT/build/evidence/reviews/round-5/measurements.json: speaking rate",
-        "inner cap (0.33 s Chinese; 0.33 s (0.22 s at commas) English)",
-        "floors (Chinese 。？！ 0.31 s, ， 0.155 s; English none declared)",
-        "breath group (Chinese 7.5 s with a 0.26 s pause; English none declared)",
-        "tolerance (0.75 dB Chinese, 0.75 dB English)",
-        "boundary ratio and margin (1.2 and 0.04 s Chinese, 1.62 and 0.00 s English)",
-        "coda pause (1.40 s Chinese, 0.90 s English)",
-        "both soundtracks reach -16.5 LUFS integrated",
         "working files are in ROOT/build/evidence/reviews/round-4/zh/; you may copy",
-        "\n1. subject_and_faithfulness: DDWG remains the subject;",
-        "\n8. credits_and_deliverable_craft: covers and Yang HENG metadata;",
+        (
+            "your own output directory.\n- Repairs: 07.6 names all seven checks.\n"
+            "- Pause policy the scripts declare:"
+        ),
+        "Write only under ROOT/build/evidence/reviews/round-5/.",
+        "inner pauses at most 0.33 s Chinese; 0.33 s (0.22 s at commas) English;",
+        "inner pause floors Chinese 。？！ 0.31 s, ， 0.155 s; English none declared;",
+        "breaths Chinese 7.5 s with a 0.26 s pause; English none declared;",
+        "ratios and margins 1.2 and 0.04 s Chinese, 1.62 and 0.00 s English;",
+        "level tolerances 0.75 dB Chinese, 0.75 dB English;",
+        "coda thought pauses 1.40 s Chinese, 0.90 s English.",
+        (
+            "\n1. subject_and_faithfulness: the rebuild of a film from its sources remains "
+            "the subject;"
+        ),
+        "\n4. deliverable_craft: cover, credits and metadata name the film and its author;",
         "and ROOT/build/evidence/reviews/round-5/review-zh.json with:",
         "Put working files under ROOT/build/evidence/reviews/round-5/zh/.",
-        # The delivery format is the specification's.
+        # The delivery format is the specification's, at the soundtracks' program level.
         (
             f"Each edition: exactly {specification.DURATION} s, 16:9 pure 2D, "
             f"{specification.FPS} fps, UHD master and a captioned 1080p viewing edition, "
-            f"{specification.RATE // 1000} kHz stereo narration, no music."
+            f"{specification.RATE // 1000} kHz stereo narration at -16.5 LUFS integrated, "
+            "no music."
         ),
     ):
         assert expected in zh
     assert "(no findings)" in en
     assert "working files are in" not in en
-    assert "the Chinese soundtrack ROOT/build/artifacts/film/zh/ddwg-zh-narration.wav" in en
+    assert "The Chinese (zh) edition is the same film in its own language" in en
     for text in (zh, en):
         assert not re.search(r"\{[a-z_]+\}", text)
         assert "runtime/work" not in text
-        # Both prompts carry the score anchors and the accepted specification's path.
-        assert "\n- 97-100: nothing a careful first-time viewer would notice." in text
-        accepted = "`ROOT/openspec/specs/film-production/spec.md` is the accepted specification."
-        assert accepted in text
     monkeypatch.setattr(specification, "DURATION", 1260)
     monkeypatch.setattr(specification, "RATE", 44100)
     review_round.prompts(previous, out, changes)
@@ -313,7 +320,7 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
     assert "44.1 kHz stereo narration" in (out / "prompt-en.md").read_text()
     Edition("en").film("uhd").unlink()
     with pytest.raises(
-        ReviewError, match=re.escape("missing build/artifacts/film/en/ddwg-en-uhd.mp4")
+        ReviewError, match=re.escape("missing build/artifacts/film/en/sample-reel-en-uhd.mp4")
     ):
         review_round.prompts(previous, out, changes)
 

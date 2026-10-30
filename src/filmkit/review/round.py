@@ -339,7 +339,7 @@ def reviewed_scores(code: str, review: dict) -> dict:
     as its overall score.
     """
     if set(review.get("scores", {})) != set(DIMENSIONS):
-        msg = f"{code}: a review scores exactly the eight declared dimensions"
+        msg = f"{code}: a review scores exactly the declared dimensions"
         raise ReviewError(msg)
     scores = {name: review["scores"][name] for name in DIMENSIONS}
     mean, reported = overall(scores), review.get("overall")
@@ -357,9 +357,9 @@ def review_records(round_dir: Path) -> list[ProductionReview]:
 
     Reads review-<code>.json and <code>-review.md from the round directory and derives
     the schema 2 record that the film verifier accepts beside a copy of the report: the
-    exact reviewed media, script and composition hashes, the eight scores and their
+    exact reviewed media, script and composition hashes, the declared scores and their
     mean, every finding and the human-listening state. Both reviews must cover the
-    current delivered films, score exactly the eight dimensions and report their mean.
+    current delivered films, score exactly the declared dimensions and report their mean.
     """
     records = []
     for code in CODES:

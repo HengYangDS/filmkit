@@ -21,6 +21,7 @@ import filmkit.picture.rendering as picture_rendering
 import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.specification as specification
+from filmkit.film import FILM
 
 # The verified films last two seconds, the last of them credits.
 DURATION, CREDITS = 2, 1
@@ -66,7 +67,7 @@ class Folder(NamedTuple):
 @pytest.fixture
 def film(tmp_path) -> Folder:
     """A root whose current members are small texts, and an absent destination."""
-    folder = Folder(tmp_path / "root", tmp_path / "Documents/ddwg-introduction-film")
+    folder = Folder(tmp_path / "root", tmp_path / "Documents" / FILM.documents_folder)
     for source, path in delivery_documents_folder.plan(folder.root):
         write_input(source, f"current {path}\n")
     return folder
@@ -213,7 +214,9 @@ def packages(inputs: Inputs) -> None:
     output = edition.artifacts
     write_input(root / edition.cover, b"cover png")
     for name in delivery_packaging.viewing_members(edition):
-        write_input(output / name, b"cover png" if name == "ddwg-cover.png" else f"{name}\n")
+        write_input(
+            output / name, b"cover png" if name == delivery_packaging.COVER_PNG else f"{name}\n"
+        )
     for film in edition.films:
         write_input(film, f"{film.name}\n")
     write_input(
@@ -221,7 +224,7 @@ def packages(inputs: Inputs) -> None:
         {
             "picture_sha256": sha(edition.picture),
             "soundtrack_sha256": sha(edition.soundtrack),
-            "cover_sha256": sha(output / "ddwg-cover.jpg"),
+            "cover_sha256": sha(output / delivery_packaging.COVER_JPEG),
             "script_sha256": sha(root / edition.script),
             "chapters_sha256": sha(output / "chapters.ffmeta"),
             "editions": [{"path": film.name, "sha256": sha(film)} for film in edition.films],

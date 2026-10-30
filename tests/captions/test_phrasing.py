@@ -9,6 +9,37 @@ import filmkit.captions.english as captions_english
 import filmkit.captions.phrasing as captions_phrasing
 import filmkit.repository as repository
 
+# The fixed terms of the English script that the phrasing cases below come from, as that
+# film declares them for its English edition.
+SCRIPT_TERMS = (
+    "source of truth",
+    "sources of truth",
+    "decision owner",
+    "task lead",
+    "release owner",
+    "work cycle",
+    "permission or compliance",
+    "resource limits",
+    "publication time",
+    "price snapshots",
+    "goes back to the member",
+    "make up for",
+    "fabricated selectively hidden or unverified facts",
+    "agent output",
+    "standing in for",
+    "fact authorization or responsibility",
+    "data department work guidelines",
+    "operational delivery",
+    "the problem scope or completion condition",
+)
+
+
+@pytest.fixture
+def script_terms(monkeypatch):
+    """Phrase captions with the fixed terms of the script the cases come from."""
+    terms = tuple(tuple(term.split()) for term in SCRIPT_TERMS)
+    monkeypatch.setattr(captions_english, "FIXED_TERMS", terms)
+
 
 def test_english_caption_cues_preserve_connected_text_and_punctuation():
     copy = (
@@ -368,6 +399,7 @@ def test_chinese_captions_end_lists_at_their_own_punctuation():
         ),
     ],
 )
+@pytest.mark.usefixtures("script_terms")
 def test_english_captions_keep_modifiers_terms_and_objects_whole(passage, phrases):
     # Round-11 review EN11-1: a modifier stays with its noun, a fixed term stays
     # whole, and a verb keeps its particle and the object it takes.

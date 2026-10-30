@@ -21,7 +21,7 @@ import {
 } from "../../src/filmkit/delivery/player-check.mjs";
 
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const FILM = { slug: "ddwg", duration: 1500 };
+const FILM = { slug: "sample-reel", duration: 60 };
 const binding = (destination = "/delivery") => ({
   destination,
   film: FILM,
@@ -82,29 +82,29 @@ const opaque = (rgb) =>
 test("the delivery has the entry page and ten members per language", () => {
   const edition = (code) =>
     [
-      `ddwg-${code}-uhd.mp4`,
-      `ddwg-${code}-1080p-captioned.mp4`,
-      "ddwg-cover.png",
-      "ddwg-cover.jpg",
-      `ddwg-${code}.srt`,
-      `ddwg-${code}.vtt`,
-      `ddwg-${code}-transcript.md`,
+      `sample-reel-${code}-uhd.mp4`,
+      `sample-reel-${code}-1080p-captioned.mp4`,
+      "sample-reel-cover.png",
+      "sample-reel-cover.jpg",
+      `sample-reel-${code}.srt`,
+      `sample-reel-${code}.vtt`,
+      `sample-reel-${code}-transcript.md`,
       "chapters.json",
       "chapters.ffmeta",
       "index.html",
     ].map((name) => `${code}/${name}`);
-  assert.deepEqual(deliveryMembers("ddwg"), ["index.html", ...edition("zh"), ...edition("en")]);
-  assert.equal(new Set(deliveryMembers("ddwg")).size, 21);
+  assert.deepEqual(deliveryMembers(FILM.slug), ["index.html", ...edition("zh"), ...edition("en")]);
+  assert.equal(new Set(deliveryMembers(FILM.slug)).size, 21);
 });
 
 test("a binding names an absolute destination, the film and exactly its delivery members", () => {
   assert.deepEqual(bindingProblems(binding()), []);
-  assert.deepEqual(bindingProblems(binding("Documents/ddwg")), [
+  assert.deepEqual(bindingProblems(binding("Documents/sample-reel")), [
     "destination is not an absolute path",
   ]);
   const finderCopy = binding();
-  finderCopy.members.push({ path: "zh/ddwg-zh 2.srt", sha256: sha("copy") });
-  assert.deepEqual(bindingProblems(finderCopy), ["unexpected members: zh/ddwg-zh 2.srt"]);
+  finderCopy.members.push({ path: "zh/sample-reel-zh 2.srt", sha256: sha("copy") });
+  assert.deepEqual(bindingProblems(finderCopy), ["unexpected members: zh/sample-reel-zh 2.srt"]);
   const short = binding();
   short.members = short.members.filter((member) => member.path !== "en/index.html");
   assert.deepEqual(bindingProblems(short), ["missing members: en/index.html"]);
@@ -114,11 +114,11 @@ test("a binding names an absolute destination, the film and exactly its delivery
   const unhashed = binding();
   unhashed.members[3].sha256 = "abc";
   assert.deepEqual(bindingProblems(unhashed), [`${unhashed.members[3].path}: no SHA-256`]);
-  assert.deepEqual(bindingProblems({ ...binding(), film: { slug: "DDWG", duration: 0 } }), [
+  assert.deepEqual(bindingProblems({ ...binding(), film: { slug: "Sample Reel", duration: 0 } }), [
     "film names no file prefix",
     "film names no duration",
   ]);
-  const another = { ...binding(), film: { slug: "another", duration: 1500 } };
+  const another = { ...binding(), film: { slug: "another", duration: FILM.duration } };
   assert.deepEqual(
     bindingProblems(another).map((problem) => problem.split(":")[0]),
     ["missing members", "unexpected members"],
@@ -136,10 +136,10 @@ test("a delivery readback binds only when it matched its sources with nothing be
     "the readback does not match its sources",
   ]);
   assert.deepEqual(
-    bindingProblems({ ...binding(), all_match: false, unexpected: ["zh/ddwg-zh 2.srt"] }),
+    bindingProblems({ ...binding(), all_match: false, unexpected: ["zh/sample-reel-zh 2.srt"] }),
     [
       "the readback does not match its sources",
-      "unexpected entries at the destination: zh/ddwg-zh 2.srt",
+      "unexpected entries at the destination: zh/sample-reel-zh 2.srt",
     ],
   );
 });
@@ -190,7 +190,9 @@ test("PNG decoding refuses what it does not decode", () => {
 
 test("the tracked cover decodes at UHD on the film's ground", async () => {
   const cover = decodePng(
-    await readFile(new URL("../../assets/cover/ddwg-cover.png", import.meta.url)),
+    await readFile(
+      new URL("../../examples/sample-film/assets/cover/sample-reel-cover.png", import.meta.url),
+    ),
   );
   assert.deepEqual([cover.width, cover.height], [3840, 2160]);
   for (const offset of [0, (1079 * 3840 + 1919) * 4, cover.data.length - 4])

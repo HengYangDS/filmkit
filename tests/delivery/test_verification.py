@@ -45,15 +45,15 @@ def test_an_edition_is_qualified_as_its_two_current_films():
     ]
     assert (report["verdict"], report["scope"], report["language"]) == ("pass", "acceptance", "en")
     assert report["media"] == [
-        ("ddwg-en-1080p-captioned.mp4", (1920, 1080)),
-        ("ddwg-en-uhd.mp4", (3840, 2160)),
+        ("sample-reel-en-1080p-captioned.mp4", (1920, 1080)),
+        ("sample-reel-en-uhd.mp4", (3840, 2160)),
     ]
     assert report["review"] == ("en", sorted(film.name for film in films))
     technical = delivery_verification.qualify(edition, films, technical_only=True)
     assert (technical["scope"], technical["review"]) == ("technical", {"verdict": "not_reviewed"})
     for files in (
         films[:1],
-        [*films, edition.artifacts / "ddwg-en-uhd.mp4"],
+        [*films, edition.artifacts / "sample-reel-en-uhd.mp4"],
         [edition.artifacts.parent / "zh" / film.name for film in films],
         production.Edition("zh").films,
     ):

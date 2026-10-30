@@ -135,7 +135,7 @@ def two_chapters(tmp_path, monkeypatch, performance):
         "evidence_sha256": sha256(level),
     }
     script = {
-        "title": "DDWG",
+        "title": "Sample Reel",
         "voice_performance": {
             **performance,
             "thought_level_tolerance_db": 0.75,

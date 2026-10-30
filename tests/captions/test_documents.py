@@ -13,7 +13,7 @@ import filmkit.specification as specification
 
 @pytest.mark.parametrize(
     ("code", "byline"),
-    [("zh", "Yang HENG · 中文 · 25 分钟"), ("en", "Yang HENG · English · 25 min")],
+    [("zh", "Yang HENG · 中文 · 1 分钟"), ("en", "Yang HENG · English · 1 min")],
 )
 def test_chapters_land_on_their_cards_and_head_the_transcript(tmp_path, monkeypatch, code, byline):
     release = repository.read(production.Edition(code).script)["release"]
@@ -34,12 +34,12 @@ def test_chapters_land_on_their_cards_and_head_the_transcript(tmp_path, monkeypa
         }
 
     timeline = {
-        "title": "DDWG",
+        "title": "Sample Reel",
         "captions": [{"start": 1.9, "end": 3.0, "text": "Text 01. "}],
         "segments": [
             segment("01", "purpose", "One", 0.0),
-            segment("02", "purpose", "One", 30.0),
-            segment("03", "decide", "Two", 60.0),
+            segment("02", "purpose", "One", 15.0),
+            segment("03", "decide", "Two", 30.0),
         ],
     }
     timeline["segments"][2]["text"] = "Text 03 isn't done."
@@ -47,21 +47,21 @@ def test_chapters_land_on_their_cards_and_head_the_transcript(tmp_path, monkeypa
     output = edition.artifacts
     chapters = json.loads((output / "chapters.json").read_text())["chapters"]
     # The second chapter starts once its card is shown, after its scene starts.
-    second = 60.0 + specification.CHAPTER_CARD_SHOWN
+    second = 30.0 + specification.CHAPTER_CARD_SHOWN
     assert [(c["title"], c["start"]) for c in chapters] == [("One", 0.0), ("Two", second)]
     metadata = (output / "chapters.ffmeta").read_text()
     assert f"START={round(second * 1000)}\n" in metadata
     assert f"END={specification.DURATION * 1000}\n" in metadata
     assert f"comment={edition.comment}\n" in metadata
-    assert ("示意" in metadata) == (code == "zh")
-    for name in (f"ddwg-{code}.srt", f"ddwg-{code}.vtt"):
+    assert ("示例影片" in metadata) == (code == "zh")
+    for name in (f"{edition.prefix}.srt", f"{edition.prefix}.vtt"):
         lines = (output / name).read_text().splitlines()
         assert "Text 01." in lines
         assert all(line == line.rstrip() for line in lines)
-    transcript = (output / f"ddwg-{code}-transcript.md").read_text()
+    transcript = (output / f"{edition.prefix}-transcript.md").read_text()
     assert transcript.splitlines()[2] == byline
     assert transcript.count("\n## ") == 2
-    assert "\n## 02 Two\n\n00:01:01.800 · Scene 03\n" in transcript
+    assert "\n## 02 Two\n\n00:00:31.800 · Scene 03\n" in transcript
     # Display copy sets an apostrophe as a typographic right single quote.
     assert "Text 03 isn’t done." in transcript
     assert captions_timing.typeset("Others' work isn't done") == "Others’ work isn’t done"

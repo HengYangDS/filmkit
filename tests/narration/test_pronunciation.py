@@ -13,9 +13,76 @@ from filmkit.production import CODES, Edition
 OPEN_SPEC = {"display": "OpenSpec", "spoken": "Open Spec", "kind": "english-name"}
 
 
-@pytest.fixture(scope="module")
+def reading(arpabet: list[str], primary: int, secondary: list[int], weak: list[int]) -> dict:
+    """A dictionary reading's phones and its stressed and weak syllables."""
+    vowels = sum(phone[-1].isdigit() for phone in arpabet)
+    return {
+        "arpabet": arpabet,
+        "syllable_count": vowels,
+        "primary_syllable": primary,
+        "secondary_syllables": secondary,
+        "weak_syllables": weak,
+    }
+
+
+# English targets of each kind, as CMU dictionary readings: a word, two contextual
+# homographs with their senses, and a letter name; and a planned occurrence of two of them.
+TARGETS = [
+    {
+        "term": "acquisition",
+        "kind": "lexical",
+        "lexical_stress": reading(
+            ["AE2", "K", "W", "AH0", "Z", "IH1", "SH", "AH0", "N"], 3, [1], [2, 4]
+        ),
+    },
+    {
+        "term": "record",
+        "kind": "contextual-homograph",
+        "lexical_stress": {
+            "noun": reading(["R", "EH1", "K", "ER0", "D"], 1, [], [2]),
+            "verb": [
+                reading(["R", "AH0", "K", "AO1", "R", "D"], 2, [], [1]),
+                reading(["R", "IH0", "K", "AO1", "R", "D"], 2, [], [1]),
+            ],
+        },
+    },
+    {
+        "term": "use",
+        "kind": "contextual-homograph",
+        "lexical_stress": {
+            "noun": reading(["Y", "UW1", "S"], 1, [], []),
+            "verb": reading(["Y", "UW1", "Z"], 1, [], []),
+        },
+    },
+    {"term": "AI", "kind": "letter-name", "lexical_stress": {}},
+]
+ENTRIES = [
+    {
+        "locale": "en",
+        "display_word": "AI",
+        "target_owner_term": "AI",
+        "grammar": "letter-name",
+        "target_stress": {},
+    },
+    {
+        "locale": "en",
+        "display_word": "use",
+        "target_owner_term": "use",
+        "grammar": "noun",
+        "target_stress": reading(["Y", "UW1", "S"], 1, [], []),
+    },
+]
+
+
+@pytest.fixture
 def performance() -> dict:
-    return repository.read("content/voice-performance.json")
+    """A contract that holds the English targets and their planned occurrences."""
+    return {
+        "pronunciation": {
+            "languages": {"English": {"targets": copy.deepcopy(TARGETS)}},
+            "occurrence_plan": {"count": len(ENTRIES), "entries": copy.deepcopy(ENTRIES)},
+        }
+    }
 
 
 def target(performance: dict, term: str) -> dict:
@@ -32,8 +99,9 @@ def stress(term, **changes):
     return lambda performance: target(performance, term)["lexical_stress"].update(changes)
 
 
-def test_the_reviewed_contract_passes_its_target_checks(performance):
-    narration_pronunciation.validate_pronunciation_targets(performance)
+def test_the_reviewed_contract_passes_its_target_checks():
+    reviewed = repository.read("content/voice-performance.json")
+    narration_pronunciation.validate_pronunciation_targets(reviewed)
 
 
 @pytest.mark.parametrize(
@@ -77,6 +145,7 @@ def test_the_reviewed_contract_passes_its_target_checks(performance):
     ],
 )
 def test_a_contradictory_target_is_refused(performance, tamper, message):
+    narration_pronunciation.validate_pronunciation_targets(performance)
     changed = copy.deepcopy(performance)
     tamper(changed)
     with pytest.raises(ValueError, match=message):
