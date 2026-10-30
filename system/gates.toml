@@ -1,0 +1,59 @@
+schema_version = 1
+id = "filmkit-gate-registry"
+source_refs = ["system/gates.toml"]
+
+# The proof sets hold the portable gates that hosted CI also runs. The sample film's build needs
+# Apple silicon, the supplied models and the pinned browser build; it stays a local acceptance.
+[proof_sets]
+default = ["native-static", "native-behavior", "source-integrity"]
+full = ["native-static", "native-behavior", "source-integrity"]
+
+[[gates]]
+id = "native-static"
+kind = "lint"
+providers = ["ethos.adapters.gates.code_quality:static_report"]
+policy = "required"
+profile = "repository"
+toolchain = "ethos"
+asset_classes = ["python-code", "javascript-code"]
+dimensions = ["static-analysis"]
+execution_mode = "provider"
+evidence_class = "proof"
+trust_bearing = true
+tool_adapter = "ethos"
+writes_files = false
+network_policy = "offline"
+version_source = "product"
+
+[[gates]]
+id = "native-behavior"
+kind = "test"
+providers = ["ethos.adapters.gates.code_quality:behavior_report"]
+policy = "required"
+profile = "repository"
+toolchain = "ethos"
+asset_classes = ["python-code", "javascript-code"]
+dimensions = ["behavior", "coverage"]
+execution_mode = "provider"
+evidence_class = "proof"
+trust_bearing = true
+tool_adapter = "ethos"
+writes_files = false
+network_policy = "offline"
+version_source = "product"
+
+[[gates]]
+id = "source-integrity"
+kind = "integrity"
+providers = ["ethos.adapters.gates.provenance.observation:integrity_report"]
+policy = "required"
+profile = "repository"
+toolchain = "ethos"
+dimensions = ["source-integrity"]
+execution_mode = "provider"
+evidence_class = "proof"
+trust_bearing = true
+tool_adapter = "ethos"
+writes_files = false
+network_policy = "offline"
+version_source = "product"
