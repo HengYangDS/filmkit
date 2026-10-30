@@ -1,0 +1,10 @@
+/build/
+/examples/*/build/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+node_modules/
+.omx/
+.serena/
+.claude/

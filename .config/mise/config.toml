@@ -1,0 +1,49 @@
+min_version = "2026.10.14"
+
+[settings]
+locked = true
+
+# The repository's common verbs; the npm scripts and the frozen uv environment they call own the commands.
+[tasks.bootstrap]
+description = "Prepare the frozen Python environment and the locked npm packages"
+run = ["uv sync --python 3.12 --frozen --group dev", "npm ci --include=dev"]
+depends_post = ["check:dependencies"]
+
+[tasks."check:dependencies"]
+description = "Verify that the lock is current and the installed dependency graphs match the frozen inputs"
+run = [
+  "uv lock --python 3.12 --check --offline",
+  "uv sync --python 3.12 --frozen --check --offline --group dev",
+  "uv run --python 3.12 --frozen --offline --no-sync --group dev uv pip check",
+  "npm ls --all --include=dev",
+]
+
+[tasks.check]
+description = "Run the engine's Node and Python tests and check the Markdown formatting without writing"
+depends = ["check:dependencies"]
+run = [
+  "npm test",
+  "npm run format:markdown:check",
+  "uv run --python 3.12 --frozen --offline --group dev python -m pytest -q tests",
+]
+
+[tasks.fix]
+description = "Apply the Markdown formatter to the files it owns"
+run = "npm run format:markdown"
+
+# The ETHOS gates resolve these only from this lock, never from PATH: Node for the picture checks,
+# Python and uv for the suite. Python stays on the 3.12 line that the films select.
+[tools]
+node = "26.12.1"
+python = "3.12.16"
+uv = "0.13.5"
+
+# The ETHOS release declaration as published with v0.2.0-alpha.20.
+[tools."http:ethos"]
+version = "0.2.0-alpha.20"
+
+[tools."http:ethos".platforms]
+linux-arm64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-alpha.20/ethos-0.2.0-alpha.20-linux-arm64.tar.gz", checksum = "sha256:6a92b46f2e78321a67da31527a7b85fa6e8bcdea840ad99a86e96f85221f8b74", bin_path = "ethos/bin" }
+linux-x64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-alpha.20/ethos-0.2.0-alpha.20-linux-x64.tar.gz", checksum = "sha256:2e67d0ef341dd38ac6cda598a8763699e83c752e5d9a23c96aa7c58e7bd3c58e", bin_path = "ethos/bin" }
+macos-arm64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-alpha.20/ethos-0.2.0-alpha.20-macos-arm64.tar.gz", checksum = "sha256:367b1070b55db644ab96e9ef457aaa65ee8bf803dba22dcbbb505d15ce59a62c", bin_path = "ethos/bin" }
+windows-x64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-alpha.20/ethos-0.2.0-alpha.20-windows-x64.tar.gz", checksum = "sha256:cc173f811052d4a0dbb555c7139b085c2b17b48c167f3c07cb67fa7b89eda724", bin_path = "ethos/bin" }

@@ -3,7 +3,7 @@
 ## 1. Import and toolchain
 
 - [x] 1.1 Import the engine's Python modules, Node tools and engine tests from `ddwg-film` at `37549a9` without history or film-specific tests, and verify each imported file's SHA-256 equals its blob there.
-- [ ] 1.2 Bind the toolchain: the Mise configuration and lock for Node 26.12.1, CPython 3.12.16, uv 0.13.5 and ETHOS `0.2.0-alpha.20`, bound with its release's Mise declaration, and the uv and npm locks; verify `mise install --locked`, `uv sync --frozen` and `npm ci` succeed.
+- [x] 1.2 Bind the toolchain: the Mise configuration and lock for Node 26.12.1, CPython 3.12.16, uv 0.13.5 and ETHOS `0.2.0-alpha.20`, bound with its release's Mise declaration, and the uv and npm locks; verify `mise install --locked`, `uv sync --frozen` and `npm ci` succeed.
 - [ ] 1.3 Declare the gate registry with the portable gates, the check policies and the agent entry; verify `ethos status` passes.
 
 ## 2. Engine boundary

@@ -2,9 +2,17 @@
 name = "filmkit"
 version = "0.1.0"
 description = "Rebuild narrated bilingual explainer films from their tracked sources"
-requires-python = ">=3.12"
-dependencies = []
+requires-python = ">=3.12,<3.15"
+dependencies = ["mlx-audio==0.5.8", "numpy==2.5.4", "pillow==13.0.0", "pydantic==2.14.1"]
 
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14.0"]
 build-backend = "uv_build"
+
+# Resolve stable releases only, as uv.lock records; `uv run --locked` refuses a lock that was
+# resolved in another prerelease mode.
+[tool.uv]
+prerelease = "disallow"
+
+[dependency-groups]
+dev = ["coverage==7.16.2", "pytest==9.1.1", "pytest-cov==7.1.0", "pytest-reportlog==1.0.0"]
