@@ -1,3 +1,7 @@
+## Purpose
+
+Keep each thought's spoken ending whole from its take to the delivered soundtrack, and measure delivered endings where a listener hears the voice stop.
+
 ## ADDED Requirements
 
 ### Requirement: A soundtrack never fades a thought that is still speaking
