@@ -265,13 +265,15 @@ def test_delivered_endings_judge_each_thought_where_its_sound_stops(narration, t
         np.pi * np.arange(1, release + 1) / (release + 1)
     )
     path = write_narration(tmp_path / "released.wav", mono)
-    released = review_endings.delivered_endings(path, timeline, released={"01.2"})
+    released = review_endings.delivered_endings(path, timeline, released={"01.2": release})
     assert released["released"] == ["01.2"]
     assert released["cut_while_voiced"] == ["01.2"]
     # A thought that dies away by itself is never judged where no release began.
     path = write_narration(tmp_path / "natural.wav", spoken(dies_away))
     assert (
-        review_endings.delivered_endings(path, timeline, released={"01.1"})["cut_while_voiced"]
+        review_endings.delivered_endings(path, timeline, released={"01.1": release})[
+            "cut_while_voiced"
+        ]
         == []
     )
     # Joined without digital zero to the next thought, a thought is delivered up to one
@@ -292,6 +294,44 @@ def test_delivered_endings_judge_each_thought_where_its_sound_stops(narration, t
     path = write_narration(tmp_path / "room.wav", mono)
     assert review_endings.delivered_endings(path, timeline)["abrupt"] == ["01.2"]
     assert review_endings.delivered_endings(path, timeline, 4.5)["abrupt"] == []
+
+
+def cut_and_released(stop: float, release: int) -> np.ndarray:
+    """The narration with "decide." voiced up to `stop` and faded into zero over `release`."""
+    mono = spoken(dies_away)
+    second, end = round(1.90 * RATE), round(stop * RATE)
+    mono[second : round(2.60 * RATE)] = 0
+    mono[second:end] = voiced(stop - 1.90, 0)
+    mono[end - release : end] *= 0.5 + 0.5 * np.cos(
+        np.pi * np.arange(1, release + 1) / (release + 1)
+    )
+    return mono
+
+
+def test_a_delivered_ending_is_judged_where_the_voice_stops_before_its_aligned_end(
+    narration, tmp_path
+):
+    _, timeline, _ = narration
+    # "decide." is aligned to end at 2.60 s, but its voice is cut at full level at 2.50 s and
+    # released over 60 ms, which lets it pass as a natural ending. Its stop is the first
+    # digital zero after the word begins, and the 20 ms before its release are heard at full
+    # voice.
+    release = round(0.06 * RATE)
+    path = write_narration(tmp_path / "early.wav", cut_and_released(2.50, release))
+    early = review_endings.delivered_endings(path, timeline, released={"01.2": release})
+    assert early["abrupt"] == []
+    assert early["cut_while_voiced"] == ["01.2"]
+
+
+def test_a_long_release_of_a_full_voice_is_judged_where_it_begins(narration, tmp_path):
+    _, timeline, _ = narration
+    # Released over a declared 0.2 s, the voice dies away smoothly enough to end naturally,
+    # but it was cut at full voice where the release began.
+    release = round(0.2 * RATE)
+    path = write_narration(tmp_path / "long.wav", cut_and_released(2.60, release))
+    released = review_endings.delivered_endings(path, timeline, released={"01.2": release})
+    assert released["abrupt"] == []
+    assert released["cut_while_voiced"] == ["01.2"]
 
 
 def test_phrase_endings_list_a_phrase_cut_before_the_pause_inside_its_thought(tmp_path):
@@ -343,7 +383,7 @@ def test_the_thoughts_an_assembly_released_are_named_by_their_joins_and_clip_end
             },
         ]
     }
-    assert review_endings.released_thoughts(assembly, timeline) == {"01.2", "02.2"}
+    assert review_endings.released_thoughts(assembly, timeline) == {"01.2": 2880, "02.2": 2880}
 
 
 def thoughts(name, words):

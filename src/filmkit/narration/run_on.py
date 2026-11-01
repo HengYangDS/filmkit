@@ -26,6 +26,10 @@ ALIGNER_STEP_SECONDS = 0.08
 def following_spoken_text(records: list[dict], segment: str, index: int) -> str:
     """The spoken text of the thought that follows one thought in a receipt's recordings.
 
+    A thought that ends in Latin text without a space, as an English thought that ends its
+    segment does, reads on into a Latin letter or digit after a word space, so its last word and
+    the next thought's first word stay separate words.
+
     Raises:
         ValueError: No thought follows it.
     """
@@ -38,7 +42,11 @@ def following_spoken_text(records: list[dict], segment: str, index: int) -> str:
     if place + 1 == len(thoughts):
         msg = f"{segment}.{index}: no thought follows it to read on into"
         raise ValueError(msg)
-    return thoughts[place + 1][2]
+    last, following = thoughts[place][2][-1:], thoughts[place + 1][2]
+    first = following[:1]
+    if last.isascii() and last.strip() and first.isascii() and first.isalnum():
+        return f" {following}"
+    return following
 
 
 def thought_bounds(items: list[dict], spoken: str, run_on: str) -> tuple[float, float]:

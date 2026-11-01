@@ -21,12 +21,20 @@ def wav_frames(path: Path) -> tuple[np.ndarray, int]:
         return pcm.reshape(-1, audio.getnchannels()), audio.getframerate()
 
 
-def thought_spans(segment: dict) -> list[tuple[float, float]]:
-    """Start and end of each thought: the first and last aligned words of its utterance group."""
+def aligned_thoughts(segment: dict) -> list[tuple[float, float, float]]:
+    """Each thought's aligned first word start, last word start and last word end."""
     words = segment["words"]
     try:
         spans = spoken_units.thought_spans(segment["text"], words, segment["utterance_groups"])
     except spoken_units.AlignmentError as error:
         msg = f"{segment['id']}: {error}"
         raise ReviewError(msg) from error
-    return [(words[span.first]["start"], words[span.last]["end"]) for span in spans]
+    return [
+        (words[span.first]["start"], words[span.last]["start"], words[span.last]["end"])
+        for span in spans
+    ]
+
+
+def thought_spans(segment: dict) -> list[tuple[float, float]]:
+    """Start and end of each thought: the first and last aligned words of its utterance group."""
+    return [(start, end) for start, _, end in aligned_thoughts(segment)]

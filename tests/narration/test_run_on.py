@@ -86,6 +86,28 @@ def test_the_last_thought_has_nothing_to_read_on_into():
         narration_run_on.following_spoken_text(RECORDS, "25", 1)
 
 
+ENGLISH = [
+    {
+        "id": "11",
+        "utterance_groups": {
+            "records": [
+                {"index": 1, "spoken_text": "Ship it. "},
+                {"index": 2, "spoken_text": "Check it."},
+            ]
+        },
+    },
+    {"id": "12", "utterance_groups": {"records": [{"index": 1, "spoken_text": "Then decide."}]}},
+]
+
+
+@pytest.mark.parametrize(
+    ("segment", "index", "following"), [("11", 2, " Then decide."), ("11", 1, "Check it.")]
+)
+def test_an_english_run_on_keeps_the_word_space_between_its_thoughts(segment, index, following):
+    # A thought that ends its segment has no trailing space, so its run-on begins with one.
+    assert narration_run_on.following_spoken_text(ENGLISH, segment, index) == following
+
+
 @pytest.mark.parametrize(
     ("run_on", "valid"),
     [

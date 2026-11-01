@@ -194,3 +194,70 @@ def test_assembly_lays_out_each_recording_with_its_own_level_and_exact_samples(t
     # Both receipt writers give the caption fields the same place.
     assert list(receipt)[-3:] == ["caption_count", "alignment_limits", "caption_timing"]
     assert receipt["caption_count"] == len(timeline["captions"]) == 4
+
+
+class Decoded(Exception):
+    """The assembly passed its checks of the bound recordings and began to decode them."""
+
+
+def decoding(*_):
+    raise Decoded
+
+
+def write_take(path, *, cut: bool) -> None:
+    """Write a mono thought take: half a second of tone that dies away or is cut, then quiet."""
+    tone = 6000 * np.sin(2 * np.pi * 220 * np.arange(round(0.5 * RATE)) / RATE)
+    if not cut:
+        tail = round(0.2 * RATE)
+        tone[-tail:] *= np.exp(-np.arange(tail) / (0.015 * RATE))
+    with wave.open(str(path), "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(RATE)
+        audio.writeframes(
+            np.rint(np.concatenate([tone, np.zeros(round(0.3 * RATE))])).astype("<i2")
+        )
+
+
+def bind_thought_takes(edition, cut=()) -> None:
+    """Bind two thought takes to each selected recording; the named thoughts are cut."""
+    selected = json.loads(edition.narration_selected.read_text())
+    for record in selected["records"]:
+        groups = []
+        for index in (1, 2):
+            path = repository.ROOT / f"take-{record['id']}-{index}.wav"
+            write_take(path, cut=f"{record['id']}.{index}" in cut)
+            groups.append({"index": index, "path": path.name})
+        record["utterance_groups"] = {"records": groups}
+    edition.narration_selected.write_text(json.dumps(selected, ensure_ascii=False))
+
+
+def test_assembly_refuses_thought_takes_cut_inside_their_last_syllable(two_chapters, monkeypatch):
+    bind_thought_takes(two_chapters, cut={"01.1", "02.2"})
+    monkeypatch.setattr(soundtrack_assembly, "_decode", decoding)
+    # Every abrupt thought is named before any recording is decoded.
+    with pytest.raises(
+        soundtrack_assembly.AssemblyError,
+        match=r"^Thought takes end abruptly without a declared release: 01\.1, 02\.2$",
+    ):
+        soundtrack_assembly.assemble(two_chapters)
+
+
+def test_a_declared_release_lets_its_thought_take_end_abruptly(two_chapters, monkeypatch):
+    bind_thought_takes(two_chapters, cut={"01.1"})
+    script = repository.ROOT / two_chapters.script
+    declared = json.loads(script.read_text())
+    declared["voice_performance"]["released_tail_seconds"] = {"01.1": 0.12}
+    script.write_text(json.dumps(declared, ensure_ascii=False))
+    monkeypatch.setattr(soundtrack_assembly, "_decode", decoding)
+    with pytest.raises(Decoded):
+        soundtrack_assembly.assemble(two_chapters)
+
+
+@pytest.mark.ffmpeg
+def test_natural_thought_takes_assemble_the_same_soundtrack(two_chapters):
+    soundtrack_assembly.assemble(two_chapters)
+    unbound = two_chapters.soundtrack.read_bytes()
+    bind_thought_takes(two_chapters)
+    soundtrack_assembly.assemble(two_chapters)
+    assert two_chapters.soundtrack.read_bytes() == unbound

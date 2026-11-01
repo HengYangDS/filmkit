@@ -1,10 +1,11 @@
 """Assemble each edition's soundtrack from the selected recordings.
 
-The selected recordings are bound to the script, decoded, and shaped in turn: the pauses inside
-each thought are capped and lengthened, every thought boundary is measured, each thought join
-takes its designed quiet, each thought and chapter is leveled, and the clips are laid out with
-the designed gaps at one program level. The timeline, the captions and the receipt record the
-result.
+The selected recordings are bound to the script, and every bound thought take must end
+naturally unless the film declares a release for its join. The recordings are then decoded
+and shaped in turn: the pauses inside each thought are capped and lengthened, every thought
+boundary is measured, each thought join takes its designed quiet, each thought and chapter is
+leveled, and the clips are laid out with the designed gaps at one program level. The timeline,
+the captions and the receipt record the result.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from filmkit.captions.phrasing import segment_caption_phrases
 from filmkit.captions.timing import caption_receipt_fields, timed_caption_cues
 from filmkit.narration.selection import validate_aligned_recording
 from filmkit.narration.spoken_units import aligned_lookup
+from filmkit.narration.take_edges import ending
 from filmkit.narration.thought_groups import validate_group_inputs
 from filmkit.repository import read, run, sha, write
 from filmkit.soundtrack.level import (
@@ -115,6 +117,29 @@ def _bound_inputs(script: dict, edition: Edition) -> tuple[dict, dict]:
         validate_aligned_recording(record, alignments[segment["id"]])
         segment_caption_phrases(segment, edition.code)
     return records, alignments
+
+
+def _abrupt_thoughts(
+    segments: list[dict], records: dict[str, dict], releases: dict[str, dict[int, float]]
+) -> list[str]:
+    """The bound thought takes that end abruptly where their join declares no release.
+
+    Each take is judged by the take criterion that the audition proposes takes by and the
+    review reports them by. The assembly would fade such a take where its silence begins,
+    which hides the cut but still swallows its last syllable.
+    """
+    abrupt = []
+    for segment in segments:
+        groups = records[segment["id"]].get("utterance_groups", {"records": []})["records"]
+        for group in groups:
+            if group["index"] in releases[segment["id"]]:
+                continue
+            with wave.open(str(repository.ROOT / group["path"])) as audio:
+                rate = audio.getframerate()
+                pcm = np.frombuffer(audio.readframes(audio.getnframes()), dtype="<i2")
+            if not ending(pcm, rate)["natural"]:
+                abrupt.append(f"{segment['id']}.{group['index']}")
+    return abrupt
 
 
 def _decode(record: dict, source: Path) -> np.ndarray:
@@ -439,6 +464,11 @@ def assemble(edition: Edition) -> None:
     policy = designed_pause_policy(script.get("voice_performance", {}))
     segments = script["segments"]
     records, alignments = _bound_inputs(script, edition)
+    releases = segment_releases(policy, segments)
+    abrupt = _abrupt_thoughts(segments, records, releases)
+    if abrupt:
+        msg = f"Thought takes end abruptly without a declared release: {', '.join(abrupt)}"
+        raise AssemblyError(msg)
     work = repository.ROOT / "build/runtime/work/audio-assembly" / edition.code
     work.mkdir(parents=True, exist_ok=True)
     edition.artifacts.mkdir(parents=True, exist_ok=True)
@@ -454,7 +484,6 @@ def assemble(edition: Edition) -> None:
     }
     inner, overhead = _boundary_measures(segments, shaped)
     targets = thought_pause_targets(segments, policy, inner, overhead)
-    releases = segment_releases(policy, segments)
     clips = [
         _designed_clip(
             segment,

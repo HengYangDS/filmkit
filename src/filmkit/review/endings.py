@@ -1,9 +1,10 @@
 """How each thought and phrase ends: on the takes the narration receipt binds, and as delivered.
 
-A take may end abruptly and still be delivered naturally, because the assembly may release its
-tail into the digital silence that follows; a released thought is also judged where its release
-began, so a voice cut at full level and then released is listed as cut while voiced. A phrase
-that ends before a heard pause inside its thought is judged by the same fall as a thought's end.
+A take that ends abruptly reaches the soundtrack only where the film declares a release for its
+join: the assembly then releases its tail into the digital silence that follows. A released
+thought is also judged on the 20 ms before its release began, so a voice cut at full level and
+then released is listed as cut while voiced. A phrase that ends before a heard pause inside its
+thought is judged by the same fall as a thought's end.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import filmkit.narration.spoken_units as spoken_units
 import filmkit.repository as repository
 from filmkit.narration.run_on import ALIGNER_STEP_SECONDS
 from filmkit.narration.take_edges import decay, ending, phrase_ends
-from filmkit.review.support import thought_spans, wav_frames
+from filmkit.review.support import aligned_thoughts, wav_frames
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -44,15 +45,15 @@ PHRASE_ENDING = (
     "delivered thought's final fall is"
 )
 
-# A run of digital zero this long after a thought's last word ends the thought as delivered.
+# A run of digital zero this long after a thought's last word begins ends the thought as
+# delivered.
 DELIVERED_STOP_SECONDS = 0.01
-# The assembly releases a voice still heard where it meets digital silence over its last 60 ms.
 # A released thought still voiced (normalized autocorrelation at least 0.6) and within 6 dB of
-# its speech median where that release begins was cut at full voice, whatever the release
-# leaves at its end.
-RELEASE_WINDOW_SECONDS = 0.06
+# its speech median in the 20 ms before its release began was cut at full voice, whatever the
+# release leaves at its end. `decay` judges the 20 ms that end 10 ms before what it is given.
 CUT_VOICING = 0.6
 CUT_DROP_DB = -6.0
+DECAY_LEAD_SECONDS = 0.01
 
 
 def thought_endings(edition: production.Edition) -> dict:
@@ -73,63 +74,65 @@ def thought_endings(edition: production.Edition) -> dict:
     }
 
 
-def released_thoughts(assembly: dict, timeline: dict) -> set[str]:
-    """The thoughts whose tails the assembly released: at their join, or at their clip's end."""
+def released_thoughts(assembly: dict, timeline: dict) -> dict[str, int]:
+    """The samples of each thought's tail that the assembly released, at its join or clip end."""
     counts = {segment["id"]: len(segment["utterance_groups"]) for segment in timeline["segments"]}
     released = {
-        f"{record['id']}.{edit['thought_group_index']}"
+        f"{record['id']}.{edit['thought_group_index']}": edit["released_tail_samples"]
         for record in assembly["records"]
         for edit in record["designed_thought_pauses"]
         if edit.get("released_tail_samples")
     }
     return released | {
-        f"{record['id']}.{counts[record['id']]}"
+        f"{record['id']}.{counts[record['id']]}": record["boundary_fades"]["released_tail_samples"]
         for record in assembly["records"]
         if record.get("boundary_fades", {}).get("released_tail_samples")
     }
 
 
 def delivered_endings(
-    soundtrack: Path, timeline: dict, gain_db: float = 0.0, released: set[str] | None = None
+    soundtrack: Path, timeline: dict, gain_db: float = 0.0, released: dict[str, int] | None = None
 ) -> dict:
     """The natural endings of every thought as the soundtrack delivers it.
 
     A thought is delivered from its first word to where its sound stops: the first run of
-    digital zero after its last word, or one aligner step before the next thought's aligned
-    first word, which may begin that much earlier, but not before its own last word. A take
-    whose own ending is abrupt may be released into that zero by the assembly, so the
-    delivered ending is judged on the soundtrack itself, by the same criterion as the takes,
-    with the program gain taken out so its quiet is measured on the takes' scale, and its
-    final fall is judged on that scale and at program level, where a listener hears it. Each
-    thought the assembly released is also judged where its release began, so a voice cut at
-    full level and then released is listed as cut while voiced; a thought that dies away by
-    itself has no release to judge.
+    digital zero after its last word begins, since the aligner may end that word after its
+    sound has stopped, or one aligner step before the next thought's aligned first word, which
+    may begin that much earlier, but not before its own last word ends. A take whose own ending
+    is abrupt may be released into that zero by the assembly, so the delivered ending is judged
+    on the soundtrack itself, by the same criterion as the takes, with the program gain taken
+    out so its quiet is measured on the takes' scale, and its final fall is judged on that
+    scale and at program level, where a listener hears it. Each thought the assembly released,
+    with the samples it released, is also judged on the 20 ms before its release began, so a
+    voice cut at full level and then released is listed as cut while voiced; a thought that
+    dies away by itself has no release to judge.
     """
     pcm, rate = wav_frames(soundtrack)
     mono = pcm[:, 0] * 10 ** (-gain_db / 20)
-    released = released or set()
+    released = released or {}
     named = [
-        (f"{segment['id']}.{k}", span)
+        (f"{segment['id']}.{k}", thought)
         for segment in timeline["segments"]
-        for k, span in enumerate(thought_spans(segment), 1)
+        for k, thought in enumerate(aligned_thoughts(segment), 1)
     ]
     stops = [
-        max(end, start - ALIGNER_STEP_SECONDS) for (_, (_, end)), (_, (start, _)) in pairwise(named)
+        max(end, start - ALIGNER_STEP_SECONDS)
+        for (_, (_, _, end)), (_, (start, _, _)) in pairwise(named)
     ]
     stops.append(len(mono) / rate)
     run, abrupt, voiced = round(DELIVERED_STOP_SECONDS * rate), [], []
-    release = round(RELEASE_WINDOW_SECONDS * rate)
-    for (name, (start, end)), following in zip(named, stops, strict=True):
-        first, last, limit = round(start * rate), round(end * rate), round(following * rate)
-        heard = mono[last:limit] != 0
+    lead = round(DECAY_LEAD_SECONDS * rate)
+    for (name, (start, last_start, _)), following in zip(named, stops, strict=True):
+        first, onset, limit = round(start * rate), round(last_start * rate), round(following * rate)
+        heard = mono[onset:limit] != 0
         # The first sample that begins a run of digital zero, or the next thought's start.
         zero_runs = np.convolve(~heard, np.ones(run, dtype=int), "valid") == run
-        stop = last + int(np.argmax(zero_runs)) if zero_runs.any() else limit
+        stop = onset + int(np.argmax(zero_runs)) if zero_runs.any() else limit
         if not ending(mono[first:stop], rate, (0.0, gain_db))["natural"]:
             abrupt.append(name)
         if name not in released:
             continue
-        before = decay(mono[first : max(first, stop - release)], rate)
+        before = decay(mono[first : max(first, stop - released[name] + lead)], rate)
         if before["tail_voicing"] >= CUT_VOICING and before["tail_drop_db"] >= CUT_DROP_DB:
             voiced.append(name)
     return {

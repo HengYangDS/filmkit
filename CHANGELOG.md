@@ -10,8 +10,14 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ### Changed
 
+- **Breaking:** the assembly refuses an edition whose bound thought take ends abruptly, naming every such thought, unless the film declares a release for that thought's join in `released_tail_seconds`. It judges each take by the criterion that auditions and the review already use. Before, it faded such a take over 60 ms where the silence after it began, which hid the cut but swallowed the last syllable. A film whose takes all end naturally assembles the same soundtrack as before.
 - The repository runs ETHOS 0.2.0-alpha.25, whose 500-line ceiling bounds JavaScript too. The frame rules and the reviewers' measures that the geometry check and the frame audit share now live in `src/filmkit/picture/rules/`, each audit keeps its entry and holds its parts in a folder of its name, and the picture tests are split by subject. The tools keep their names, invocations and output.
 - The engine renders with HyperFrames 0.8.225 and narrates with mlx-audio 0.6.3 and MLX 0.32.4, drives the browser with puppeteer-core 25.16.0 and @puppeteer/browsers 3.2.6, and builds with Node 26.13.0, uv 0.13.6 and Pydantic 2.14.2. The browser build stays Chrome Headless Shell 152.0.7977.30. A new renderer and speech engine change the frames and narration a film renders, so a film keeps its current filmkit pin until it produces, narrates, reviews and accepts an edition on this engine; moving that pin is not a routine update.
+
+### Fixed
+
+- The review's measure of delivered endings takes each thought's stop at the first digital silence after its last word begins, not after the word's aligned end, which the aligner can place after the voice has stopped, and judges a released thought on the 20 ms before the samples the assembly released. It had counted thoughts whose voice was cut and then faded as natural endings.
+- A thought that ends in Latin text without a space, such as an English thought that ends its segment, is auditioned as a run-on that reads into the next thought after a word space, so the two thoughts' words stay apart.
 
 ### Security
 
