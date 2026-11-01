@@ -25,6 +25,6 @@ None. The engine behaves as before and no film's output changes, so `.openspec.y
 
 ## Impact
 
-- The picture tools' modules and their tests, `package.json`'s test command, three Python test files, `.config/mise/config.toml`, `.config/mise/mise.lock`, `.github/workflows/ci.yml`, `CHANGELOG.md` and the repository-common runtime selection.
+- The picture tools' modules and their tests, `package.json`'s test command, `.gitattributes`, three Python test files, `.config/mise/config.toml`, `.config/mise/mise.lock`, `.github/workflows/ci.yml`, `CHANGELOG.md` and the repository-common runtime selection.
 - The change lands on the local `dev` only; public pushes of this repository wait for the user's approval. The films pin filmkit v0.1.1 by tag, so none of them moves until it adopts a later release under its own reproduction standard.
 - `tasks.md` is the sole progress ledger.

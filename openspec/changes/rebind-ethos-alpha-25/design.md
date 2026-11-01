@@ -30,7 +30,7 @@ The frame rules are the shared contract of the real-browser check and the frame 
 
 ### The test file splits by subject
 
-A test file counts as its subject, so a failure names what broke. `tests/picture/sample-film.mjs` holds what several of them share: the sample film's folder, the staged timeline and the scratch folders. `package.json`'s test command names each test file, as it does today.
+A test file counts as its subject, so a failure names what broke. `tests/picture/sample-film.mjs` holds what several of them share: the sample film's folder, the staged timeline and the scratch folders. `package.json`'s test command names each test file, as it does today. ETHOS treats every module below `tests/` as a test the runner must enter, so `.gitattributes` gives the helper the `tooling` role, as ddwg-film does for its `tests/engine.mjs`.
 
 ### Behaviour is compared, not assumed
 
