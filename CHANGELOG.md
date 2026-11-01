@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-02
+
 ### Added
 
 - A concept contract: `concepts` in the declaration names a TOML file that states what each concept a film names means in its pinned source, quoting the passage, and which words each edition uses for it. `python -m filmkit.concepts` checks that each segment says the concepts it declares, the same in both editions, by their approved words; that no counterexample appears in the narration, titles, caption terms or picture sources; and, with a source clone, that each quotation is in its document at the pinned commit.
@@ -52,7 +54,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/HengYangDS/filmkit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/HengYangDS/filmkit/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/HengYangDS/filmkit/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/HengYangDS/filmkit/releases/tag/v0.1.0
