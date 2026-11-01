@@ -30,7 +30,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d
         with:
-          version: 2026.10.23
+          version: 2026.10.25
           install: false
           cache: false
       - name: Acquire locked product supply

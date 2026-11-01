@@ -79,10 +79,10 @@ def test_another_renderer_version_refuses_before_any_tool_runs(tmp_path, monkeyp
     manifest = root / "node_modules" / picture_rendering.RENDERER_PACKAGE
     manifest.parent.mkdir(parents=True)
     manifest.write_text(json.dumps({"name": "hyperframes", "version": "0.8.149"}))
-    with pytest.raises(PictureError, match=r"HyperFrames 0\.8\.149.*HyperFrames 0\.8\.150"):
+    with pytest.raises(PictureError, match=r"HyperFrames 0\.8\.149.*HyperFrames 0\.8\.225"):
         tools.run("geometry-check", [])
     manifest.unlink()
-    with pytest.raises(PictureError, match=r"installs no HyperFrames.*HyperFrames 0\.8\.150"):
+    with pytest.raises(PictureError, match=r"installs no HyperFrames.*HyperFrames 0\.8\.225"):
         tools.run("frame-audit", [])
     with pytest.raises(SystemExit, match=r"^motion-audit: The film installs no HyperFrames"):
         tools.main(["motion-audit", "timeline.json"])

@@ -56,7 +56,7 @@ dependencies = ["filmkit"]
 filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.1.1" }
 ```
 
-Its `package.json` declares the npm packages the engine runs, at these versions: `hyperframes` 0.8.150, the renderer, which the engine checks before it stages, renders or runs a tool; `gsap` 3.15.0, which each staged document loads; and `puppeteer-core` 25.12.0 and `@puppeteer/browsers` 3.2.3, which drive and install the browser build.
+Its `package.json` declares the npm packages the engine runs, at these versions: `hyperframes` 0.8.225, the renderer, which the engine checks before it stages, renders or runs a tool; `gsap` 3.15.0, which each staged document loads; and `puppeteer-core` 25.16.0 and `@puppeteer/browsers` 3.2.6, which drive and install the browser build. It also overrides `undici` to 7.30.1, because HyperFrames 0.8.225 pins 7.25.0, which known advisories affect.
 
 ## Commands
 
