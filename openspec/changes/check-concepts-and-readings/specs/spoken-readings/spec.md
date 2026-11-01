@@ -1,3 +1,7 @@
+## Purpose
+
+Give every ambiguous Chinese character in a film's narration one declared reading at each occurrence, and every name one declared spoken form, before any speech is synthesized.
+
 ## ADDED Requirements
 
 ### Requirement: Every watched Chinese character resolves to a declared reading

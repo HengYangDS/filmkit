@@ -1,3 +1,7 @@
+## Purpose
+
+Keep every concept a film names faithful to its canonical source: one approved rendering per edition, said wherever a segment declares the concept, and no rejected rendering anywhere a viewer meets words.
+
 ## ADDED Requirements
 
 ### Requirement: A film may declare a concept contract
