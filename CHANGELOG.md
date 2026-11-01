@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-01
+
 ### Added
 
 - `CONTRIBUTING.md`: how to prepare the tools, change the engine in an ETHOS Work Lane, verify a change, commit, and cut and publish a release.
@@ -40,6 +42,7 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/HengYangDS/filmkit/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/HengYangDS/filmkit/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/HengYangDS/filmkit/releases/tag/v0.1.0
