@@ -2,7 +2,7 @@
 
 filmkit rebuilds a narrated bilingual explainer film, a Chinese and an English edition, from the film's tracked sources. It narrates each edition's script with a local speech model, assembles one soundtrack per edition at a single program level, times the captions, renders the picture with HyperFrames, packages a UHD master and a captioned 1080p film with FFmpeg, and verifies every film against the inputs it binds. The build is offline after one supply step.
 
-The engine carries no film's content. Each film's repository holds its scripts, casts, pronunciation contract, pages, review policy and picture composition, and the engine reads them from the film it builds. The [DDWG introduction films](https://github.com/HengYangDS/ddwg-film) are built with it.
+The engine carries no film's content. Each film's repository holds its scripts, casts, pronunciation contract, pages, review policy and picture composition, and the engine reads them from the film it builds. The [DDWG introduction films](https://github.com/HengYangDS/data-department-work-guidelines-film) are built with it.
 
 ## Requirements
 
@@ -89,7 +89,7 @@ Packaging refuses to extend films bound to other inputs. A film sets a reviewed 
 
 ## Development
 
-`mise run bootstrap` prepares the locked Python and npm environments, and `mise run check` runs the Node and Python suites and the Markdown format check. The repository is governed by [ETHOS](https://github.com/HengYangDS/ethos); its portable proof runs in GitHub Actions and GitLab CI, and the sample film's build stays a local acceptance because it needs the speech models and the browser build. [CHANGELOG.md](CHANGELOG.md) records each release.
+`mise run bootstrap` prepares the locked Python and npm environments, and `mise run check` runs the Node and Python suites and the Markdown format check. The repository is governed by [ETHOS](https://github.com/HengYangDS/ethos); its portable proof runs in GitHub Actions and GitLab CI, and the sample film's build stays a local acceptance because it needs the speech models and the browser build. [CONTRIBUTING.md](CONTRIBUTING.md) explains how to change, verify and release the engine, and [CHANGELOG.md](CHANGELOG.md) records each release.
 
 ## License
 

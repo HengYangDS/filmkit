@@ -11,8 +11,9 @@ repository and is licensed with the code.
 The sample film's narrator reference recordings,
 examples/sample-film/assets/audio/narration-reference-clear.wav and
 examples/sample-film/assets/audio/en/narration-reference.wav, are unchanged copies from the
-DDWG introduction films by Yang HENG (https://github.com/HengYangDS/ddwg-film), licensed
-under the Creative Commons Attribution 4.0 International License
+DDWG introduction films by Yang HENG
+(https://github.com/HengYangDS/data-department-work-guidelines-film), licensed under the
+Creative Commons Attribution 4.0 International License
 (SPDX-License-Identifier: CC-BY-4.0; https://creativecommons.org/licenses/by/4.0/).
 
 The fonts in examples/sample-film/assets/fonts/ keep the SIL Open Font License 1.1
