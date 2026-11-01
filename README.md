@@ -26,7 +26,7 @@ A film is the folder that holds `content/film.toml`. The engine builds the film 
 | `content/release.json`                                      | The published release that `filmkit.delivery.reproduction` compares a rebuild with          |
 | `build/`                                                    | Everything the engine writes; keep it out of version control                                |
 
-Every other file is named by the declaration, a script or a cast: the entry page, the source manifest, the covers, the fonts, the pronunciation contract, the reviewer prompt, the listening-plan readings and the reference recordings.
+Every other file is named by the declaration, a script or a cast: the entry page, the source manifest, the concept contract, the covers, the fonts, the pronunciation contract, the reviewer prompt, the listening-plan readings and the reference recordings.
 
 ## The declaration
 
@@ -36,6 +36,7 @@ Every other file is named by the declaration, a script or a cast: the entry page
 | `documents_folder`               | The folder in `~/Documents` that a delivery fills                                                                                                                      |
 | `entry`                          | The template of the page that leads to each edition's player                                                                                                           |
 | `source_manifest`                | The commit and digests of the document the film explains                                                                                                               |
+| `concepts`                       | The concept contract (optional): what each concept the film names means in its source, and the words each edition uses for it                                          |
 | `[editions.zh]`, `[editions.en]` | Each edition's `sources` folder, its 16:9 `cover` and the `caption_terms` that stay on one caption line                                                                |
 | `[picture] fonts`                | The font files the picture stages below `fonts/`, in order                                                                                                             |
 | `[review]`                       | The reviewer `prompt`, the listening-plan `readings` (optional), the verifier's `overall_minimum` and `dimension_minimum`, and the scored `dimensions` in record order |
@@ -43,6 +44,15 @@ Every other file is named by the declaration, a script or a cast: the entry page
 Each script declares the edition's title, author, language, duration, frame rate, credits duration, chapters, release metadata, pause policy and pronunciation contract, and its segments, each split into utterance groups that end at sentence punctuation. Both editions declare the same duration, author and chapter count, at 60 fps. The engine refuses a declaration or a script that differs from this contract before any work, naming each failing field. [`examples/sample-film`](examples/sample-film) is a complete film to follow.
 
 A new film names its covers before they exist. It narrates and stages its picture without them; `filmkit.tools player-check cover <stage> <cover> <painting>` paints each edition's cover from the staged picture, reports a painting with no tracked cover as uncompared and fails, and the painting is then tracked as the cover. Packaging refuses an edition whose cover is missing, naming its field.
+
+## Concepts and readings
+
+A film can make its words checkable before anything is narrated. Narration runs both checks first, including a dry run, and refuses on either, naming every failure.
+
+- **Concepts.** The concept contract that `concepts` names is a TOML file of `[[concept]]` entries. Each has an `id`, the source `term`, its `essence` in one sentence, a `source` with the `path` of a document the source manifest pins and a `quote` from it, and a `zh` and an `en` table with the edition's `rendering`, the other `forms` the narration may use and the counterexamples to `avoid`. A segment lists the ids it states in `concepts`, the same in both editions, and must say each by its rendering or a form. No counterexample may appear in the narration, the titles, the caption terms or the text files below `picture/`. With `FILM_SOURCE_CHECKOUT` naming a clone of the source repository, every quotation must be in its document at the pinned commit. `python -m filmkit.concepts` runs the check alone.
+- **Readings.** A pronunciation contract of `schema_version` 2 must declare, as `contextual-mandarin-word` targets, the reading of every Chinese character on the engine's watch list wherever the narration says it. A character that reads differently in ordinary words needs a declared word of two or more characters around each occurrence; one that reads differently only inside known words may be declared alone. Each declared reading must be a dictionary reading per character, or after a word's first character that reading in the neutral tone; where the dictionary reads an occurrence otherwise in context, the word records why in `dictionary_disagreement`. Declarations the narration no longer says are refused. Every Latin word in the Chinese narration and every English word with two or more capitals needs a declared spoken form. `python -m filmkit.narration.readings` runs the check alone and writes each edition's occurrence plan to `build/evidence/readings/`, which the reviewer prompt names beside the contract.
+
+A film that declares neither, or keeps a version 1 pronunciation contract, narrates as before.
 
 ## Installing the engine in a film
 
@@ -66,6 +76,8 @@ Run each command at the film's root, for example from a Mise task, with `uv run 
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `filmkit.supply`                                       | Installs the pinned browser build and speech models below `build/runtime/tool-cache/`                                                                             |
 | `filmkit.narration.narrate --language zh\|en`          | Narrates an edition from its cast's seeds, then aligns and transcribes it                                                                                         |
+| `filmkit.concepts`                                     | Checks the film's words against its concept contract                                                                                                              |
+| `filmkit.narration.readings [--language zh\|en]`       | Checks every declared reading and name, and writes the occurrence plans                                                                                           |
 | `filmkit.produce <action> --language zh\|en`           | Runs one production action: `select`, `assemble`, `refresh-captions`, `stage-picture`, `render-picture`, `validate-picture`, `package-metadata` or `package-film` |
 | `filmkit.tools <tool> [arguments]`                     | Runs a Node tool with the film's npm packages: `geometry-check`, `frame-audit`, `motion-audit` or `player-check`                                                  |
 | `filmkit.delivery.verification --language zh\|en\|all` | Verifies the films and every input they bind; `--technical-only` leaves out the review                                                                            |

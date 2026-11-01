@@ -54,6 +54,12 @@ def test_a_missing_font_or_readings_file_refuses_naming_its_field(declared):
     assert f"review.readings: {film.FILM.review.readings}" in str(refusal.value)
 
 
+def test_a_missing_concept_contract_refuses_naming_its_field(declared):
+    (declared / film.FILM.concepts).unlink()
+    with pytest.raises(FilmError, match=r"concepts: content/concepts\.toml"):
+        film.load(declared)
+
+
 def test_a_declaration_names_covers_before_they_are_painted(declared):
     for code in CODES:
         cover = declared / film.FILM.editions[code].cover

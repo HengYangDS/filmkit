@@ -84,12 +84,16 @@ class Review(Declared):
 
 
 class Film(Declared):
-    """A bilingual film: its file prefix, delivery folder, entry page, sources, fonts and review."""
+    """A bilingual film: its file prefix, delivery folder, entry page, sources, fonts and review.
+
+    A film may name a concept contract, which `filmkit.concepts` checks its narration against.
+    """
 
     slug: Name
     documents_folder: Name
     entry: str
     source_manifest: str
+    concepts: str | None = None
     editions: dict[Literal["zh", "en"], EditionDeclaration] = Field(min_length=2)
     picture: Picture
     review: Review
@@ -108,6 +112,8 @@ def named_files(film: Film) -> list[tuple[str, str]]:
     named += [("picture.fonts", font) for font in film.picture.fonts]
     if film.review.readings is not None:
         named.append(("review.readings", film.review.readings))
+    if film.concepts is not None:
+        named.append(("concepts", film.concepts))
     return named
 
 

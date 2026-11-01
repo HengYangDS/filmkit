@@ -5,6 +5,10 @@ the repository root on the edition's ear-first evidence. With --ids only those s
 are narrated, into a receipt, alignment and transcript named after them, such as
 narration-receipt-06-07.json, alignment-06-07.json and asr-06-07.json.
 
+Before any speech model loads, and with --dry-run too, the edition must pass the concept
+check (`filmkit.concepts`) and its readings check (`filmkit.narration.readings`); a refusal
+stops the run and names every failure.
+
 Usage: python -m filmkit.narration.narrate
     --language zh|en [--ids 06,07] [--dry-run | --skip-generation]
 --dry-run prints the narration plan without writing; --skip-generation aligns and
@@ -18,7 +22,9 @@ import subprocess
 import sys
 import time
 
+import filmkit.concepts as concepts
 import filmkit.repository as repository
+from filmkit.narration import readings
 from filmkit.narration.snapshots import ALIGNER as ALIGNER_SNAPSHOT
 from filmkit.production import CODES, Edition
 
@@ -102,6 +108,19 @@ def steps(code: str, ids: str = "", scope: Scope = Scope.ALL) -> list[tuple[str,
     return checks if scope is Scope.CHECKS else [("narration", narration), *checks]
 
 
+def gate(code: str) -> dict:
+    """Refuse an edition whose words depart from the concept contract or leave a reading open.
+
+    Returns:
+        The concept check's and the edition's readings check's reports.
+    """
+    try:
+        return {"concepts": concepts.check(), "readings": readings.check(code)}
+    except (concepts.ConceptError, readings.ReadingError) as error:
+        message = f"Narration refused before synthesis:\n{error}"
+        raise SystemExit(message) from None
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Narrate, align and transcribe one edition.")
     parser.add_argument("--language", choices=CODES, required=True)
@@ -119,6 +138,8 @@ def main(argv: list[str] | None = None) -> None:
         scope = Scope.PLAN
     elif options.skip_generation:
         scope = Scope.CHECKS
+    if scope is not Scope.CHECKS:
+        print(json.dumps({"edition": options.language, "gate": gate(options.language)}), flush=True)
     for name, command in steps(options.language, options.ids, scope):
         started = time.monotonic()
         subprocess.run(command, cwd=repository.ROOT, check=True)

@@ -281,6 +281,12 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
         ),
         "working files are in ROOT/build/evidence/reviews/round-4/zh/; you may copy",
         (
+            "Concept contract: ROOT/content/concepts.toml; judge each concept's words in "
+            "narration, captions and picture against it. Reading occurrence plans: "
+            "ROOT/build/evidence/readings/zh-plan.json and "
+            "ROOT/build/evidence/readings/en-plan.json."
+        ),
+        (
             "your own output directory.\n- Repairs: 07.6 names all seven checks.\n"
             "- Pause policy the scripts declare:"
         ),
@@ -315,9 +321,13 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
         assert "runtime/work" not in text
     monkeypatch.setattr(specification, "DURATION", 1260)
     monkeypatch.setattr(specification, "RATE", 44100)
+    monkeypatch.setattr(
+        review_round, "FILM", review_round.FILM.model_copy(update={"concepts": None})
+    )
     review_round.prompts(previous, out, changes)
     assert "exactly 1260 s, 16:9 pure 2D" in (out / "prompt-en.md").read_text()
     assert "44.1 kHz stereo narration" in (out / "prompt-en.md").read_text()
+    assert "Concept contract: none declared;" in (out / "prompt-en.md").read_text()
     Edition("en").film("uhd").unlink()
     with pytest.raises(
         ReviewError, match=re.escape("missing build/artifacts/film/en/sample-reel-en-uhd.mp4")

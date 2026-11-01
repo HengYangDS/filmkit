@@ -31,6 +31,7 @@ import filmkit.sources as sources
 import filmkit.specification as specification
 from filmkit.delivery.packaging import BOUND_FILM
 from filmkit.film import FILM
+from filmkit.narration.readings import plan_path
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
@@ -251,8 +252,9 @@ def finding_index(findings: list[dict]) -> str:
 def prompt_context(out_dir: Path, previous: Path, changes: Path | None) -> dict:
     """The template fields both editions' prompts share.
 
-    They name the canonical source, the round's places, the delivery format and the pause
-    and level policies the current scripts and assemblies declare.
+    They name the canonical source, the film's concept contract and the readings' occurrence
+    plans, the round's places, the delivery format and the pause and level policies the
+    current scripts and assemblies declare.
     """
     zh, en = (repository.read(Edition(code).script)["voice_performance"] for code in CODES)
     manifest = sources.manifest()
@@ -265,6 +267,8 @@ def prompt_context(out_dir: Path, previous: Path, changes: Path | None) -> dict:
         "root": repository.ROOT,
         "source": sources.location(),
         "documents": ", ".join(Path(member["path"]).stem for member in manifest["members"]),
+        "concepts": cited(repository.ROOT / FILM.concepts) if FILM.concepts else "none declared",
+        "readings": " and ".join(cited(repository.ROOT / plan_path(code)) for code in CODES),
         "out": cited(out_dir),
         "previous": cited(previous),
         "changes": "" if changes is None else changes.read_text().strip() + "\n",

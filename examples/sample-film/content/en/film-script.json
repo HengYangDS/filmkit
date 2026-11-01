@@ -105,6 +105,9 @@
       "source_sections": [
         "README:Layout"
       ],
+      "concepts": [
+        "rebuild"
+      ],
       "utterance_groups": [
         "This short film shows how a film is rebuilt from its sources. ",
         "The script holds what is said, a reference recording sets the narrator's voice, and the composition draws every frame."
@@ -140,6 +143,9 @@
       "source_sections": [
         "README:Rebuilding the films"
       ],
+      "concepts": [
+        "offline"
+      ],
       "utterance_groups": [
         "Then it renders every frame and packages the films. ",
         "None of these steps reaches the network, and every file they make stays in the build folder."
@@ -156,6 +162,9 @@
       "language": "English",
       "source_sections": [
         "README:Rebuilding the films"
+      ],
+      "concepts": [
+        "rebuild"
       ],
       "utterance_groups": [
         "Last, each film is checked against its sources. ",

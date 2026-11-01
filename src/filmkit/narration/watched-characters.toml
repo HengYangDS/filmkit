@@ -1,0 +1,13 @@
+# The Mandarin characters whose reading a narrator can confuse, which every film that declares a
+# pronunciation contract of schema version 2 must declare wherever its Chinese narration says them.
+# The readings check refuses any occurrence that no declared word covers.
+
+[word]
+# Each has more than one reading in ordinary words, so an occurrence must lie in a declared word of
+# two or more characters, whose reading the context fixes.
+characters = "重行长只调处当相数种为得地模更正间几将奇强角觉教散发转落划干结给尽号好圈场斗累舍钻参应供恶难空解系担冲便量差降曾朝藏传似薄背塞露盛称识乐率校少省宿载屏劲倒假切卡吐待炸漂答血铺脏缝冠创卷兴曲"
+
+[character]
+# Each has one reading wherever it stands alone and others only inside known words, so a declared
+# single character may cover its occurrences outside the declared words.
+characters = "还都着的要会和说看没大把什片了中分"

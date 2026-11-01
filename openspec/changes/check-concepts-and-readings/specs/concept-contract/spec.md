@@ -21,7 +21,7 @@ A film MAY name a concept contract in its declaration. The engine SHALL refuse a
 
 ### Requirement: Quotations match the pinned source
 
-When a local clone of the source repository is named, each concept's quotation SHALL be found in its document at the pinned commit, with runs of whitespace compared as one space.
+When a local clone of the source repository is named, each concept's quotation SHALL be found in its document at the pinned commit, both compared as plain text: Markdown emphasis and code marks are ignored and runs of whitespace count as one space.
 
 #### Scenario: A quotation that the document no longer holds
 

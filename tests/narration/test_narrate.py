@@ -71,7 +71,18 @@ def test_narrate_edition_plans_receipts_named_after_the_selected_segments(scope,
 
 
 @pytest.fixture
-def commands(monkeypatch) -> list:
+def gates(monkeypatch) -> list:
+    """The editions the narration gate checked, through checks that pass."""
+    checked = []
+    monkeypatch.setattr(narration_narrate.concepts, "check", lambda: {"concepts": 2})
+    monkeypatch.setattr(
+        narration_narrate.readings, "check", lambda code: checked.append(code) or {"edition": code}
+    )
+    return checked
+
+
+@pytest.fixture
+def commands(monkeypatch, gates) -> list:
     calls = []
     monkeypatch.setattr(
         narration_narrate.subprocess,
@@ -96,7 +107,11 @@ def test_narrate_edition_runs_the_whole_edition_from_the_root(commands, capsys):
     assert run[2][-3:] == [f"{base}/asr.json", "--language", "English"]
     assert [options for _, options in commands] == [{"cwd": repository.ROOT, "check": True}] * 3
     printed = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
-    assert [line["step"] for line in printed] == ["narration", "alignment", "transcription"]
+    assert printed[0] == {
+        "edition": "en",
+        "gate": {"concepts": {"concepts": 2}, "readings": {"edition": "en"}},
+    }
+    assert [line["step"] for line in printed[1:]] == ["narration", "alignment", "transcription"]
 
 
 @pytest.mark.parametrize(
@@ -115,3 +130,30 @@ def test_narrate_edition_runs_the_whole_edition_from_the_root(commands, capsys):
 def test_a_mode_flag_runs_only_its_steps(commands, flag, expected):
     narration_narrate.main(["--language", "zh", flag])
     assert [(command[3], command[-1]) for command, _ in commands] == expected
+
+
+def test_the_gate_runs_before_narration_and_its_plan_but_not_before_the_checks(commands, gates):
+    narration_narrate.main(["--language", "zh", "--dry-run"])
+    narration_narrate.main(["--language", "zh", "--skip-generation"])
+    narration_narrate.main(["--language", "en"])
+    assert gates == ["zh", "en"]
+
+
+def test_a_refused_gate_stops_narration_before_any_step(commands, monkeypatch):
+    def refuse(code):
+        message = f"zh 04.2 at 9: 重 in “代码和日期去重。” has no declared reading ({code})"
+        raise narration_narrate.readings.ReadingError(message)
+
+    monkeypatch.setattr(narration_narrate.readings, "check", refuse)
+    with pytest.raises(SystemExit, match="Narration refused before synthesis:\nzh 04.2 at 9"):
+        narration_narrate.main(["--language", "zh", "--dry-run"])
+    assert commands == []
+
+    def contract_refuses():
+        message = "zh 03 declares rebuild but says none of: 重建"
+        raise narration_narrate.concepts.ConceptError(message)
+
+    monkeypatch.setattr(narration_narrate.concepts, "check", contract_refuses)
+    with pytest.raises(SystemExit, match="declares rebuild but says none of"):
+        narration_narrate.main(["--language", "en"])
+    assert commands == []

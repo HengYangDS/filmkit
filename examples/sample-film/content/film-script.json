@@ -111,6 +111,9 @@
       "source_sections": [
         "README:Layout"
       ],
+      "concepts": [
+        "rebuild"
+      ],
       "utterance_groups": [
         "这部短片演示一部影片怎样从源文件重建出来。",
         "脚本写着要说的话，参考录音定下旁白的嗓音，画面合成决定每一帧画什么。"
@@ -146,6 +149,9 @@
       "source_sections": [
         "README:Rebuilding the films"
       ],
+      "concepts": [
+        "offline"
+      ],
       "utterance_groups": [
         "接着渲染每一帧画面，打包出成片。",
         "这些步骤都不联网，产生的文件全都留在构建目录里。"
@@ -162,6 +168,9 @@
       "language": "Chinese",
       "source_sections": [
         "README:Rebuilding the films"
+      ],
+      "concepts": [
+        "rebuild"
       ],
       "utterance_groups": [
         "最后，每部成片都要和它的源文件逐项核对。",

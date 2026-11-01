@@ -1,0 +1,19 @@
+# The concepts the sample film names: what each means in the README the film explains, and the
+# words each edition uses for it. `filmkit.concepts` checks the narration, titles, caption terms
+# and picture against them.
+
+[[concept]]
+id = "rebuild"
+term = "rebuild"
+essence = "Making the films again from their tracked sources, so that each published file can be checked against them."
+source = { path = "README.md", quote = "and everything needed to rebuild them from source." }
+zh = { rendering = "重建", avoid = ["复刻"] }
+en = { rendering = "rebuild", forms = ["rebuilt"], avoid = ["remake"] }
+
+[[concept]]
+id = "offline"
+term = "offline"
+essence = "The build reaches no network; everything it makes stays below the build folder."
+source = { path = "README.md", quote = "offline and only under `build/`." }
+zh = { rendering = "不联网" }
+en = { rendering = "network" }

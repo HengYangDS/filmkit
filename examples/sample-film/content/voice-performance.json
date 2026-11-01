@@ -1,6 +1,6 @@
 {
   "pronunciation": {
-    "schema_version": 1,
+    "schema_version": 2,
     "status": "planned-not-listened",
     "control_boundary": "Dictionary and occurrence targets are acceptance criteria. Native Qwen Base does not consume IPA or SSML. No normalization is proposed without an actually heard error.",
     "sources": [
@@ -12,6 +12,11 @@
           "Simplified Chinese-English"
         ],
         "qualification": "First returned single-character sense is not a universal reading."
+      },
+      {
+        "id": "pypinyin",
+        "provider": "pypinyin 0.55.0 dictionary readings and phrase-dictionary contextual readings",
+        "qualification": "A declared reading overrules the dictionary's contextual reading only with a recorded reason."
       }
     ],
     "languages": {
@@ -22,15 +27,100 @@
           {
             "term": "重建",
             "kind": "contextual-mandarin-word",
-            "target_reading": "chóngjiàn",
-            "source": "macos-dictionary",
+            "target_reading": "chóng jiàn",
+            "source": "pypinyin",
             "status": "planned-not-listened"
           },
           {
             "term": "得上",
             "kind": "contextual-mandarin-word",
             "target_reading": "de shàng",
-            "source": "macos-dictionary",
+            "dictionary_disagreement": "得 is the complement marker in 对得上, which says the files match; the dictionary reads it dé.",
+            "source": "pypinyin",
+            "status": "planned-not-listened"
+          },
+          {
+            "term": "参考",
+            "kind": "contextual-mandarin-word",
+            "target_reading": "cān kǎo",
+            "source": "pypinyin",
+            "status": "planned-not-listened"
+          },
+          {
+            "term": "时间",
+            "kind": "contextual-mandarin-word",
+            "target_reading": "shí jiān",
+            "source": "pypinyin",
+            "status": "planned-not-listened"
+          },
+          {
+            "term": "种子",
+            "kind": "contextual-mandarin-word",
+            "target_reading": "zhǒng zi",
+            "source": "pypinyin",
+            "status": "planned-not-listened"
+          },
+          {
+            "term": "片",
+            "kind": "contextual-mandarin-word",
+            "target_reading": "piàn",
+            "source": "pypinyin",
+            "status": "planned-not-listened"
+          },
+          {
+            "term": "着",
+            "kind": "contextual-mandarin-word",
+            "target_reading": "zhe",
+            "source": "pypinyin",
+            "status": "planned-not-listened"
+          },
+          {
+            "term": "要",
+            "kind": "contextual-mandarin-word",
+            "target_reading": "yào",
+            "source": "pypinyin",
+            "status": "planned-not-listened"
+          },
+          {
+            "term": "说",
+            "kind": "contextual-mandarin-word",
+            "target_reading": "shuō",
+            "source": "pypinyin",
+            "status": "planned-not-listened"
+          },
+          {
+            "term": "的",
+            "kind": "contextual-mandarin-word",
+            "target_reading": "de",
+            "source": "pypinyin",
+            "status": "planned-not-listened"
+          },
+          {
+            "term": "什",
+            "kind": "contextual-mandarin-word",
+            "target_reading": "shén",
+            "source": "pypinyin",
+            "status": "planned-not-listened"
+          },
+          {
+            "term": "把",
+            "kind": "contextual-mandarin-word",
+            "target_reading": "bǎ",
+            "source": "pypinyin",
+            "status": "planned-not-listened"
+          },
+          {
+            "term": "都",
+            "kind": "contextual-mandarin-word",
+            "target_reading": "dōu",
+            "source": "pypinyin",
+            "status": "planned-not-listened"
+          },
+          {
+            "term": "和",
+            "kind": "contextual-mandarin-word",
+            "target_reading": "hé",
+            "source": "pypinyin",
             "status": "planned-not-listened"
           }
         ],

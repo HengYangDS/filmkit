@@ -2,41 +2,69 @@
 
 ### Requirement: Every watched Chinese character resolves to a declared reading
 
-For a pronunciation contract of schema version 2, every occurrence in the Chinese narration of a character on the engine's watch list SHALL resolve to one declared reading: by the longest declared word that covers it, or, for a character of the default class, by the film's declared default. An occurrence that does not resolve SHALL be refused with its segment, thought, position and surrounding text, and all such occurrences SHALL be reported together.
+For a pronunciation contract of schema version 2, every occurrence in the Chinese narration of a character on the engine's watch list SHALL resolve to the reading of the longest declared word that covers it. An occurrence that does not resolve SHALL be refused with its segment, thought, position and surrounding text, and all such occurrences SHALL be reported together.
 
-#### Scenario: A strict character outside any declared word
+#### Scenario: An undeclared single character
 
-- **WHEN** 重 occurs in 去重 and no declared word covers that occurrence
+- **WHEN** 还 occurs outside every declared word and the film does not declare 还
 - **THEN** the check refuses and names the segment, thought, position and the text around it
-
-#### Scenario: A default character without a default
-
-- **WHEN** 还 occurs outside every declared word and the film declares no default reading for 还
-- **THEN** the check refuses and names the occurrence
 
 #### Scenario: A version 1 contract
 
 - **WHEN** the pronunciation contract declares schema version 1
 - **THEN** the readings check does not apply and narration proceeds as before
 
+### Requirement: A word character resolves only inside a declared word
+
+An occurrence of a character in the watch list's word class SHALL be covered by a declared word of two or more characters. An occurrence of a character in its single-character class MAY be covered by the character's own declaration.
+
+#### Scenario: A word character outside any declared word
+
+- **WHEN** 重 occurs in 去重 and no declared word covers that occurrence
+- **THEN** the check refuses and names the occurrence
+
+#### Scenario: A word character covered only by its own declaration
+
+- **WHEN** 重 is declared as a single character and occurs in 去重, which no declared word covers
+- **THEN** the check refuses and names the occurrence
+
 ### Requirement: Declared readings are dictionary readings
 
-Each declared word's reading SHALL divide into one dictionary reading per character, written with or without spaces between syllables, and each default SHALL be a dictionary reading of its character. Where the dictionary's contextual reading of an occurrence differs from its declared reading, the declaring word SHALL record a reason; a default SHALL never resolve an occurrence the dictionary reads otherwise.
+Each declared word's reading SHALL divide into one dictionary reading per character, written with or without spaces between syllables; after a word's first character, the reading MAY be in the neutral tone. Where the dictionary's contextual reading of an occurrence differs from its declared reading, the declaring word SHALL record a reason. A declared single character SHALL NOT record a reason, so it never resolves an occurrence the dictionary reads otherwise.
 
 #### Scenario: A reading the dictionary does not hold
 
 - **WHEN** a declared word gives a character a reading that is not among its dictionary readings
-- **THEN** the check refuses and names the word and the character
+- **THEN** the check refuses and names the word and its reading
+
+#### Scenario: A neutral tone after the first character
+
+- **WHEN** a word declares 还是 as háishi, with 是 in the neutral tone
+- **THEN** the declaration divides into hái and shi and is accepted
 
 #### Scenario: A declared reading the dictionary contradicts
 
 - **WHEN** an occurrence's declared reading differs from the dictionary's contextual reading and its word records no reason
 - **THEN** the check refuses and names the occurrence, the declared reading and the dictionary's reading
 
-#### Scenario: A default that the context overrides
+#### Scenario: A single character that the context overrides
 
-- **WHEN** a default would resolve an occurrence that the dictionary reads otherwise in context
+- **WHEN** a declared single character covers an occurrence that the dictionary reads otherwise in context
 - **THEN** the check refuses and names the occurrence, so the word that reads otherwise is declared
+
+### Requirement: Declarations stay current
+
+The check SHALL refuse a Chinese word declared more than once, a declared word that the Chinese narration never says, and a recorded reason that no occurrence needs, naming each.
+
+#### Scenario: A declaration the narration no longer needs
+
+- **WHEN** a script edit removes the last occurrence of a declared word
+- **THEN** the check refuses and names the word as declared but never said
+
+#### Scenario: A reason no occurrence needs
+
+- **WHEN** a declared word records a dictionary disagreement and every occurrence it covers agrees with the dictionary
+- **THEN** the check refuses and names the word
 
 ### Requirement: Every name has one declared spoken form
 
@@ -54,12 +82,12 @@ For a pronunciation contract of schema version 2, every Latin word in the Chines
 
 ### Requirement: The resolved readings are written for review
 
-The readings check SHALL write the occurrence plan of each edition it checks: every watched occurrence with its segment, thought, position, covering word, resolved reading, the basis of that reading and the dictionary's contextual reading. The plan SHALL be derived on every check and never read as a declaration.
+The readings check SHALL write the occurrence plan of each edition it checks: every watched occurrence with its thought, position, character class, covering word, declared reading and the dictionary's contextual reading. The plan SHALL be derived on every check and never read as a declaration.
 
 #### Scenario: A passing check
 
 - **WHEN** every watched occurrence resolves
-- **THEN** the plan lists each occurrence with its reading, its basis and the dictionary's reading
+- **THEN** the plan lists each occurrence with its covering word, its declared reading and the dictionary's reading
 
 ### Requirement: Narration refuses unresolved readings
 

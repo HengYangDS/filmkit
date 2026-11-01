@@ -11,6 +11,8 @@ documents_folder = "sample-reel"
 entry = "content/index.html"
 # The commit and digest of the document the film explains.
 source_manifest = "content/source-manifest.json"
+# What each concept the film names means in that document, and each edition's words for it.
+concepts = "content/concepts.toml"
 
 # Each edition's folder of script, cast and player, and its 16:9 cover.
 [editions.zh]
