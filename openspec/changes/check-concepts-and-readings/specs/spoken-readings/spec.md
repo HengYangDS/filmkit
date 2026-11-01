@@ -82,12 +82,21 @@ For a pronunciation contract of schema version 2, every Latin word in the Chines
 
 ### Requirement: The resolved readings are written for review
 
-The readings check SHALL write the occurrence plan of each edition it checks: every watched occurrence with its thought, position, character class, covering word, declared reading and the dictionary's contextual reading. The plan SHALL be derived on every check and never read as a declaration.
+The readings check SHALL write the occurrence plan of each edition it checks: every watched occurrence with its thought, position, character class, covering word, declared reading, the dictionary's contextual reading and the text around it. The plan SHALL be derived on every check and never read as a declaration.
 
 #### Scenario: A passing check
 
 - **WHEN** every watched occurrence resolves
-- **THEN** the plan lists each occurrence with its covering word, its declared reading and the dictionary's reading
+- **THEN** the plan lists each occurrence with its covering word, its declared reading, the dictionary's reading and the text around it
+
+### Requirement: Proposed declarations help an author declare
+
+On request, the readings check SHALL write a proposed declaration for each watched occurrence in the Chinese narration that no declaration resolves: the dictionary's word around it, widened to two characters for a word character, with the dictionary's contextual reading, grouped by word with its occurrences and where they are said. Proposing SHALL NOT change the pronunciation contract.
+
+#### Scenario: Proposals for an undeclared narration
+
+- **WHEN** an author requests proposals and 去重 is said twice with no declared word covering 重
+- **THEN** the proposals list 去重 with the dictionary's reading, two occurrences and the thoughts that say it, and the contract is unchanged
 
 ### Requirement: Narration refuses unresolved readings
 

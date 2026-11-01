@@ -98,6 +98,7 @@ def test_a_declared_reading_the_dictionary_contradicts_needs_its_reason():
         "reading": "chóng",
         "dictionary": "zhòng",
         "class": "word",
+        "context": "代码和日期去重。",
     }
 
 
@@ -148,6 +149,49 @@ def test_declared_words_refuse_readings_repeats_and_single_character_reasons():
         "行情 xíngqíngg: not one dictionary reading per character",
         "得: a single character cannot record a dictionary disagreement",
     ]
+
+
+def test_proposals_cover_each_unresolved_occurrence_with_the_dictionarys_word():
+    thoughts = [Thought("01.1", "按股票代码和日期去重。"), Thought("02.1", "先去重，再核对。")]
+    assert readings.proposals(thoughts, []) == [
+        {
+            "term": "去重",
+            "target_reading": "qù zhòng",
+            "occurrences": 2,
+            "said_in": ["01.1", "02.1"],
+        },
+        {"term": "和", "target_reading": "hé", "occurrences": 1, "said_in": ["01.1"]},
+    ]
+    declared = [Word("去重", ("qù", "chóng"), "去重 deduplicates.")]
+    assert [row["term"] for row in readings.proposals(thoughts, declared)] == ["和"]
+
+
+def test_a_word_character_is_widened_to_a_dictionary_phrase_or_its_predecessor():
+    assert readings.widened("只是数据。", 0) == (0, 2)
+    assert readings.widened("做得更好。", 1) == (0, 2)
+    assert readings.widened("得", 0) == (0, 1)
+
+
+def test_the_cli_proposes_without_changing_the_contract(film, capsys):
+    root, edit = film
+    path = root / "content/voice-performance.json"
+
+    def drop_a_word(pronunciation):
+        pronunciation["languages"]["Chinese"]["targets"] = [
+            target
+            for target in pronunciation["languages"]["Chinese"]["targets"]
+            if target["term"] != "参考"
+        ]
+
+    edit(drop_a_word)
+    before = path.read_bytes()
+    readings.main(["--propose"])
+    assert json.loads(capsys.readouterr().out)["proposals"] == 1
+    written = json.loads((root / readings.PROPOSALS).read_text(encoding="utf-8"))
+    assert written["rows"] == [
+        {"term": "参考", "target_reading": "cān kǎo", "occurrences": 1, "said_in": ["01.2"]}
+    ]
+    assert path.read_bytes() == before
 
 
 def test_names_need_one_declared_spoken_form():

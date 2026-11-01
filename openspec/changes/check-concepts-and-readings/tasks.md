@@ -14,6 +14,7 @@
 - [x] 2.3 Resolve every watched occurrence of a schema version 2 contract through declared words and declared single characters, check declared readings against the dictionary, require a reason for each contextual disagreement and refuse stale declarations; verify with tests for each refusal, for a recorded disagreement and for a version 1 contract.
 - [x] 2.4 Require a declared spoken form for every Latin word in the Chinese narration and every English word with two or more capitals; verify with tests for both refusals.
 - [x] 2.5 Write each edition's occurrence plan and report the check from `python -m filmkit.narration.readings`; verify with a test of the plan's rows and the refusal exit.
+- [x] 2.6 Propose a declaration for each unresolved Chinese occurrence from the dictionary's phrase segmentation, without changing the contract; verify with tests of the proposals, the widening of a word character and the unchanged contract.
 
 ## 3. Gates and review
 

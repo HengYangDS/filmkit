@@ -23,7 +23,12 @@ The check writes each edition's occurrence plan, a view derived on every check, 
 build/evidence/readings/. Every failure is reported at once, and thoughts are numbered from 1
 within their segment.
 
-Usage: python -m filmkit.narration.readings [--language zh|en]
+With --propose, the check instead writes proposed declarations for the Chinese narration: for each
+watched occurrence that no declaration resolves, the dictionary's word around it, widened to two
+characters for a word character, with the dictionary's contextual reading. A proposal declares
+nothing; the author reads it and declares what the narration means.
+
+Usage: python -m filmkit.narration.readings [--language zh|en | --propose]
 """
 
 from __future__ import annotations
@@ -37,6 +42,8 @@ from pathlib import Path
 from typing import NamedTuple
 
 from pypinyin import Style, pinyin
+from pypinyin.constants import PHRASES_DICT
+from pypinyin.seg.mmseg import seg
 
 import filmkit.repository as repository
 from filmkit.narration.pronunciation import HAN, native_utterance_plan
@@ -217,6 +224,7 @@ def resolve(thoughts: list[Thought], words: list[Word]) -> tuple[list[dict], lis
                     "reading": reading,
                     "dictionary": heard,
                     "class": kind,
+                    "context": context(thought.text, position),
                 }
             )
     failures += [
@@ -259,6 +267,86 @@ def edition_thoughts(script: dict, contract: dict) -> list[Thought]:
 def plan_path(code: str) -> str:
     """Where the readings check writes an edition's occurrence plan."""
     return f"build/evidence/readings/{code}-plan.json"
+
+
+PROPOSALS = "build/evidence/readings/zh-proposals.json"
+
+
+def segments(text: str) -> list[tuple[int, int]]:
+    """The dictionary's words in each run of Han characters, as spans of the text."""
+    spans = []
+    for run in re.finditer(f"{HAN}+", text):
+        start = run.start()
+        for word in seg.cut(run.group()):
+            spans.append((start, start + len(word)))
+            start += len(word)
+    return spans
+
+
+def widened(text: str, position: int) -> tuple[int, int]:
+    """Two characters around a word character: a dictionary phrase if one is, else the preceding."""
+    han = re.compile(HAN)
+    candidates = [
+        (start, start + 2)
+        for start, neighbour in ((position - 1, position - 1), (position, position + 1))
+        if 0 <= neighbour < len(text) and han.fullmatch(text[neighbour])
+    ]
+    phrases = [span for span in candidates if text[span[0] : span[1]] in PHRASES_DICT]
+    return (phrases or candidates or [(position, position + 1)])[0]
+
+
+def proposals(thoughts: list[Thought], words: list[Word]) -> list[dict]:
+    """A proposed declaration for each watched occurrence that no declared word resolves.
+
+    Returns:
+        One row per proposed word and dictionary reading, most frequent first.
+    """
+    watched, grouped = watch_list(), {}
+    for thought in thoughts:
+        covered, dictionary = coverage(thought.text, words), contextual(thought.text)
+        spans = segments(thought.text)
+        for position, char in enumerate(thought.text):
+            kind = watched.get(char)
+            word = covered.get(position, (None, 0, 0))[0]
+            if kind is None or (word is not None and (kind == "character" or len(word.term) > 1)):
+                continue
+            start, end = next(span for span in spans if span[0] <= position < span[1])
+            if kind == "word" and end - start < 2:
+                start, end = widened(thought.text, position)
+            term = thought.text[start:end]
+            reading = " ".join(dictionary[index] for index in range(start, end))
+            row = grouped.setdefault(
+                (term, reading),
+                {"term": term, "target_reading": reading, "occurrences": 0, "said_in": []},
+            )
+            row["occurrences"] += 1
+            if thought.where not in row["said_in"]:
+                row["said_in"].append(thought.where)
+    return sorted(grouped.values(), key=lambda row: (-row["occurrences"], row["term"]))
+
+
+def propose() -> dict:
+    """Write the proposed declarations for the Chinese narration, whatever its schema version.
+
+    Returns:
+        The report: the contract, the proposals' path and their counts.
+    """
+    edition = Edition("zh")
+    script = repository.read(edition.script)
+    path = script["pronunciation_contract"]
+    contract = repository.read(path)["pronunciation"]["languages"][edition.language]
+    words, _failures = declared_words(contract)
+    rows = proposals(edition_thoughts(script, contract), words)
+    report = {
+        "edition": "zh",
+        "contract": path,
+        "contract_sha256": repository.sha(path),
+        "proposals": len(rows),
+        "occurrences": sum(row["occurrences"] for row in rows),
+        "path": PROPOSALS,
+    }
+    repository.write(PROPOSALS, {**report, "rows": rows})
+    return report
 
 
 def check(code: str) -> dict:
@@ -306,8 +394,13 @@ def check(code: str) -> dict:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Check every declared reading and name.")
-    parser.add_argument("--language", choices=CODES)
+    choice = parser.add_mutually_exclusive_group()
+    choice.add_argument("--language", choices=CODES)
+    choice.add_argument("--propose", action="store_true", help="Propose Chinese declarations")
     options = parser.parse_args(argv)
+    if options.propose:
+        print(json.dumps(propose(), ensure_ascii=False))
+        return
     reports, failures = [], []
     for code in (options.language,) if options.language else CODES:
         try:

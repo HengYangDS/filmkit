@@ -3,11 +3,12 @@
 # The readings check refuses any occurrence that no declared word covers.
 
 [word]
-# Each has more than one reading in ordinary words, so an occurrence must lie in a declared word of
-# two or more characters, whose reading the context fixes.
-characters = "重行长只调处当相数种为得地模更正间几将奇强角觉教散发转落划干结给尽号好圈场斗累舍钻参应供恶难空解系担冲便量差降曾朝藏传似薄背塞露盛称识乐率校少省宿载屏劲倒假切卡吐待炸漂答血铺脏缝冠创卷兴曲"
+# Each has more than one reading where it stands alone, so an occurrence must lie in a declared word
+# of two or more characters, whose reading the context fixes.
+characters = "重行长只调处当相数种为得地觉教散转落划干结尽场斗应供空系担冲量曾薄背露盛率宿载屏倒卡吐待炸血铺缝卷曲"
 
 [character]
 # Each has one reading wherever it stands alone and others only inside known words, so a declared
-# single character may cover its occurrences outside the declared words.
-characters = "还都着的要会和说看没大把什片了中分"
+# single character may cover its occurrences outside the declared words. The dictionary check still
+# refuses a single character where the context reads it otherwise.
+characters = "还都着的要会和说看没大把什片了中分模更正间几将奇强角发给号好圈累舍钻参恶难解便差降朝藏传似塞称识乐校少省劲假切答漂脏冠创兴"
