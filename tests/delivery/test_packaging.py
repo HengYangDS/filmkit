@@ -159,10 +159,13 @@ def packaging_root(tmp_path, monkeypatch):
         output = Path(command[-1])
         if command[0] == "ffmpeg":
             output.write_text(
-                f"{output.name} encoded from {Path(command[command.index('-i') + 1]).name}\n"
+                f"{output.name} encoded from {Path(command[command.index('-i') + 1]).name}\n",
+                encoding="utf-8",
             )
         else:
-            output.write_text(output.read_text() + "author tagged\n")
+            output.write_text(
+                output.read_text(encoding="utf-8") + "author tagged\n", encoding="utf-8"
+            )
         return subprocess.CompletedProcess(command, 0, b"", b"")
 
     monkeypatch.setattr(delivery_packaging, "run", run)

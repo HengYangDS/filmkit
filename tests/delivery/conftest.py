@@ -31,11 +31,11 @@ def write_input(path: Path, body: str | bytes | dict) -> Path:
     """Write text, bytes or a JSON object to a file, creating its folders."""
     path.parent.mkdir(parents=True, exist_ok=True)
     if isinstance(body, dict):
-        path.write_text(json.dumps(body))
+        path.write_text(json.dumps(body), encoding="utf-8")
     elif isinstance(body, bytes):
         path.write_bytes(body)
     else:
-        path.write_text(body)
+        path.write_text(body, encoding="utf-8")
     return path
 
 
@@ -102,13 +102,13 @@ class Inputs:
     @staticmethod
     def change(path: Path, *keys: str, value: object) -> None:
         """Set one value in a JSON record, by its keys and list indices from the top."""
-        record = json.loads(path.read_text())
+        record = json.loads(path.read_text(encoding="utf-8"))
         place = record
         for key in keys[:-1]:
             place = place[int(key) if isinstance(place, list) else key]
         last = keys[-1]
         place[int(last) if isinstance(place, list) else last] = value
-        path.write_text(json.dumps(record))
+        path.write_text(json.dumps(record), encoding="utf-8")
 
     def soundtrack(self, frames: int, rate: int = specification.RATE, channels: int = 2) -> None:
         """Replace the soundtrack and rebind its assembly to it."""

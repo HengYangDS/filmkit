@@ -329,7 +329,7 @@ def test_rendering_records_a_completed_render_that_binds(staged, root, tmp_path,
     assert (receipt["exit"], receipt["timed_out"], receipt["deadline_seconds"]) == (0, False, 60)
     assert receipt["source_sha256"] == repository.sha(stage / "index.html")
     assert receipt["output_sha256"] == repository.sha(picture)
-    observed = json.loads(Path(f"{fake}.json").read_text())
+    observed = json.loads(Path(f"{fake}.json").read_text(encoding="utf-8"))
     assert observed == {
         "stdin": "",
         "session_leader": True,
