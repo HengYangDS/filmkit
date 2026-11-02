@@ -4,10 +4,13 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-02
+
 ### Changed
 
 - The repository runs ETHOS 0.2.0-alpha.27, and its CI workflow uses `jdx/mise-action` 5.2.5.
 - The engine renders with HyperFrames 0.9.3. The browser build stays Chrome Headless Shell 152.0.7977.30, and `package.json` keeps its `undici` override, because 0.9.3 still pins 7.25.0. A new renderer can change the frames a film renders, so a film keeps its current filmkit pin until it produces, reviews and accepts an edition on a release that carries this one.
+- The locks hold the newest releases their declared ranges admit: anyio 4.16.0 in `uv.lock`, and @hono/node-server 2.1.6, ansi-regex 6.5.0, hono 4.13.16, nanoid 3.3.20, postcss 8.5.32, tslib 2.9.1 and ws 8.22.1 in `package-lock.json`. OSV reports no advisory for any package either lock pins.
 
 ## [0.3.0] - 2026-11-02
 
@@ -59,7 +62,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/HengYangDS/filmkit/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/HengYangDS/filmkit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/HengYangDS/filmkit/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/HengYangDS/filmkit/compare/v0.1.0...v0.1.1

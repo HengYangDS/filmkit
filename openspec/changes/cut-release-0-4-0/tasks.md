@@ -7,8 +7,8 @@
 
 ## 2. Release notes and version
 
-- [ ] 2.1 Record the lock refresh under `Unreleased`, then date the notes as `[0.4.0] - 2026-11-02` with the `v0.3.0...v0.4.0` history link and open an empty `Unreleased`; done when every entry of the former `Unreleased` section stands unchanged under `[0.4.0]`.
-- [ ] 2.2 Set `VERSION` to 0.4.0 and the README pin to `v0.4.0`; done when no tracked file outside the Changelog history names 0.3.0 as the current version and every `mise run check` command passes.
+- [x] 2.1 Record the lock refresh under `Unreleased`, then date the notes as `[0.4.0] - 2026-11-02` with the `v0.3.0...v0.4.0` history link and open an empty `Unreleased`; done when every entry of the former `Unreleased` section stands unchanged under `[0.4.0]`. The cut moved the section whole and added the lock refresh entry, the heading and the links.
+- [x] 2.2 Set `VERSION` to 0.4.0 and the README pin to `v0.4.0`; done when no tracked file outside the Changelog history names 0.3.0 as the current version and every `mise run check` command passes. Both pass, with 63 Node and 687 pytest tests; the README's note on the `undici` override now names HyperFrames 0.9.3.
 
 ## Workflow follow-up
 
