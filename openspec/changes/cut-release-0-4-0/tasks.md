@@ -2,8 +2,8 @@
 
 ## 1. Locks
 
-- [ ] 1.1 Refresh `package-lock.json` with `npm update --package-lock-only` and `uv.lock` with `uv lock --upgrade`; done when each lock holds the newest release its ranges admit, `undici` stays on the newest 7.x release, and OSV reports no advisory for any package either lock pins.
-- [ ] 1.2 Build the sample film with `mise run sample:build` on the refreshed locks; done when `sample:verify` passes for both editions.
+- [x] 1.1 Refresh `package-lock.json` with `npm update --package-lock-only` and `uv.lock` with `uv lock --upgrade`; done when each lock holds the newest release its ranges admit, `undici` stays on the newest 7.x release, and OSV reports no advisory for any package either lock pins. On 2026-11-02 npm moved the seven packages the audit named, uv moved anyio to 4.16.0, `undici` 7.30.1 was the newest 7.x release, and OSV found no issue in the 127 npm and 54 uv packages.
+- [x] 1.2 Build the sample film with `mise run sample:build` on the refreshed locks; done when `sample:verify` passes for both editions. On 2026-11-02 it passed for both editions on HyperFrames 0.9.3 and Chrome Headless Shell 152.0.7977.30, with 1,800 geometry frames each.
 
 ## 2. Release notes and version
 
