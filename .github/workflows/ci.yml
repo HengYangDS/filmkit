@@ -28,7 +28,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d
+      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195
         with:
           version: 2026.10.25
           install: false
