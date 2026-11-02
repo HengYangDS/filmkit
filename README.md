@@ -76,6 +76,7 @@ Run each command at the film's root, for example from a Mise task, with `uv run 
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `filmkit.supply`                                       | Installs the pinned browser build and speech models below `build/runtime/tool-cache/`                                                                             |
 | `filmkit.narration.narrate --language zh\|en`          | Narrates an edition from its cast's seeds, then aligns and transcribes it                                                                                         |
+| `filmkit.narration.audition audition\|apply`           | Auditions other seeds or run-on takes of chosen thoughts, then binds the chosen ones into the cast's retakes                                                      |
 | `filmkit.concepts`                                     | Checks the film's words against its concept contract                                                                                                              |
 | `filmkit.narration.readings [--language zh\|en]`       | Checks every declared reading and name, and writes the occurrence plans; `--propose` proposes Chinese declarations                                                |
 | `filmkit.produce <action> --language zh\|en`           | Runs one production action: `select`, `assemble`, `refresh-captions`, `stage-picture`, `render-picture`, `validate-picture`, `package-metadata` or `package-film` |
@@ -84,6 +85,12 @@ Run each command at the film's root, for example from a Mise task, with `uv run 
 | `filmkit.delivery.documents_folder`                    | Delivers the reviewed editions to the film's Documents folder with rsync and reads them back                                                                      |
 | `filmkit.delivery.reproduction`                        | Compares a rebuild with the published release                                                                                                                     |
 | `filmkit.review.round <step>`                          | Prepares and records an independent review round                                                                                                                  |
+
+## Whole endings
+
+The assembly refuses a thought whose take ends inside its last syllable. In-context narration with mlx-audio 0.6.4 can produce such takes: its decode counts a frame as valid only when the frame's first codebook id is above 0, while the reference tokenizer pads with −1 and counts every id above it. The reference's codes are decoded with the take's, so each frame with id 0 in either removes 80 ms from the end of the take, and a reference whose pauses encode to id 0 shortens every take narrated from it. The fix is proposed upstream as [Blaizzy/mlx-audio#1116](https://github.com/Blaizzy/mlx-audio/pull/1116).
+
+Until a release carries it, `filmkit.narration.audition` keeps endings whole. Its targets file names each thought the assembly refused and a phrase the take must contain. An audition narrates other seeds of each target and proposes a take that still ends naturally; a run-on target is narrated on into the next thought and cut in the quiet between, so the trim falls on the words cut away. `apply` binds the proposals into the cast's retakes, and narration then records only the retaken thoughts again.
 
 ## The sample film
 
