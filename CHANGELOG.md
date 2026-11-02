@@ -7,6 +7,7 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 ### Changed
 
 - The repository runs ETHOS 0.2.0-alpha.27, and its CI workflow uses `jdx/mise-action` 5.2.5.
+- The engine renders with HyperFrames 0.9.3. The browser build stays Chrome Headless Shell 152.0.7977.30, and `package.json` keeps its `undici` override, because 0.9.3 still pins 7.25.0. A new renderer can change the frames a film renders, so a film keeps its current filmkit pin until it produces, reviews and accepts an edition on a release that carries this one.
 
 ## [0.3.0] - 2026-11-02
 

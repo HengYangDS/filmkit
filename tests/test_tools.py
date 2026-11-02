@@ -1,6 +1,7 @@
 """The tools command: the engine's Node tools run from a copy below the film, with its packages."""
 
 import json
+import re
 from importlib.metadata import version
 
 import pytest
@@ -79,10 +80,11 @@ def test_another_renderer_version_refuses_before_any_tool_runs(tmp_path, monkeyp
     manifest = root / "node_modules" / picture_rendering.RENDERER_PACKAGE
     manifest.parent.mkdir(parents=True)
     manifest.write_text(json.dumps({"name": "hyperframes", "version": "0.8.149"}))
-    with pytest.raises(PictureError, match=r"HyperFrames 0\.8\.149.*HyperFrames 0\.8\.225"):
+    pinned = re.escape(picture_rendering.RENDERER_VERSION)
+    with pytest.raises(PictureError, match=rf"HyperFrames 0\.8\.149.*HyperFrames {pinned}"):
         tools.run("geometry-check", [])
     manifest.unlink()
-    with pytest.raises(PictureError, match=r"installs no HyperFrames.*HyperFrames 0\.8\.225"):
+    with pytest.raises(PictureError, match=rf"installs no HyperFrames.*HyperFrames {pinned}"):
         tools.run("frame-audit", [])
     with pytest.raises(SystemExit, match=r"^motion-audit: The film installs no HyperFrames"):
         tools.main(["motion-audit", "timeline.json"])

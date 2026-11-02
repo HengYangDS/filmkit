@@ -395,8 +395,9 @@ def test_another_renderer_version_refuses_staging_and_rendering(
     staged, root, tmp_path, monkeypatch
 ):
     manifest = root / "node_modules" / picture_rendering.RENDERER_PACKAGE
-    manifest.write_text(json.dumps({"name": "hyperframes", "version": "0.9.0"}))
-    versions = r"installs HyperFrames 0\.9\.0; the engine renders with HyperFrames 0\.8\.225"
+    manifest.write_text(json.dumps({"name": "hyperframes", "version": "0.0.1"}))
+    pinned = re.escape(picture_rendering.RENDERER_VERSION)
+    versions = rf"installs HyperFrames 0\.0\.1; the engine renders with HyperFrames {pinned}"
     with pytest.raises(PictureError, match=versions):
         picture_rendering.stage_picture(staged, None, DURATION, 3840, 2160)
     fake = renderer(tmp_path, "open(__file__ + '.ran', 'w').close()")
