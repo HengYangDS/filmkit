@@ -335,6 +335,38 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
         review_round.prompts(previous, out, changes)
 
 
+def test_prompts_name_the_optional_pause_fields_a_script_omits(root, put, monkeypatch):
+    policies = {
+        "zh": {"thought_level_tolerance_db": 0.75},
+        "en": {
+            "inner_pause_cap_seconds": 0.6,
+            "thought_level_tolerance_db": 0.75,
+            "thought_boundary_ratio": 1.62,
+            "coda_thought_pause_seconds": 1.9,
+        },
+    }
+    for code, policy in policies.items():
+        put(root / Edition(code).script, {"voice_performance": policy})
+        put(
+            Edition(code).audio_assembly,
+            {"program_level": {"policy": {"integrated_lufs": -16.5}}},
+        )
+    put(
+        root / sources.MANIFEST,
+        {
+            "repository": "https://example.test/guidelines",
+            "commit": "abc",
+            "members": [{"path": "docs/charter.md"}],
+        },
+    )
+    monkeypatch.setenv(sources.CHECKOUT, "/source/guidelines")
+    out = root / "build/evidence/reviews/round-5"
+    context = review_round.prompt_context(out, root / "build/evidence/reviews/round-4", None)
+    assert context["caps"] == "none declared Chinese; 0.60 s English"
+    assert context["ratios"] == "none declared Chinese, 1.62 and 0.00 s English"
+    assert context["codas"] == "none declared Chinese, 1.90 s English"
+
+
 def test_record_writes_reviews_that_verify_film_accepts(root, review, put, capsys):
     for code in CODES:
         put(root / Edition(code).script, f"{code} script")

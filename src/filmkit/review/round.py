@@ -210,33 +210,43 @@ def bind(out: Path) -> dict:
 
 # The reviewer prompt, filled per edition: the str.format template the film declares.
 TEMPLATE = (repository.ROOT / FILM.review.prompt).read_text(encoding="utf-8")
+# How the prompt names an optional field that the film or a script does not declare.
+NOT_DECLARED = "none declared"
+
+
+def declared_seconds(policy: dict, key: str) -> str:
+    """A script's declared duration, or "none declared" for an optional one it omits."""
+    value = policy.get(key)
+    return NOT_DECLARED if value is None else f"{value:.2f} s"
 
 
 def inner_caps(policy: dict) -> str:
     marks = policy.get("inner_pause_caps_seconds") or {}
     names = {",": "commas", "，": "commas", "、": "enumeration commas"}
     extra = ", ".join(f"{value:.2f} s at {names.get(mark, mark)}" for mark, value in marks.items())
-    cap = f"{policy['inner_pause_cap_seconds']:.2f} s"
+    cap = declared_seconds(policy, "inner_pause_cap_seconds")
     return f"{cap} ({extra})" if extra else cap
 
 
 def inner_floors(policy: dict) -> str:
     floors = policy.get("inner_pause_floors_seconds")
     if not floors:
-        return "none declared"
+        return NOT_DECLARED
     return ", ".join(f"{marks} {value:.3g} s" for marks, value in floors.items())
 
 
 def inner_breath(policy: dict) -> str:
     breath = policy.get("inner_breath")
     if not breath:
-        return "none declared"
+        return NOT_DECLARED
     seconds, pause = breath["longest_group_seconds"], breath["pause_seconds"]
     return f"{seconds:g} s with a {pause:g} s pause"
 
 
 def boundary(policy: dict) -> str:
     """A script's declared thought boundary ratio and the margin each floored boundary adds."""
+    if policy.get("thought_boundary_ratio") is None:
+        return NOT_DECLARED
     margin = policy.get("thought_boundary_margin_seconds", 0)
     return f"{policy['thought_boundary_ratio']} and {margin:.2f} s"
 
@@ -267,7 +277,7 @@ def prompt_context(out_dir: Path, previous: Path, changes: Path | None) -> dict:
         "root": repository.ROOT,
         "source": sources.location(),
         "documents": ", ".join(Path(member["path"]).stem for member in manifest["members"]),
-        "concepts": cited(repository.ROOT / FILM.concepts) if FILM.concepts else "none declared",
+        "concepts": cited(repository.ROOT / FILM.concepts) if FILM.concepts else NOT_DECLARED,
         "readings": " and ".join(cited(repository.ROOT / plan_path(code)) for code in CODES),
         "out": cited(out_dir),
         "previous": cited(previous),
@@ -282,8 +292,8 @@ def prompt_context(out_dir: Path, previous: Path, changes: Path | None) -> dict:
         "tolerances": f"{zh['thought_level_tolerance_db']} dB Chinese, "
         f"{en['thought_level_tolerance_db']} dB English",
         "ratios": f"{boundary(zh)} Chinese, {boundary(en)} English",
-        "codas": f"{zh['coda_thought_pause_seconds']:.2f} s Chinese, "
-        f"{en['coda_thought_pause_seconds']:.2f} s English",
+        "codas": f"{declared_seconds(zh, 'coda_thought_pause_seconds')} Chinese, "
+        f"{declared_seconds(en, 'coda_thought_pause_seconds')} English",
         "dimensions": "\n".join(
             f"{index}. {name}: {text}" for index, (name, text) in enumerate(DIMENSIONS.items(), 1)
         ),

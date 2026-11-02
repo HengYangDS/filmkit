@@ -2,7 +2,7 @@
 
 ## 1. Review prompts
 
-- [ ] 1.1 Name an absent coda, inner pause cap or thought boundary ratio as not declared in the reviewer prompt context; done when a test builds the context from a voice performance without them and every `mise run check` command passes.
+- [x] 1.1 Name an absent coda, inner pause cap or thought boundary ratio as not declared in the reviewer prompt context; done when a test builds the context from a voice performance without them and every `mise run check` command passes. `tests/review/test_round.py` builds the context from a Chinese performance without the three fields and reads "none declared" for each; on 2026-11-03 every check command passed, with 63 Node tests and 688 Python tests.
 
 ## 2. Supply
 
