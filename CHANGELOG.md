@@ -6,7 +6,7 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ### Changed
 
-- The repository runs ETHOS 0.2.0-alpha.26, and its CI workflow uses `jdx/mise-action` 5.2.5.
+- The repository runs ETHOS 0.2.0-alpha.27, and its CI workflow uses `jdx/mise-action` 5.2.5.
 
 ## [0.3.0] - 2026-11-02
 
