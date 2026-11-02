@@ -15,7 +15,7 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - The repository runs ETHOS 0.2.0-alpha.28.
 - The engine renders with HyperFrames 0.9.5. The browser build stays Chrome Headless Shell 152.0.7977.30, and `package.json` keeps its `undici` override, because 0.9.5 still declares that build and pins `undici` 7.25.0. A new renderer can change the frames a film renders, so a film keeps its current filmkit pin until it produces, reviews and accepts an edition on a release that carries this one.
 - The speech engine is mlx-audio 0.6.4. Its in-context path without streaming narrates the same takes as 0.6.3 from the same seeds, so a film that moves to it keeps its accepted takes.
-- The locks hold the newest releases their declared ranges admit: filelock 4.2.7 in `uv.lock` and semver 7.8.6 in `package-lock.json`. OSV reports no advisory for any package either lock pins.
+- The locks hold the newest releases their declared ranges admit: `filelock` 4.2.7 in `uv.lock` and `semver` 7.8.6 in `package-lock.json`. OSV reports no advisory for any package either lock pins.
 
 ### Fixed
 
