@@ -4,6 +4,10 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+
+- The repository runs ETHOS 0.2.0-alpha.28.
+
 ## [0.4.0] - 2026-11-02
 
 ### Changed
