@@ -13,7 +13,7 @@
 ## 3. Documentation and release notes
 
 - [x] 3.1 Document the speech engine's decode defect, its upstream fix and how auditions and run-on retakes keep endings whole meanwhile, and bring the comments and notices that name the engine and renderer versions up to date; done when `README.md` and `NOTICE` name the new versions. The README's "Whole endings" section names the defect, Blaizzy/mlx-audio#1116 and both remedies, and the README and `NOTICE` name HyperFrames 0.9.5 and mlx-audio 0.6.4.
-- [ ] 3.2 Record the changes under `Unreleased`, then date the notes as `[0.5.0]` with the `v0.4.0...v0.5.0` history link and open an empty `Unreleased`; set `VERSION` and the README pin to 0.5.0; done when no tracked file outside the Changelog history names 0.4.0 as the current version and every `mise run check` command passes.
+- [x] 3.2 Record the changes under `Unreleased`, then date the notes as `[0.5.0]` with the `v0.4.0...v0.5.0` history link and open an empty `Unreleased`; set `VERSION` and the README pin to 0.5.0; done when no tracked file outside the Changelog history names 0.4.0 as the current version and every `mise run check` command passes. `[0.5.0] - 2026-11-03` follows an empty `Unreleased`, outside the Changelog only the archived 0.4.0 Change names filmkit 0.4.0, and every check command passed on 2026-11-03.
 
 ## Workflow follow-up
 
