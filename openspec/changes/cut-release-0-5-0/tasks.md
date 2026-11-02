@@ -6,9 +6,9 @@
 
 ## 2. Supply
 
-- [ ] 2.1 Raise mlx-audio to 0.6.4 in `pyproject.toml` and refresh `uv.lock` with `uv lock --upgrade`; done when the lock resolves on the Python 3.12 line and OSV reports no advisory for any package it pins.
-- [ ] 2.2 Raise `hyperframes` to 0.9.5 in `package.json`, refresh `package-lock.json` with `npm update --package-lock-only`, and set `RENDERER_VERSION` and the browser pin to what 0.9.5 declares; done when the supply installs that build at its pinned digest and OSV reports no advisory for any package the lock pins.
-- [ ] 2.3 Build the sample film with `mise run sample:build` on the refreshed locks; done when `sample:verify` passes for both editions.
+- [x] 2.1 Raise mlx-audio to 0.6.4 in `pyproject.toml` and refresh `uv.lock` with `uv lock --upgrade`; done when the lock resolves on the Python 3.12 line and OSV reports no advisory for any package it pins. The lock resolves 54 packages on CPython 3.12.16, moving only mlx-audio to 0.6.4 and filelock to 4.2.7, and OSV finds no issue.
+- [x] 2.2 Raise `hyperframes` to 0.9.5 in `package.json`, refresh `package-lock.json` with `npm update --package-lock-only`, and set `RENDERER_VERSION` and the browser pin to what 0.9.5 declares; done when the supply installs that build at its pinned digest and OSV reports no advisory for any package the lock pins. The lock moves HyperFrames to 0.9.5 and semver to 7.8.6. HyperFrames 0.9.5 still declares Chrome Headless Shell 152.0.7977.30 and pins undici 7.25.0, so the browser pin and the undici 7.30.1 override stay; `sample:supply` installed that build and OSV finds no issue.
+- [x] 2.3 Build the sample film with `mise run sample:build` on the refreshed locks; done when `sample:verify` passes for both editions. On 2026-11-03 both editions passed, each with 1,800 geometry frames drawn by HeadlessChrome/152.0.7977.30 and a soundtrack at −16.5 LUFS.
 
 ## 3. Documentation and release notes
 

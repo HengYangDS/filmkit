@@ -154,7 +154,7 @@ def _check_cast(cast: dict) -> None:
     ):
         msg = "Reference transcript identity changed"
         raise RuntimeError(msg)
-    # mlx-audio 0.6.3 raises ICL penalties to 1.5; a cast may declare a lower one.
+    # mlx-audio 0.6.4 raises ICL penalties to 1.5; a cast may declare a lower one.
     penalty = cast.get("icl_repetition_penalty")
     if penalty is not None and (type(penalty) is not float or not 1 <= penalty < 1.5):
         msg = "A declared ICL repetition penalty must be in [1, 1.5)"

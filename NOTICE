@@ -29,7 +29,7 @@ THIRD-PARTY SOFTWARE AND MODELS
 The repository includes no third-party code. A build installs the following under their
 own licenses, which the licenses above do not cover:
 
-- HyperFrames 0.9.3, puppeteer-core 25.16.0 and @puppeteer/browsers 3.2.6, from npm,
+- HyperFrames 0.9.5, puppeteer-core 25.16.0 and @puppeteer/browsers 3.2.6, from npm,
   under the Apache License 2.0, and undici 7.30.1, which `package.json` selects for
   HyperFrames, from npm, under the MIT License;
 - GSAP 3.15.0, from npm, under its standard no-charge license
@@ -37,7 +37,7 @@ own licenses, which the licenses above do not cover:
   staged picture document;
 - Chrome Headless Shell 152.0.7977.30, which the supply step installs, under the licenses
   of Chromium and its components;
-- mlx-audio 0.6.3 and MLX under the MIT License, with the other Python packages that
+- mlx-audio 0.6.4 and MLX under the MIT License, with the other Python packages that
   uv.lock pins, each under its own license;
 - the speech models that the supply step downloads, each under the Apache License 2.0:
   mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16 at revision a6eb4f68,
