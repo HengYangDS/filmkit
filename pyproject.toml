@@ -18,9 +18,11 @@ requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 # Resolve stable releases only, as uv.lock records; `uv run --locked` refuses a lock that was
-# resolved in another prerelease mode.
+# resolved in another prerelease mode. An editable install is rebuilt when VERSION changes, so
+# the metadata it reports, and the gate records that read it, name the engine that runs.
 [tool.uv]
 prerelease = "disallow"
+cache-keys = [{ file = "pyproject.toml" }, { file = "VERSION" }]
 
 # VERSION is the only version source, as ETHOS requires of a repository that tags releases;
 # uv_build reads no dynamic version, so hatchling builds the package. The wheel carries the
