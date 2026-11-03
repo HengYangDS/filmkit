@@ -1,2 +1,3 @@
 * text=auto eol=lf
 tests/picture/sample-film.mjs ethos-role=tooling
+tests/picture/rules/fixtures.mjs ethos-role=tooling
