@@ -24,3 +24,17 @@ The engine's tests SHALL load the sample film as the film the engine builds, and
 
 - **WHEN** the engine's Python and Node suites run in a checkout of this repository alone
 - **THEN** every test that loads a film loads the sample film, and the suites pass
+
+### Requirement: The sample film meets the owner's text and review bars
+
+The sample film's text SHALL line up as the frame audit measures it, and its review configuration SHALL hold the overall score and every dimension at 95 or more.
+
+#### Scenario: The sample's picture passes the text-layout measures
+
+- **WHEN** `check-picture` audits either edition of the sample film
+- **THEN** the frame audit reports no text-layout finding, and the closing checklist's items share one left edge beside their checks
+
+#### Scenario: The sample's review floors
+
+- **WHEN** the sample film's review configuration is read
+- **THEN** its overall and dimension minimums are 95
