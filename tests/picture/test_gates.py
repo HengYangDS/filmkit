@@ -1,6 +1,7 @@
 """The picture's gate before a render: the gated findings of the audits and the record they bind."""
 
 import json
+import shutil
 from importlib.metadata import version
 from pathlib import Path
 
@@ -8,8 +9,13 @@ import pytest
 
 import filmkit.picture.gates as gates
 import filmkit.repository as repository
-from filmkit.picture.rendering import COMPOSITION_SCRIPT, PictureError
+from filmkit.film import FILM
+from filmkit.picture.metrics import VARIABLE
+from filmkit.picture.rendering import COMPOSITION_SCRIPT, STYLE, PictureError
 from filmkit.production import Edition
+
+# The sample film, whose stylesheet and fonts the gate's film declares.
+SAMPLE = Path(__file__).resolve().parents[2] / "examples/sample-film"
 
 # Reports of a clean picture: no gated frame finding, every label in sync, no long still.
 CLEAN = {
@@ -41,10 +47,14 @@ def put(path, data):
 
 @pytest.fixture
 def film(tmp_path, monkeypatch):
-    """A film root with a composition and the Chinese edition's timeline."""
+    """A film root with a composition, the sample film's stylesheet and fonts, and the Chinese
+    edition's timeline."""
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
     put(root / COMPOSITION_SCRIPT, "scenes = {};\n")
+    for path in (STYLE, *FILM.picture.fonts):
+        (root / path).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(SAMPLE / path, root / path)
     put(Edition("zh").timeline, {"segments": [], "captions": []})
     return root
 
@@ -80,16 +90,25 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
     assert record["composition_sha256"] == repository.sha(film / COMPOSITION_SCRIPT)
     assert record["timeline_sha256"] == repository.sha(edition.timeline)
     assert record["engine_version"] == version("filmkit")
+    # The audits measure text by the faces the stylesheet declares from these fonts.
+    assert record["stylesheet_sha256"] == repository.sha(film / STYLE)
+    assert record["fonts_sha256"] == {
+        font: repository.sha(film / font) for font in FILM.picture.fonts
+    }
     assert record["frames_checked"] == 301
     assert sorted(record["reports"]) == ["frame", "motion", "sync"]
     for report in record["reports"].values():
         assert report["sha256"] == repository.sha(film / report["path"])
     # The frame audit runs at one thirtieth of a second with its traces, the motion audit at
     # 30 frames per second, both on the edition's timeline.
-    (frame_tool, frame_args, frame_env), (motion_tool, motion_args, _) = calls
+    (frame_tool, frame_args, frame_env), (motion_tool, motion_args, motion_env) = calls
     assert (frame_tool, frame_args) == ("frame-audit", [str(edition.timeline), "0.0333333"])
-    assert sorted(frame_env) == ["MARKS", "TRACE"]
+    assert sorted(frame_env) == [VARIABLE, "MARKS", "TRACE"]
     assert (motion_tool, motion_args[:2]) == ("motion-audit", [str(edition.timeline), "30"])
+    assert motion_env == {VARIABLE: frame_env[VARIABLE]}
+    table = repository.read(Path(frame_env[VARIABLE]))
+    assert sorted(table["faces"]) == ["Sample", "SampleBold", "SampleLatin", "SampleLatinBold"]
+    assert table["fonts_sha256"] == record["fonts_sha256"]
 
 
 @pytest.mark.parametrize(
@@ -103,6 +122,33 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
         (
             {**CLEAN, "frame": {**CLEAN["frame"], "ragged_rows": {"02": [RAGGED_ROW]}}},
             "frame ragged_rows",
+        ),
+        (
+            {
+                **CLEAN,
+                "frame": {**CLEAN["frame"], "off_centre_builds": {"04": ["1.00-2.60 -120.0 px"]}},
+            },
+            "frame off_centre_builds",
+        ),
+        (
+            {
+                **CLEAN,
+                "frame": {
+                    **CLEAN["frame"],
+                    "uneven_pitch": {
+                        "03": [
+                            {
+                                "start": 2.0,
+                                "end": 4.5,
+                                "texts": ["A", "B", "C"],
+                                "pitch": [168.4, 184.6],
+                                "gaps": [100.0, 100.0],
+                            }
+                        ]
+                    },
+                },
+            },
+            "frame uneven_pitch",
         ),
         (
             {
@@ -131,17 +177,16 @@ def test_a_gated_finding_writes_a_refused_record_and_refuses(film, monkeypatch, 
     assert len(record["gated_findings"]) == 1 and named in record["gated_findings"][0]
 
 
-def test_a_measure_on_estimated_widths_is_recorded_and_refuses_nothing(film, monkeypatch):
-    # Like marks at uneven pitch over names at equal gaps rest on the headless widths of Latin
-    # text, so the reviewers judge them from the record.
-    pitch = {"start": 2.0, "end": 4.5, "texts": ["A", "B", "C"], "pitch": [168.4, 184.6]}
-    frame = {**CLEAN["frame"], "uneven_pitch": {"03": [{**pitch, "gaps": [100.0, 100.0]}]}}
+def test_a_still_state_off_centre_is_recorded_and_refuses_nothing(film, monkeypatch):
+    # Whether a still state is a settled composition or a build-up waiting for its next parts
+    # only the stage's intent tells, so the reviewers judge it from the record.
+    frame = {**CLEAN["frame"], "off_centre_settled": {"09": ["0.50-3.00 60.0 px"]}}
     audits(monkeypatch, {**CLEAN, "frame": frame})
     record = gates.check_picture(Edition("zh"))
     assert record["verdict"] == "pass" and record["gated_findings"] == []
-    assert len(record["recorded_findings"]) == 1
-    assert record["recorded_findings"][0].startswith("frame uneven_pitch: ")
-    assert '"pitch": [168.4, 184.6]' in record["recorded_findings"][0]
+    assert record["recorded_findings"] == [
+        'frame off_centre_settled: {"09": ["0.50-3.00 60.0 px"]}'
+    ]
     assert set(gates.FRAME_RECORDED).isdisjoint(gates.FRAME_GATES)
 
 

@@ -60,3 +60,21 @@ export function litLevel(palette, { lift = null } = {}) {
 /* A stroke's worst share of a cell, and a fill's: thin marks fall short of a whole cell. */
 export const strokeShare = (width) => Math.min(1, width / 7),
   fillShare = ([x0, y0, x1, y1]) => Math.min(1, (x1 - x0) / 7) * Math.min(1, (y1 - y0) / 7);
+
+/** Lit at full size, as the reviews since DDWG round 29 measure a frame: a mark whose colour, mixed over the ground at
+ * its opacity, is brighter than grey 60 by BT.601 luma, the grey of the reviewers' PIL measure. A style other than a
+ * #rrggbb colour is never lit. */
+export const FULL_SIZE_LIT_GRAY = 60;
+export function litAtFullSize(palette) {
+  const luma = (color) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
+    return 0.299 * r + 0.587 * g + 0.114 * b;
+  };
+  const ground = luma(palette.ground);
+  return function lit(color, alpha) {
+    return (
+      /^#[0-9a-f]{6}$/i.test(color ?? "") &&
+      ground + (luma(color) - ground) * alpha > FULL_SIZE_LIT_GRAY
+    );
+  };
+}

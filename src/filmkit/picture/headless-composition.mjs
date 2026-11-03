@@ -6,7 +6,9 @@
  * is the path as screen subpaths, sampled the way the real-browser check samples them (geometry-check.mjs); a text
  * stands at its anchor. `points` are the drawing points in the painter's own coordinates, as the motion audit
  * identifies a mark across frames: an arc gives the corners of its circle, a text the corners of its box, and
- * `toScreen` maps them to the screen. The stand-in estimates text metrics; geometry-check.mjs measures real ones. */
+ * `toScreen` maps them to the screen. The stand-in measures a text's width by the advances of the film's declared
+ * faces when it is given them (readTextMetrics), and otherwise by an estimate; geometry-check.mjs measures real
+ * metrics. */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import vm from "node:vm";
@@ -26,20 +28,49 @@ export function readTimeline(path) {
 }
 
 const fontSize = (font) => Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 30);
-/* Estimated metrics: a CJK character is as wide as the font size, a capital 0.66 of it and any other character 0.54;
- * the box rises and falls from its baseline in proportion to the size. */
-function textMetrics(text, { font, textAlign, textBaseline }) {
-  const size = fontSize(font);
-  const width = [...text].reduce(
-    (w, ch) =>
-      w +
-      (/[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/u.test(ch)
-        ? size
-        : /[A-Z]/.test(ch)
-          ? size * 0.66
-          : size * 0.54),
-    0,
+/* The family a CSS font names first, after its size: "700 30px FilmLatin, sans-serif" names FilmLatin. */
+const fontFamily = (font) =>
+  /\d(?:\.\d+)?px(?:\/\S+)?\s+(.+)$/
+    .exec(font)?.[1]
+    .split(",")[0]
+    .trim()
+    .replace(/^(['"])(.*)\1$/, "$2") ?? null;
+const spacingOf = (value) => Number(/(-?\d+(?:\.\d+)?)px/.exec(String(value))?.[1] ?? 0);
+/* The estimate's share of the size for one character: a CJK character as wide as the size, a capital 0.66 of it and
+ * any other character 0.54. */
+const estimated = (ch) =>
+  /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/u.test(ch) ? 1 : /[A-Z]/.test(ch) ? 0.66 : 0.54;
+
+/** The advance widths of the film's declared faces (filmkit.picture.metrics), read from the file that
+ * `FILMKIT_TEXT_METRICS` names, or null without one: per family, its default advance, its other advances and the
+ * characters its character map holds, in em. */
+export function readTextMetrics(path = process.env.FILMKIT_TEXT_METRICS) {
+  if (!path) return null;
+  const { faces } = JSON.parse(readFileSync(path, "utf8"));
+  return Object.fromEntries(
+    Object.entries(faces).map(([family, face]) => [
+      family,
+      { default: face.default, advances: face.advances, mapped: new Set(face.mapped) },
+    ]),
   );
+}
+
+/* A text's metrics. In a face the table declares, the width is the sum of the characters' advances at the size, plus
+ * the letter spacing for each character, as a canvas measures it; a character the face does not map, and any text in
+ * a family the table does not hold, take the estimate. The box rises and falls from its baseline in proportion to the
+ * size. */
+function textMetrics(text, { font, textAlign, textBaseline, letterSpacing }, faces = null) {
+  const size = fontSize(font),
+    face = faces?.[fontFamily(font)] ?? null,
+    chars = [...text];
+  const width = face
+    ? chars.reduce(
+        (w, ch) =>
+          w + size * (face.mapped.has(ch) ? (face.advances[ch] ?? face.default) : estimated(ch)),
+        0,
+      ) +
+      spacingOf(letterSpacing) * chars.length
+    : chars.reduce((w, ch) => w + size * estimated(ch), 0);
   const left = textAlign === "center" ? width / 2 : textAlign === "right" ? width : 0;
   const ascent = textBaseline === "top" ? 0 : textBaseline === "middle" ? size * 0.52 : size * 0.8;
   const descent =
@@ -79,7 +110,7 @@ export function canvasSweep(a0, a1, anticlockwise = false) {
   return anticlockwise ? -sweep : sweep;
 }
 
-export function canvasStandIn(deliver) {
+export function canvasStandIn(deliver, faces = null) {
   let m = [1, 0, 0, 1, 0, 0],
     state = { ...STATE, dash: [] };
   const stack = [];
@@ -160,7 +191,7 @@ export function canvasStandIn(deliver) {
     setLineDash(segments) {
       state.dash = [...segments];
     },
-    measureText: (v) => textMetrics(v, state),
+    measureText: (v) => textMetrics(v, state, faces),
     beginPath() {
       subs = [];
       sub = null;
@@ -225,7 +256,7 @@ export function canvasStandIn(deliver) {
     },
     fillText(v, x, y) {
       const text = String(v),
-        k = textMetrics(text, state);
+        k = textMetrics(text, state, faces);
       deliver(
         paintOf("text", state.fillStyle, {
           subs: [[tx(x, y)]],
@@ -257,11 +288,12 @@ export function canvasStandIn(deliver) {
   });
 }
 
-/** Load film.js on `timeline`. Returns `palette`, the film's colours; `render(t, onPaint)`, which renders the frame
- * at t, hands each of its paints to `onPaint` and returns the layout film.js publishes; `framed`, whether film.js
- * defines a camera `cameraOf`; `camera(segment, t)`, that camera of a segment at t; and `origin()`, called while a
- * paint is handed over, the innermost line of a scene body in film.js that made it, as `film.js:<line>`, or null. */
-export function openComposition(timeline) {
+/** Load film.js on `timeline`, measuring text with the declared `faces` (readTextMetrics) when they are given.
+ * Returns `palette`, the film's colours; `render(t, onPaint)`, which renders the frame at t, hands each of its paints
+ * to `onPaint` and returns the layout film.js publishes; `framed`, whether film.js defines a camera `cameraOf`;
+ * `camera(segment, t)`, that camera of a segment at t; and `origin()`, called while a paint is handed over, the
+ * innermost line of a scene body in film.js that made it, as `film.js:<line>`, or null. */
+export function openComposition(timeline, { faces = null } = {}) {
   const composition = resolve(COMPOSITION),
     source = readFileSync(composition, "utf8");
   // The scene whose body each line of film.js lies in, so a paint can be traced to the scene line that made it.
@@ -281,7 +313,7 @@ export function openComposition(timeline) {
     onPaint(paint);
   }
   // The document holds the picture's canvas and the film element whose width sets the resolution, nothing else.
-  const ctx = canvasStandIn(deliver);
+  const ctx = canvasStandIn(deliver, faces);
   const elements = {
     picture: {
       getContext(type) {

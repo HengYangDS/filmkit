@@ -21,6 +21,14 @@ const runsByScene = (runs) =>
       list.map((v) => `${v.start.toFixed(2)}-${v.end.toFixed(2)} ${(v.worst * 100).toFixed(1)}%`),
     ]),
   );
+/* The reviewers' balance runs per scene, each as its span and its largest offset from x 960 in px. */
+const pxRunsByScene = (runs) =>
+  Object.fromEntries(
+    Object.entries(Object.groupBy(runs, (v) => v.scene)).map(([id, list]) => [
+      id,
+      list.map((v) => `${v.start.toFixed(2)}-${v.end.toFixed(2)} ${v.worst.toFixed(1)} px`),
+    ]),
+  );
 /* Text-layout runs per scene, each with its start, end, texts and the offsets of its worst frame. */
 const layoutByScene = (runs) =>
   Object.fromEntries(
@@ -61,6 +69,8 @@ export function frameReport({
   longNames,
   sparseRuns,
   offCentreRuns,
+  offCentreBuilds,
+  offCentreSettled,
   thinRuns,
   underfilled,
   textLayout,
@@ -204,6 +214,11 @@ export function frameReport({
     /* Runs of 2 s or more of speech whose lit picture stands more than 12% off the content centre, or covers less than
      * a tenth of the band, per scene, with their span and the largest offset or the least cover. */
     off_centre_runs: runsByScene(offCentreRuns),
+    /* Balance as the reviews since round 29 measure it, in every frame of a scene: runs of 1.5 s or more whose
+     * full-size lit box stands more than 90 px off x 960, and settled runs of 2 s or more, the box's edges steady
+     * within 4 px, more than 50 px off, per scene, with their span and the largest offset in px. */
+    off_centre_builds: pxRunsByScene(offCentreBuilds),
+    off_centre_settled: pxRunsByScene(offCentreSettled),
     thin_runs: runsByScene(thinRuns),
     /* Thoughts whose lit picture covers less than the reviewers' share of the band at one of their instants, with the
      * instant and the share. */

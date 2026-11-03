@@ -51,9 +51,18 @@ test("the frame audit reports a stretch of the film, its label trace, its marks 
     "long_names",
     "sparse_runs",
     "off_centre_runs",
+    "off_centre_builds",
+    "off_centre_settled",
     "thin_runs",
   ])
     assert.ok(report[key] && typeof report[key] === "object", key);
+  // The reviewers' balance runs, with their span and largest offset in px.
+  for (const key of ["off_centre_builds", "off_centre_settled"])
+    for (const runs of Object.values(report[key]))
+      assert.ok(
+        runs.every((run) => /^[\d.]+-[\d.]+ -?[\d.]+ px$/.test(run)),
+        key,
+      );
   // Runs of speech whose visible marks cover too little of the band, and runs whose lit picture stands off the content
   // centre or covers too little of it, with their span and worst share.
   for (const key of ["sparse_runs", "off_centre_runs", "thin_runs"])
@@ -198,4 +207,85 @@ test("the frame audit reports a ragged row with its scene, span, texts and basel
   );
   for (const key of TEXT_LAYOUT.filter((v) => v !== "ragged_rows"))
     assert.deepEqual(report[key], {}, key);
+});
+
+/* A composition whose one name stands left-aligned at x 900, so its box is centred by its width: measured by a
+ * declared face of 0.5 em a character, "Sources and films" is 255 px wide and stands 67.5 px right of centre; before
+ * 2 s it stands 300 px further left. */
+const OFF_CENTRE = `"use strict";
+const ctx = document.getElementById("picture").getContext("2d");
+const P = { ground: "#0F1519", panel: "#1E2932", line: "#63758B", ink: "#ECE8DF", muted: "#9BA8B1" };
+let texts = [];
+window.renderFrame = (t) => {
+  texts = [];
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = P.ground;
+  ctx.fillRect(0, 0, 1920, 1080);
+  window.__sceneId = "01";
+  const value = "Sources and films", x = t < 2 ? 600 : 900;
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = P.ink;
+  ctx.font = "30px Sample";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(value, x, 500);
+  const width = ctx.measureText(value).width;
+  texts.push({ text: value, bounds: [x, 476, x + width, 507], color: P.ink, alpha: 1, role: "label", scene: "01",
+    placed: true, size: 30 });
+  window.__sceneId = null;
+  window.__filmLayout = { time: t, texts };
+};
+`;
+
+test("the frame audit measures balance as the reviewers do, with the widths of the declared faces", async () => {
+  const root = await scratchFolder(),
+    path = join(root, "timeline.json"),
+    metrics = join(root, "text-metrics.json");
+  await mkdir(join(root, "picture"));
+  await writeFile(join(root, "picture/film.js"), OFF_CENTRE);
+  const words = ["Sources", "and", "films"].map((text, i) => ({
+    text,
+    start: 0.5 + 1.5 * i,
+    end: 1.5 + 1.5 * i,
+  }));
+  const segment = {
+    id: "01",
+    chapter: "sample",
+    start: 0,
+    end: 6,
+    voice_start: 0.5,
+    voice_end: 5.5,
+    utterance_groups: ["Sources and films"],
+    words,
+  };
+  await writeFile(
+    path,
+    JSON.stringify({ language: "English", duration: 6, segments: [segment], captions: [] }),
+  );
+  await writeFile(
+    metrics,
+    JSON.stringify({
+      faces: { Sample: { default: 0.5, advances: {}, mapped: "Sacdefilmnorsu " } },
+    }),
+  );
+  const audit = (env) =>
+    JSON.parse(
+      execFileSync(process.execPath, [AUDIT_FRAMES, path, "0.1"], {
+        cwd: root,
+        env: { ...process.env, ...env },
+        encoding: "utf8",
+      }),
+    );
+  const report = audit({ FILMKIT_TEXT_METRICS: metrics });
+  assert.deepEqual(report.errors, []);
+  // 232.5 px left for the first 2 s is a build-up, and settled; still at 67.5 px right from 2 s on is settled.
+  assert.deepEqual(report.off_centre_builds, { "01": ["0.00-2.00 -232.5 px"] });
+  assert.deepEqual(report.off_centre_settled, {
+    "01": ["0.00-2.00 -232.5 px", "2.00-6.10 67.5 px"],
+  });
+  // Without the table the estimate measures the name 24 px wider, and its box stands 12 px further right.
+  const estimated = audit({ FILMKIT_TEXT_METRICS: "" });
+  assert.deepEqual(estimated.off_centre_settled, {
+    "01": ["0.00-2.00 -220.5 px", "2.00-6.10 79.5 px"],
+  });
 });

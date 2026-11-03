@@ -12,6 +12,7 @@ import { spanOf } from "../../src/filmkit/picture/frame-audit/marks.mjs";
 import {
   canvasStandIn,
   openComposition,
+  readTextMetrics,
   readTimeline,
 } from "../../src/filmkit/picture/headless-composition.mjs";
 import { authoredTimeline, SAMPLE, scratchFolder } from "./sample-film.mjs";
@@ -289,6 +290,73 @@ test("the canvas stand-in paints what film.js draws and refuses any other member
   // The ground laid under each frame is never a mark.
   ctx.fillRect(0, 0, 1920, 1080);
   assert.equal(paints.length, 4);
+});
+
+test("the canvas stand-in measures a declared face by its advances and anything else by the estimate", () => {
+  const faces = {
+      Sample: { default: 1, advances: { A: 0.6, b: 0.55 }, mapped: new Set(["A", "b", "中"]) },
+    },
+    ctx = canvasStandIn(() => {}, faces);
+  ctx.font = "20px Sample";
+  // A declared face: the characters' advances times the size.
+  assert.equal(ctx.measureText("Ab").width, 23);
+  // A character the face does not map takes the estimate (a capital 0.66 of the size), a mapped one its default.
+  assert.equal(ctx.measureText("AZ中").width, 12 + 13.2 + 20);
+  // Letter spacing is added for each character, as a canvas measures it.
+  ctx.letterSpacing = "2px";
+  assert.equal(ctx.measureText("Ab").width, 27);
+  // The family is the first the font names, after its weight and size, without quotes.
+  ctx.letterSpacing = "0px";
+  ctx.font = "700 20px 'Sample', sans-serif";
+  assert.equal(ctx.measureText("Ab").width, 23);
+  // A family the table does not hold keeps the estimate, letter spacing included, as without a table.
+  ctx.font = "20px Other";
+  ctx.letterSpacing = "2px";
+  assert.equal(ctx.measureText("Ab").width, 24);
+  assert.equal(canvasStandIn(() => {}).measureText("Ab").width, 0.66 * 10 + 0.54 * 10);
+});
+
+test("the faces' table is read from the file the audits are given, and is absent without one", async () => {
+  const folder = await mkdtemp(join(tmpdir(), "text-metrics-"));
+  try {
+    const path = join(folder, "text-metrics.json");
+    await writeFile(
+      path,
+      JSON.stringify({
+        stylesheet_sha256: "0".repeat(64),
+        faces: { Sample: { default: 1, advances: { A: 0.6 }, mapped: "A中" } },
+      }),
+    );
+    const faces = readTextMetrics(path);
+    assert.deepEqual(Object.keys(faces), ["Sample"]);
+    assert.equal(faces.Sample.default, 1);
+    assert.deepEqual(faces.Sample.advances, { A: 0.6 });
+    assert.deepEqual([...faces.Sample.mapped], ["A", "中"]);
+    assert.equal(readTextMetrics(""), null);
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
+});
+
+test("a composition opened with the declared faces measures its texts by them", async () => {
+  const film = await mkdtemp(join(tmpdir(), "film-root-")),
+    before = process.cwd();
+  try {
+    await mkdir(join(film, "picture"));
+    await writeFile(
+      join(film, "picture/film.js"),
+      'var P = { ground: "#0F1519" };\n' +
+        'const ctx = document.getElementById("picture").getContext("2d");\n' +
+        'window.renderFrame = () => { ctx.font = "10px Face"; window.__filmLayout = { width: ctx.measureText("aa").width, texts: [] }; };\n',
+    );
+    process.chdir(film);
+    const faces = { Face: { default: 0.5, advances: {}, mapped: new Set(["a"]) } };
+    assert.equal(openComposition({}, { faces }).render(0).width, 10);
+    assert.equal(openComposition({}).render(0).width, 10.8);
+  } finally {
+    process.chdir(before);
+    await rm(film, { recursive: true, force: true });
+  }
 });
 
 test("the vendored timeline engine seeks a paused timeline as the composition drives it", async () => {

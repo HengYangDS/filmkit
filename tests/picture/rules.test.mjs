@@ -3,11 +3,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { openComposition } from "../../src/filmkit/picture/headless-composition.mjs";
-import { balanceRuns, bandCover, pictureOffset } from "../../src/filmkit/picture/rules/balance.mjs";
+import {
+  balanceRuns,
+  bandCover,
+  pictureOffset,
+  reviewedRuns,
+} from "../../src/filmkit/picture/rules/balance.mjs";
 import { analysis } from "../../src/filmkit/picture/rules/frame.mjs";
 import {
   fillShare,
   inkLevel,
+  litAtFullSize,
   litLevel,
   readingLoad,
   strokeShare,
@@ -514,4 +520,132 @@ test("balance through speech leaves a brief excursion, a scene change and quiet 
     (t) => (t >= 1.5 && t < 4.5 ? null : [900, 500, 1000, 520]),
   );
   assert.deepEqual(quiet, { off: [], thin: [] });
+});
+
+/* A box of the given width whose centre stands dx px from x 960, within the reviewers' band. */
+const offBy = (dx, width = 400) => [960 + dx - width / 2, 300, 960 + dx + width / 2, 700];
+const near = (a, b) => Math.abs(a - b) < 1e-6;
+
+test("a build-up off centre for 1.5 s or more is a reviewers' run; a briefer state is not", () => {
+  // 120 px left for 1.6 s while the parts arrive, then centred.
+  const build = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    4,
+    () => "07",
+    (t) => (t >= 1 && t < 2.6 ? offBy(-120) : offBy(0)),
+  );
+  assert.equal(build.builds.length, 1);
+  assert.equal(build.builds[0].scene, "07");
+  assert.ok(near(build.builds[0].start, 1) && near(build.builds[0].end, 2.6));
+  assert.ok(near(build.builds[0].worst, -120));
+  // 200 px off for 1.4 s and then within 90 px is no run.
+  const brief = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    4,
+    () => "07",
+    (t) => (t >= 1 && t < 2.4 ? offBy(200) : offBy(80)),
+  );
+  assert.deepEqual(brief.builds, []);
+  // A scene change, a frame with nothing lit and a gap in the samples each end a run.
+  const cut = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    3,
+    (t) => (t < 1.2 ? "07" : "08"),
+    () => offBy(150),
+  );
+  assert.deepEqual(
+    cut.builds.map((v) => v.scene),
+    ["08"],
+  );
+  const dark = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    3,
+    () => "07",
+    (t) => (t >= 1.2 && t < 1.3 ? null : offBy(150)),
+  );
+  assert.deepEqual(
+    dark.builds.map((v) => near(v.start, 1.3)),
+    [true],
+  );
+  const runs = reviewedRuns(0.1);
+  for (const t of [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 1.4, 1.5, 1.6])
+    runs.frame(t, "07", offBy(150));
+  assert.deepEqual(runs.finish().builds, []);
+});
+
+test("a settled composition off centre for 2 s or more is a reviewers' run; a growing build-up is not", () => {
+  // Still at 60 px right for 2.5 s.
+  const still = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    3,
+    () => "09",
+    (t) => (t >= 0.5 ? offBy(60) : offBy(0)),
+  );
+  assert.equal(still.settled.length, 1);
+  assert.ok(near(still.settled[0].worst, 60) && near(still.settled[0].start, 0.5));
+  assert.deepEqual(still.builds, []);
+  // 70 px off for 3 s while its right edge grows by 40 px is a build-up within its limit: neither run.
+  const growing = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    3,
+    () => "09",
+    (t) => {
+      const [x0, y0, x1, y1] = offBy(-70);
+      return [x0, y0, x1 + (40 * t) / 3, y1];
+    },
+  );
+  assert.deepEqual(growing, { builds: [], settled: [] });
+  // A still state that the next part grows from is a build-up held while it waits: no settled run. The same state
+  // followed by another picture of its scene, or by nothing lit, is a settled composition.
+  const waiting = (t) => (t < 2.5 ? offBy(70) : [offBy(70)[0], 300, offBy(70)[2] + 300, 700]);
+  assert.deepEqual(sampled(reviewedRuns(1 / 30), 0, 3, () => "09", waiting).settled, []);
+  const replaced = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    3,
+    () => "09",
+    (t) => (t < 2.5 ? offBy(70) : offBy(0, 100)),
+  );
+  assert.deepEqual(
+    replaced.settled.map((v) => near(v.end, 2.5)),
+    [true],
+  );
+  const fading = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    3,
+    () => "09",
+    (t) => (t < 2.5 ? offBy(70) : null),
+  );
+  assert.deepEqual(
+    fading.settled.map((v) => near(v.worst, 70)),
+    [true],
+  );
+  // A lone mark centred where it stands is within both limits.
+  const lone = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    3,
+    () => "09",
+    () => offBy(0, 60),
+  );
+  assert.deepEqual(lone, { builds: [], settled: [] });
+});
+
+test("a mark is lit at full size when its colour over the ground is brighter than grey 60", () => {
+  const lit = litAtFullSize({ ground: "#0F1519" });
+  // The film's ink is lit, its grey line colour too, and the ink at a tenth of its opacity is not.
+  assert.equal(lit("#ECE8DF", 1), true);
+  assert.equal(lit("#63758B", 1), true);
+  assert.equal(lit("#ECE8DF", 0.1), false);
+  // BT.601 luma: pure green (150) is lit, pure blue (29) is not, and a style other than #rrggbb never is.
+  assert.equal(lit("#00FF00", 1), true);
+  assert.equal(lit("#0000FF", 1), false);
+  assert.equal(lit("rgba(255,255,255,1)", 1), false);
 });

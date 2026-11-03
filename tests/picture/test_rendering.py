@@ -89,6 +89,7 @@ def passing_gates(edition, **changes):
         "composition_sha256": repository.sha(composition),
         "timeline_sha256": repository.sha(edition.timeline),
         "engine_version": version("filmkit"),
+        **picture_rendering.face_bindings(),
         "verdict": "pass",
         **changes,
     }
@@ -428,6 +429,8 @@ def test_another_renderer_version_refuses_staging_and_rendering(
         (None, "has no gate record; run check-picture"),
         ({"verdict": "refuse"}, "did not pass; run check-picture"),
         ({"engine_version": "0.0.0"}, "binds another engine_version; run check-picture"),
+        ({"fonts_sha256": {}}, "binds another fonts_sha256; run check-picture"),
+        ({"stylesheet_sha256": "0" * 64}, "binds another stylesheet_sha256; run check-picture"),
     ],
 )
 def test_rendering_refuses_a_picture_without_a_current_passing_check(

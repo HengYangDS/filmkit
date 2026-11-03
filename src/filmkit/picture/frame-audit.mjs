@@ -5,15 +5,16 @@
  * reports one frame in detail. TRACE=<file> writes the label trace that filmkit.picture.sync_audit reads; MARKS=<file> writes the
  * firm marks and repeated members of each voiced frame, with whether a legible name stands at each, for its seat
  * check (src/filmkit/picture/seat-marks.mjs); BOUNDS=<file> writes each scene's drawn extent; BALANCE=<file> writes
- * each thought's lit offsets and band cover at the reviewers' two instants. The headless canvas
- * approximates text metrics (headless-composition.mjs); geometry-check.mjs measures real geometry. */
+ * each thought's lit offsets and band cover at the reviewers' two instants. FILMKIT_TEXT_METRICS=<file> names the
+ * advance widths of the film's declared faces (filmkit.picture.metrics), by which the headless canvas measures text;
+ * without it the canvas estimates text metrics (headless-composition.mjs). geometry-check.mjs measures real geometry. */
 import { parseArgs } from "node:util";
 
 import { compositionMeasures } from "./frame-audit/composition.mjs";
 import { inHead, spanOf, VISIBLE } from "./frame-audit/marks.mjs";
 import { frameReport, writeRequestedFiles } from "./frame-audit/report.mjs";
 import { textLayout } from "./frame-audit/typography/index.mjs";
-import { openComposition, readTimeline } from "./headless-composition.mjs";
+import { openComposition, readTextMetrics, readTimeline } from "./headless-composition.mjs";
 import { analysis } from "./rules/frame.mjs";
 import { inkLevel, readingLoad } from "./rules/ink.mjs";
 import { faintLabels, listTracker, nameRules } from "./rules/names.mjs";
@@ -73,7 +74,7 @@ function extendRun(runs, key, t) {
   runs.set(key, list);
 }
 
-const film = openComposition(timeline);
+const film = openComposition(timeline, { faces: readTextMetrics() });
 /* Reading load is measured as WCAG contrast against the ground: a label of at least 3:1 is legible; a label held
  * between 1.8:1 and 3:1 for more than a second is neither a usable recap nor gone, so it reads as faint clutter. The
  * ink level and the label, name and list rules are those of the real-browser check (geometry-check.mjs). */
@@ -345,6 +346,7 @@ const measures = [
   nameLoad,
   composition.pictureBalance,
   composition.balanceThroughSpeech,
+  composition.reviewedBalance,
   composition.containers,
   labelEchoes,
   composition.sparseSpeech,
@@ -421,6 +423,8 @@ const report = frameReport({
   longNames,
   sparseRuns: composition.sparseRuns,
   offCentreRuns: composition.offCentreRuns,
+  offCentreBuilds: composition.offCentreBuilds,
+  offCentreSettled: composition.offCentreSettled,
   thinRuns: composition.thinRuns,
   underfilled: composition.underfilled,
   textLayout: typography.finish(),

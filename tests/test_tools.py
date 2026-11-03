@@ -2,14 +2,18 @@
 
 import json
 import re
+import shutil
 from importlib.metadata import version
+from pathlib import Path
 
 import pytest
 
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 import filmkit.tools as tools
-from filmkit.picture.rendering import PictureError
+from filmkit.film import FILM
+from filmkit.picture.metrics import TABLE, VARIABLE
+from filmkit.picture.rendering import STYLE, PictureError
 from filmkit.tools import ToolError
 
 # The engine's npm packages, found before a test rebinds the film root; they hold the renderer
@@ -17,12 +21,20 @@ from filmkit.tools import ToolError
 PACKAGES = repository.node_modules()
 
 
+# The sample film, whose stylesheet and fonts the tools' film declares.
+SAMPLE = Path(__file__).resolve().parents[1] / "examples/sample-film"
+
+
 @pytest.fixture
 def film(tmp_path, monkeypatch):
-    """A film root whose npm packages are the engine's own, away from the engine's sources."""
+    """A film root whose npm packages are the engine's own, away from the engine's sources,
+    with the sample film's stylesheet and fonts."""
     root = tmp_path.resolve() / "film"
     root.mkdir()
     (root / "node_modules").symlink_to(PACKAGES)
+    for path in (STYLE, *FILM.picture.fonts):
+        (root / path).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(SAMPLE / path, root / path)
     monkeypatch.setattr(repository, "ROOT", root)
     return root
 
@@ -87,6 +99,31 @@ def test_a_tool_takes_added_variables_and_may_write_its_output_to_a_file(
     assert tools.run("frame-audit", [], environment={"TRACE": "trace.tsv"}, stdout=out) == 0
     assert json.loads(out.read_text()) == {"trace": "trace.tsv"}
     assert capfd.readouterr().out == ""
+
+
+def test_the_headless_audits_measure_text_by_the_films_faces(film, tmp_path, monkeypatch, capfd):
+    package = tmp_path / "package"
+    (package / "picture").mkdir(parents=True)
+    probe = f"console.log(JSON.stringify({{table: process.env.{VARIABLE} ?? null}}));"
+    for tool in ("frame-audit", "motion-audit", "geometry-check"):
+        (package / tools.TOOLS[tool]).write_text(probe)
+    monkeypatch.setattr(tools, "PACKAGE", package)
+    monkeypatch.delenv(VARIABLE, raising=False)
+    # Both audits that run the composition are given the table of the film's declared faces.
+    for tool in ("frame-audit", "motion-audit"):
+        assert tools.run(tool, []) == 0
+        assert json.loads(capfd.readouterr().out) == {"table": str(film / TABLE)}
+    assert sorted(repository.read(film / TABLE)["faces"]) == [
+        "Sample",
+        "SampleBold",
+        "SampleLatin",
+        "SampleLatinBold",
+    ]
+    # A browser check measures the real fonts, and a caller's own table is kept.
+    assert tools.run("geometry-check", []) == 0
+    assert json.loads(capfd.readouterr().out) == {"table": None}
+    assert tools.run("frame-audit", [], environment={VARIABLE: "own.json"}) == 0
+    assert json.loads(capfd.readouterr().out) == {"table": "own.json"}
 
 
 def test_another_renderer_version_refuses_before_any_tool_runs(tmp_path, monkeypatch):

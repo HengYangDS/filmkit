@@ -1,7 +1,15 @@
 /* The frame audit's measures of what a frame's picture shows: the seats and containers of its firm marks, its balance
- * and cover at the reviewers' instants, the runs of speech over too little of it, and the extent each scene paints. */
-import { BALANCE_BAND, balanceRuns, bandCover, pictureOffset } from "../rules/balance.mjs";
-import { fillShare, litLevel, strokeShare } from "../rules/ink.mjs";
+ * and cover at the reviewers' instants, its balance in every frame as the reviews since round 29 measure it, the runs
+ * of speech over too little of it, and the extent each scene paints. */
+import {
+  BALANCE_BAND,
+  balanceRuns,
+  bandCover,
+  pictureOffset,
+  REVIEWED_BAND,
+  reviewedRuns,
+} from "../rules/balance.mjs";
+import { fillShare, litAtFullSize, litLevel, strokeShare } from "../rules/ink.mjs";
 import { containerFill, FRAME, seatMarks } from "../seat-marks.mjs";
 import { emptyBox, growBox, HEAD, inHead, pointsOf, spanOf, VISIBLE } from "./marks.mjs";
 
@@ -158,6 +166,29 @@ export function compositionMeasures({ film, step, thoughts }) {
         if (point[1] >= BALANCE_BAND[0] && point[1] <= BALANCE_BAND[1]) growBox(lit, point);
     runs.frame(f.t, f.speaking?.id ?? null, lit[2] > lit[0] ? lit : null);
   }
+  /* Balance as the reviews since round 29 measure it, in every frame, spoken or not: the box of every paint lit at full
+   * size whose extent reaches rows 120-919, a text by its box, a stroke by its path widened by half its width and a
+   * fill by its path, joined per scene, the timeline segment the frame falls in, into off-centre build-ups and settled
+   * runs (rules/balance.mjs). */
+  const reviewed = reviewedRuns(step),
+    isLitAtFullSize = litAtFullSize(film.palette),
+    offCentreBuilds = [],
+    offCentreSettled = [];
+  function reviewedBalance(f) {
+    const box = emptyBox();
+    for (const p of f.paints) {
+      if (!isLitAtFullSize(p.color, p.alpha)) continue;
+      if (p.kind === "text" && !p.text.trim()) continue;
+      const points = p.kind === "text" ? p.points.map(p.toScreen) : p.subs.flat();
+      if (!points.length) continue;
+      const half = p.kind === "stroke" ? (p.lineWidth * p.scale) / 2 : 0,
+        [x0, y0, x1, y1] = spanOf(points);
+      if (Math.min(y1 + half, REVIEWED_BAND[1]) < Math.max(y0 - half, REVIEWED_BAND[0])) continue;
+      growBox(box, [x0 - half, Math.max(y0 - half, REVIEWED_BAND[0])]);
+      growBox(box, [x1 + half, Math.min(y1 + half, REVIEWED_BAND[1])]);
+    }
+    reviewed.frame(f.t, f.seg?.id ?? null, box[2] > box[0] ? box : null);
+  }
   /* Sparse runs, as the Chinese review measured them: the box around every mark of visible ink in the content band,
    * through each voiced frame; a run of 1.5 s or more of speech whose box covers less than 4% of the band is reported per
    * scene, with its start, end and least cover. On the delivered round-16 film, the review's runs (18.2, 21.4, 16.2,
@@ -251,12 +282,16 @@ export function compositionMeasures({ film, step, thoughts }) {
     const { off, thin } = runs.finish();
     offCentreRuns.push(...off);
     thinRuns.push(...thin);
+    const { builds, settled } = reviewed.finish();
+    offCentreBuilds.push(...builds);
+    offCentreSettled.push(...settled);
   }
   return {
     seats,
     containers,
     pictureBalance,
     balanceThroughSpeech,
+    reviewedBalance,
     sparseSpeech,
     paintedExtent,
     finish,
@@ -265,6 +300,8 @@ export function compositionMeasures({ film, step, thoughts }) {
     drawn,
     sparseRuns,
     offCentreRuns,
+    offCentreBuilds,
+    offCentreSettled,
     thinRuns,
     underfilled,
   };

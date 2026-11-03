@@ -65,3 +65,72 @@ export function balanceRuns(step) {
     },
   };
 }
+
+/** Balance as the reviews since DDWG round 29 measure it, on full-size frames: the box of every paint brighter than
+ * grey 60 in rows 120-919 (rules/ink.mjs litAtFullSize) and its horizontal offset from x 960. A build-up may stand
+ * more than 90 px off for less than 1.5 s; a settled composition, its box's left and right edges steady within 4 px,
+ * may stand more than 50 px off for less than 2 s. A still state that the next parts grow from is a build-up, held
+ * while they are still to come, not a settled composition. A lone mark centred where it stands is within both. */
+export const REVIEWED_BAND = [120, 919],
+  REVIEWED_BUILD = { px: 90, seconds: 1.5 },
+  REVIEWED_SETTLED = { px: 50, seconds: 2, steady: 4 };
+
+/** Joins frames sampled every `step` seconds into the reviewers' off-centre runs. `frame(t, scene, box)` takes the
+ * scene the frame falls in and the frame's lit box in the band, or null when nothing is lit; a frame of another scene,
+ * a frame without a lit box and a gap in the samples each end a run, and a settled run also ends when an edge moves
+ * more than 4 px from where it stood when the run began. A still run is left out when the frame that ends it holds a
+ * wider box of the same scene that contains it: the picture grew from it. `finish()` returns `builds` and `settled`,
+ * each run with its scene, start, end and largest offset in px, signed. */
+export function reviewedRuns(step) {
+  const runs = { builds: [], settled: [] },
+    open = { builds: null, settled: null },
+    least = { builds: REVIEWED_BUILD.seconds, settled: REVIEWED_SETTLED.seconds },
+    { steady: STEADY } = REVIEWED_SETTLED;
+  const close = (kind) => {
+    const run = open[kind];
+    if (run && run.end - run.start >= least[kind] - 1e-9)
+      runs[kind].push({ scene: run.scene, start: run.start, end: run.end, worst: run.worst });
+    open[kind] = null;
+  };
+  const follows = (run, t, scene) =>
+    run && run.scene === scene && Math.abs(run.end - t) < step * 1.5;
+  const steady = (run, box) =>
+    Math.abs(box[0] - run.left) <= STEADY && Math.abs(box[2] - run.right) <= STEADY;
+  // The next frame's box grew from the still run's: it holds it and reaches further.
+  const grewFrom = (run, t, scene, box) =>
+    follows(run, t, scene) &&
+    box !== null &&
+    box[0] <= run.left + STEADY &&
+    box[2] >= run.right - STEADY &&
+    box[2] - box[0] > run.right - run.left + STEADY;
+  return {
+    frame(t, scene, box) {
+      const dx = box ? (box[0] + box[2]) / 2 - 960 : 0;
+      if (box && Math.abs(dx) > REVIEWED_BUILD.px) {
+        const run = open.builds;
+        if (follows(run, t, scene)) {
+          run.end = t + step;
+          if (Math.abs(dx) > Math.abs(run.worst)) run.worst = dx;
+        } else {
+          close("builds");
+          open.builds = { scene, start: t, end: t + step, worst: dx };
+        }
+      } else close("builds");
+      const run = open.settled;
+      if (box && Math.abs(dx) > REVIEWED_SETTLED.px && follows(run, t, scene) && steady(run, box)) {
+        run.end = t + step;
+        if (Math.abs(dx) > Math.abs(run.worst)) run.worst = dx;
+        return;
+      }
+      if (run && grewFrom(run, t, scene, box)) open.settled = null;
+      else close("settled");
+      if (box && Math.abs(dx) > REVIEWED_SETTLED.px)
+        open.settled = { scene, start: t, end: t + step, worst: dx, left: box[0], right: box[2] };
+    },
+    finish() {
+      close("builds");
+      close("settled");
+      return runs;
+    },
+  };
+}

@@ -432,11 +432,20 @@ def run_renderer(command: list[str], deadline: float) -> tuple[int | None, bool]
     return exit_code, False
 
 
+def face_bindings() -> dict:
+    """The stylesheet's and each declared font's SHA-256, from which the audits measure text."""
+    return {
+        "stylesheet_sha256": sha(repository.ROOT / STYLE),
+        "fonts_sha256": {font: sha(repository.ROOT / font) for font in FILM.picture.fonts},
+    }
+
+
 def require_passing_gates(edition: Edition) -> None:
     """Refuse a render unless check-picture passed the edition's current picture.
 
     The gate record (`filmkit.picture.gates`) must have passed and must name the current
-    composition's and timeline's SHA-256 and the running engine version.
+    composition's, timeline's, stylesheet's and declared fonts' SHA-256 and the running engine
+    version.
     """
     path = edition.picture_gates
     if not path.is_file():
@@ -447,6 +456,7 @@ def require_passing_gates(edition: Edition) -> None:
         "composition_sha256": sha(repository.ROOT / COMPOSITION_SCRIPT),
         "timeline_sha256": sha(edition.timeline),
         "engine_version": version("filmkit"),
+        **face_bindings(),
     }
     stale = [key for key, value in current.items() if record.get(key) != value]
     if stale:

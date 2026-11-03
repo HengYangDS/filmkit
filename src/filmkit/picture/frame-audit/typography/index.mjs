@@ -3,9 +3,9 @@
  * layout.mjs reads a frame's settled text and marks into lines, names, containers, blocks and columns, and
  * measures.mjs finds its ragged rows and columns, crammed lines, names off their card's centre, uneven pitch and
  * touching marks. Each measure's findings are joined over consecutive voiced frames into runs per scene and texts, and
- * a run of 1 s or more is kept with its start, its end, its texts and the offsets of its worst frame. The first four
- * rest on exact anchors, sizes and baselines; uneven_pitch and touching_marks rest on the estimated extents of Latin
- * text. */
+ * a run of 1 s or more is kept with its start, its end, its texts and the offsets of its worst frame. Every measure
+ * rests on exact anchors, sizes and baselines and on the widths the canvas stand-in measures, which are the film's own
+ * when the audit is given its faces; a text's height keeps the estimate. */
 import { frameLayout } from "./layout.mjs";
 import {
   crammedLines,

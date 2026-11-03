@@ -5,7 +5,10 @@ folder, into build/runtime/tool-cache/filmkit/<version>/ below the film, replaci
 bytes differ from the package's, and runs the named tool from that copy with Node at the film's
 root: its imports resolve from the film's npm packages and its paths from the film. The tools
 check the film's picture and players, so each first refuses a renderer version other than the one
-the engine renders with, and a browser check runs the browser that the renderer uses.
+the engine renders with, and a browser check runs the browser that the renderer uses. The frame
+and motion audits measure text by the advance widths of the film's declared faces
+(`filmkit.picture.metrics`), which a run names to them in `FILMKIT_TEXT_METRICS` unless the
+caller names its own table.
 
 A refusal exits with status 1 and "<tool>: <reason>" on standard error; otherwise the command
 exits with the tool's own status.
@@ -26,6 +29,7 @@ from pathlib import Path
 
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
+from filmkit.picture import metrics
 from filmkit.picture.rendering import PictureError
 
 # The engine's Node modules, which the package carries below this module's folder.
@@ -40,6 +44,8 @@ TOOLS = {
 }
 # The copies, below the film's root, in a folder for each engine version.
 CACHE = picture_rendering.TOOL_CACHE / "filmkit"
+# The tools that run the composition headlessly, which measure text by the film's declared faces.
+MEASURING = ("frame-audit", "motion-audit")
 
 
 class ToolError(RuntimeError):
@@ -73,7 +79,9 @@ def run(
     """Run a tool from its copy at the film's root and return its exit status.
 
     `environment` adds variables to the tool's environment, and `stdout` names a file that
-    receives the tool's standard output instead of the caller's.
+    receives the tool's standard output instead of the caller's. A tool that runs the
+    composition headlessly is given the table of the film's declared faces unless the caller
+    names one.
     """
     picture_rendering.require_renderer()
     node = shutil.which("node")
@@ -86,6 +94,8 @@ def run(
         **(environment or {}),
         "FILM_CHROMIUM_PATH": str(picture_rendering.browser_path()),
     }
+    if tool in MEASURING and metrics.VARIABLE not in variables:
+        variables[metrics.VARIABLE] = str(metrics.current_table())
     with contextlib.ExitStack() as stack:
         output = None if stdout is None else stack.enter_context(stdout.open("w"))
         completed = subprocess.run(

@@ -2,11 +2,12 @@
  * and camera framing, measured headlessly from the composition.
  * Usage: python -m filmkit.tools motion-audit <timeline.json> [fps] [--from s] [--to s] [--out report.json]
  * Every mark a scene paints is recorded with its ink level (opacity times its colour's rise above the ground), its
- * screen box, its box in its own drawing coordinates (its identity across frames) and, for words, the size shown. */
+ * screen box, its box in its own drawing coordinates (its identity across frames) and, for words, the size shown.
+ * FILMKIT_TEXT_METRICS=<file> names the advance widths of the film's declared faces, as for the frame audit. */
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
-import { openComposition, readTimeline } from "./headless-composition.mjs";
+import { openComposition, readTextMetrics, readTimeline } from "./headless-composition.mjs";
 import { motionReport, round } from "./motion-audit/report.mjs";
 import { inkLevel } from "./rules/ink.mjs";
 
@@ -49,7 +50,7 @@ const SEEN = 5,
   VISIBLE = 25,
   FIRM = 60;
 
-const film = openComposition(timeline);
+const film = openComposition(timeline, { faces: readTextMetrics() });
 /* Ink level: how far the brightest channel rises above the ground at the mark's opacity (0-255), as the real-browser
  * check measures it (geometry-check.mjs). */
 const levelOf = inkLevel(film.palette);
