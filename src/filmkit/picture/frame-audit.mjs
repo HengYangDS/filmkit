@@ -337,6 +337,7 @@ const measures = [
   listSets,
   nameLoad,
   composition.pictureBalance,
+  composition.balanceThroughSpeech,
   composition.containers,
   labelEchoes,
   composition.sparseSpeech,
@@ -411,6 +412,8 @@ const report = frameReport({
   echoes,
   longNames,
   sparseRuns: composition.sparseRuns,
+  offCentreRuns: composition.offCentreRuns,
+  thinRuns: composition.thinRuns,
   underfilled: composition.underfilled,
 });
 writeRequestedFiles({

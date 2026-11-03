@@ -16,6 +16,7 @@ Usage: python -m filmkit.tools <tool> [arguments]
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import shutil
 import subprocess
@@ -62,22 +63,39 @@ def stage_tools() -> Path:
     return cache
 
 
-def run(tool: str, arguments: list[str]) -> int:
-    """Run a tool from its copy at the film's root and return its exit status."""
+def run(
+    tool: str,
+    arguments: list[str],
+    *,
+    environment: dict | None = None,
+    stdout: Path | None = None,
+) -> int:
+    """Run a tool from its copy at the film's root and return its exit status.
+
+    `environment` adds variables to the tool's environment, and `stdout` names a file that
+    receives the tool's standard output instead of the caller's.
+    """
     picture_rendering.require_renderer()
     node = shutil.which("node")
     if node is None:
         msg = "No node on PATH; run the tools in the film's Mise environment"
         raise ToolError(msg)
     script = stage_tools() / TOOLS[tool]
-    environment = {**os.environ, "FILM_CHROMIUM_PATH": str(picture_rendering.browser_path())}
-    completed = subprocess.run(
-        [node, str(script), *arguments],
-        cwd=repository.ROOT,
-        env=environment,
-        stdin=subprocess.DEVNULL,
-        check=False,
-    )
+    variables = {
+        **os.environ,
+        **(environment or {}),
+        "FILM_CHROMIUM_PATH": str(picture_rendering.browser_path()),
+    }
+    with contextlib.ExitStack() as stack:
+        output = None if stdout is None else stack.enter_context(stdout.open("w"))
+        completed = subprocess.run(
+            [node, str(script), *arguments],
+            cwd=repository.ROOT,
+            env=variables,
+            stdin=subprocess.DEVNULL,
+            stdout=output,
+            check=False,
+        )
     return completed.returncode
 
 

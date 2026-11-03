@@ -176,6 +176,11 @@ class Edition:
         return self.evidence / "picture-sync.json"
 
     @property
+    def picture_gates(self) -> Path:
+        """The record of the audits that check-picture ran on the current picture."""
+        return self.evidence / "picture-gates.json"
+
+    @property
     def film_package(self) -> Path:
         return self.evidence / "film-package.json"
 

@@ -20,6 +20,7 @@ import signal
 import subprocess
 import time
 from datetime import UTC, datetime
+from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -431,14 +432,44 @@ def run_renderer(command: list[str], deadline: float) -> tuple[int | None, bool]
     return exit_code, False
 
 
+def require_passing_gates(edition: Edition) -> None:
+    """Refuse a render unless check-picture passed the edition's current picture.
+
+    The gate record (`filmkit.picture.gates`) must have passed and must name the current
+    composition's and timeline's SHA-256 and the running engine version.
+    """
+    path = edition.picture_gates
+    if not path.is_file():
+        msg = f"The {edition.code} picture has no gate record; run check-picture"
+        raise PictureError(msg)
+    record = read(path)
+    current = {
+        "composition_sha256": sha(repository.ROOT / COMPOSITION_SCRIPT),
+        "timeline_sha256": sha(edition.timeline),
+        "engine_version": version("filmkit"),
+    }
+    stale = [key for key, value in current.items() if record.get(key) != value]
+    if stale:
+        msg = (
+            f"The {edition.code} picture gate record binds another {', '.join(stale)}; "
+            "run check-picture"
+        )
+        raise PictureError(msg)
+    if record.get("verdict") != "pass":
+        msg = f"The {edition.code} picture gate record did not pass; run check-picture"
+        raise PictureError(msg)
+
+
 def render_picture(edition: Edition, deadline: int) -> None:
     """Run the locked renderer on the complete current stage and record its receipt.
 
-    At the deadline the renderer's process group is sent SIGTERM and, after
-    `STOP_GRACE_SECONDS`, SIGKILL. A render that does not exit 0 within its deadline, or
-    whose stage changed meanwhile, raises `PictureError` after its receipt is written.
+    The edition's picture must have passed check-picture as it stands. At the deadline the
+    renderer's process group is sent SIGTERM and, after `STOP_GRACE_SECONDS`, SIGKILL. A
+    render that does not exit 0 within its deadline, or whose stage changed meanwhile, raises
+    `PictureError` after its receipt is written.
     """
     require_renderer()
+    require_passing_gates(edition)
     stage = edition.picture_stage
     require_current_stage(edition, stage)
     picture = edition.picture

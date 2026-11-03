@@ -13,6 +13,15 @@ const CENTRE = [960, 500],
 /* The smallest share of the frame a thought's picture may cover two seconds in and 70% through. */
 const AREA = 0.1;
 
+/* Runs per scene, each as its span and its worst share in percent. */
+const runsByScene = (runs) =>
+  Object.fromEntries(
+    Object.entries(Object.groupBy(runs, (v) => v.scene)).map(([id, list]) => [
+      id,
+      list.map((v) => `${v.start.toFixed(2)}-${v.end.toFixed(2)} ${(v.worst * 100).toFixed(1)}%`),
+    ]),
+  );
+
 export function frameReport({
   from,
   to,
@@ -38,6 +47,8 @@ export function frameReport({
   echoes,
   longNames,
   sparseRuns,
+  offCentreRuns,
+  thinRuns,
   underfilled,
 }) {
   const listsLeft = Object.groupBy(lists.findings(), (v) =>
@@ -176,6 +187,10 @@ export function frameReport({
         runs.map((v) => `${v.start.toFixed(2)}-${v.end.toFixed(2)} ${(v.least * 100).toFixed(1)}%`),
       ]),
     ),
+    /* Runs of 2 s or more of speech whose lit picture stands more than 12% off the content centre, or covers less than
+     * a tenth of the band, per scene, with their span and the largest offset or the least cover. */
+    off_centre_runs: runsByScene(offCentreRuns),
+    thin_runs: runsByScene(thinRuns),
     /* Thoughts whose lit picture covers less than the reviewers' share of the band at one of their instants, with the
      * instant and the share. */
     thin_lit: Object.fromEntries(

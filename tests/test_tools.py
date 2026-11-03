@@ -74,6 +74,21 @@ def test_a_tool_runs_at_the_film_root_with_the_renderers_browser(
     assert json.loads(capfd.readouterr().out)["browser"] == "/opt/chromium/chrome"
 
 
+def test_a_tool_takes_added_variables_and_may_write_its_output_to_a_file(
+    film, tmp_path, monkeypatch, capfd
+):
+    package = tmp_path / "package"
+    (package / "picture").mkdir(parents=True)
+    (package / "picture/frame-audit.mjs").write_text(
+        "console.log(JSON.stringify({trace: process.env.TRACE ?? null}));"
+    )
+    monkeypatch.setattr(tools, "PACKAGE", package)
+    out = tmp_path / "report.json"
+    assert tools.run("frame-audit", [], environment={"TRACE": "trace.tsv"}, stdout=out) == 0
+    assert json.loads(out.read_text()) == {"trace": "trace.tsv"}
+    assert capfd.readouterr().out == ""
+
+
 def test_another_renderer_version_refuses_before_any_tool_runs(tmp_path, monkeypatch):
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)

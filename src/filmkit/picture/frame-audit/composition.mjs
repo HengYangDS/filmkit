@@ -1,6 +1,6 @@
 /* The frame audit's measures of what a frame's picture shows: the seats and containers of its firm marks, its balance
  * and cover at the reviewers' instants, the runs of speech over too little of it, and the extent each scene paints. */
-import { BALANCE_BAND, bandCover, pictureOffset } from "../rules/balance.mjs";
+import { BALANCE_BAND, balanceRuns, bandCover, pictureOffset } from "../rules/balance.mjs";
 import { fillShare, litLevel, strokeShare } from "../rules/ink.mjs";
 import { containerFill, FRAME, seatMarks } from "../seat-marks.mjs";
 import { emptyBox, growBox, HEAD, inHead, pointsOf, spanOf, VISIBLE } from "./marks.mjs";
@@ -146,6 +146,18 @@ export function compositionMeasures({ film, step, thoughts }) {
       growBox(thought.box, [picture[2], picture[3]]);
     }
   }
+  /* Balance and cover through speech: the box around every lit mark and legible name of the reviewers' band in each
+   * voiced frame, joined into runs of speech that stand off the content centre or cover too little of the band. */
+  const runs = balanceRuns(step),
+    offCentreRuns = [],
+    thinRuns = [];
+  function balanceThroughSpeech(f) {
+    const lit = emptyBox();
+    if (f.speaking)
+      for (const point of litPoints(f))
+        if (point[1] >= BALANCE_BAND[0] && point[1] <= BALANCE_BAND[1]) growBox(lit, point);
+    runs.frame(f.t, f.speaking?.id ?? null, lit[2] > lit[0] ? lit : null);
+  }
   /* Sparse runs, as the Chinese review measured them: the box around every mark of visible ink in the content band,
    * through each voiced frame; a run of 1.5 s or more of speech whose box covers less than 4% of the band is reported per
    * scene, with its start, end and least cover. On the delivered round-16 film, the review's runs (18.2, 21.4, 16.2,
@@ -236,11 +248,15 @@ export function compositionMeasures({ film, step, thoughts }) {
   function finish() {
     for (const key of [...containerRuns.keys()]) closeContainer(key);
     closeSparse();
+    const { off, thin } = runs.finish();
+    offCentreRuns.push(...off);
+    thinRuns.push(...thin);
   }
   return {
     seats,
     containers,
     pictureBalance,
+    balanceThroughSpeech,
     sparseSpeech,
     paintedExtent,
     finish,
@@ -248,6 +264,8 @@ export function compositionMeasures({ film, step, thoughts }) {
     extents,
     drawn,
     sparseRuns,
+    offCentreRuns,
+    thinRuns,
     underfilled,
   };
 }

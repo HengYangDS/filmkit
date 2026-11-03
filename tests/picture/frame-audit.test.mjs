@@ -44,11 +44,23 @@ test("the frame audit reports a stretch of the film, its label trace, its marks 
   for (const runs of Object.values(report.underfilled_containers))
     assert.ok(runs.every((run) => /^(frame|bracket) [\d,-]+ [\d.]+-[\d.]+ \d+%$/.test(run)));
   // Thoughts whose lit picture covers too little of the band, and names that repeat their caption or run past two lines.
-  for (const key of ["thin_lit", "caption_echoes", "long_names", "sparse_runs"])
+  for (const key of [
+    "thin_lit",
+    "caption_echoes",
+    "long_names",
+    "sparse_runs",
+    "off_centre_runs",
+    "thin_runs",
+  ])
     assert.ok(report[key] && typeof report[key] === "object", key);
-  // Runs of speech whose visible marks cover too little of the band, with their span and least cover.
-  for (const runs of Object.values(report.sparse_runs))
-    assert.ok(runs.every((run) => /^[\d.]+-[\d.]+ [\d.]+%$/.test(run)));
+  // Runs of speech whose visible marks cover too little of the band, and runs whose lit picture stands off the content
+  // centre or covers too little of it, with their span and worst share.
+  for (const key of ["sparse_runs", "off_centre_runs", "thin_runs"])
+    for (const runs of Object.values(report[key]))
+      assert.ok(
+        runs.every((run) => /^[\d.]+-[\d.]+ [\d.]+%$/.test(run)),
+        key,
+      );
   for (const rows of Object.values(report.thin_lit))
     assert.ok(rows.every((row) => /^\d\d\.\d+ (two|late) [\d.]+%$/.test(row)));
   for (const rows of [...Object.values(report.caption_echoes), ...Object.values(report.long_names)])

@@ -23,6 +23,7 @@ from filmkit.media import MediaError
 from filmkit.narration.selection import SelectionError, select
 from filmkit.narration.spoken_units import AlignmentError
 from filmkit.narration.thought_groups import RetainedUtteranceError
+from filmkit.picture.gates import check_picture
 from filmkit.picture.rendering import (
     PictureError,
     render_picture,
@@ -35,6 +36,7 @@ from filmkit.soundtrack.level import LevelError
 from filmkit.soundtrack.pauses import PauseError
 from filmkit.soundtrack.policy import PausePolicyError
 from filmkit.specification import DURATION
+from filmkit.tools import ToolError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -49,6 +51,7 @@ EDITION_ACTIONS: dict[str, Callable[[Edition, argparse.Namespace], object]] = {
     "stage-picture": lambda edition, options: stage_picture(
         edition, options.output, options.duration, options.width, options.height, options.start
     ),
+    "check-picture": lambda edition, _: check_picture(edition),
     "render-picture": lambda edition, options: render_picture(edition, options.deadline),
     "package-metadata": lambda edition, _: package_metadata(edition),
     "validate-picture": lambda edition, _: validate_picture(edition),
@@ -66,6 +69,7 @@ REFUSALS = (
     LevelError,
     CaptionError,
     PictureError,
+    ToolError,
     MediaError,
     PackagingError,
 )

@@ -422,6 +422,20 @@ def read_trace(path: Path) -> list[str]:
         return handle.readlines()
 
 
+def full_report(timeline: dict, trace: Path, marks: Path | None, step: float) -> dict:
+    """The audit of a trace at the default tolerance, as the command writes its report.
+
+    The report adds the trace's continuity, the seats of the mark trace when one is given, and
+    every judged label.
+    """
+    lines = read_trace(trace)
+    report, judged = audit(timeline, lines)
+    report["continuity"] = continuity(timeline, lines, step)
+    if marks is not None:
+        report["continuity"]["seats"] = seats(timeline, read_trace(marks), step)
+    return {**report, "judged": judged}
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("timeline", type=Path, help="the timeline the trace ran on")

@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { openComposition } from "../../src/filmkit/picture/headless-composition.mjs";
-import { bandCover, pictureOffset } from "../../src/filmkit/picture/rules/balance.mjs";
+import { balanceRuns, bandCover, pictureOffset } from "../../src/filmkit/picture/rules/balance.mjs";
 import { analysis } from "../../src/filmkit/picture/rules/frame.mjs";
 import {
   fillShare,
@@ -444,4 +444,74 @@ test("a picture's cover is its box's share of the content band", () => {
   // The band runs from 120 to 900 px over the full width; a box reaching past it counts only its part inside.
   assert.equal(bandCover([0, 120, 1920, 900]), 1);
   assert.ok(Math.abs(bandCover([0, 0, 960, 510]) - 0.25) < 1e-12);
+});
+
+/* Frames every thirtieth of a second from `from` to `to`, each with the speaking scene and its lit box at t. */
+function sampled(runs, from, to, scene, boxAt) {
+  for (let k = 0; from + k / 30 < to - 1e-9; k++) {
+    const t = from + k / 30;
+    runs.frame(t, scene(t), boxAt(t));
+  }
+  return runs.finish();
+}
+// A centred picture covering a fifth of the band, and the same picture standing 13% of the height above the centre.
+const CENTRED = [560, 360, 1360, 660],
+  HIGH = [560, 220, 1360, 520];
+
+test("balance through speech reports a run of 2 s or more beyond the reviewers' limits", () => {
+  // The picture stands 13% high for 2.5 s of one thought, then returns to the centre.
+  const off = sampled(
+    balanceRuns(1 / 30),
+    0,
+    5,
+    () => "04",
+    (t) => (t >= 1 && t < 3.5 ? HIGH : CENTRED),
+  );
+  assert.equal(off.off.length, 1);
+  assert.equal(off.off[0].scene, "04");
+  assert.ok(Math.abs(off.off[0].start - 1) < 1e-9 && Math.abs(off.off[0].end - 3.5) < 1e-6);
+  assert.ok(Math.abs(off.off[0].worst - 140 / 1080) < 1e-12);
+  assert.deepEqual(off.thin, []);
+  // A label alone, a twentieth of the band, through 3 s of speech is thin, its least cover recorded.
+  const label = [860, 490, 1060, 530],
+    thin = sampled(
+      balanceRuns(1 / 30),
+      0,
+      4,
+      () => "05",
+      (t) => (t < 3 ? label : CENTRED),
+    );
+  assert.equal(thin.thin.length, 1);
+  assert.ok(Math.abs(thin.thin[0].worst - bandCover(label)) < 1e-12);
+  assert.ok(Math.abs(thin.thin[0].end - 3) < 1e-6);
+});
+
+test("balance through speech leaves a brief excursion, a scene change and quiet alone", () => {
+  // 13% off for 1.5 s is an excursion, not a run.
+  const brief = sampled(
+    balanceRuns(1 / 30),
+    0,
+    4,
+    () => "04",
+    (t) => (t >= 1 && t < 2.5 ? HIGH : CENTRED),
+  );
+  assert.deepEqual(brief, { off: [], thin: [] });
+  // Two scenes each off for 1.5 s in a row are two excursions.
+  const cut = sampled(
+    balanceRuns(1 / 30),
+    0,
+    3,
+    (t) => (t < 1.5 ? "04" : "05"),
+    () => HIGH,
+  );
+  assert.deepEqual(cut.off, []);
+  // Nothing lit between voices is quiet: no thin run, and the pause ends the run of speech before it.
+  const quiet = sampled(
+    balanceRuns(1 / 30),
+    0,
+    6,
+    (t) => (t >= 1.5 && t < 4.5 ? null : "06"),
+    (t) => (t >= 1.5 && t < 4.5 ? null : [900, 500, 1000, 520]),
+  );
+  assert.deepEqual(quiet, { off: [], thin: [] });
 });

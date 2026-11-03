@@ -9,6 +9,7 @@ import signal
 import sys
 import textwrap
 import time
+from importlib.metadata import version
 from pathlib import Path
 
 import pytest
@@ -81,11 +82,25 @@ def root(tmp_path, monkeypatch):
     return root
 
 
+def passing_gates(edition, **changes):
+    """A gate record that check-picture passed for the edition's current picture."""
+    composition = repository.ROOT / picture_rendering.COMPOSITION_SCRIPT
+    record = {
+        "composition_sha256": repository.sha(composition),
+        "timeline_sha256": repository.sha(edition.timeline),
+        "engine_version": version("filmkit"),
+        "verdict": "pass",
+        **changes,
+    }
+    put(edition.picture_gates, record)
+
+
 @pytest.fixture
 def staged():
-    """The Chinese edition, staged complete at the UHD frame."""
+    """The Chinese edition, staged complete at the UHD frame, its picture checked."""
     edition = Edition("zh")
     picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160)
+    passing_gates(edition)
     return edition
 
 
@@ -405,6 +420,39 @@ def test_another_renderer_version_refuses_staging_and_rendering(
         render(monkeypatch, staged, fake, 60)
     assert not Path(f"{fake}.ran").exists()
     assert not staged.render_receipt.exists()
+
+
+@pytest.mark.parametrize(
+    ("record", "reason"),
+    [
+        (None, "has no gate record; run check-picture"),
+        ({"verdict": "refuse"}, "did not pass; run check-picture"),
+        ({"engine_version": "0.0.0"}, "binds another engine_version; run check-picture"),
+    ],
+)
+def test_rendering_refuses_a_picture_without_a_current_passing_check(
+    staged, tmp_path, monkeypatch, record, reason
+):
+    if record is None:
+        staged.picture_gates.unlink()
+    else:
+        passing_gates(staged, **record)
+    fake = renderer(tmp_path, "open(__file__ + '.ran', 'w').close()")
+    with pytest.raises(PictureError, match=reason):
+        render(monkeypatch, staged, fake, 60)
+    assert not Path(f"{fake}.ran").exists()
+    assert not staged.render_receipt.exists()
+
+
+def test_rendering_refuses_a_composition_changed_after_its_check(
+    staged, root, tmp_path, monkeypatch
+):
+    script = root / picture_rendering.COMPOSITION_SCRIPT
+    script.write_text(script.read_text() + "\n// changed after its check\n")
+    fake = renderer(tmp_path, "open(__file__ + '.ran', 'w').close()")
+    with pytest.raises(PictureError, match="binds another composition_sha256; run check-picture"):
+        render(monkeypatch, staged, fake, 60)
+    assert not Path(f"{fake}.ran").exists()
 
 
 def test_rendering_refuses_a_stale_stage_before_running(staged, root, tmp_path, monkeypatch):

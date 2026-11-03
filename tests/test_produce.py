@@ -23,6 +23,7 @@ def test_the_actions_are_the_documented_ones_in_order():
         "assemble",
         "refresh-captions",
         "stage-picture",
+        "check-picture",
         "render-picture",
         "package-metadata",
         "validate-picture",
