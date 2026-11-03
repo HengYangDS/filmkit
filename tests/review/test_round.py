@@ -301,7 +301,8 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
             "\n1. subject_and_faithfulness: the rebuild of a film from its sources remains "
             "the subject;"
         ),
-        "\n4. deliverable_craft: cover, credits and metadata name the film and its author;",
+        "\n2. concept_fidelity: each concept the film names keeps its source meaning",
+        "\n5. deliverable_craft: cover, credits and metadata name the film and its author;",
         "and ROOT/build/evidence/reviews/round-5/review-zh.json with:",
         "Put working files under ROOT/build/evidence/reviews/round-5/zh/.",
         # The delivery format is the specification's, at the soundtracks' program level.
@@ -365,6 +366,34 @@ def test_prompts_name_the_optional_pause_fields_a_script_omits(root, put, monkey
     assert context["caps"] == "none declared Chinese; 0.60 s English"
     assert context["ratios"] == "none declared Chinese, 1.62 and 0.00 s English"
     assert context["codas"] == "none declared Chinese, 1.90 s English"
+
+
+def test_prompts_refuse_a_review_that_leaves_out_the_declared_concept_contract(root, monkeypatch):
+    # The sample film declares a contract, cites it and scores concept fidelity.
+    assert review_round.contract_gaps(review_round.TEMPLATE, review_record.DIMENSIONS) == []
+    template = "Review the {language} edition: {media}\n{dimensions}\n"
+    dimensions = {
+        name: text
+        for name, text in review_record.DIMENSIONS.items()
+        if name != review_round.CONCEPT_DIMENSION
+    }
+    monkeypatch.setattr(review_round, "TEMPLATE", template)
+    monkeypatch.setattr(review_round, "DIMENSIONS", dimensions)
+    out = root / "build/evidence/reviews/round-5"
+    with pytest.raises(ReviewError) as refusal:
+        review_round.prompts(root / "build/evidence/reviews/round-4", out)
+    assert str(refusal.value) == (
+        "the review omits the concept contract the film declares: "
+        "content/review/prompt.md never cites {concepts}; "
+        "content/review/prompt.md never cites {readings}; "
+        "review.dimensions has no concept_fidelity"
+    )
+    assert not out.exists()
+    # A film without a contract owes neither.
+    monkeypatch.setattr(
+        review_round, "FILM", review_round.FILM.model_copy(update={"concepts": None})
+    )
+    assert review_round.contract_gaps(template, dimensions) == []
 
 
 def test_record_writes_reviews_that_verify_film_accepts(root, review, put, capsys):

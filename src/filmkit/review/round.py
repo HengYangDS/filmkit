@@ -3,7 +3,9 @@
 A round sets the reviewed packages aside before the next render, binds the packaged
 members for the real-browser player check, writes each edition's reviewer prompt with
 the exact media hashes and the previous round's findings, and records the finished
-reviews as the production reviews that `filmkit.delivery.verification` accepts. A
+reviews as the production reviews that `filmkit.delivery.verification` accepts. A film
+that declares a concept contract gets prompts only when its prompt template cites the
+contract and the reading occurrence plans and its dimensions score concept fidelity. A
 round's directory defaults to build/evidence/reviews/round-<n>/. Setting aside and
 recording are planned and checked in full before anything moves or is written, and
 --dry-run stops after the plan. A refused input raises `ReviewError`, which each command
@@ -22,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import string
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -212,6 +215,29 @@ def bind(out: Path) -> dict:
 TEMPLATE = (repository.ROOT / FILM.review.prompt).read_text(encoding="utf-8")
 # How the prompt names an optional field that the film or a script does not declare.
 NOT_DECLARED = "none declared"
+# The dimension that scores a declared concept contract, and the prompt fields that cite it
+# and the reading occurrence plans.
+CONCEPT_DIMENSION = "concept_fidelity"
+CONTRACT_FIELDS = ("concepts", "readings")
+
+
+def contract_gaps(template: str, dimensions: dict[str, str]) -> list[str]:
+    """What a film's review configuration leaves out of the concept contract it declares.
+
+    A film that declares a contract cites it and the reading occurrence plans in its prompt
+    template and scores concept fidelity; a film without one owes neither.
+    """
+    if not FILM.concepts:
+        return []
+    fields = {name for _, name, _, _ in string.Formatter().parse(template) if name}
+    gaps = [
+        f"{FILM.review.prompt} never cites {{{name}}}"
+        for name in CONTRACT_FIELDS
+        if name not in fields
+    ]
+    if CONCEPT_DIMENSION not in dimensions:
+        gaps.append(f"review.dimensions has no {CONCEPT_DIMENSION}")
+    return gaps
 
 
 def declared_seconds(policy: dict, key: str) -> str:
@@ -308,8 +334,13 @@ def prompts(previous: Path, out_dir: Path, changes: Path | None = None) -> dict:
     scripts declare. changes holds Markdown context bullets for this round, such as the
     repairs since the previous review and their dispositions. The previous review is
     context to verify, never a score to inherit. Nothing is written unless both
-    editions' films and previous reviews and the round's inputs exist.
+    editions' films and previous reviews and the round's inputs exist, and the review
+    configuration keeps the concept contract the film declares (`contract_gaps`).
     """
+    gaps = contract_gaps(TEMPLATE, DIMENSIONS)
+    if gaps:
+        msg = "the review omits the concept contract the film declares: " + "; ".join(gaps)
+        raise ReviewError(msg)
     present([out_dir / name for name in ROUND_INPUTS])
     context = prompt_context(out_dir, previous, changes)
     texts = {}

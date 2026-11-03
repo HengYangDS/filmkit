@@ -51,6 +51,10 @@ dimension_minimum = 90
 subject_and_faithfulness = """\
   the rebuild of a film from its sources remains the subject; every statement follows the cited \
   README; the stages appear in the order they run."""
+concept_fidelity = """\
+  each concept the film names keeps its source meaning as the concept contract quotes it, in \
+  the edition's one rendering through narration, captions, titles and picture; no rendering \
+  narrows, personifies, substitutes or literally translates a concept."""
 narration_and_language = """\
   natural delivery with audible phrase tails and distinct thought pauses; idiomatic language in \
   each edition; consistent terms."""

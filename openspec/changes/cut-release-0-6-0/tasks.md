@@ -12,7 +12,7 @@
 
 ## 3. Review contract
 
-- [ ] 3.1 Refuse a review round's prompts for a film that declares a concept contract unless its prompt template cites `{concepts}` and `{readings}` and its dimensions include `concept_fidelity`, naming each omission, and score `concept_fidelity` in the sample film; done when tests show the refusal before any prompt is written, nothing required of a film without a contract, and the sample film's prompts listing concept fidelity among their dimensions.
+- [x] 3.1 Refuse a review round's prompts for a film that declares a concept contract unless its prompt template cites `{concepts}` and `{readings}` and its dimensions include `concept_fidelity`, naming each omission, and score `concept_fidelity` in the sample film; done when tests show the refusal before any prompt is written, nothing required of a film without a contract, and the sample film's prompts listing concept fidelity among their dimensions. `tests/review/test_round.py` refuses a template without `{concepts}` and `{readings}` and dimensions without `concept_fidelity` for the sample film, naming all three before any prompt is written, requires neither of a film without a contract, and finds concept fidelity second among the sample film's dimensions in its prompts.
 
 ## 4. Supply
 
