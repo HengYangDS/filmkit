@@ -16,7 +16,7 @@
 
 ## 4. Supply
 
-- [ ] 4.1 Raise `hyperframes` to 0.9.6 in `package.json`, refresh `package-lock.json` with `npm update --package-lock-only`, and set `RENDERER_VERSION` and the browser pin to what 0.9.6 declares; done when the supply installs that build at its pinned digest and OSV reports no advisory for any package the lock pins.
+- [x] 4.1 Raise `hyperframes` to 0.9.6 in `package.json`, refresh `package-lock.json` with `npm update --package-lock-only`, and set `RENDERER_VERSION` and the browser pin to what 0.9.6 declares; done when the supply installs that build at its pinned digest and OSV reports no advisory for any package the lock pins. The lock moves only HyperFrames, to 0.9.6. It still declares Chrome Headless Shell 152.0.7977.30 and pins undici 7.25.0, so the browser pin and the undici 7.30.1 override stay, and 7.30.1 is the newest 7.x release; `sample:supply` installed that build at its pinned digest, `uv lock --upgrade` moves nothing, and OSV finds no issue in either lock.
 - [ ] 4.2 Run `check-picture` before each `render-picture` in the sample film's picture task, and build the sample film with `mise run sample:build`; done when `sample:verify` passes for both editions.
 
 ## 5. Documentation and release notes

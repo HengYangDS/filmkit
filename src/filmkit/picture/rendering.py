@@ -54,7 +54,7 @@ STOP_GRACE_SECONDS = 10
 # renderer version the engine renders with.
 RENDERER = Path(".bin/hyperframes")
 RENDERER_PACKAGE = Path("hyperframes/package.json")
-RENDERER_VERSION = "0.9.5"
+RENDERER_VERSION = "0.9.6"
 # The tools and models the supply task installs, below the repository root.
 TOOL_CACHE = Path("build/runtime/tool-cache")
 # The browser build that the locked renderer pins, as the supply task installs it, and the
