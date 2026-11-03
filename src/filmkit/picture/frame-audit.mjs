@@ -12,7 +12,7 @@ import { parseArgs } from "node:util";
 import { compositionMeasures } from "./frame-audit/composition.mjs";
 import { inHead, spanOf, VISIBLE } from "./frame-audit/marks.mjs";
 import { frameReport, writeRequestedFiles } from "./frame-audit/report.mjs";
-import { textLayout } from "./frame-audit/typography.mjs";
+import { textLayout } from "./frame-audit/typography/index.mjs";
 import { openComposition, readTimeline } from "./headless-composition.mjs";
 import { analysis } from "./rules/frame.mjs";
 import { inkLevel, readingLoad } from "./rules/ink.mjs";

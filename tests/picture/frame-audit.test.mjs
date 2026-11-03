@@ -6,7 +6,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { TEXT_LAYOUT } from "../../src/filmkit/picture/frame-audit/typography.mjs";
+import { TEXT_LAYOUT } from "../../src/filmkit/picture/frame-audit/typography/index.mjs";
 import { authoredTimeline, scratchFolder } from "./sample-film.mjs";
 
 // The headless audits run the composition itself on a timeline; a short stretch exercises every measurement.

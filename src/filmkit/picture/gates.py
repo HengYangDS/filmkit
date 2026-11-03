@@ -57,7 +57,7 @@ FRAME_GATES = (
     "thin_runs",
     "underfilled_containers",
     "faint_clutter",
-    # How text lines up, from exact anchors, sizes and baselines (frame-audit/typography.mjs).
+    # How text lines up, from exact anchors, sizes and baselines (frame-audit/typography/).
     "ragged_rows",
     "ragged_columns",
     "crammed_lines",

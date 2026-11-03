@@ -7,7 +7,7 @@ import {
   frameFindings,
   TEXT_LAYOUT,
   textLayout,
-} from "../../src/filmkit/picture/frame-audit/typography.mjs";
+} from "../../src/filmkit/picture/frame-audit/typography/index.mjs";
 
 /* One frame's paints as the frame audit receives them: drawn on the headless canvas, each in scene 01. */
 function paintsOf(draw) {

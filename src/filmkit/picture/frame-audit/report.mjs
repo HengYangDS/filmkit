@@ -265,7 +265,7 @@ export function frameReport({
         },
       ]),
     ),
-    /* How the settled text of the content band lines up through 1 s or more of speech (frame-audit/typography.mjs),
+    /* How the settled text of the content band lines up through 1 s or more of speech (frame-audit/typography/),
      * per scene. Neighbouring names of one size whose baselines step by more than 3.5 px and less than half their
      * size, with both baselines and the gap between them. */
     ragged_rows: layoutByScene(textLayout.ragged_rows),
