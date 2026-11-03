@@ -122,7 +122,7 @@ The frame audit SHALL measure the settled names and marks of the content band in
 
 ### Requirement: An edition's picture is checked before it renders
 
-`check-picture` SHALL run the frame audit over every frame of the edition's timeline at one thirtieth of a second, the sync audit on that audit's trace and marks, and the motion audit at 30 frames per second, on the current composition and timeline, with the advance widths of the film's declared faces. It SHALL write a gate record naming the composition's, the timeline's, the stylesheet's and each declared font's SHA-256, the engine version, each audit's report and every gated finding, and SHALL refuse when a gated finding exists.
+`check-picture` SHALL run the frame audit over every frame of the edition's timeline at one thirtieth of a second, the sync audit on that audit's trace and marks, and the motion audit at 30 frames per second, on the current composition and timeline. It SHALL write a gate record naming the SHA-256 of the composition, the timeline, the stylesheet and each declared font, the engine version, each audit's report and every gated finding, and SHALL refuse when a gated finding exists.
 
 #### Scenario: A clean picture passes
 
