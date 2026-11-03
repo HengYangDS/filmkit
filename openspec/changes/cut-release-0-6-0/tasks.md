@@ -8,7 +8,7 @@
 
 ## 2. Narration retakes
 
-- [ ] 2.1 Bind each thought retake to the SHA-256 of its spoken text: the audition records each row's spoken text, binding refuses a row without one or with stale speech, and synthesis refuses a retake whose recorded spoken text differs from the thought's, naming it; done when tests cover a reading changed after the audition, unchanged speech, a retake bound before 0.6.0 and a stale proposal.
+- [x] 2.1 Bind each thought retake to the SHA-256 of its spoken text: the audition records each row's spoken text, binding refuses a row without one or with stale speech, and synthesis refuses a retake whose recorded spoken text differs from the thought's, naming it; done when tests cover a reading changed after the audition, unchanged speech, a retake bound before 0.6.0 and a stale proposal. `tests/narration/test_retakes.py` binds a proposal auditioned on its thought's current speech with that speech's `spoken_sha256`, refuses one without spoken text or with speech that a changed reading no longer gives the thought, refuses a retake auditioned on other spoken text and names its thought, and still binds a retake recorded before 0.6.0; `tests/narration/test_audition.py` records each row's spoken text.
 
 ## 3. Review contract
 

@@ -66,6 +66,18 @@ def test_a_malformed_run_on_is_refused(run_on):
         narration_retakes.apply_retakes(PLANS, takes, 3)
 
 
+def test_a_retake_binds_the_speech_it_was_auditioned_on():
+    # A reading changed after the audition: the display text is the same, the speech is not.
+    plans = [PLANS[0], {"text": "再说明。", "spoken_text": "在说明。"}]
+    take = {"seed": 7, "text_sha256": sha256("再说明。"), "spoken_sha256": sha256("再说明。")}
+    with pytest.raises(ValueError, match=r"^26\.2: the retake was auditioned on other spoken"):
+        narration_retakes.apply_retakes(plans, {"2": take}, 3, "26")
+    # The same speech narrates as before, and a retake bound before 0.6.0 binds by its text.
+    assert narration_retakes.apply_retakes(PLANS, {"2": take}, 3, "26")[1]["seed"] == 7
+    legacy = {"seed": 7, "text_sha256": sha256("再说明。")}
+    assert narration_retakes.apply_retakes(plans, {"2": legacy}, 3, "26")[1]["seed"] == 7
+
+
 def test_thought_retakes_require_authored_thoughts():
     with pytest.raises(ValueError, match="authored utterance groups"):
         narration_retakes.apply_retakes(
@@ -117,30 +129,73 @@ SCRIPT = {
 }
 
 
+# A pronunciation contract that reads 交付 by a homophone, as an edition's contract may.
+CONTRACT = {"normalization": [{"kind": "homophone", "display": "交付", "spoken": "交附"}]}
+
+
 def row(index: int, text: str, seed: int | None) -> dict:
-    return {"segment": "06", "index": index, "text": text, "proposed_seed": seed}
+    spoken = text.replace("交付", "交附")
+    return {
+        "segment": "06",
+        "index": index,
+        "text": text,
+        "spoken_text": spoken,
+        "proposed_seed": seed,
+    }
 
 
 def test_proposals_bind_the_current_thoughts_and_skip_those_without_a_seed():
     cast = {"reference_audio": "reference.wav"}
     rows = [row(2, "决定由有权的人作出。", 99711), row(1, "按标准，这次交付不合格。", None)]
-    bound_cast, bound, skipped = narration_retakes.bind_proposals(SCRIPT, cast, rows)
+    bound_cast, bound, skipped = narration_retakes.bind_proposals(SCRIPT, cast, rows, CONTRACT)
     assert bound_cast == {
         "reference_audio": "reference.wav",
         "retakes": {
-            "06": {"groups": {"2": {"seed": 99711, "text_sha256": sha256("决定由有权的人作出。")}}}
+            "06": {
+                "groups": {
+                    "2": {
+                        "seed": 99711,
+                        "text_sha256": sha256("决定由有权的人作出。"),
+                        "spoken_sha256": sha256("决定由有权的人作出。"),
+                    }
+                }
+            }
         },
     }
     assert (bound, skipped) == (["06.2=99711"], ["06.1"])
     assert cast == {"reference_audio": "reference.wav"}
 
 
+def test_a_proposal_binds_the_speech_its_audition_narrated():
+    rows = [row(1, "按标准，这次交付不合格。", 31)]
+    bound_cast, _, _ = narration_retakes.bind_proposals(SCRIPT, {}, rows, CONTRACT)
+    assert bound_cast["retakes"]["06"]["groups"]["1"] == {
+        "seed": 31,
+        "text_sha256": sha256("按标准，这次交付不合格。"),
+        "spoken_sha256": sha256("按标准，这次交附不合格。"),
+    }
+
+
+@pytest.mark.parametrize(
+    "spoken",
+    [None, "按标准，这次交付不合格。"],
+    ids=["unrecorded", "stale reading"],
+)
+def test_a_proposal_from_other_speech_is_refused(spoken):
+    stale = {**row(1, "按标准，这次交付不合格。", 31), "spoken_text": spoken}
+    if spoken is None:
+        del stale["spoken_text"]
+    with pytest.raises(ValueError, match="06.1: the auditioned speech is not the current"):
+        narration_retakes.bind_proposals(SCRIPT, {}, [stale], CONTRACT)
+
+
 def test_a_proposal_binds_its_run_on_with_its_seed():
     rows = [{**row(2, "决定由有权的人作出。", 99711), "proposed_run_on": RUN_ON}]
-    bound_cast, bound, _ = narration_retakes.bind_proposals(SCRIPT, {}, rows)
+    bound_cast, bound, _ = narration_retakes.bind_proposals(SCRIPT, {}, rows, CONTRACT)
     assert bound_cast["retakes"]["06"]["groups"]["2"] == {
         "seed": 99711,
         "text_sha256": sha256("决定由有权的人作出。"),
+        "spoken_sha256": sha256("决定由有权的人作出。"),
         "run_on": RUN_ON,
     }
     assert bound == ["06.2=99711"]
@@ -157,7 +212,7 @@ def test_a_proposal_binds_its_run_on_with_its_seed():
 )
 def test_a_proposal_for_a_changed_thought_is_refused(stale):
     with pytest.raises(ValueError, match="not the current thought"):
-        narration_retakes.bind_proposals(SCRIPT, {}, [stale])
+        narration_retakes.bind_proposals(SCRIPT, {}, [stale], CONTRACT)
 
 
 def test_a_bound_retake_follows_its_exact_text_or_is_released():
@@ -175,3 +230,8 @@ def test_a_bound_retake_follows_its_exact_text_or_is_released():
 
 def test_a_thought_entry_binds_its_seed_to_its_text():
     assert narration_retakes.retake_entry(7, "甲。") == {"seed": 7, "text_sha256": sha256("甲。")}
+    assert narration_retakes.retake_entry(7, "甲。", spoken_text="假。") == {
+        "seed": 7,
+        "text_sha256": sha256("甲。"),
+        "spoken_sha256": sha256("假。"),
+    }

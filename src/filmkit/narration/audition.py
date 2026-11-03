@@ -47,6 +47,7 @@ import filmkit.narration.group_generation as group_generation
 import filmkit.repository as repository
 from filmkit.narration.alignment import verify_aligner
 from filmkit.narration.narrate import ALIGNER
+from filmkit.narration.pronunciation import pronunciation_contract
 from filmkit.narration.receipts import bound_records
 from filmkit.narration.recognition import heard_phrase, recognition_units, unit_distance
 from filmkit.narration.retakes import bind_proposals, thought_text
@@ -128,6 +129,7 @@ def audition(
             "segment": record["id"],
             "index": child["index"],
             "text": child["text"],
+            "spoken_text": child["spoken_text"],
             "required": phrase,
             "current_seed": child["seed"],
             "aligner": aligner["identity"],
@@ -308,8 +310,9 @@ def apply(code: str, proposals_file: str, *, dry_run: bool = False) -> dict:
     """Bind a proposals file into the edition's cast, writing it unless a dry run."""
     edition = Edition(code)
     script, cast = repository.read(edition.script), repository.read(edition.cast)
+    contract, _ = pronunciation_contract(script, edition.language)
     rows = json.loads((repository.ROOT / proposals_file).read_text())
-    cast, bound, skipped = bind_proposals(script, cast, rows)
+    cast, bound, skipped = bind_proposals(script, cast, rows, contract)
     if not dry_run:
         repository.write(edition.cast, cast)
     return {"language": code, "applied": bound, "skipped": skipped, "dry_run": dry_run}

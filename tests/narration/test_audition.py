@@ -81,6 +81,7 @@ def proposal(segment: str, index: int, text: str, seed: int | None) -> dict:
         "segment": segment,
         "index": index,
         "text": text,
+        "spoken_text": text,
         "required": "有权的人",
         "current_seed": 4683,
         "takes": [],
@@ -104,7 +105,15 @@ def test_apply_binds_current_thoughts_and_skips_rows_without_a_proposal(tmp_path
         "dry_run": False,
     }
     assert repository.read(cast)["retakes"] == {
-        "06": {"groups": {"2": {"seed": 99711, "text_sha256": sha256(THOUGHTS[1])}}}
+        "06": {
+            "groups": {
+                "2": {
+                    "seed": 99711,
+                    "text_sha256": sha256(THOUGHTS[1]),
+                    "spoken_sha256": sha256(THOUGHTS[1]),
+                }
+            }
+        }
     }
 
 
