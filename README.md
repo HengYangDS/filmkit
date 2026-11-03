@@ -60,6 +60,8 @@ A film that declares neither, or keeps a version 1 pronunciation contract, narra
 
 `filmkit.produce check-picture --language zh|en` audits an edition's current picture before it renders: the frame audit over every frame of its timeline at one thirtieth of a second, the sync audit of its labels against their words, and the motion audit at 30 frames per second. Besides layout, legibility and collisions, the frame audit follows the lit picture through all speech and reports each stretch of 2 s or more in which it stands more than 12% off the content centre or covers less than a tenth of the content band. The command writes `build/evidence/editions/<edition>/picture-gates.json`, which binds the composition, the timeline and the engine version and lists every gated finding, and refuses while one remains. `render-picture` refuses an edition without a passing record for its current composition, timeline and engine version, so a film's picture task runs `check-picture` before each render.
 
+The frame audit also measures how text lines up, from the exact anchors, sizes and baselines of each voiced frame's settled names and marks, and reports each defect that lasts 1 s or more per scene with its span, texts and offsets. The gate refuses four of these measures: `ragged_rows`, names of one size side by side on baselines more than 3.5 px apart; `ragged_columns`, the lines of a block or the items of a column off their shared edge, or a left-aligned block off the axis of the mark it stands under or over; `crammed_lines`, stacked lines with less than 7 px between their inks; and `off_card_centre`, a name alone in a small card more than 4 px off its centre or middle. Two rest on the headless estimate of Latin text widths, which a real browser lays out differently, so the gate record lists them for the reviewers without refusing them: `uneven_pitch`, like marks at uneven pitch over names at equal gaps, and `touching_marks`, a name within 3 px of a mark's stroke.
+
 ## Installing the engine in a film
 
 A film pins a release tag in its Python project and locks it:
@@ -69,7 +71,7 @@ A film pins a release tag in its Python project and locks it:
 dependencies = ["filmkit"]
 
 [tool.uv.sources]
-filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.6.0" }
+filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.7.0" }
 ```
 
 Its `package.json` declares the npm packages the engine runs, at these versions: `hyperframes` 0.9.8, the renderer, which the engine checks before it stages, renders or runs a tool; `gsap` 3.15.0, which each staged document loads; and `puppeteer-core` 25.16.0 and `@puppeteer/browsers` 3.2.6, which drive and install the browser build. It also overrides `undici` to 7.30.1, because HyperFrames 0.9.8 pins 7.25.0, which known advisories affect.

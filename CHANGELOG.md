@@ -4,6 +4,23 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-04
+
+### Added
+
+- The frame audit measures how text lines up, from the exact anchors, sizes and baselines of each voiced frame's settled names and marks. `ragged_rows` reports names of one size side by side on baselines more than 3.5 px apart; `ragged_columns` reports the lines of a block or the items of a column off their shared edge or axis; `crammed_lines` reports stacked lines with less than 7 px between their inks; `off_card_centre` reports a name alone in a small card off its centre; `uneven_pitch` reports like marks at uneven pitch under names at equal gaps; and `touching_marks` reports a name within 3 px of a mark's stroke. Each lasts 1 s or more and is reported per scene with its span, texts and offsets.
+
+### Changed
+
+- `check-picture` refuses `ragged_rows`, `ragged_columns`, `crammed_lines` and `off_card_centre`, and records `uneven_pitch` and `touching_marks` in the gate record without refusing them, because they rest on the headless estimate of Latin text widths.
+- The sample film's closing checklist stands left-aligned beside its checks, and its review floors are 95, as the owner set for every film on 2026-11-03.
+- The engine renders with HyperFrames 0.9.8. The browser build stays Chrome Headless Shell 152.0.7977.30, and `package.json` keeps its `undici` override, because 0.9.8 still declares that build and pins `undici` 7.25.0. A new renderer can change the frames a film renders, so a film keeps its current filmkit pin until it produces, reviews and accepts an edition on a release that carries this one.
+- The locks hold the newest releases their declared ranges admit; apart from HyperFrames, neither lock moves. OSV reports no advisory for any package either lock pins.
+
+### Fixed
+
+- An editable install is rebuilt when `VERSION` changes, so the gate records of a bumped engine name the version that ran: `pyproject.toml` declares `tool.uv.cache-keys` for itself and `VERSION`.
+
 ## [0.6.0] - 2026-11-03
 
 ### Added
@@ -95,7 +112,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/HengYangDS/filmkit/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/HengYangDS/filmkit/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/HengYangDS/filmkit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/HengYangDS/filmkit/compare/v0.3.0...v0.4.0
