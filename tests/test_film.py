@@ -78,7 +78,7 @@ def test_fonts_that_share_a_file_name_refuse(declared):
 
 def test_invalid_fields_refuse_naming_each_field(declared):
     rewrite(declared, f'slug = "{film.FILM.slug}"', 'slug = "Two Words"')
-    rewrite(declared, "overall_minimum = 90", "overall_minimum = 190")
+    rewrite(declared, "overall_minimum = 95", "overall_minimum = 195")
     with pytest.raises(FilmError) as refusal:
         film.load(declared)
     assert "slug" in str(refusal.value)

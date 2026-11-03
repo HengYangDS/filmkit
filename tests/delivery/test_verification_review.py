@@ -77,10 +77,10 @@ def test_review_accepts_only_current_media_above_thresholds(current_review):
     check, record, files = current_review
     accepted = check()
     assert (accepted["overall"], accepted["minimum_dimension"]) == (96.0, 96)
-    # Every dimension at 90 qualifies; 95 overall is a later plan, not this gate.
-    floor = check(scores=dict.fromkeys(review_record.DIMENSIONS, 90), overall=90.0)
-    assert (floor["overall"], floor["minimum_dimension"]) == (90.0, 90)
-    low = {**record["scores"], next(iter(review_record.DIMENSIONS)): 89}
+    # Every dimension at the film's floors of 95 qualifies; one dimension at 94 does not.
+    floor = check(scores=dict.fromkeys(review_record.DIMENSIONS, 95), overall=95.0)
+    assert (floor["overall"], floor["minimum_dimension"]) == (95.0, 95)
+    low = {**record["scores"], next(iter(review_record.DIMENSIONS)): 94}
     with pytest.raises(VerificationError, match="below the acceptance thresholds"):
         check(scores=low, overall=round(sum(low.values()) / len(low), 1))
     with pytest.raises(VerificationError, match="mean of its dimensions"):

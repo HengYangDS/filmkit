@@ -44,14 +44,20 @@ const CHINESE = /[\u3000-\u303f\u3400-\u9fff\uf900-\ufaff\uff00-\uffef]/u;
 const family = (value, bold) =>
   CHINESE.test(value) ? (bold ? "SampleBold" : "Sample") : bold ? "SampleLatinBold" : "SampleLatin";
 
-/* Paint one text and record its bounds, colour, opacity, role and scene. */
-function text(value, x, y, { size, bold = false, color = P.ink, alpha = 1, role = "label" }) {
+/* Paint one text and record its bounds, colour, opacity, role and scene. `align` starts the text at x, centres it on
+ * x or ends it there. */
+function text(
+  value,
+  x,
+  y,
+  { size, bold = false, color = P.ink, alpha = 1, role = "label", align = "center" },
+) {
   if (alpha <= 0) return;
   ctx.font = `${bold ? "700 " : ""}${size}px ${family(value, bold)}`;
-  ctx.textAlign = "center";
+  ctx.textAlign = align;
   ctx.textBaseline = "alphabetic";
   const metrics = ctx.measureText(value);
-  const left = x - metrics.width / 2;
+  const left = align === "left" ? x : align === "right" ? x - metrics.width : x - metrics.width / 2;
   ctx.globalAlpha = alpha;
   ctx.fillStyle = color;
   ctx.fillText(value, x, y);
@@ -235,6 +241,10 @@ const CHECKED = [
   [L("画面", "Picture"), L("画面", "picture")],
   [L("打包记录", "Packages"), L("打包记录", "packages")],
 ];
+/* Each check stands from x 870 to 898, and its item starts one gap after it, so the items share one left edge. */
+const CHECK_LEFT = 870;
+const CHECK_RIGHT = 898;
+const ITEM_LEFT = CHECK_RIGHT + 26;
 
 /* Each film beside its sources, and between them what the check covers; each item is marked as it is said to match,
  * and the check completes when everything does. */
@@ -256,12 +266,16 @@ function checkScene(s, t, alpha) {
   const matched = alpha * shown(t, cue(s, L("一致", "match"), 0.7));
   CHECKED.forEach(([name, key], i) => {
     const y = 440 + i * 45;
-    text(name, 980, y, { size: NOTE, alpha: alpha * shown(t, cue(s, key, 0.3 + 0.08 * i)) });
+    text(name, ITEM_LEFT, y, {
+      size: NOTE,
+      align: "left",
+      alpha: alpha * shown(t, cue(s, key, 0.3 + 0.08 * i)),
+    });
     line(
       [
-        [870, y - 12],
-        [880, y - 2],
-        [898, y - 22],
+        [CHECK_LEFT, y - 12],
+        [CHECK_LEFT + 10, y - 2],
+        [CHECK_RIGHT, y - 22],
       ],
       matched,
       { color: P.done, width: 4 },

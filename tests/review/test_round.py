@@ -15,7 +15,7 @@ import filmkit.specification as specification
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
 
-SCORES = dict.fromkeys(review_record.DIMENSIONS, 92)
+SCORES = dict.fromkeys(review_record.DIMENSIONS, 96)
 PURPOSE = "superseded by its repairs"
 
 
@@ -30,7 +30,7 @@ def review(put):
         edition = {
             "media": media,
             "scores": SCORES,
-            "overall": 92.0,
+            "overall": 96.0,
             "findings": list(findings),
             "human_listening_checklist": ["Listen to 24.3 in its clause."],
         } | edition
@@ -406,9 +406,9 @@ def test_record_writes_reviews_that_verify_film_accepts(root, review, put, capsy
         for film in Edition("en").films
     ]
     review(folder, "zh", findings=[{"id": "R5-1", "severity": "minor"}])
-    review(folder, "en", media=relative, overall=93.0)
+    review(folder, "en", media=relative, overall=97.0)
     with pytest.raises(
-        ReviewError, match=re.escape("en: reported overall 93.0 is not the mean 92.0")
+        ReviewError, match=re.escape("en: reported overall 97.0 is not the mean 96.0")
     ):
         review_round.review_records(folder)
     review(folder, "en", media=relative)
@@ -424,8 +424,8 @@ def test_record_writes_reviews_that_verify_film_accepts(root, review, put, capsy
     assert json.loads(capsys.readouterr().out) == {
         "dry_run": False,
         "editions": [
-            {"language": "zh", "overall": 92.0, "minimum": 92, "material": 0},
-            {"language": "en", "overall": 92.0, "minimum": 92, "material": 0},
+            {"language": "zh", "overall": 96.0, "minimum": 96, "material": 0},
+            {"language": "en", "overall": 96.0, "minimum": 96, "material": 0},
         ],
     }
     record = json.loads(Edition("zh").production_review.read_text())
@@ -457,7 +457,7 @@ def test_record_writes_reviews_that_verify_film_accepts(root, review, put, capsy
     for code in CODES:
         edition = Edition(code)
         accepted = delivery_verification.verify_review(edition, sorted(edition.films))
-        assert accepted["overall"] == 92.0
+        assert accepted["overall"] == 96.0
         assert root / accepted["path"] == edition.production_review
 
 

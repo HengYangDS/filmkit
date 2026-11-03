@@ -43,8 +43,8 @@ prompt = "content/review/prompt.md"
 # keyed by segment and offset in the script.
 readings = "content/review/readings.json"
 # The verifier's floor: the overall score and every dimension at least this.
-overall_minimum = 90
-dimension_minimum = 90
+overall_minimum = 95
+dimension_minimum = 95
 
 # The scored dimensions in record order, with what each one asks reviewers to judge.
 [review.dimensions]
