@@ -17,7 +17,7 @@ The third gap is in the review configuration. Since 0.3.0 a review round's promp
 - `render-picture` refuses an edition unless a passing gate record binds its current composition, timeline and engine version.
 - A thought retake also binds the SHA-256 of the spoken text it was auditioned on. Synthesis refuses a retake whose thought now speaks other text and names the thought, and binding an audition's proposal records both texts. A retake bound before 0.6.0 keeps its text-only binding.
 - A review round refuses to write prompts for a film that declares a concept contract unless its prompt template cites `{concepts}` and `{readings}` and its dimensions include `concept_fidelity`, and names each omission. The sample film scores concept fidelity.
-- Raise HyperFrames to 0.9.6, set `RENDERER_VERSION` to it, and run `check-picture` in the sample film's picture task before each render.
+- Raise HyperFrames to 0.9.6, set `RENDERER_VERSION` to it, and run `check-picture` in the sample film's picture task before each render. The sample film's composition is reworked so that its picture passes the gate.
 - Record the changes under `Unreleased`, date them as `[0.6.0]`, and set `VERSION` and the README pin to 0.6.0.
 
 ## Capabilities
@@ -39,7 +39,7 @@ The Change touches these files:
 - a new `src/filmkit/picture/gates.py`, with `src/filmkit/produce.py`, `src/filmkit/picture/rendering.py`, `src/filmkit/picture/sync_audit.py`, `src/filmkit/production.py`, `src/filmkit/tools.py` and their tests;
 - `src/filmkit/narration/retakes.py`, `src/filmkit/narration/audition.py` and their tests;
 - `src/filmkit/review/round.py`, its tests and the sample film's `content/film.toml`;
-- `package.json`, `package-lock.json` and the sample film's tasks in `.config/mise/config.toml`;
+- `package.json`, `package-lock.json`, the sample film's tasks in `.config/mise/config.toml` and its composition `examples/sample-film/picture/film.js`;
 - `README.md`, `NOTICE`, `CHANGELOG.md` and `VERSION`.
 
 A film adopts 0.6.0 when it next renders. Its picture task must then run `check-picture` before each render, its composition must pass the continuous balance and cover runs, and it must raise its own `hyperframes` pin. A film with a concept contract must also cite it and the reading occurrence plans in its prompt template and score `concept_fidelity`; DDWG 1.2.0, ETHOS v2 and the essentials already do. Films that keep 0.5.0, such as the DDWG 1.2.0 repair, are not affected. In the 0.x series this is a minor release.

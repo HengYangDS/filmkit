@@ -82,7 +82,7 @@ function card(x, y, width, height, alpha, outline = P.line) {
   ctx.roundRect(x, y, width, height, 12);
   ctx.fill();
   ctx.strokeStyle = outline;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.roundRect(x, y, width, height, 12);
   ctx.stroke();
@@ -104,23 +104,16 @@ function line(points, alpha, { color = P.line, width = 3, dash = [] } = {}) {
   ctx.globalAlpha = 1;
 }
 
-/* An arrow from one point to another along a horizontal line. */
-function arrow(x0, x1, y, alpha) {
-  line(
-    [
-      [x0, y],
-      [x1, y],
-    ],
-    alpha,
-  );
-  line(
-    [
-      [x1 - 14, y - 10],
-      [x1, y],
-      [x1 - 14, y + 10],
-    ],
-    alpha,
-  );
+/* A card's outline alone, as the narration lights or marks it. */
+function outline(x, y, width, height, alpha, color) {
+  if (alpha <= 0) return;
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, 12);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 }
 
 /* When a segment's voice first says `key`, or the share of its voice when no word matches. */
@@ -141,31 +134,49 @@ function cue(s, key, share) {
 /* Something named appears as the narration names it. */
 const shown = (t, at) => ramp(t, at, 0.35);
 
+/* The three sources stand together from the scene's start and light as one when the narration names them; each card
+ * is named, then explained, as its words are said. */
+const SOURCES = [
+  [
+    L("脚本", "Script"),
+    L("脚本", "script"),
+    L("要说的话", "What is said"),
+    L("要说的话", "what is said"),
+  ],
+  [
+    L("参考录音", "Reference"),
+    L("参考录音", "reference"),
+    L("旁白的嗓音", "The narrator’s voice"),
+    L("旁白的嗓音", "narrator"),
+  ],
+  [
+    L("画面合成", "Composition"),
+    L("画面合成", "composition"),
+    L("每一帧画什么", "Every frame"),
+    L("每一帧画什么", "every frame"),
+  ],
+];
+
 function sourcesScene(s, t, alpha) {
-  text(L("一部影片的源文件", "A film’s sources"), 960, 260, {
+  text(L("一部影片的源文件", "A film’s sources"), 960, 330, {
     size: NOTE,
     color: P.muted,
     alpha,
   });
-  const items = [
-    [L("脚本", "Script"), L("要说的话", "What is said"), cue(s, L("脚本", "script"), 0.4)],
-    [
-      L("参考录音", "Reference recording"),
-      L("旁白的嗓音", "The narrator’s voice"),
-      cue(s, L("参考录音", "reference"), 0.6),
-    ],
-    [
-      L("画面合成", "Composition"),
-      L("每一帧画什么", "Every frame"),
-      cue(s, L("画面合成", "composition"), 0.8),
-    ],
-  ];
-  items.forEach(([name, note, at], i) => {
-    const x = 270 + i * 480;
-    const q = alpha * shown(t, at);
-    card(x, 360, 420, 280, q);
-    text(name, x + 210, 490, { size: LABEL, alpha: q });
-    text(note, x + 210, 560, { size: NOTE, color: P.muted, alpha: q });
+  const lit = alpha * shown(t, cue(s, L("源文件", "sources"), 0.5));
+  SOURCES.forEach(([name, nameKey, note, noteKey], i) => {
+    const x = 350 + i * 440;
+    card(x, 420, 340, 170, alpha);
+    outline(x, 420, 340, 170, lit, P.accent);
+    text(name, x + 170, 495, {
+      size: LABEL,
+      alpha: alpha * shown(t, cue(s, nameKey, 0.4 + 0.2 * i)),
+    });
+    text(note, x + 170, 550, {
+      size: NOTE,
+      color: P.muted,
+      alpha: alpha * shown(t, cue(s, noteKey, 0.5 + 0.2 * i)),
+    });
   });
 }
 
@@ -177,31 +188,37 @@ const STAGES = [
   [L("成片", "Films"), L("成片", "films")],
 ];
 
-/* The build's stages in a row: the stages before `from` stand already, those up to `to` appear
- * as the narration names them, and the rest wait for the next scene. */
+/* The build's five stages stand in a row from its first scene; the stages before `from` are named already, those up to
+ * `to` are named as the narration names them, and the rest wait for the next scene. The first scene shows what keeps a
+ * rebuild's voice the same, the second that the build stays offline. */
 function buildScene(s, t, alpha, from, to) {
-  text(L("构建的步骤", "The build"), 960, 300, { size: NOTE, color: P.muted, alpha });
-  STAGES.slice(0, to).forEach(([name, key], i) => {
+  text(L("构建的步骤", "Build steps"), 960, 330, { size: NOTE, color: P.muted, alpha });
+  STAGES.forEach(([name, key], i) => {
     const x = 206 + i * 312;
-    const q = alpha * (i < from ? 1 : shown(t, cue(s, key, 0.15 + 0.3 * (i - from))));
-    card(x, 420, 260, 140, q);
-    text(name, x + 130, 504, { size: LABEL, alpha: q });
-    if (i > 0) arrow(x - 44, x - 8, 490, q);
+    card(x, 440, 260, 140, alpha);
+    const named = i < from ? 1 : i < to ? shown(t, cue(s, key, 0.15 + 0.3 * (i - from))) : 0;
+    text(name, x + 130, 524, { size: LABEL, alpha: alpha * named });
   });
-  if (from === 0) return;
+  if (from === 0) {
+    const seed = alpha * shown(t, cue(s, L("固定的种子", "fixed seed"), 0.6));
+    text(L("固定的种子", "A fixed seed"), 336, 630, { size: NOTE, color: P.muted, alpha: seed });
+    const same = alpha * shown(t, cue(s, L("声音都一样", "same voice"), 0.9));
+    text(L("声音都一样", "The same voice"), 336, 680, { size: NOTE, color: P.done, alpha: same });
+    return;
+  }
   const offline = alpha * shown(t, cue(s, L("不联网", "network"), 0.6));
   line(
     [
-      [176, 380],
-      [1744, 380],
-      [1744, 600],
-      [176, 600],
-      [176, 380],
+      [176, 400],
+      [1744, 400],
+      [1744, 620],
+      [176, 620],
+      [176, 400],
     ],
     offline,
     { color: P.accent, width: 2, dash: [14, 10] },
   );
-  text(L("不联网", "Offline"), 960, 360, { size: NOTE, color: P.accent, alpha: offline });
+  text(L("不联网", "Offline"), 960, 385, { size: NOTE, color: P.accent, alpha: offline });
   const kept = alpha * shown(t, cue(s, L("构建目录", "build folder"), 0.8));
   text(L("所有文件都留在构建目录", "Everything stays in the build folder"), 960, 680, {
     size: NOTE,
@@ -210,34 +227,51 @@ function buildScene(s, t, alpha, from, to) {
   });
 }
 
-/* Each film beside its sources; the check lands when everything matches. */
+/* What the check covers, as the narration lists it. */
+const CHECKED = [
+  [L("录音", "Recordings"), L("录音", "recordings")],
+  [L("音轨", "Soundtrack"), L("音轨", "soundtrack")],
+  [L("字幕", "Captions"), L("字幕", "captions")],
+  [L("画面", "Picture"), L("画面", "picture")],
+  [L("打包记录", "Packages"), L("打包记录", "packages")],
+];
+
+/* Each film beside its sources, and between them what the check covers; each item is marked as it is said to match,
+ * and the check completes when everything does. */
 function checkScene(s, t, alpha) {
-  text(L("逐项核对", "Item by item"), 960, 330, { size: NOTE, color: P.muted, alpha });
-  card(420, 420, 340, 140, alpha);
-  text(L("成片", "Films"), 590, 504, { size: LABEL, alpha });
-  card(1160, 420, 340, 140, alpha);
-  text(L("源文件", "Sources"), 1330, 504, { size: LABEL, alpha });
-  for (const y of [460, 490, 520]) {
+  text(L("核对成片", "Checking the films"), 960, 330, { size: NOTE, color: P.muted, alpha });
+  const complete = alpha * shown(t, cue(s, L("全部", "everything"), 0.85));
+  for (const x of [330, 1290]) {
+    card(x, 425, 300, 170, alpha);
+    outline(x, 425, 300, 170, complete, P.done);
+  }
+  text(L("成片", "Films"), 480, 523, {
+    size: LABEL,
+    alpha: alpha * shown(t, cue(s, L("成片", "film"), 0.1)),
+  });
+  text(L("源文件", "Sources"), 1440, 523, {
+    size: LABEL,
+    alpha: alpha * shown(t, cue(s, L("源文件", "sources"), 0.15)),
+  });
+  const matched = alpha * shown(t, cue(s, L("一致", "match"), 0.7));
+  CHECKED.forEach(([name, key], i) => {
+    const y = 440 + i * 45;
+    text(name, 980, y, { size: NOTE, alpha: alpha * shown(t, cue(s, key, 0.3 + 0.08 * i)) });
     line(
       [
-        [776, y],
-        [1144, y],
+        [870, y - 12],
+        [880, y - 2],
+        [898, y - 22],
       ],
-      alpha,
-      { dash: [10, 8] },
+      matched,
+      { color: P.done, width: 4 },
     );
-  }
-  const matched = alpha * shown(t, cue(s, L("全部", "everything"), 0.6));
-  line(
-    [
-      [912, 650],
-      [948, 686],
-      [1012, 614],
-    ],
-    matched,
-    { color: P.done, width: 8 },
-  );
-  text(L("完成", "Complete"), 960, 760, { size: LABEL, color: P.done, alpha: matched });
+  });
+  text(L("完成", "Complete"), 960, 700, {
+    size: LABEL,
+    color: P.done,
+    alpha: alpha * shown(t, cue(s, L("完成", "complete"), 0.95)),
+  });
 }
 
 const scenes = {
