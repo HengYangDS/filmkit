@@ -21,7 +21,7 @@
 
 ## 5. Documentation and release notes
 
-- [ ] 5.1 Document the picture gates, the retakes' spoken binding and the review's contract check in `README.md`, and bring the README and `NOTICE` to HyperFrames 0.9.6; done when both name the new version and the README names `check-picture` before `render-picture`.
+- [x] 5.1 Document the picture gates, the retakes' spoken binding and the review's contract check in `README.md`, and bring the README and `NOTICE` to HyperFrames 0.9.6; done when both name the new version and the README names `check-picture` before `render-picture`. The README's new section "The picture gate" names `check-picture` before `render-picture` and the gate record, "Concepts and readings" names the review's contract check, "Whole endings" names the retakes' spoken binding, and the README and `NOTICE` name HyperFrames 0.9.6.
 - [ ] 5.2 Record the changes under `Unreleased`, then date the notes as `[0.6.0]` with the `v0.5.0...v0.6.0` history link and open an empty `Unreleased`; set `VERSION` and the README pin to 0.6.0; done when no tracked file outside the Changelog history names 0.5.0 as the current version and every `mise run check` command passes.
 
 ## Workflow follow-up
