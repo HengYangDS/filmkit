@@ -21,6 +21,19 @@ const runsByScene = (runs) =>
       list.map((v) => `${v.start.toFixed(2)}-${v.end.toFixed(2)} ${(v.worst * 100).toFixed(1)}%`),
     ]),
   );
+/* Text-layout runs per scene, each with its start, end, texts and the offsets of its worst frame. */
+const layoutByScene = (runs) =>
+  Object.fromEntries(
+    Object.entries(Object.groupBy(runs, (v) => v.scene)).map(([id, list]) => [
+      id,
+      list.map((v) => ({
+        start: +v.start.toFixed(2),
+        end: +v.end.toFixed(2),
+        texts: v.texts,
+        ...v.detail,
+      })),
+    ]),
+  );
 
 export function frameReport({
   from,
@@ -50,6 +63,7 @@ export function frameReport({
   offCentreRuns,
   thinRuns,
   underfilled,
+  textLayout,
 }) {
   const listsLeft = Object.groupBy(lists.findings(), (v) =>
     v.kind === "list_leaving_early" ? "early" : "dimmed",
@@ -251,6 +265,21 @@ export function frameReport({
         },
       ]),
     ),
+    /* How the settled text of the content band lines up through 1 s or more of speech (frame-audit/typography.mjs),
+     * per scene. Neighbouring names of one size whose baselines step by more than 3.5 px and less than half their
+     * size, with both baselines and the gap between them. */
+    ragged_rows: layoutByScene(textLayout.ragged_rows),
+    /* Lines of one block, or items stacked in one column, whose shared edge differs by more than 3 px, with the edge
+     * and its positions; a left-aligned block centred on a mark, with the mark's axis and each line's offset. */
+    ragged_columns: layoutByScene(textLayout.ragged_columns),
+    /* A line under another of its block with less than 7 px clear between their inks, with the clearance. */
+    crammed_lines: layoutByScene(textLayout.crammed_lines),
+    /* A name alone in a small card, more than 4 px off its centre or middle, with both offsets and the card. */
+    off_card_centre: layoutByScene(textLayout.off_card_centre),
+    /* Like marks on one centre line at uneven pitch over names at equal gaps, with the pitch and the gaps. */
+    uneven_pitch: layoutByScene(textLayout.uneven_pitch),
+    /* A name whose ink comes within 3 px of a mark, measured on its path, with the clearance and the mark's box. */
+    touching_marks: layoutByScene(textLayout.touching_marks),
   };
 }
 

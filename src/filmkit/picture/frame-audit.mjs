@@ -1,4 +1,5 @@
-/* Exercise every frame of the composition headlessly on one timeline and report layout, legibility and pacing.
+/* Exercise every frame of the composition headlessly on one timeline and report layout, legibility, how its text
+ * lines up and its pacing.
  * Usage: python -m filmkit.tools frame-audit <timeline.json> [step-seconds] [--from s] [--to s] [--at s]
  * --from and --to limit the frames exercised to one stretch of the film, such as the scenes being rebuilt; --at
  * reports one frame in detail. TRACE=<file> writes the label trace that filmkit.picture.sync_audit reads; MARKS=<file> writes the
@@ -11,6 +12,7 @@ import { parseArgs } from "node:util";
 import { compositionMeasures } from "./frame-audit/composition.mjs";
 import { inHead, spanOf, VISIBLE } from "./frame-audit/marks.mjs";
 import { frameReport, writeRequestedFiles } from "./frame-audit/report.mjs";
+import { textLayout } from "./frame-audit/typography.mjs";
 import { openComposition, readTimeline } from "./headless-composition.mjs";
 import { analysis } from "./rules/frame.mjs";
 import { inkLevel, readingLoad } from "./rules/ink.mjs";
@@ -83,11 +85,13 @@ const contrast = readingLoad(film.palette),
   faintSeen = faintLabels();
 
 /* Painted paths are recorded so labels crossing strokes or partly covered by fills are reported, and what the scene
- * itself paints outside the head band is counted, so speech over an empty picture is reported. */
+ * itself paints outside the head band is counted, so speech over an empty picture is reported. Every paint is kept
+ * for the frame's text layout. */
 let paints;
 function onPaint(paint) {
   const points = paint.subs.flat(),
     seq = ++paints.seq;
+  paints.all.push(paint);
   if (paint.kind === "text") paints.texts.push(seq);
   if (paint.scene && !inHead(points)) {
     paints.level = Math.max(paints.level, levelOf(paint.color, paint.alpha));
@@ -136,7 +140,7 @@ const thoughts = timeline.segments.flatMap((seg) => {
 /* Render the frame at t and gather what the measures read: its layout and graphics, what its scene painted, where it
  * falls in the timeline and its scene words. */
 function renderedFrame(t) {
-  paints = { graphics: [], texts: [], seq: 0, ink: 0, strong: 0, level: 0 };
+  paints = { all: [], graphics: [], texts: [], seq: 0, ink: 0, strong: 0, level: 0 };
   const layout = film.render(t, onPaint);
   const segments = timeline.segments,
     at = segments.findLastIndex((v) => v.start <= t),
@@ -157,6 +161,7 @@ function renderedFrame(t) {
   return {
     t,
     layout,
+    paints: paints.all,
     graphics: paints.graphics,
     sceneGraphics,
     sceneMarks: sceneGraphics.filter((g) => g.alpha > 0.35).length,
@@ -324,6 +329,8 @@ function labelsAndShapes(f) {
 }
 
 const composition = compositionMeasures({ film, step, thoughts });
+/* How the settled text of each voiced frame lines up: rows, columns, leading, cards, pitch and clearance. */
+const typography = textLayout(step);
 /* What each frame is measured for; the trace, the marks and the bounds only when their file is asked for. */
 const measures = [
   blankBetweenScenes,
@@ -344,6 +351,7 @@ const measures = [
   faintClutter,
   ...(process.env.BOUNDS ? [composition.paintedExtent] : []),
   labelsAndShapes,
+  typography.frame,
 ];
 function* frameTimes() {
   if (probe !== null) yield probe;
@@ -415,6 +423,7 @@ const report = frameReport({
   offCentreRuns: composition.offCentreRuns,
   thinRuns: composition.thinRuns,
   underfilled: composition.underfilled,
+  textLayout: typography.finish(),
 });
 writeRequestedFiles({
   trace,

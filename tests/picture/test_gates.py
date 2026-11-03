@@ -23,6 +23,14 @@ CLEAN = {
     "sync": {"findings": [], "out_of_sync": 0, "labels_judged": 12},
     "motion": {"still": [{"start": 4.0, "end": 7.2, "seconds": 3.2}], "pops": [1]},
 }
+# A text-layout run as the frame audit reports it per scene.
+RAGGED_ROW = {
+    "start": 1.0,
+    "end": 3.0,
+    "texts": ["Sources", "Films"],
+    "baselines": [500.0, 506.0],
+    "gap": 199.2,
+}
 
 
 def put(path, data):
@@ -68,6 +76,7 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
     record = gates.check_picture(edition)
     assert repository.read(edition.picture_gates) == record
     assert record["verdict"] == "pass" and record["gated_findings"] == []
+    assert record["recorded_findings"] == []
     assert record["composition_sha256"] == repository.sha(film / COMPOSITION_SCRIPT)
     assert record["timeline_sha256"] == repository.sha(edition.timeline)
     assert record["engine_version"] == version("filmkit")
@@ -90,6 +99,10 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
         (
             {**CLEAN, "frame": {**CLEAN["frame"], "off_centre_runs": {"04": ["1.00-3.50 13.0%"]}}},
             "off_centre_runs",
+        ),
+        (
+            {**CLEAN, "frame": {**CLEAN["frame"], "ragged_rows": {"02": [RAGGED_ROW]}}},
+            "frame ragged_rows",
         ),
         (
             {
@@ -116,6 +129,20 @@ def test_a_gated_finding_writes_a_refused_record_and_refuses(film, monkeypatch, 
     record = repository.read(edition.picture_gates)
     assert record["verdict"] == "refuse"
     assert len(record["gated_findings"]) == 1 and named in record["gated_findings"][0]
+
+
+def test_a_measure_on_estimated_widths_is_recorded_and_refuses_nothing(film, monkeypatch):
+    # Like marks at uneven pitch over names at equal gaps rest on the headless widths of Latin
+    # text, so the reviewers judge them from the record.
+    pitch = {"start": 2.0, "end": 4.5, "texts": ["A", "B", "C"], "pitch": [168.4, 184.6]}
+    frame = {**CLEAN["frame"], "uneven_pitch": {"03": [{**pitch, "gaps": [100.0, 100.0]}]}}
+    audits(monkeypatch, {**CLEAN, "frame": frame})
+    record = gates.check_picture(Edition("zh"))
+    assert record["verdict"] == "pass" and record["gated_findings"] == []
+    assert len(record["recorded_findings"]) == 1
+    assert record["recorded_findings"][0].startswith("frame uneven_pitch: ")
+    assert '"pitch": [168.4, 184.6]' in record["recorded_findings"][0]
+    assert set(gates.FRAME_RECORDED).isdisjoint(gates.FRAME_GATES)
 
 
 def test_a_picture_changed_while_it_is_checked_is_refused(film, monkeypatch):

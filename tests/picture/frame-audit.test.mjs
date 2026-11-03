@@ -2,10 +2,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { TEXT_LAYOUT } from "../../src/filmkit/picture/frame-audit/typography.mjs";
 import { authoredTimeline, scratchFolder } from "./sample-film.mjs";
 
 // The headless audits run the composition itself on a timeline; a short stretch exercises every measurement.
@@ -65,6 +66,8 @@ test("the frame audit reports a stretch of the film, its label trace, its marks 
     assert.ok(rows.every((row) => /^\d\d\.\d+ (two|late) [\d.]+%$/.test(row)));
   for (const rows of [...Object.values(report.caption_echoes), ...Object.values(report.long_names)])
     assert.ok(rows.every((row) => /@[\d.]+$/.test(row)));
+  // How the text lines up, per scene: the stretch's names stand on their rows, columns and cards.
+  for (const key of TEXT_LAYOUT) assert.deepEqual(report[key], {}, key);
   // Each thought instant in the stretch with its lit offsets and its share of the band.
   const instants = JSON.parse(await readFile(balance, "utf8"));
   assert.ok(
@@ -103,4 +106,96 @@ test("the frame audit reports a stretch of the film, its label trace, its marks 
     assert.ok(drawn[0] <= box[0] && drawn[1] <= box[1] && drawn[2] >= box[2] && drawn[3] >= box[3]);
     assert.ok(mean_frame_area > 0 && mean_frame_area <= 1);
   }
+});
+
+test("the frame audit finds the sample film's closing checklist on one left edge in both editions", async () => {
+  const folder = await scratchFolder();
+  for (const code of ["zh", "en"]) {
+    const film = await authoredTimeline(code),
+      path = join(folder, `timeline-${code}.json`),
+      closing = film.segments.at(-1);
+    await writeFile(path, JSON.stringify(film));
+    const report = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [AUDIT_FRAMES, path, "0.0333333", "--from", String(closing.voice_start)],
+        { encoding: "utf8" },
+      ),
+    );
+    assert.deepEqual(report.errors, [], code);
+    for (const key of TEXT_LAYOUT) assert.deepEqual(report[key], {}, `${code} ${key}`);
+  }
+});
+
+/* A composition of one scene: two names of one row, the second 6 px low for its first 3 s. */
+const RAGGED_ROW = `"use strict";
+const ctx = document.getElementById("picture").getContext("2d");
+const P = { ground: "#0F1519", panel: "#1E2932", line: "#63758B", ink: "#ECE8DF", muted: "#9BA8B1" };
+let texts = [];
+function name(value, x, y) {
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = P.ink;
+  ctx.font = "30px Sample";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(value, x, y);
+  const width = ctx.measureText(value).width;
+  texts.push({ text: value, bounds: [x - width / 2, y - 24, x + width / 2, y + 7], color: P.ink, alpha: 1,
+    role: "label", scene: "01", placed: true, size: 30 });
+}
+window.renderFrame = (t) => {
+  texts = [];
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = P.ground;
+  ctx.fillRect(0, 0, 1920, 1080);
+  window.__sceneId = "01";
+  name("Sources", 760, 500);
+  name("Films", 1160, t < 3 ? 506 : 500);
+  window.__sceneId = null;
+  window.__filmLayout = { time: t, texts };
+};
+`;
+
+test("the frame audit reports a ragged row with its scene, span, texts and baselines", async () => {
+  const root = await scratchFolder(),
+    path = join(root, "timeline.json");
+  await mkdir(join(root, "picture"));
+  await writeFile(join(root, "picture/film.js"), RAGGED_ROW);
+  const words = ["Sources", "and", "films"].map((text, i) => ({
+    text,
+    start: 0.45 + i,
+    end: 1.35 + i,
+  }));
+  const segment = {
+    id: "01",
+    chapter: "sample",
+    start: 0,
+    end: 6,
+    voice_start: 0.45,
+    voice_end: 5.5,
+    utterance_groups: ["Sources and films"],
+    words,
+  };
+  await writeFile(
+    path,
+    JSON.stringify({ language: "English", duration: 6, segments: [segment], captions: [] }),
+  );
+  const report = JSON.parse(
+    execFileSync(process.execPath, [AUDIT_FRAMES, path, "0.0333333"], {
+      cwd: root,
+      encoding: "utf8",
+    }),
+  );
+  assert.deepEqual(report.errors, []);
+  assert.deepEqual(Object.keys(report.ragged_rows), ["01"]);
+  const [row] = report.ragged_rows["01"];
+  assert.deepEqual(row.texts, ["Sources", "Films"]);
+  assert.deepEqual(row.baselines, [500, 506]);
+  // The run spans the voiced frames sampled while the name stands low, each within one step.
+  assert.ok(
+    Math.abs(row.start - 0.45) <= 0.04 && Math.abs(row.end - 3) <= 0.04,
+    `${row.start}-${row.end}`,
+  );
+  for (const key of TEXT_LAYOUT.filter((v) => v !== "ragged_rows"))
+    assert.deepEqual(report[key], {}, key);
 });

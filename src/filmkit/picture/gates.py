@@ -5,10 +5,11 @@ timeline at one thirtieth of a second with its label and mark traces, the sync a
 traces, and the motion audit at 30 frames per second. Their reports go to
 build/runtime/work/picture-gates/<code>/. The edition's gate record binds the SHA-256 of the
 composition and of the timeline, the engine version and the frames the frame audit checked; it
-holds each report's SHA-256 and every gated finding, and passes only when there is none. A
-gated finding refuses with `PictureError`, after the record is written, and so does an audit that
-fails or a composition or timeline that changes while it is checked. `render-picture` reads the
-record before it starts the renderer (`filmkit.picture.rendering.require_passing_gates`).
+holds each report's SHA-256, every gated finding and every recorded finding, and passes only when
+there is no gated one. A gated finding refuses with `PictureError`, after the record is written,
+and so does an audit that fails or a composition or timeline that changes while it is checked.
+`render-picture` reads the record before it starts the renderer
+(`filmkit.picture.rendering.require_passing_gates`).
 
 Usage: python -m filmkit.produce check-picture --language zh|en
 """
@@ -56,7 +57,16 @@ FRAME_GATES = (
     "thin_runs",
     "underfilled_containers",
     "faint_clutter",
+    # How text lines up, from exact anchors, sizes and baselines (frame-audit/typography.mjs).
+    "ragged_rows",
+    "ragged_columns",
+    "crammed_lines",
+    "off_card_centre",
 )
+# The frame audit's text-layout findings that rest on the headless estimate of Latin widths,
+# which a real browser lays out differently: the record lists them for the reviewers, and they
+# refuse nothing.
+FRAME_RECORDED = ("uneven_pitch", "touching_marks")
 # Seconds a still picture may hold under speech: the reviewers' limit for a held picture.
 STILL_LIMIT = 3.5
 # The frame audit's sampling step and the motion audit's frame rate.
@@ -83,6 +93,15 @@ def gated_findings(frame: dict, sync: dict, motion: dict) -> list[str]:
         if run["seconds"] > STILL_LIMIT
     ]
     return findings
+
+
+def recorded_findings(frame: dict) -> list[str]:
+    """The frame audit's recorded findings, each named by its measure, which refuse nothing."""
+    return [
+        f"frame {key}: {json.dumps(frame[key], ensure_ascii=False)}"
+        for key in FRAME_RECORDED
+        if frame.get(key)
+    ]
 
 
 def current_bindings(edition: Edition) -> dict:
@@ -136,6 +155,7 @@ def check_picture(edition: Edition) -> dict:
             for name, path in (("frame", frame_path), ("sync", sync_path), ("motion", motion_path))
         },
         "gated_findings": findings,
+        "recorded_findings": recorded_findings(frame),
         "verdict": "refuse" if findings else "pass",
     }
     repository.write(edition.picture_gates, record)
