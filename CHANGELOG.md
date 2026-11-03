@@ -4,6 +4,22 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-03
+
+### Added
+
+- `python -m filmkit.produce check-picture --language zh|en` runs the frame, sync and motion audits of an edition's current composition and timeline. It writes `build/evidence/editions/<edition>/picture-gates.json`, which binds the composition, the timeline and the engine version and lists every gated finding, and refuses while one remains.
+- The frame audit follows the lit picture through all speech. `off_centre_runs` and `thin_runs` report each run of 2 s or more of one scene's speech in which the picture stands more than 12% off the content centre or covers less than a tenth of the content band, with its start, end and worst value; both are gated.
+
+### Changed
+
+- `render-picture` refuses an edition without a passing gate record for its current composition, timeline and engine version. A film's picture task runs `check-picture` before each render, as the sample film's now does.
+- The sample film's composition is reworked to pass the gate: each scene stands centred from its first word, names each thing on its words and changes within 3.5 s.
+- A thought retake that `filmkit.narration.audition apply` binds records `spoken_sha256`, the SHA-256 of the spoken text its audition narrated. Binding refuses a proposal without spoken text or with speech its thought no longer says, and narration refuses a retake whose thought now speaks other text, naming the thought. A retake bound before 0.6.0 keeps its text-only binding.
+- A review round refuses to write prompts for a film that declares a concept contract unless its reviewer prompt cites `{concepts}` and `{readings}` and its dimensions include `concept_fidelity`, and names each omission. The sample film scores concept fidelity.
+- The engine renders with HyperFrames 0.9.6. The browser build stays Chrome Headless Shell 152.0.7977.30, and `package.json` keeps its `undici` override, because 0.9.6 still declares that build and pins `undici` 7.25.0. A new renderer can change the frames a film renders, so a film keeps its current filmkit pin until it produces, reviews and accepts an edition on a release that carries this one.
+- The locks hold the newest releases their declared ranges admit; apart from HyperFrames, neither lock moves. OSV reports no advisory for any package either lock pins.
+
 ## [0.5.0] - 2026-11-03
 
 ### Added
@@ -79,7 +95,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/HengYangDS/filmkit/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/HengYangDS/filmkit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/HengYangDS/filmkit/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/HengYangDS/filmkit/compare/v0.2.0...v0.3.0

@@ -22,7 +22,7 @@
 ## 5. Documentation and release notes
 
 - [x] 5.1 Document the picture gates, the retakes' spoken binding and the review's contract check in `README.md`, and bring the README and `NOTICE` to HyperFrames 0.9.6; done when both name the new version and the README names `check-picture` before `render-picture`. The README's new section "The picture gate" names `check-picture` before `render-picture` and the gate record, "Concepts and readings" names the review's contract check, "Whole endings" names the retakes' spoken binding, and the README and `NOTICE` name HyperFrames 0.9.6.
-- [ ] 5.2 Record the changes under `Unreleased`, then date the notes as `[0.6.0]` with the `v0.5.0...v0.6.0` history link and open an empty `Unreleased`; set `VERSION` and the README pin to 0.6.0; done when no tracked file outside the Changelog history names 0.5.0 as the current version and every `mise run check` command passes.
+- [x] 5.2 Record the changes under `Unreleased`, then date the notes as `[0.6.0]` with the `v0.5.0...v0.6.0` history link and open an empty `Unreleased`; set `VERSION` and the README pin to 0.6.0; done when no tracked file outside the Changelog history names 0.5.0 as the current version and every `mise run check` command passes. The notes are dated `[0.6.0] - 2026-11-03` under an empty `Unreleased`, and `VERSION` and the README pin say 0.6.0; outside the Changelog only this Change names 0.5.0, as the release it follows. On 2026-11-03 every `mise run check` command passed, with 65 Node tests and 705 Python tests.
 
 ## Workflow follow-up
 
