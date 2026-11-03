@@ -75,7 +75,7 @@ A film pins a release tag in its Python project and locks it:
 dependencies = ["filmkit"]
 
 [tool.uv.sources]
-filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.7.0" }
+filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.8.0" }
 ```
 
 Its `package.json` declares the npm packages the engine runs, at these versions: `hyperframes` 0.9.9, the renderer, which the engine checks before it stages, renders or runs a tool; `gsap` 3.15.0, which each staged document loads; and `puppeteer-core` 25.16.0 and `@puppeteer/browsers` 3.2.6, which drive and install the browser build. It also overrides `undici` to 7.30.1, because HyperFrames 0.9.9 pins 7.25.0, which known advisories affect.

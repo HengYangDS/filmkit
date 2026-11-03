@@ -15,12 +15,12 @@
 
 ## 3. Sample film
 
-- [ ] 3.1 Run the new measures on the sample film and lay out any stage that stands off centre; done when `check-picture` passes for both editions and `mise run sample:build` and `sample:verify` pass.
+- [x] 3.1 Run the new measures on the sample film and lay out any stage that stands off centre; done when `check-picture` passes for both editions and `mise run sample:build` and `sample:verify` pass.
 
 ## 4. Documentation and release notes
 
 - [x] 4.1 Document the text metrics and the balance measures and their gate in `README.md`; done when the README names both measures, their limits and the table.
-- [ ] 4.2 Record the changes under `Unreleased`, then date the notes as `[0.8.0]` with the `v0.7.0...v0.8.0` history link and open an empty `Unreleased`; set `VERSION` and the README pin to 0.8.0; done when no tracked file outside the Changelog history names 0.7.0 as the current version and every `mise run check` command passes.
+- [x] 4.2 Record the changes under `Unreleased`, then date the notes as `[0.8.0]` with the `v0.7.0...v0.8.0` history link and open an empty `Unreleased`; set `VERSION` and the README pin to 0.8.0; done when no tracked file outside the Changelog history names 0.7.0 as the current version and every `mise run check` command passes.
 
 ## Workflow follow-up
 

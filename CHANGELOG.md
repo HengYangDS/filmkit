@@ -4,6 +4,22 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-04
+
+### Added
+
+- The headless audits measure text with the film's own fonts. `filmkit.picture.metrics` reads each `@font-face` rule of `picture/film.css` whose source is one of the film's `picture.fonts` and records the advance width of every character each face maps, and the canvas stand-in measures a text as the sum of its characters' advances at its size plus its letter spacing. `check-picture` names the table to the frame and motion audits in `FILMKIT_TEXT_METRICS`, and `python -m filmkit.tools frame-audit` and `motion-audit` name it when the caller names none. A family the stylesheet does not declare and a character its face does not map keep the estimate, and every text's height keeps it.
+- The frame audit measures balance as the reviews since DDWG round 29 do, in every frame it exercises: the box of every paint brighter than grey 60 at full size within rows 120–919, and its horizontal offset from x 960. `off_centre_builds` reports each run of 1.5 s or more in which the box stands more than 90 px off, and `off_centre_settled` each run of 2 s or more in which it stands more than 50 px off while its edges keep still, unless the picture then grows from it.
+
+### Changed
+
+- `check-picture` refuses `off_centre_builds`, and lists `off_centre_settled` in the gate record without refusing it, because whether a still state is a finished composition or a build-up held for its next part only the stage's intent tells.
+- `check-picture` refuses `uneven_pitch` and `touching_marks` too. Measured with the film's widths, they report nothing on the repaired DDWG and ETHOS v2 compositions, and on the DDWG composition its third re-check judged they keep the touches the drafts showed real and drop the ones they showed clear.
+- The gate record binds the SHA-256 of `picture/film.css` and of each declared font, and `render-picture` refuses a record measured with other fonts.
+- The measures that already read text extents, such as the round-16 cover runs, read the film's widths too, so a film that passed 0.7.0 can be refused by this release before its next render.
+- The engine renders with HyperFrames 0.9.9. The browser build stays Chrome Headless Shell 152.0.7977.30, and `package.json` keeps its `undici` override, because 0.9.9 still declares that build and pins `undici` 7.25.0. A new renderer can change the frames a film renders, so a film keeps its current filmkit pin until it produces, reviews and accepts an edition on a release that carries this one.
+- The locks hold the newest releases their declared ranges admit; apart from HyperFrames, neither lock moves. OSV reports no advisory for any package either lock pins.
+
 ## [0.7.0] - 2026-11-04
 
 ### Added
@@ -112,7 +128,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/HengYangDS/filmkit/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/HengYangDS/filmkit/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/HengYangDS/filmkit/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/HengYangDS/filmkit/compare/v0.4.0...v0.5.0
