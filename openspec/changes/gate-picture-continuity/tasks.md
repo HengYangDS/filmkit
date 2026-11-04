@@ -2,9 +2,9 @@
 
 ## 1. Supply
 
-- [ ] 1.1 Declare and lock ETHOS 0.2.0-alpha.29 and uv 0.13.7; done when `mise install --locked` reports every tool installed and `mise run bootstrap` passes.
-- [ ] 1.2 Project the CI workflow for `jdx/mise-action` 5.2.6; done when `lane project --check` conforms.
-- [ ] 1.3 Keep the code to alpha.29's Ruff policy with `DOC102`; done when that rule reports no finding on `src` and `tests`.
+- [x] 1.1 Declare and lock ETHOS 0.2.0-alpha.29 and uv 0.13.7; done when `mise install --locked` reports every tool installed and `mise run bootstrap` passes.
+- [x] 1.2 Project the CI workflow for `jdx/mise-action` 5.2.6; done when `lane project --check` conforms.
+- [x] 1.3 Keep the code to alpha.29's Ruff policy with `DOC102`; done when that rule reports no finding on `src` and `tests`.
 
 ## 2. Continuity gates
 
