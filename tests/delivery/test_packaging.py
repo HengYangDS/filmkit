@@ -98,11 +98,13 @@ def probe(
     sound="audio",
     kind="uhd",
     changes=None,
+    chapters="zho",
 ):
     """A probe of a finished film, as FFprobe reports one that meets the delivery contract.
 
     Its tags are the zh edition's release tags for the rendition of the given kind, and
-    `changes` replaces or, with None, removes some of them.
+    `changes` replaces or, with None, removes some of them; its chapter track's language is
+    `chapters`.
     """
     edition = production.Edition("zh")
     rendition = production.RENDITIONS[kind]
@@ -128,6 +130,7 @@ def probe(
                 "duration": duration,
                 "tags": {"language": "zho", "handler_name": names["narration"]},
             },
+            {"codec_type": "data", "tags": {"language": chapters, "handler_name": "Chapters"}},
             {"codec_type": "video", "disposition": {"attached_pic": 1}},
         ],
         "format": {"duration": duration, "tags": {k: v for k, v in tags.items() if v}},
@@ -170,6 +173,12 @@ def packaging_root(tmp_path, monkeypatch):
 
     monkeypatch.setattr(delivery_packaging, "run", run)
     monkeypatch.setattr(delivery_packaging, "validate_picture", lambda _edition: {})
+    # The chapter track's language is written into each finished film after its keys.
+    monkeypatch.setattr(
+        delivery_packaging,
+        "set_chapter_language",
+        lambda path, language: calls.append((["chapter-language", language, str(path)], 0)),
+    )
     monkeypatch.setattr(delivery_packaging, "package_metadata", lambda _edition: None)
     monkeypatch.setattr(media, "probe", lambda path: probe(kind=kind_of(path)))
     return tmp_path, edition, calls
@@ -207,7 +216,8 @@ def test_each_film_is_encoded_finished_and_checked_in_work_before_it_is_linked_i
         assert encode[-1] == str(work / film.name)
         assert cover[-1] == author[-1] == str(work / "finished" / film.name)
         assert [command for command, _ in calls[:3]] == member["commands"]
-        calls[:3] = []
+        assert calls[3][0] == ["chapter-language", "zho", str(work / "finished" / film.name)]
+        calls[:4] = []
     assert list(work.rglob("*.mp4")) == []
     assert not (edition.evidence / "packaging-failure.json").exists()
 
@@ -325,6 +335,7 @@ def test_the_commands_carry_the_release_metadata(packaging_root):
                 120,
             ),
             (["exiftool", "-overwrite_original", *keys, finished], 120),
+            (["chapter-language", "zho", finished], 0),
         ]
     assert calls == expected
     created = {
@@ -359,8 +370,9 @@ def test_a_failed_check_leaves_no_film_in_place_and_keeps_the_work(packaging_roo
         {"changes": {"synopsis": "Another film."}},
         {"changes": {"com.apple.quicktime.keywords": None}},
         {"kind": "1080p-captioned"},
+        {"chapters": "eng"},
     ],
-    ids=["frames", "author", "sound", "album", "synopsis", "keywords", "hd-mark"],
+    ids=["frames", "author", "sound", "album", "synopsis", "keywords", "hd-mark", "chapters"],
 )
 def test_a_finished_film_needs_every_frame_its_author_and_release(tmp_path, monkeypatch, change):
     monkeypatch.setattr(media, "probe", lambda _path: probe(**change))
@@ -395,6 +407,22 @@ def test_the_release_tags_come_from_the_script():
         "picture": "Picture",
         "narration": "English narration",
     }
+
+
+def test_the_release_prose_sets_typographic_quotes(tmp_path, monkeypatch):
+    edition, uhd = production.Edition("en"), production.RENDITIONS["uhd"]
+    script = repository.read(edition.script)
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    prose = {key: f'The {key} says "Done." It\'s done.' for key in ("comment", "description")}
+    release = {**script["release"], **prose, "synopsis": 'An Agent reports "Done."'}
+    repository.write(edition.script, {**script, "title": 'The "Sample" Reel', "release": release})
+    tags = delivery_packaging.delivered_tags(edition, uhd)
+    assert tags["title"] == tags["com.apple.quicktime.title"] == "The “Sample” Reel"
+    assert tags["synopsis"] == "An Agent reports “Done.”"
+    for key in ("comment", "description"):
+        assert (
+            tags[key] == tags[f"com.apple.quicktime.{key}"] == f"The {key} says “Done.” It’s done."
+        )
 
 
 def test_a_failed_encode_records_its_bindings_and_command(packaging_root, monkeypatch):

@@ -67,6 +67,60 @@ def test_chapters_land_on_their_cards_and_head_the_transcript(tmp_path, monkeypa
     assert captions_timing.typeset("Others' work isn't done") == "Others’ work isn’t done"
 
 
+def test_titles_headings_and_chapters_set_typographic_quotes(tmp_path, monkeypatch):
+    # The transcript, its player and the chapter carriers set quotes as the captions do.
+    release = repository.read(production.Edition("en").script)["release"]
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    edition = production.Edition("en")
+    repository.write(edition.script, {"release": {**release, "comment": 'It says "Done".'}})
+    edition.artifacts.mkdir(parents=True)
+    segment = {
+        "id": "01",
+        "chapter": "life",
+        "chapter_title": "One requirement's life",
+        "title": '"Done"',
+        "start": 0.0,
+        "voice_start": 1.8,
+        "text": 'It says "Done."',
+    }
+    timeline = {"title": 'The "Sample" Reel', "captions": [], "segments": [segment]}
+    captions_documents.subtitle_files(timeline, edition)
+    output = edition.artifacts
+    transcript = (output / f"{edition.prefix}-transcript.md").read_text()
+    assert transcript.startswith("# The “Sample” Reel\n")
+    assert (
+        "\n## 01 One requirement’s life\n\n00:00:01.800 · “Done”\n\nIt says “Done.”\n" in transcript
+    )
+    chapters = json.loads((output / "chapters.json").read_text())["chapters"]
+    assert chapters[0]["title"] == "One requirement’s life"
+    metadata = (output / "chapters.ffmeta").read_text()
+    assert "title=The “Sample” Reel\n" in metadata
+    assert "comment=It says “Done”.\n" in metadata
+    assert "title=One requirement’s life\n" in metadata
+    assert '"' not in transcript + metadata and "'" not in transcript + metadata
+
+
+def test_chinese_titles_keep_their_marks(tmp_path, monkeypatch):
+    release = repository.read(production.Edition("zh").script)["release"]
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    edition = production.Edition("zh")
+    repository.write(edition.script, {"release": release})
+    edition.artifacts.mkdir(parents=True)
+    segment = {
+        "id": "01",
+        "chapter": "question",
+        "chapter_title": "问题",
+        "title": "“做完了”",
+        "start": 0.0,
+        "voice_start": 1.8,
+        "text": "它交回一句话：“做完了。”",
+    }
+    timeline = {"title": "示例影片", "captions": [], "segments": [segment]}
+    captions_documents.subtitle_files(timeline, edition)
+    transcript = (edition.artifacts / f"{edition.prefix}-transcript.md").read_text()
+    assert "00:00:01.800 · “做完了”\n\n它交回一句话：“做完了。”\n" in transcript
+
+
 def test_timecodes_round_to_the_millisecond():
     assert captions_documents.timecode(3723.4567) == "01:02:03,457"
     assert captions_documents.timecode(59.9996, ".") == "00:01:00.000"

@@ -2,7 +2,8 @@
 
 The SRT and VTT files show each cue's display copy on one line. chapters.json, the transcript
 and the FFmetadata chapters share one derivation of the chapters from the timeline: a chapter
-starts where the timeline's segments change chapter.
+starts where the timeline's segments change chapter. Every title, heading and tag they write is
+typeset as the captions are, with typographic quotation marks (`filmkit.captions.timing.typeset`).
 """
 
 from __future__ import annotations
@@ -46,7 +47,7 @@ def _chapters(segments: list[dict]) -> list[_Chapter]:
             start = segment["start"] + (CHAPTER_CARD_SHOWN if chapters else 0.0)
             entry = {
                 "id": segment["chapter"],
-                "title": segment["chapter_title"],
+                "title": typeset(segment["chapter_title"]),
                 "start": round(start, 3),
             }
             chapters.append(_Chapter(entry, []))
@@ -72,12 +73,12 @@ def _transcript(title: str, chapters: list[_Chapter], code: str) -> str:
         if code == "zh"
         else f"{AUTHOR} · English · {DURATION // 60} min"
     )
-    transcript = f"# {title}\n\n{byline}\n"
+    transcript = f"# {typeset(title)}\n\n{byline}\n"
     for number, chapter in enumerate(chapters, 1):
         transcript += f"\n## {number:02d} {chapter.entry['title']}\n"
         for segment in chapter.segments:
             transcript += (
-                f"\n{timecode(segment['voice_start'], '.')} · {segment['title']}\n\n"
+                f"\n{timecode(segment['voice_start'], '.')} · {typeset(segment['title'])}\n\n"
                 f"{typeset(segment['text']).strip()}\n"
             )
     return transcript
@@ -85,7 +86,10 @@ def _transcript(title: str, chapters: list[_Chapter], code: str) -> str:
 
 def _chapter_metadata(title: str, comment: str, chapters: list[_Chapter]) -> str:
     """The FFmetadata of the film's tags and chapters, in milliseconds; the last ends the film."""
-    metadata = f";FFMETADATA1\ntitle={title}\nartist={AUTHOR}\nauthor={AUTHOR}\ncomment={comment}\n"
+    metadata = (
+        f";FFMETADATA1\ntitle={typeset(title)}\nartist={AUTHOR}\nauthor={AUTHOR}\n"
+        f"comment={typeset(comment)}\n"
+    )
     for i, chapter in enumerate(chapters):
         end = chapters[i + 1].entry["start"] if i + 1 < len(chapters) else DURATION
         metadata += (

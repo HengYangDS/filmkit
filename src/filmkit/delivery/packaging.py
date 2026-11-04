@@ -11,8 +11,10 @@ its SHA-256 and commands in the edition's film package.
 A film's release metadata comes from its script's "release": FFmpeg writes it as the iTunes
 item list (title, artist, collection, genre, year, comments, synopsis, copyright and media
 kind) and names each track, and ExifTool adds the same facts as QuickTime keys with the
-keywords and creation date, so both kinds of player read them. FFmpeg's MP4 muxer tags its
-chapter text track English whatever the film's language; that tag is not settable.
+keywords and creation date, so both kinds of player read them. The title and the prose tags
+set quotation marks as the captions do. FFmpeg's MP4 muxer tags its chapter text track English
+whatever the film's language, so the finished film's chapter track takes the edition's
+language in place (`filmkit.delivery.track_language`), and every track must carry it.
 """
 
 from __future__ import annotations
@@ -30,6 +32,8 @@ from PIL import Image
 
 import filmkit.media as media
 import filmkit.repository as repository
+from filmkit.captions.timing import typeset
+from filmkit.delivery.track_language import set_chapter_language
 from filmkit.film import FILM
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, validate_picture
 from filmkit.production import CODES, RENDITIONS
@@ -290,15 +294,15 @@ def release_tags(edition: Edition, rendition: Rendition) -> list[tuple[str, str]
     script = read(edition.script)
     release = script["release"]
     tags = [
-        ("title", script["title"]),
+        ("title", typeset(script["title"])),
         ("artist", AUTHOR),
         ("album_artist", AUTHOR),
         ("album", release["collection"]),
         ("genre", release["genre"]),
         ("date", str(release["year"])),
-        ("comment", release["comment"]),
-        ("description", release["description"]),
-        ("synopsis", release["synopsis"]),
+        ("comment", typeset(release["comment"])),
+        ("description", typeset(release["description"])),
+        ("synopsis", typeset(release["synopsis"])),
         ("copyright", f"© {release['year']} {AUTHOR}"),
         ("media_type", "9"),
     ]
@@ -316,12 +320,12 @@ def quicktime_keys(edition: Edition) -> dict[str, str]:
     release = script["release"]
     return {
         "Author": AUTHOR,
-        "Title": script["title"],
+        "Title": typeset(script["title"]),
         "Artist": AUTHOR,
         "Album": release["collection"],
         "Genre": release["genre"],
-        "Description": release["description"],
-        "Comment": release["comment"],
+        "Description": typeset(release["description"]),
+        "Comment": typeset(release["comment"]),
         "Copyright": f"© {release['year']} {AUTHOR}",
         "Keywords": ", ".join(release["keywords"]),
         "Year": str(release["year"]),
@@ -466,8 +470,9 @@ def attach_cover_and_keys(
 def check_delivered_film(path: Path, edition: Edition, rendition: Rendition) -> None:
     """Refuse a finished film without every frame, its duration, cover, release tags or tracks.
 
-    Its release tags must be exactly the rendition's, so only the 1080p film is marked HD, and
-    its picture and narration tracks must carry their names and the edition's language.
+    Its release tags must be exactly the rendition's, so only the 1080p film is marked HD, its
+    picture and narration tracks must carry their names, and every track but the attached
+    cover, the chapter track included, the edition's language.
     """
     info = media.probe(path)
     streams = info["streams"]
@@ -486,6 +491,11 @@ def check_delivered_film(path: Path, edition: Edition, rendition: Rendition) -> 
         == movie.get("tags", {})
         and sounds[0].get("tags", {}) | {"handler_name": names["narration"], "language": language}
         == sounds[0].get("tags", {})
+        and all(
+            stream.get("tags", {}).get("language") == language
+            for stream in streams
+            if not stream.get("disposition", {}).get("attached_pic")
+        )
     ):
         msg = f"The finished film differs from the delivery contract: {path}"
         raise PackagingError(msg)
@@ -513,6 +523,7 @@ def package_rendition(
     deadline = max(DEADLINE_FLOOR, DURATION * rendition.deadline_ratio)
     encode(edition, package, command, deadline, intermediate)
     commands = [command, *attach_cover_and_keys(edition, intermediate, finished, created_at)]
+    set_chapter_language(finished, ISO_LANGUAGES[edition.code])
     check_delivered_film(finished, edition, rendition)
     target.hardlink_to(finished)
     member = {"path": target.name, "sha256": sha(target), "commands": commands}

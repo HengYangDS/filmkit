@@ -22,8 +22,8 @@
 
 ## 5. Deliverables
 
-- [ ] 5.1 Typeset the transcript's title and headings, the chapter titles and the release's prose tags; done when tests show the part title in the transcript and the player's transcript, the chapter title in every chapter carrier and the synopsis tag set with typographic marks, and a Chinese script unchanged.
-- [ ] 5.2 Tag the chapter track with the edition's language and refuse a finished film with a track in another; done when tests write `zho` into a chapter track, leave the film's size unchanged and refuse an `eng` chapter track in the Chinese edition.
+- [x] 5.1 Typeset the transcript's title and headings, the chapter titles and the release's prose tags; done when tests show the part title in the transcript and the player's transcript, the chapter title in every chapter carrier and the synopsis tag set with typographic marks, and a Chinese script unchanged.
+- [x] 5.2 Tag the chapter track with the edition's language and refuse a finished film with a track in another; done when tests write `zho` into a chapter track, leave the film's size unchanged and refuse an `eng` chapter track in the Chinese edition.
 - [ ] 5.3 Read the player's prose and the release's prose in the concept check; done when tests refuse a counterexample in each and pass one that stands only in the player's script.
 
 ## 6. Calibration
