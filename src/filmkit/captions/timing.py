@@ -32,8 +32,11 @@ CAPTION_TIMING = (
 )
 # A cue that ends a sentence, after any closing marks and spaces.
 SENTENCE_END = re.compile(rf"[{re.escape(SENTENCE_ENDS)}][{re.escape(CLOSING_MARKS)}]*\s*$")
-# A cue that ends a line: at a sentence end or a semicolon.
-_LINE_END = re.compile(rf"[{re.escape(LINE_ENDS)}][ \t]*$")
+# A cue that ends a line: at a sentence end or a semicolon, after any closing marks.
+_LINE_END = re.compile(rf"[{re.escape(LINE_ENDS)}][{re.escape(CLOSING_MARKS)}]*[ \t]*$")
+# A straight double quote opens a quotation at the start of the text or after a space, an
+# opening bracket or a dash.
+_OPENING_QUOTE = re.compile(r'(?:^|(?<=[\s(\[{\u2013\u2014]))"')
 # A cue shown for less than this is brief.
 BRIEF_CUE_SECONDS = 1.0
 # A brief cue joins its neighbour only across less quiet than this.
@@ -41,8 +44,14 @@ CUE_JOIN_QUIET_SECONDS = 0.25
 
 
 def typeset(text: str) -> str:
-    """Display copy: an apostrophe is set as a typographic right single quote."""
-    return text.replace("'", "\u2019")
+    """Display copy: typographic quotation marks in place of straight ones.
+
+    A straight double quote is set as a left double quote where it opens a quotation and
+    as a right one elsewhere, and an apostrophe as a right single quote. Each mark becomes
+    one character, so every cue keeps its offsets in the copy.
+    """
+    opened = _OPENING_QUOTE.sub("\u201c", text)
+    return opened.replace('"', "\u201d").replace("'", "\u2019")
 
 
 def shown_text(cue: dict) -> str:

@@ -1,9 +1,10 @@
 """Set a Chinese passage as single caption lines that end at its own punctuation.
 
-A sentence end, semicolon, question or exclamation closes a line, and between them the lines
-balance the length of their speech: the fewest lines of at most 25 characters of speech win,
-a line that ends inside an enumeration or holds under a second of speech costs more, and a
-line may hold up to 30 characters when that reads better.
+A sentence end, semicolon, question or exclamation closes a line, with the closing quotes and
+brackets that follow it. Between them the lines balance the length of their speech: the fewest
+lines of at most 25 characters of speech win, a line that ends inside an enumeration or holds
+under a second of speech costs more, and a line may hold up to 30 characters when that reads
+better.
 """
 
 from __future__ import annotations
@@ -11,7 +12,13 @@ from __future__ import annotations
 import re
 
 from filmkit.captions import CaptionError
-from filmkit.narration.spoken_units import CLAUSE_MARKS, ENUMERATION_MARK, LINE_ENDS, units
+from filmkit.narration.spoken_units import (
+    CLAUSE_MARKS,
+    CLOSING_MARKS,
+    ENUMERATION_MARK,
+    LINE_ENDS,
+    units,
+)
 from filmkit.specification import CAPTION_LIMITS
 
 # A Chinese line holds at most 25 characters of speech, about five seconds, or up to 30 when
@@ -26,7 +33,15 @@ LINE_COST = 100
 ENUMERATION_COST = 150
 BRIEF_COST = 200
 WIDE_COST = 20
-_CLAUSE = re.compile(f"[^{re.escape(CLAUSE_MARKS)}]+[{re.escape(CLAUSE_MARKS)}]?")
+# A clause runs to its mark and keeps the closing quotes and brackets after that mark.
+_CLAUSE = re.compile(
+    f"[^{re.escape(CLAUSE_MARKS)}]+[{re.escape(CLAUSE_MARKS)}]?[{re.escape(CLOSING_MARKS)}]*"
+)
+
+
+def _mark_end(text: str) -> str:
+    """The text up to its last mark, without the closing quotes and brackets after it."""
+    return text.rstrip(CLOSING_MARKS)
 
 
 def _fits(run: list[str], first: int, last: int, cap: int) -> bool:
@@ -44,7 +59,7 @@ def _fits(run: list[str], first: int, last: int, cap: int) -> bool:
 def _line_cost(run: list[str], last: int, line: str) -> int:
     """What one line costs among the lines of its sentence."""
     cost = LINE_COST
-    if last < len(run) and line.endswith(ENUMERATION_MARK):
+    if last < len(run) and _mark_end(line).endswith(ENUMERATION_MARK):
         cost += ENUMERATION_COST
     if len(run) > 1 and len(units(line)) < BRIEF_UNITS:
         cost += BRIEF_COST
@@ -79,14 +94,18 @@ def _settle(run: list[str]) -> list[str]:
     inside an enumeration.
     """
     strict, wide = _partition(run, LINE_UNITS), _partition(run, WIDE_LINE_UNITS)
-    inside = [sum(line.endswith(ENUMERATION_MARK) for line in lines) for lines in (strict, wide)]
+    inside = [
+        sum(_mark_end(line).endswith(ENUMERATION_MARK) for line in lines)
+        for lines in (strict, wide)
+    ]
     return wide if len(wide) == len(strict) or inside[1] < inside[0] else strict
 
 
 def caption_phrases(text: str) -> list[str]:
     """Set a Chinese passage as single caption lines that end at its punctuation.
 
-    A sentence end, semicolon, question or exclamation closes its line. Between them
+    A sentence end, semicolon, question or exclamation closes its line, and a closing
+    quote or bracket after any mark stays on the line that mark ends. Between them
     a line holds at most 25 characters of speech, about five seconds, within the
     caption limit, and the fewest lines win. A line that ends inside an enumeration
     at 、 costs more than one more line, and a line of fewer than six characters,
@@ -98,7 +117,7 @@ def caption_phrases(text: str) -> list[str]:
     result, run = [], []
     for clause in (clause for clause in _CLAUSE.findall(text) if clause.strip()):
         run.append(clause)
-        if clause.endswith(tuple(LINE_ENDS)):
+        if _mark_end(clause).endswith(tuple(LINE_ENDS)):
             result.extend(_settle(run))
             run = []
     if run:

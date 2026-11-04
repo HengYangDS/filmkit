@@ -86,6 +86,24 @@ def test_chinese_caption_cues_count_visible_punctuation():
     assert all(cue[-1] in "，。；：！？、" for cue in cues)
 
 
+def test_chinese_captions_keep_closing_quotes_on_the_line_they_close():
+    # A closing quote stays on the line its mark ends, after a sentence end or a comma, and
+    # never begins the next line.
+    passages = {
+        "它交回一句话：“完成了。测试全部通过。”这句话，到底说明了多少？": [
+            "它交回一句话：“完成了。",
+            "测试全部通过。”",
+            "这句话，到底说明了多少？",
+        ],
+        "他说：“这件事先放一放，等数据齐了再说，”然后转身去看下一份报告。": [
+            "他说：“这件事先放一放，等数据齐了再说，”",
+            "然后转身去看下一份报告。",
+        ],
+    }
+    for passage, expected in passages.items():
+        assert captions_chinese.caption_phrases(passage) == expected
+
+
 def test_english_captions_keep_complements_and_rebalance_short_tails():
     passages = [
         (

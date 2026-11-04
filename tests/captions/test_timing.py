@@ -98,6 +98,23 @@ def test_a_cue_never_crosses_a_thought():
         captions_timing.timed_caption_cues({"caption_timing": policy, "segments": [across]}, "zh")
 
 
+def test_a_brief_line_that_ends_in_a_closing_quote_starts_early():
+    words = [("甲", 1.0, 1.2), ("乙", 1.2, 1.4), ("丙", 1.4, 1.6), ("丁", 1.6, 1.8)]
+    words += [("戊", 1.8, 2.0), ("己", 2.0, 2.2), ("庚", 2.6, 2.8), ("辛", 2.8, 3.0)]
+    quoted = segment(
+        text="甲乙丙丁戊己。“庚辛。”",
+        utterance_groups=["甲乙丙丁戊己。“庚辛。”"],
+        voice_end=3.1,
+        words=[{"text": text, "start": start, "end": end} for text, start, end in words],
+    )
+    cues = captions_timing.timed_caption_cues(
+        {"caption_timing": {"short_cue_lead_seconds": 0.1}, "segments": [quoted]}, "zh"
+    )
+    # The quote rides on the line its sentence ends, and that brief line takes its lead.
+    assert [cue["text"] for cue in cues] == ["甲乙丙丁戊己。", "“庚辛。”"]
+    assert cues[1]["start"] == pytest.approx(2.5)
+
+
 def test_brief_captions_join_their_sentence_or_hold_for_reading():
     def cue(start, end, text, segment="01"):
         return {"start": start, "end": end, "text": text, "segment": segment}
@@ -152,6 +169,24 @@ def test_a_brief_caption_holds_into_the_quiet_without_moving_the_next_one():
     # The next cue still starts on its first word: a brief cue only takes the quiet.
     assert lent[0]["end"] == 2.75
     assert lent[1]["start"] == 2.75
+
+
+@pytest.mark.parametrize(
+    ("text", "display"),
+    [
+        (
+            'An Agent hands back one sentence: "Done. All tests pass."',
+            "An Agent hands back one sentence: “Done. All tests pass.”",
+        ),
+        ('"Deduplicate by date" fails, ', "“Deduplicate by date” fails, "),
+        ('kept ("just in case")—"or not".', "kept (“just in case”)—“or not”."),
+        ("the reviewer's notes", "the reviewer’s notes"),
+    ],
+)
+def test_the_display_copy_sets_typographic_quotes(text, display):
+    # Each mark becomes one character, so every cue keeps its offsets in the copy.
+    assert captions_timing.typeset(text) == display
+    assert len(display) == len(text)
 
 
 def test_the_receipt_counts_the_cues_and_states_their_timing():

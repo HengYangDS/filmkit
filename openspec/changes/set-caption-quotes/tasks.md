@@ -2,8 +2,8 @@
 
 ## 1. Caption text
 
-- [ ] 1.1 Keep each closing quotation mark or bracket that follows a punctuation mark on its Chinese caption line; done when a phrasing test sets 。” at the end of a line and starts the next with its own words, a timing test gives a brief line that ends in 。” its early start, no line of the ETHOS v2 Chinese script begins with a closing mark, and the sample film's and DDWG's Chinese lines are unchanged.
-- [ ] 1.2 Set straight double quotes as typographic ones in the display copy; done when a timing test shows an opening and a closing quote by position, an apostrophe as a right single quote, and a display copy as long as its text.
+- [x] 1.1 Keep each closing quotation mark or bracket that follows a punctuation mark on its Chinese caption line; done when a phrasing test sets 。” at the end of a line and starts the next with its own words, a timing test gives a brief line that ends in 。” its early start, no line of the ETHOS v2 Chinese script begins with a closing mark, and the sample film's and DDWG's Chinese lines are unchanged.
+- [x] 1.2 Set straight double quotes as typographic ones in the display copy; done when a timing test shows an opening and a closing quote by position, an apostrophe as a right single quote, and a display copy as long as its text.
 
 ## 2. Documentation and release notes
 
