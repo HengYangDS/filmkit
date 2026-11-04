@@ -221,8 +221,8 @@ test("the canvas stand-in paints what film.js draws and refuses any other member
   ctx.stroke();
   const [line] = paints;
   assert.deepEqual(
-    [line.kind, line.color, line.alpha, line.lineWidth, line.scale],
-    ["stroke", "#ECE8DF", 0.5, 3, 2],
+    [line.kind, line.color, line.alpha, line.lineWidth, line.scale, line.dashed],
+    ["stroke", "#ECE8DF", 0.5, 3, 2, true],
   );
   assert.deepEqual(line.subs, [
     [
@@ -250,6 +250,11 @@ test("the canvas stand-in paints what film.js draws and refuses any other member
   ctx.ellipse(100, 100, 40, 20, 0, 0, Math.PI * 2);
   ctx.stroke();
   const [ring] = paints[1].subs;
+  // The dash set before the save holds until it is cleared; a cleared dash draws a solid stroke.
+  assert.equal(paints[1].dashed, true);
+  ctx.setLineDash([]);
+  ctx.stroke();
+  assert.equal(paints.pop().dashed, false);
   assert.equal(ring.length, 49);
   assert.ok(
     ring.every(([x, y]) => Math.abs(((x - 100) / 40) ** 2 + ((y - 100) / 20) ** 2 - 1) < 1e-9),

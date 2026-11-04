@@ -2,13 +2,13 @@
  *
  * film.js runs in its own vm context on a canvas stand-in. Each stroke, fill and text it paints while the caller renders
  * a frame reaches the caller as one paint: its kind, the scene drawing it (film.js publishes window.__sceneId around each
- * scene), its opacity and colour, its line width and the scale of its transform, and its geometry twice over. `subs`
- * is the path as screen subpaths, sampled the way the real-browser check samples them (geometry-check.mjs); a text
- * stands at its anchor. `points` are the drawing points in the painter's own coordinates, as the motion audit
- * identifies a mark across frames: an arc gives the corners of its circle, a text the corners of its box, and
- * `toScreen` maps them to the screen. The stand-in measures a text's width by the advances of the film's declared
- * faces when it is given them (readTextMetrics), and otherwise by an estimate; geometry-check.mjs measures real
- * metrics. */
+ * scene), its opacity and colour, its line width, whether its line is dashed, the scale of its transform, and its geometry
+ * twice over. `subs` is the path as screen subpaths, sampled the way the real-browser check samples them
+ * (geometry-check.mjs); a text stands at its anchor. `points` are the drawing points in the painter's own coordinates,
+ * as the motion audit identifies a mark across frames: an arc gives the corners of its circle, a text the corners of
+ * its box, and `toScreen` maps them to the screen. The stand-in measures a text's width by the advances of the film's
+ * declared faces when it is given them (readTextMetrics), and otherwise by an estimate; geometry-check.mjs measures
+ * real metrics. */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import vm from "node:vm";
@@ -164,6 +164,7 @@ export function canvasStandIn(deliver, faces = null) {
       alpha: state.globalAlpha,
       color,
       lineWidth: state.lineWidth,
+      dashed: state.dash.some((v) => v > 0),
       scale: Math.hypot(a, b),
       toScreen: ([x, y]) => [a * x + c * y + e, b * x + d * y + f],
       ...geometry,

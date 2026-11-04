@@ -65,7 +65,6 @@ export function frameReport({
   dotJoins,
   lists,
   thoughts,
-  echoes,
   longNames,
   sparseRuns,
   offCentreRuns,
@@ -192,13 +191,7 @@ export function frameReport({
         ),
       ).map(([id, list]) => [id, list.map((v) => v.row)]),
     ),
-    /* Names equal to the caption standing with them, or sentence-long names it contains, per scene, with when each was
-     * first seen; and names set on more than two lines. */
-    caption_echoes: Object.fromEntries(
-      Object.entries(Object.groupBy([...echoes], ([key]) => key.split("\u0000")[0])).map(
-        ([id, list]) => [id, list.map(([key, t]) => `${key.split("\u0000")[1]}@${t}`)],
-      ),
-    ),
+    /* Names set on more than two lines, per scene, with when each was first seen. */
     long_names: Object.fromEntries(
       Object.entries(Object.groupBy([...longNames], ([key]) => key.split("\u0000")[0])).map(
         ([id, list]) => [id, list.map(([key, t]) => `${key.split("\u0000")[1]}@${t}`)],
@@ -295,6 +288,8 @@ export function frameReport({
     uneven_pitch: layoutByScene(textLayout.uneven_pitch),
     /* A name whose ink comes within 3 px of a mark, measured on its path, with the clearance and the mark's box. */
     touching_marks: layoutByScene(textLayout.touching_marks),
+    /* The names of one set, or of one row of one size, that begin in both cases, with those in each case. */
+    mixed_case: layoutByScene(textLayout.mixed_case),
   };
 }
 

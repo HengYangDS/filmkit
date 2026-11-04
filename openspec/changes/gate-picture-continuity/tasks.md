@@ -8,17 +8,17 @@
 
 ## 2. Continuity gates
 
-- [ ] 2.1 Refuse seats and unnamed speech and record held pictures in `check-picture`; done when gate tests refuse a seat and a run of unnamed speech by name and list a held picture in a passing record.
-- [ ] 2.2 Carry a stroke's dash through the stand-in and judge a dashed outline joined to a mark on its own; done when tests show a dashed paint, a seat at a dashed place on a link's end, and no seat for a solid card joined the same way.
-- [ ] 2.3 Name a frame by its contents only through a name; done when seat tests list a seat for a frame holding only a pictogram and none for a frame holding a named card.
+- [x] 2.1 Refuse seats and unnamed speech and record held pictures in `check-picture`; done when gate tests refuse a seat and a run of unnamed speech by name and list a held picture in a passing record.
+- [x] 2.2 Carry a stroke's dash through the stand-in and judge a dashed outline joined to a mark on its own; done when tests show a dashed paint, a seat at a dashed place on a link's end, and no seat for a solid card joined the same way.
+- [x] 2.3 Name a frame by its contents only through a name; done when seat tests list a seat for a frame holding only a pictogram and none for a frame holding a named card.
 
 ## 3. Caption echoes
 
-- [ ] 3.1 List whole and partial caption echoes in the sync audit, refuse the first and record the second, and retire the frame audit's `caption_echoes`; done when tests list a cue drawn in one label, a cue drawn in two labels at 100% and no two-word cue, and gate tests refuse and record them.
+- [x] 3.1 List whole and partial caption echoes in the sync audit, refuse the first and record the second, and retire the frame audit's `caption_echoes`; done when tests list a cue drawn in one label, a cue drawn in two labels at 100% and no two-word cue, and gate tests refuse and record them.
 
 ## 4. Case of a set of names
 
-- [ ] 4.1 Report and refuse `mixed_case`; done when tests report three cards in mixed case, a set's names apart in a frame, and none for a smaller qualifier, a wrapped name's second line, an acronym or Chinese names, and a gate test refuses it.
+- [x] 4.1 Report and refuse `mixed_case`; done when tests report three cards in mixed case, a set's names apart in a frame, and none for a smaller qualifier, a wrapped name's second line, an acronym or Chinese names, and a gate test refuses it.
 
 ## 5. Deliverables
 

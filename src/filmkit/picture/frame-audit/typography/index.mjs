@@ -2,10 +2,11 @@
  *
  * layout.mjs reads a frame's settled text and marks into lines, names, containers, blocks and columns, and
  * measures.mjs finds its ragged rows and columns, crammed lines, names off their card's centre, uneven pitch and
- * touching marks. Each measure's findings are joined over consecutive voiced frames into runs per scene and texts, and
+ * touching marks; case.mjs finds the sets and rows of names that begin in both cases. Each measure's findings are joined over consecutive voiced frames into runs per scene and texts, and
  * a run of 1 s or more is kept with its start, its end, its texts and the offsets of its worst frame. Every measure
  * rests on exact anchors, sizes and baselines and on the widths the canvas stand-in measures, which are the film's own
  * when the audit is given its faces; a text's height keeps the estimate. */
+import { mixedCase } from "./case.mjs";
 import { frameLayout } from "./layout.mjs";
 import {
   crammedLines,
@@ -29,6 +30,7 @@ export function frameFindings(paints) {
     ...offCardCentre(layout),
     ...unevenPitch(layout),
     ...touchingMarks(layout),
+    ...mixedCase(layout),
   ];
 }
 
@@ -40,6 +42,7 @@ export const TEXT_LAYOUT = [
   "off_card_centre",
   "uneven_pitch",
   "touching_marks",
+  "mixed_case",
 ];
 
 /** Joins each voiced frame's findings, sampled every `step` seconds, into runs. `frame(f)` reads the frame audit's

@@ -21,8 +21,8 @@ export function compositionMeasures({ film, step, thoughts }) {
   const marks = [],
     extents = {},
     drawn = {};
-  /* The firm graphics of the content band, each with its box, its kind and, for a stroke, its segments, as the seat
-   * check and the container check read them (src/filmkit/picture/seat-marks.mjs). */
+  /* The firm graphics of the content band, each with its box, its kind, whether it is dashed and, for a stroke, its
+   * segments, as the seat check and the container check read them (src/filmkit/picture/seat-marks.mjs). */
   function bandShapes(f) {
     const shapes = [];
     const closed = (sub) =>
@@ -43,7 +43,7 @@ export function compositionMeasures({ film, step, thoughts }) {
       const frame =
         g.kind === "fill" ? large(pts) : g.subs.some((sub) => closed(sub) && large(sub));
       const kind = g.kind === "fill" ? "fill" : g.subs.some(closed) ? "closed" : "open";
-      shapes.push({ box, segs, kind, frame });
+      shapes.push({ box, segs, kind, frame, dashed: Boolean(g.dashed) });
     }
     return shapes;
   }

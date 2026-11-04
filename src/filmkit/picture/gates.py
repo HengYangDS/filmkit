@@ -6,10 +6,12 @@ traces, and the motion audit at 30 frames per second, both audits measuring text
 widths of the film's declared faces (`filmkit.picture.metrics`). Their reports go to
 build/runtime/work/picture-gates/<code>/. The edition's gate record binds the SHA-256 of the
 composition, the timeline, the stylesheet and each declared font, the engine version and the
-frames the frame audit checked; it
-holds each report's SHA-256, every gated finding and every recorded finding, and passes only when
-there is no gated one. A gated finding refuses with `PictureError`, after the record is written,
-and so does an audit that fails or a composition or timeline that changes while it is checked.
+frames the frame audit checked; it holds each report's SHA-256, every gated finding and every
+recorded finding, and passes only when there is no gated one. Besides the labels out of sync, the
+sync audit's seats, its unnamed speech and its caption cues drawn whole as one label are gated;
+the thoughts that hold the previous picture and the cues mostly drawn as labels are recorded. A
+gated finding refuses with `PictureError`, after the record is written, and so does an audit
+that fails or a composition or timeline that changes while it is checked.
 `render-picture` reads the record before it starts the renderer
 (`filmkit.picture.rendering.require_passing_gates`).
 
@@ -69,6 +71,7 @@ FRAME_GATES = (
     "off_card_centre",
     "uneven_pitch",
     "touching_marks",
+    "mixed_case",
 )
 # The frame audit's findings that the record lists for the reviewers and that refuse nothing: the
 # still states off centre, which are a settled composition or a build-up held while its next
@@ -94,6 +97,21 @@ def gated_findings(frame: dict, sync: dict, motion: dict) -> list[str]:
         f"sync {row['scene']} {row['label']}: {row['verdict']} at {row['legible']:.2f} s"
         for row in sync["findings"]
     ]
+    continuity = sync["continuity"]
+    findings += [
+        f"sync seat {row['thought']} at {row['at']:.2f} s: a mark waits {row['lag']:.2f} s"
+        f" for its name at {row['box']}"
+        for row in continuity["seats"]
+    ]
+    findings += [
+        f"sync unnamed speech {row['thought']} {row['from']:.2f}-{row['to']:.2f} s"
+        for row in continuity["unnamed_speech"]
+    ]
+    findings += [
+        f"sync caption echo {row['start']:.2f} s: one label repeats {row['text']!r}"
+        for row in continuity["caption_echoes"]
+        if row["whole"]
+    ]
     findings += [
         f"motion still {run['start']:.2f}-{run['end']:.2f} s ({run['seconds']} s)"
         for run in motion["still"]
@@ -102,13 +120,29 @@ def gated_findings(frame: dict, sync: dict, motion: dict) -> list[str]:
     return findings
 
 
-def recorded_findings(frame: dict) -> list[str]:
-    """The frame audit's recorded findings, each named by its measure, which refuse nothing."""
-    return [
+def recorded_findings(frame: dict, sync: dict) -> list[str]:
+    """The findings the record lists for the reviewers and that refuse nothing.
+
+    They are the frame audit's recorded measures, the thoughts that hold the previous picture,
+    since a deliberate index may stay while the first new name arrives, and the caption cues
+    mostly drawn as labels, since labels may name the marks whose words a cue says.
+    """
+    found = [
         f"frame {key}: {json.dumps(frame[key], ensure_ascii=False)}"
         for key in FRAME_RECORDED
         if frame.get(key)
     ]
+    continuity = sync["continuity"]
+    found += [
+        f"sync held over {row['thought']} {row['held']:.2f} s" for row in continuity["held_over"]
+    ]
+    found += [
+        f"sync caption echo {row['start']:.2f} s: labels repeat {row['share']:.0%} of"
+        f" {row['text']!r}"
+        for row in continuity["caption_echoes"]
+        if not row["whole"]
+    ]
+    return found
 
 
 def current_bindings(edition: Edition) -> dict:
@@ -166,7 +200,7 @@ def check_picture(edition: Edition) -> dict:
             for name, path in (("frame", frame_path), ("sync", sync_path), ("motion", motion_path))
         },
         "gated_findings": findings,
-        "recorded_findings": recorded_findings(frame),
+        "recorded_findings": recorded_findings(frame, sync),
         "verdict": "refuse" if findings else "pass",
     }
     repository.write(edition.picture_gates, record)

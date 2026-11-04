@@ -97,6 +97,59 @@ def test_a_previous_picture_held_over_a_second_into_a_thought_is_reported():
     assert picture_sync_audit.continuity(timeline(), cut, step=0.1)["held_over"] == []
 
 
+def captioned(*cues):
+    """The timeline with caption cues, each its start, end and text."""
+    film = timeline()
+    film["captions"] = [
+        {"start": a, "end": b, "text": text, "segment": "01"} for a, b, text in cues
+    ]
+    return film
+
+
+def test_a_cue_drawn_whole_as_one_label_is_a_whole_echo():
+    # The label was drawn before the cue; it repeats the cue's words while the cue shows.
+    film = captioned((4.0, 6.5, "Solve the whole problem."), (1.0, 2.0, "Test it."))
+    trace = frames(3.0, 6.5, "Solve the whole problem") + frames(1.0, 2.0, "Test it")
+    echoes = picture_sync_audit.continuity(film, trace, step=0.1)["caption_echoes"]
+    # A cue of fewer than three words is not judged.
+    assert echoes == [
+        {
+            "start": 4.0,
+            "segment": "01",
+            "text": "Solve the whole problem.",
+            "whole": True,
+            "share": 1.0,
+            "labels": ["Solve the whole problem"],
+        }
+    ]
+
+
+def test_a_cue_mostly_drawn_as_labels_during_it_is_a_partial_echo():
+    film = captioned((4.0, 6.5, "Solve the whole problem."))
+    # Two labels drawn during the cue repeat all four words between them.
+    parts = frames(4.1, 6.5, "Solve the") + frames(5.1, 6.5, "Whole problem")
+    (echo,) = picture_sync_audit.continuity(film, parts, step=0.1)["caption_echoes"]
+    assert (echo["whole"], echo["share"], echo["labels"]) == (
+        False,
+        1.0,
+        ["Solve the", "Whole problem"],
+    )
+    # A label drawn before the cue counts only for a whole echo, and a label that holds more
+    # than the cue's words repeats none of them as a label of its own.
+    earlier = frames(3.0, 6.5, "Solve the whole") + frames(6.0, 6.5, "problem")
+    longer = frames(4.1, 6.5, "Solve the whole problem today")
+    for trace in (earlier, longer):
+        assert picture_sync_audit.continuity(film, trace, step=0.1)["caption_echoes"] == []
+
+
+def test_chinese_cues_are_compared_by_character():
+    film = timeline()
+    film["captions"] = [{"start": 4.0, "end": 6.5, "text": "一项正式变更，", "segment": "01"}]
+    trace = frames(4.1, 6.5, "一项") + frames(4.5, 6.5, "正式变更")
+    (echo,) = picture_sync_audit.continuity(film, trace, step=0.1)["caption_echoes"]
+    assert (echo["whole"], echo["share"]) == (False, 1.0)
+
+
 def mark(t, box, named, scene="01"):
     return f"{t:.2f}\t{scene}\t" + "\t".join(str(v) for v in box) + f"\t{int(named)}\n"
 
@@ -156,7 +209,7 @@ def test_parts_are_judged_on_their_own_and_reports_are_deterministic(tmp_path):
     # The trace comes from running the composition, so the report binds its script too.
     composition = repository.ROOT / picture_rendering.COMPOSITION_SCRIPT
     assert written["composition_sha256"] == repository.sha(composition)
-    assert set(written["continuity"]) == {"unnamed_speech", "held_over", "seats"}
+    assert set(written["continuity"]) == {"unnamed_speech", "held_over", "seats", "caption_echoes"}
 
 
 def test_words_that_do_not_cover_their_segment_text_are_refused():

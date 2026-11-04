@@ -5,7 +5,11 @@
  * within 240 px, or a name in its column within 90 px, the reaches of a name placed by its structure's rule. A frame is
  * a filled panel or a closed outline at least 120 by 100 px. A mark is an empty frame while nothing but its own edge
  * marks, such as a document's fold, lies inside its frames; an empty frame waits for its content whatever name stands
- * beside it. A mark that holds another mark or a name is not waiting, and a mark inside a named mark belongs to it.
+ * beside it. A frame that holds another mark is named by a name within reach, a text inside it or a named mark it
+ * holds, since a pictogram drawn in a tool's frame names neither. Any other mark that holds another mark or a name is
+ * not waiting, and a mark inside a named mark belongs to it. A dashed closed outline stands in for something absent:
+ * joined to a larger mark by a link or a touch, it is still judged on its own, named only by a name within its reach
+ * or by a mark or text inside it.
  *
  * Members are judged on their own. Shapes of one kind repeated at one size that do not touch each other, such as the
  * stations of a rail, its stubs, ruled rows, slots or owner frames, each wait for their own name, whatever names the
@@ -35,7 +39,7 @@ const encloses = (outer, inner) =>
   outer[0] <= inner[0] && outer[1] <= inner[1] && outer[2] >= inner[2] && outer[3] >= inner[3];
 const gap = (a, b) =>
   Math.hypot(Math.max(0, a[0] - b[2], b[0] - a[2]), Math.max(0, a[1] - b[3], b[1] - a[3]));
-const places = (name, box) => {
+const reaches = (name, box) => {
   const dx = Math.max(0, box[0] - name[2], name[0] - box[2]),
     dy = Math.max(0, box[1] - name[3], name[1] - box[3]);
   return gap(box, name) <= NAME_REACH || (!dy && dx <= ROW_REACH) || (!dx && dy <= COLUMN_REACH);
@@ -239,20 +243,26 @@ export function seatMarks(shapes, written, legible) {
       empty: frames.length > 0 && !drawn.some((v) => frames.some((f) => inside(v, f))),
     };
   });
-  // A mark holds content when it encloses another mark or any text, a name or a written value. An empty frame waits
-  // for its content whatever name stands beside it; any other mark is named by a legible name within reach.
+  // A mark holds content when it encloses another mark or any text, a name or a written value; a frame holds content
+  // by enclosing text. An empty frame, holding no mark, waits for its content whatever name stands beside it; any
+  // other mark is named by a legible name within reach.
+  const framed = parts.map(({ drawn }) => drawn.some((v) => v.frame)),
+    holdsMark = parts.map(({ box }, i) =>
+      parts.some((other, j) => j !== i && encloses(box, other.box)),
+    );
   const named = new Set();
   parts.forEach(({ box, empty }, i) => {
-    const holds =
-      parts.some((other, j) => j !== i && encloses(box, other.box)) ||
-      written.some((v) => encloses(box, v.bounds));
-    if (holds || (!empty && legible.some((v) => places(v.bounds, box)))) named.add(i);
+    const holds = (!framed[i] && holdsMark[i]) || written.some((v) => encloses(box, v.bounds));
+    if (holds || (!(empty && !holdsMark[i]) && legible.some((v) => reaches(v.bounds, box))))
+      named.add(i);
   });
-  // A mark drawn inside a named mark is part of what that name names.
+  // A mark drawn inside a named mark is part of what that name names, and a frame holding a named mark is named.
   for (let grew = true; grew;) {
     grew = false;
     parts.forEach(({ box }, i) => {
-      if (!named.has(i) && parts.some((other, j) => named.has(j) && encloses(other.box, box))) {
+      const by = (other, j) =>
+        named.has(j) && (encloses(other.box, box) || (framed[i] && encloses(box, other.box)));
+      if (!named.has(i) && parts.some(by)) {
         named.add(i);
         grew = true;
       }
@@ -319,7 +329,7 @@ export function seatMarks(shapes, written, legible) {
   const pairs = [];
   legible.forEach((v, i) =>
     members.forEach((m, j) => {
-      if (!taken.has(i) && !memberNamed.has(j) && places(v.bounds, m.box))
+      if (!taken.has(i) && !memberNamed.has(j) && reaches(v.bounds, m.box))
         pairs.push([gap(m.box, v.bounds), i, j]);
     }),
   );
@@ -334,8 +344,29 @@ export function seatMarks(shapes, written, legible) {
     if (!members.some((m) => sameBox(m.box, box) && m.shapes.every((v) => drawn.includes(v))))
       rows.push({ box, named: named.has(i), member: false });
   });
+  // A dashed place joined to a larger mark is judged on its own, unless it is itself a mark or a member.
+  const judged = [...parts, ...members].map((v) => v.box);
+  const places = parts.flatMap(({ drawn }) =>
+    drawn
+      .filter(
+        (v) =>
+          v.dashed &&
+          v.kind === "closed" &&
+          Math.min(...size(v.box)) >= DETAIL &&
+          !judged.some((box) => sameBox(box, v.box)),
+      )
+      .map((v) => ({
+        box: v.box,
+        named:
+          shapes.some((u) => inside(u, v)) ||
+          written.some((t) => encloses(v.box, t.bounds)) ||
+          legible.some((t) => reaches(t.bounds, v.box)),
+        member: false,
+      })),
+  );
   return [
     ...rows,
+    ...places,
     ...members.map((m, j) => ({ box: m.box, named: memberNamed.has(j), member: true })),
   ];
 }

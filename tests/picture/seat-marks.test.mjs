@@ -28,6 +28,84 @@ const ringAt = (x, y, r) => {
   };
 };
 const seatRows = (rows) => rows.map((row) => [row.box.map(Math.round).join(","), row.named]);
+/* A rectangle's outline, a frame from 120 by 100 px, solid unless dashed. */
+const outline = (x0, y0, x1, y1, dashed = false) => ({
+  box: [x0, y0, x1, y1],
+  segs: [
+    [
+      [x0, y0],
+      [x1, y0],
+    ],
+    [
+      [x1, y0],
+      [x1, y1],
+    ],
+    [
+      [x1, y1],
+      [x0, y1],
+    ],
+    [
+      [x0, y1],
+      [x0, y0],
+    ],
+  ],
+  kind: "closed",
+  frame: x1 - x0 >= 120 && y1 - y0 >= 100,
+  dashed,
+});
+
+test("a dashed place at a link's end waits for its own name, whatever names the card it joins", () => {
+  // A named card's link ends at a dashed place: the three touch, and the card's words name the mark they make.
+  const card = outline(400, 400, 700, 480),
+    link = segment(700, 440, 900, 440),
+    words = { bounds: [450, 425, 650, 455] };
+  const place = outline(906, 395, 1086, 485, true);
+  assert.deepEqual(seatRows(seatMarks([card, link, place], [words], [words])), [
+    ["400,395,1086,485", true],
+    ["906,395,1086,485", false],
+  ]);
+  // A name below the place names it, and so does what arrives inside it.
+  const name = { bounds: [930, 500, 1060, 530] },
+    check = segment(980, 430, 1010, 450),
+    placeRow = (rows) => seatRows(rows).find(([box]) => box === "906,395,1086,485");
+  assert.deepEqual(placeRow(seatMarks([card, link, place], [words, name], [words, name])), [
+    "906,395,1086,485",
+    true,
+  ]);
+  assert.deepEqual(placeRow(seatMarks([card, link, place, check], [words], [words])), [
+    "906,395,1086,485",
+    true,
+  ]);
+  // A solid card at the link's end is part of the mark the link joins.
+  const solid = outline(906, 395, 1086, 485);
+  assert.deepEqual(seatRows(seatMarks([card, link, solid], [words], [words])), [
+    ["400,395,1086,485", true],
+  ]);
+});
+
+test("a frame that holds only a pictogram waits for a name, and one that holds a named mark is named", () => {
+  // A tool's frame holds its pictogram, apart from its edge: neither names the other.
+  const tool = outline(400, 300, 700, 500),
+    branch = segment(450, 350, 450, 450);
+  assert.deepEqual(seatRows(seatMarks([tool, branch], [], [])), [
+    ["400,300,700,500", false],
+    ["450,350,450,450", false],
+  ]);
+  // Its name inside names both.
+  const git = { bounds: [480, 390, 540, 420] };
+  assert.deepEqual(seatRows(seatMarks([tool, branch], [git], [git])), [
+    ["400,300,700,500", true],
+    ["450,350,450,450", true],
+  ]);
+  // A frame that holds a card named by a name below the frame is named through it.
+  const store = outline(300, 300, 900, 600),
+    record = outline(400, 500, 600, 560),
+    below = { bounds: [420, 620, 580, 650] };
+  assert.deepEqual(
+    seatRows(seatMarks([store, record], [below], [below])).map(([, named]) => named),
+    [true, true],
+  );
+});
 
 test("each member repeated on a named rail waits for its own name", () => {
   const rail = segment(300, 500, 1300, 500),

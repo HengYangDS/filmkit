@@ -106,6 +106,7 @@ function onPaint(paint) {
       alpha: paint.alpha,
       color: paint.color,
       width: paint.lineWidth * paint.scale,
+      dashed: paint.dashed,
       subs: paint.subs,
       scene: paint.scene,
     });
@@ -154,9 +155,12 @@ function renderedFrame(t) {
   const beforeNext = following && following.chapter === seg.chapter && t > seg.voice_end;
   // Words are read; marks such as "?", "≠" or a bare value are seen, so only text with letters counts.
   const labels = layout.texts.filter((v) => v.scene && v.role === "label" && /\p{L}/u.test(v.text));
-  // fillText order matches registration order, so each label knows what was painted before it.
+  // fillText order matches registration order, so each label knows what was painted before it, and each text's paint
+  // carries the whole text, set and role its name is registered with.
   layout.texts.forEach((v, i) => {
     v.seq = paints.texts[i];
+    const paint = paints.all[v.seq - 1];
+    if (paint) Object.assign(paint, { whole: v.whole ?? v.text, set: v.set ?? null, role: v.role });
   });
   const sceneGraphics = paints.graphics.filter((g) => g.scene);
   return {
@@ -264,35 +268,20 @@ function nameLoad(f) {
     else if (v.kind === "type_sizes") for (const size of v.sizes) note(sizes, f.speaking.id, size);
   }
 }
-/* Names the eye reads while the ear hears them: a name that repeats the caption standing with it, at least three
- * quarters of the caption's letters; and names set on more than two lines. Each is kept per scene with the first time
- * it was seen. */
-const echoes = new Map(),
-  longNames = new Map();
-function labelEchoes(f) {
+/* Names set on more than two lines, kept per scene with the first time each was seen. The captions that labels repeat
+ * are measured by the sync audit, which reads the cues. */
+const longNames = new Map();
+function longLabels(f) {
   if (!f.speaking) return;
-  const caption = f.layout.texts.find((v) => v.role === "caption" && v.alpha > 0.5),
-    said = caption ? units(caption.text) : "",
-    lines = new Map();
+  const lines = new Map();
   for (const v of f.legible) {
     const key = `${v.scene}\u0000${v.whole ?? v.text}`,
       ys = lines.get(key) ?? new Set();
     ys.add(Math.round((v.bounds[1] + v.bounds[3]) / 2));
     lines.set(key, ys);
   }
-  for (const [key, ys] of lines) {
-    const whole = key.split("\u0000")[1],
-      name = units(whole);
+  for (const [key, ys] of lines)
     if (ys.size > 2 && !longNames.has(key)) longNames.set(key, +f.t.toFixed(2));
-    if (
-      said &&
-      name &&
-      said.includes(name) &&
-      name.length >= 0.75 * said.length &&
-      !echoes.has(key)
-    )
-      echoes.set(key, +f.t.toFixed(2));
-  }
 }
 /* Labels held between 1.8:1 and 3:1 for more than a second. */
 function faintClutter(f) {
@@ -348,7 +337,7 @@ const measures = [
   composition.balanceThroughSpeech,
   composition.reviewedBalance,
   composition.containers,
-  labelEchoes,
+  longLabels,
   composition.sparseSpeech,
   faintClutter,
   ...(process.env.BOUNDS ? [composition.paintedExtent] : []),
@@ -419,7 +408,6 @@ const report = frameReport({
   dotJoins,
   lists,
   thoughts,
-  echoes,
   longNames,
   sparseRuns: composition.sparseRuns,
   offCentreRuns: composition.offCentreRuns,

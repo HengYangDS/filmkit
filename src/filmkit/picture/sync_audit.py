@@ -7,7 +7,8 @@ spoken occurrence nearest that frame (within 8 s). A label is out of sync when i
 legible more than 0.3 s before the clause that speaks it begins, more than 1.5 s ahead
 of its words within that clause, or more than 0.5 s after its words end. Labels with no
 verbatim spoken match are listed and counted, not judged. The report also lists speech that runs
-over 1.0 s without a legible name, and thoughts that keep the previous picture over 1.0 s.
+over 1.0 s without a legible name, thoughts that keep the previous picture over 1.0 s, and caption
+cues that labels repeat: a cue drawn whole as one label, or mostly as labels drawn during it.
 Given the mark trace that frame-audit.mjs writes (MARKS=<file>), it also lists seats: a
 mark that stands in speech for more than 0.6 s before a name is legible at it. A segment
 whose aligned words do not spell its text raises `PictureError`.
@@ -24,6 +25,7 @@ from __future__ import annotations
 import argparse
 import bisect
 import json
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -46,6 +48,14 @@ AFTER_WORDS = 0.5
 FAR_FROM_WORDS = 8
 # Seconds into a thought within which the previous picture gives way.
 HOLD_WINDOW = 4
+# A caption cue of at least this many words is listed when one label legible during it holds
+# exactly its words, or labels drawn during it repeat at least this share of them.
+ECHO_WORDS = 3
+ECHO_SHARE = 0.8
+# A cue's and a label's words: each CJK character, or a run of other letters and digits with its
+# apostrophes.
+_CJK = "\u3400-\u9fff\uf900-\ufaff"
+_WORD = re.compile(rf"[{_CJK}]|[^\W_{_CJK}]+(?:['\u2019][^\W_{_CJK}]+)*")
 # The verdicts of a label out of sync, and the report's counts that reviews read.
 VERDICTS = ("before-clause", "ahead-in-clause", "after-words")
 SUMMARY_KEYS = ("tolerance", "labels_judged", "labels_unmatched", "out_of_sync", *VERDICTS)
@@ -308,17 +318,88 @@ def held_over(
     return None
 
 
+def words(text: str) -> list[str]:
+    """A text's words as a caption cue and a label are compared: lowercased, one apostrophe."""
+    return [word.lower().replace("\u2019", "'") for word in _WORD.findall(text)]
+
+
+def label_runs(trace_lines: Iterable[str], step: float) -> dict[str, list[tuple[float, float]]]:
+    """Each label's runs of legible samples, from its first to its last; a gap ends a run."""
+    seen: dict[str, set[float]] = {}
+    for t, _scene, fields in trace_rows(trace_lines, 5):
+        if float(fields[0]) >= LEGIBLE_CONTRAST:
+            seen.setdefault(fields[2].strip(), set()).add(round(t, 3))
+    runs = {}
+    for label, times in seen.items():
+        spans: list[list[float]] = []
+        for t in sorted(times):
+            if spans and t - spans[-1][1] <= 1.5 * step + 1e-9:
+                spans[-1][1] = t
+            else:
+                spans.append([t, t])
+        runs[label] = [(a, b) for a, b in spans]
+    return runs
+
+
+def repeated(said: list[str], label: list[str]) -> set[int]:
+    """The positions of the cue's words that the label repeats as one run of them."""
+    n = len(label)
+    return {
+        k + i for k in range(len(said) - n + 1) if n and said[k : k + n] == label for i in range(n)
+    }
+
+
+def caption_echoes(timeline: dict, trace_lines: Iterable[str], step: float) -> list[dict]:
+    """The caption cues of three words or more that labels repeat while the cue shows.
+
+    A cue is a whole echo when one label legible at a sample within it holds exactly its
+    words, in order. Otherwise it is listed when the labels drawn during it, legible from a
+    sample within it, repeat at least 80% of its words, each label as one run of them.
+    """
+    runs, found = label_runs(trace_lines, step), []
+    for cue in timeline.get("captions", []):
+        said, a, b = words(cue["text"]), cue["start"], cue["end"]
+        if len(said) < ECHO_WORDS:
+            continue
+        whole = sorted(
+            label
+            for label, spans in runs.items()
+            if words(label) == said and any(s < b and e >= a for s, e in spans)
+        )
+        drawn = {
+            label: repeated(said, words(label))
+            for label, spans in runs.items()
+            if any(a <= s < b for s, _ in spans)
+        }
+        drawn = {label: places for label, places in drawn.items() if places}
+        share = len(set().union(*drawn.values())) / len(said)
+        if whole or share >= ECHO_SHARE:
+            found.append(
+                {
+                    "start": round(a, 3),
+                    "segment": cue.get("segment"),
+                    "text": cue["text"].strip(),
+                    "whole": bool(whole),
+                    "share": 1.0 if whole else round(share, 2),
+                    "labels": whole or sorted(drawn),
+                }
+            )
+    return found
+
+
 def continuity(
     timeline: dict, trace_lines: Iterable[str], step: float = 1 / 30, limit: float = 1.0
 ) -> dict:
-    """Speech left without a legible name, and a previous picture held into a thought.
+    """Speech left without a legible name, a previous picture held into a thought, and echoes.
 
     The trace samples the film every `step` seconds and lists only frames that paint a
     label, so a sample with no legible name in its scene is absent. A run of a thought's
     speech longer than `limit` without a legible name of its scene is unnamed speech. A
     thought that begins under names that at least half give way to new ones more than
-    `limit` into it, within 4 s and the thought, holds the previous picture over.
+    `limit` into it, within 4 s and the thought, holds the previous picture over. The
+    caption cues that labels repeat are listed by `caption_echoes`.
     """
+    trace_lines = list(trace_lines)
     frames = legible_frames(trace_lines)
     times = sorted(frames)
     unnamed, held = [], []
@@ -331,7 +412,8 @@ def continuity(
             seconds = held_over(frames, times, (a, b), step, limit)
             if seconds is not None:
                 held.append({"thought": key, "held": seconds})
-    return {"unnamed_speech": unnamed, "held_over": held}
+    echoes = caption_echoes(timeline, trace_lines, step)
+    return {"unnamed_speech": unnamed, "held_over": held, "caption_echoes": echoes}
 
 
 def overlap(a: list[int], b: list[int]) -> float:
@@ -412,6 +494,9 @@ def print_report(report: dict) -> None:
         print(f"{row['thought']}  unnamed-speech  {row['from']:.2f}-{row['to']:.2f}")
     for row in report["continuity"]["held_over"]:
         print(f"{row['thought']}  held-over  {row['held']:.2f}s")
+    for row in report["continuity"]["caption_echoes"]:
+        kind = "whole" if row["whole"] else f"{row['share']:.0%}"
+        print(f"{row['segment']}  caption-echo  {row['start']:.2f}  {kind}  {row['text']}")
     for row in report["continuity"].get("seats", []):
         print(f"{row['thought']}  seat  {row['at']:.2f}  waits {row['lag']:.2f}s  {row['box']}")
 

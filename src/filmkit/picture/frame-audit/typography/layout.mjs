@@ -67,7 +67,8 @@ const extent = ([left, top, right, bottom]) => ({
 });
 
 /* A painted text: its anchor, size and baseline, its alignment read from where the anchor stands in its box, its box
- * and its ink. The box rises 0.8 of the size above an alphabetic anchor, 0.52 above a middle one and none above a top
+ * and its ink, and the whole text, set and role its name is registered with (the text itself, none and a label when
+ * the paint carries none). The box rises 0.8 of the size above an alphabetic anchor, 0.52 above a middle one and none above a top
  * one (headless-composition.mjs), which places the baseline. */
 function textOf(paint) {
   const [x, y] = paint.subs[0][0],
@@ -85,6 +86,9 @@ function textOf(paint) {
   return {
     text: paint.text,
     scene: paint.scene,
+    whole: paint.whole ?? paint.text,
+    set: paint.set ?? null,
+    role: paint.role ?? "label",
     size,
     mode,
     anchor: x,

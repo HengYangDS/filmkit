@@ -139,27 +139,36 @@ function cue(s, key, share) {
 
 /* Something named appears as the narration names it. */
 const shown = (t, at) => ramp(t, at, 0.35);
+/* A card's tag: the kind of file or the step it stands for, set small at its top left from the moment the card
+ * stands until the narration names the card, so no card waits empty for its name. */
+const TAG = { dx: 22, dy: 34 };
+function tag(value, x, y, alpha) {
+  text(value, x + TAG.dx, y + TAG.dy, { size: NOTE, color: P.muted, alpha, align: "left" });
+}
 
-/* The three sources stand together from the scene's start and light as one when the narration names them; each card
- * is named, then explained, as its words are said. */
+/* The three sources stand together from the scene's start, each tagged with its kind of file, and light as one when
+ * the narration names them; each card is named, then explained, as its words are said. */
 const SOURCES = [
   [
     L("脚本", "Script"),
     L("脚本", "script"),
     L("要说的话", "What is said"),
     L("要说的话", "what is said"),
+    ".json",
   ],
   [
     L("参考录音", "Reference"),
     L("参考录音", "reference"),
     L("旁白的嗓音", "The narrator’s voice"),
     L("旁白的嗓音", "narrator"),
+    ".wav",
   ],
   [
     L("画面合成", "Composition"),
     L("画面合成", "composition"),
     L("每一帧画什么", "Every frame"),
     L("每一帧画什么", "every frame"),
+    ".js",
   ],
 ];
 
@@ -170,14 +179,13 @@ function sourcesScene(s, t, alpha) {
     alpha,
   });
   const lit = alpha * shown(t, cue(s, L("源文件", "sources"), 0.5));
-  SOURCES.forEach(([name, nameKey, note, noteKey], i) => {
+  SOURCES.forEach(([name, nameKey, note, noteKey, kind], i) => {
     const x = 350 + i * 440;
     card(x, 420, 340, 170, alpha);
     outline(x, 420, 340, 170, lit, P.accent);
-    text(name, x + 170, 495, {
-      size: LABEL,
-      alpha: alpha * shown(t, cue(s, nameKey, 0.4 + 0.2 * i)),
-    });
+    const named = shown(t, cue(s, nameKey, 0.4 + 0.2 * i));
+    tag(kind, x, 420, alpha * (1 - named));
+    text(name, x + 170, 495, { size: LABEL, alpha: alpha * named });
     text(note, x + 170, 550, {
       size: NOTE,
       color: P.muted,
@@ -194,15 +202,16 @@ const STAGES = [
   [L("成片", "Films"), L("成片", "films")],
 ];
 
-/* The build's five stages stand in a row from its first scene; the stages before `from` are named already, those up to
- * `to` are named as the narration names them, and the rest wait for the next scene. The first scene shows what keeps a
- * rebuild's voice the same, the second that the build stays offline. */
+/* The build's five stages stand in a row from its first scene, each tagged with its step; the stages before `from` are
+ * named already, those up to `to` are named as the narration names them, and the rest are named in the next scene. The
+ * first scene shows what keeps a rebuild's voice the same, the second that the build stays offline. */
 function buildScene(s, t, alpha, from, to) {
   text(L("构建的步骤", "Build steps"), 960, 330, { size: NOTE, color: P.muted, alpha });
   STAGES.forEach(([name, key], i) => {
     const x = 206 + i * 312;
     card(x, 440, 260, 140, alpha);
     const named = i < from ? 1 : i < to ? shown(t, cue(s, key, 0.15 + 0.3 * (i - from))) : 0;
+    tag(L(`步骤 ${i + 1}`, `Step ${i + 1}`), x, 440, alpha * (1 - named));
     text(name, x + 130, 524, { size: LABEL, alpha: alpha * named });
   });
   if (from === 0) {
@@ -251,18 +260,16 @@ const ITEM_LEFT = CHECK_RIGHT + 26;
 function checkScene(s, t, alpha) {
   text(L("核对成片", "Checking the films"), 960, 330, { size: NOTE, color: P.muted, alpha });
   const complete = alpha * shown(t, cue(s, L("全部", "everything"), 0.85));
-  for (const x of [330, 1290]) {
+  for (const [x, kind, name, key, share] of [
+    [330, ".mp4", L("成片", "Films"), L("成片", "film"), 0.1],
+    [1290, ".json .wav .js", L("源文件", "Sources"), L("源文件", "sources"), 0.15],
+  ]) {
     card(x, 425, 300, 170, alpha);
     outline(x, 425, 300, 170, complete, P.done);
+    const named = shown(t, cue(s, key, share));
+    tag(kind, x, 425, alpha * (1 - named));
+    text(name, x + 150, 523, { size: LABEL, alpha: alpha * named });
   }
-  text(L("成片", "Films"), 480, 523, {
-    size: LABEL,
-    alpha: alpha * shown(t, cue(s, L("成片", "film"), 0.1)),
-  });
-  text(L("源文件", "Sources"), 1440, 523, {
-    size: LABEL,
-    alpha: alpha * shown(t, cue(s, L("源文件", "sources"), 0.15)),
-  });
   const matched = alpha * shown(t, cue(s, L("一致", "match"), 0.7));
   CHECKED.forEach(([name, key], i) => {
     const y = 440 + i * 45;

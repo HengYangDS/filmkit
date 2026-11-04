@@ -24,11 +24,32 @@ CLEAN = {
         "errors": [],
         "overlaps": [],
         "frames_checked": 301,
-        "caption_echoes": {"03": ["a name@4.0"]},
+        "long_names": {"03": ["a name@4.0"]},
     },
-    "sync": {"findings": [], "out_of_sync": 0, "labels_judged": 12},
+    "sync": {
+        "findings": [],
+        "out_of_sync": 0,
+        "labels_judged": 12,
+        "continuity": {"unnamed_speech": [], "held_over": [], "seats": [], "caption_echoes": []},
+    },
     "motion": {"still": [{"start": 4.0, "end": 7.2, "seconds": 3.2}], "pops": [1]},
 }
+# A caption cue that labels drawn during it repeat, as the sync audit lists it.
+ECHO = {
+    "start": 717.7,
+    "segment": "08",
+    "text": "The people watching the pipeline report this back,",
+}
+
+
+def continuity(**rows):
+    """The clean reports with the sync audit's continuity lists replaced by `rows`."""
+    return {
+        **CLEAN,
+        "sync": {**CLEAN["sync"], "continuity": {**CLEAN["sync"]["continuity"], **rows}},
+    }
+
+
 # A text-layout run as the frame audit reports it per scene.
 RAGGED_ROW = {
     "start": 1.0,
@@ -154,9 +175,10 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
             {
                 **CLEAN,
                 "sync": {
+                    **CLEAN["sync"],
                     "findings": [
                         {"scene": "05", "label": "ETHOS", "verdict": "after-words", "legible": 9.5}
-                    ]
+                    ],
                 },
             },
             "sync 05 ETHOS: after-words",
@@ -164,6 +186,24 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
         (
             {**CLEAN, "motion": {"still": [{"start": 4.0, "end": 7.6, "seconds": 3.6}]}},
             "motion still 4.00-7.60 s",
+        ),
+        (
+            continuity(
+                seats=[{"thought": "03.2", "at": 153.167, "lag": 2.13, "box": [1, 2, 3, 4]}]
+            ),
+            "sync seat 03.2 at 153.17 s: a mark waits 2.13 s for its name",
+        ),
+        (
+            continuity(unnamed_speech=[{"thought": "03.7", "from": 260.823, "to": 262.456}]),
+            "sync unnamed speech 03.7 260.82-262.46 s",
+        ),
+        (
+            continuity(caption_echoes=[{**ECHO, "whole": True, "share": 1.0, "labels": ["x"]}]),
+            "sync caption echo 717.70 s: one label repeats",
+        ),
+        (
+            {**CLEAN, "frame": {**CLEAN["frame"], "mixed_case": {"08": [RAGGED_ROW]}}},
+            "frame mixed_case",
         ),
     ],
 )
@@ -188,6 +228,22 @@ def test_a_still_state_off_centre_is_recorded_and_refuses_nothing(film, monkeypa
         'frame off_centre_settled: {"09": ["0.50-3.00 60.0 px"]}'
     ]
     assert set(gates.FRAME_RECORDED).isdisjoint(gates.FRAME_GATES)
+
+
+def test_a_held_picture_and_a_partial_echo_are_recorded_and_refuse_nothing(film, monkeypatch):
+    # A deliberate index may stay while the first new name arrives, and labels may name the marks
+    # whose words a cue says; the reviewers judge both from the record.
+    labels = ["The people watching the pipeline", "report this back"]
+    echo = {**ECHO, "whole": False, "share": 1.0, "labels": labels}
+    reports = continuity(held_over=[{"thought": "02.2", "held": 2.85}], caption_echoes=[echo])
+    audits(monkeypatch, reports)
+    record = gates.check_picture(Edition("zh"))
+    assert record["verdict"] == "pass" and record["gated_findings"] == []
+    assert record["recorded_findings"] == [
+        "sync held over 02.2 2.85 s",
+        "sync caption echo 717.70 s: labels repeat 100% of "
+        "'The people watching the pipeline report this back,'",
+    ]
 
 
 def test_a_picture_changed_while_it_is_checked_is_refused(film, monkeypatch):

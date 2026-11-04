@@ -44,10 +44,11 @@ test("the frame audit reports a stretch of the film, its label trace, its marks 
   assert.ok(report.underfilled_containers && typeof report.underfilled_containers === "object");
   for (const runs of Object.values(report.underfilled_containers))
     assert.ok(runs.every((run) => /^(frame|bracket) [\d,-]+ [\d.]+-[\d.]+ \d+%$/.test(run)));
-  // Thoughts whose lit picture covers too little of the band, and names that repeat their caption or run past two lines.
+  // Thoughts whose lit picture covers too little of the band, and names that run past two lines; the captions that
+  // labels repeat are the sync audit's to measure.
+  assert.equal(report.caption_echoes, undefined);
   for (const key of [
     "thin_lit",
-    "caption_echoes",
     "long_names",
     "sparse_runs",
     "off_centre_runs",
@@ -73,7 +74,7 @@ test("the frame audit reports a stretch of the film, its label trace, its marks 
       );
   for (const rows of Object.values(report.thin_lit))
     assert.ok(rows.every((row) => /^\d\d\.\d+ (two|late) [\d.]+%$/.test(row)));
-  for (const rows of [...Object.values(report.caption_echoes), ...Object.values(report.long_names)])
+  for (const rows of Object.values(report.long_names))
     assert.ok(rows.every((row) => /@[\d.]+$/.test(row)));
   // How the text lines up, per scene: the stretch's names stand on their rows, columns and cards.
   for (const key of TEXT_LAYOUT) assert.deepEqual(report[key], {}, key);
