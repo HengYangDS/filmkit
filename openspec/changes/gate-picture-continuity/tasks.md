@@ -15,6 +15,7 @@
 ## 3. Caption echoes
 
 - [x] 3.1 List whole and partial caption echoes in the sync audit, refuse the first and record the second, and retire the frame audit's `caption_echoes`; done when tests list a cue drawn in one label, a cue drawn in two labels at 100% and no two-word cue, and gate tests refuse and record them.
+- [x] 3.2 Record a cue that is itself one quotation, the narration reading out what the picture shows, instead of refusing it as a whole echo; done when tests list such a cue as quoted at 100%, a cue of two quotations as a whole echo, and the gate records the first as a quotation.
 
 ## 4. Case of a set of names
 

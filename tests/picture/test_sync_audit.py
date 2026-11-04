@@ -118,10 +118,25 @@ def test_a_cue_drawn_whole_as_one_label_is_a_whole_echo():
             "segment": "01",
             "text": "Solve the whole problem.",
             "whole": True,
+            "quoted": False,
             "share": 1.0,
             "labels": ["Solve the whole problem"],
         }
     ]
+
+
+def test_a_cue_that_is_one_quotation_is_not_a_whole_echo():
+    # The narration reads out a document the picture shows: a label that holds the quotation's
+    # words depicts the document, so the cue is listed at 100% and not as a whole echo. Two
+    # quotations joined by other words are not one quotation.
+    film = captioned(
+        (4.0, 6.5, "“Solve the whole problem.”"),
+        (7.0, 9.5, "“Solve it” and “test it”"),
+    )
+    trace = frames(3.0, 6.5, "Solve the whole problem") + frames(7.0, 9.5, "Solve it and test it")
+    quoted, joined = picture_sync_audit.continuity(film, trace, step=0.1)["caption_echoes"]
+    assert (quoted["whole"], quoted["quoted"], quoted["share"]) == (False, True, 1.0)
+    assert (joined["whole"], joined["quoted"]) == (True, False)
 
 
 def test_a_cue_mostly_drawn_as_labels_during_it_is_a_partial_echo():

@@ -246,6 +246,19 @@ def test_a_held_picture_and_a_partial_echo_are_recorded_and_refuse_nothing(film,
     ]
 
 
+def test_a_quoted_cue_drawn_whole_is_recorded_as_a_quotation(film, monkeypatch):
+    # The narration reads out the document the picture shows; the reviewers judge it.
+    text = "“Deduplicate by stock code and date.”"
+    label = "Deduplicate by stock code and date"
+    echo = {**ECHO, "text": text, "whole": False, "quoted": True, "share": 1.0, "labels": [label]}
+    audits(monkeypatch, continuity(caption_echoes=[echo]))
+    record = gates.check_picture(Edition("zh"))
+    assert record["verdict"] == "pass" and record["gated_findings"] == []
+    assert record["recorded_findings"] == [
+        f"sync caption echo 717.70 s: labels repeat 100% of {text!r}, a quotation the picture shows"
+    ]
+
+
 def test_a_picture_changed_while_it_is_checked_is_refused(film, monkeypatch):
     edition = Edition("zh")
     audits(monkeypatch, CLEAN, change=lambda: put(film / COMPOSITION_SCRIPT, "changed"))

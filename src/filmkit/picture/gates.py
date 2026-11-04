@@ -125,7 +125,8 @@ def recorded_findings(frame: dict, sync: dict) -> list[str]:
 
     They are the frame audit's recorded measures, the thoughts that hold the previous picture,
     since a deliberate index may stay while the first new name arrives, and the caption cues
-    mostly drawn as labels, since labels may name the marks whose words a cue says.
+    mostly drawn as labels, since labels may name the marks whose words a cue says, or a cue may
+    quote what the picture shows.
     """
     found = [
         f"frame {key}: {json.dumps(frame[key], ensure_ascii=False)}"
@@ -138,7 +139,7 @@ def recorded_findings(frame: dict, sync: dict) -> list[str]:
     ]
     found += [
         f"sync caption echo {row['start']:.2f} s: labels repeat {row['share']:.0%} of"
-        f" {row['text']!r}"
+        f" {row['text']!r}" + (", a quotation the picture shows" if row.get("quoted") else "")
         for row in continuity["caption_echoes"]
         if not row["whole"]
     ]

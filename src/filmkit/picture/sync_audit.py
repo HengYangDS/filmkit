@@ -52,6 +52,8 @@ HOLD_WINDOW = 4
 # exactly its words, or labels drawn during it repeat at least this share of them.
 ECHO_WORDS = 3
 ECHO_SHARE = 0.8
+# The quotation marks that open and close a cue that is itself one quotation.
+QUOTATION_MARKS = {"“": "”", "‘": "’", "「": "」", '"': '"'}
 # A cue's and a label's words: each CJK character, or a run of other letters and digits with its
 # apostrophes.
 _CJK = "\u3400-\u9fff\uf900-\ufaff"
@@ -323,6 +325,14 @@ def words(text: str) -> list[str]:
     return [word.lower().replace("\u2019", "'") for word in _WORD.findall(text)]
 
 
+def quotation(text: str) -> bool:
+    """Whether a cue is itself one quotation: it opens with a quotation mark, and the matching
+    mark first closes it at its end."""
+    text = text.strip()
+    close = QUOTATION_MARKS.get(text[:1])
+    return close is not None and len(text) > 1 and text.find(close, 1) == len(text) - 1
+
+
 def label_runs(trace_lines: Iterable[str], step: float) -> dict[str, list[tuple[float, float]]]:
     """Each label's runs of legible samples, from its first to its last; a gap ends a run."""
     seen: dict[str, set[float]] = {}
@@ -353,8 +363,10 @@ def caption_echoes(timeline: dict, trace_lines: Iterable[str], step: float) -> l
     """The caption cues of three words or more that labels repeat while the cue shows.
 
     A cue is a whole echo when one label legible at a sample within it holds exactly its
-    words, in order. Otherwise it is listed when the labels drawn during it, legible from a
-    sample within it, repeat at least 80% of its words, each label as one run of them.
+    words, in order, unless the cue is itself one quotation: the narration then reads out what
+    the picture shows, and the cue is listed as quoted. Otherwise it is listed when the labels
+    drawn during it, legible from a sample within it, repeat at least 80% of its words, each
+    label as one run of them.
     """
     runs, found = label_runs(trace_lines, step), []
     for cue in timeline.get("captions", []):
@@ -374,12 +386,14 @@ def caption_echoes(timeline: dict, trace_lines: Iterable[str], step: float) -> l
         drawn = {label: places for label, places in drawn.items() if places}
         share = len(set().union(*drawn.values())) / len(said)
         if whole or share >= ECHO_SHARE:
+            quoted = quotation(cue["text"])
             found.append(
                 {
                     "start": round(a, 3),
                     "segment": cue.get("segment"),
                     "text": cue["text"].strip(),
-                    "whole": bool(whole),
+                    "whole": bool(whole) and not quoted,
+                    "quoted": quoted,
                     "share": 1.0 if whole else round(share, 2),
                     "labels": whole or sorted(drawn),
                 }
