@@ -28,13 +28,13 @@
 
 ## 6. Calibration
 
-- [ ] 6.1 Run the new gates on the ETHOS v2 lane at `f08e93d`, the seat-fixed copy and the sample film; done when the gates list the round-4 findings on the lane and nothing the reviewers did not find, the sample film passes `check-picture` on timelines staged from its scripts, and the counts stand in the Changelog entry and the decisions they settle in design.
-- [ ] 6.2 Run the document and packaging changes on the current inputs of DDWG, ETHOS v2 and the essentials film, and the concept check on each; done when the strings that change and any refusal stand in the Changelog entry.
+- [x] 6.1 Run the new gates on the ETHOS v2 lane at `f08e93d`, the seat-fixed copy and the sample film; done when the gates list the round-4 findings on the lane and nothing the reviewers did not find, the sample film passes `check-picture` on timelines staged from its scripts, and the counts stand in the Changelog entry and the decisions they settle in design.
+- [x] 6.2 Run the document and packaging changes on the current inputs of DDWG, ETHOS v2 and the essentials film, and the concept check on each; done when the strings that change and any refusal stand in the Changelog entry.
 
 ## 7. Documentation and release notes
 
-- [ ] 7.1 Document the gates and the deliverable rules in `README.md`; done when it names each new finding and the chapter track's language.
-- [ ] 7.2 Set `VERSION` and the README pin to 0.9.0 and add an `UNRELEASED` 0.9.0 entry to the Changelog; done when no tracked file outside the Changelog history names 0.8.1 as the current version and `mise run check` passes.
+- [x] 7.1 Document the gates and the deliverable rules in `README.md`; done when it names each new finding and the chapter track's language.
+- [x] 7.2 Set `VERSION` and the README pin to 0.9.0 and add an `UNRELEASED` 0.9.0 entry to the Changelog; done when no tracked file outside the Changelog history names 0.8.1 as the current version and `mise run check` passes.
 
 ## Workflow follow-up
 

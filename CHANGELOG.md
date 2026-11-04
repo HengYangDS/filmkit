@@ -4,6 +4,25 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.9.0] - UNRELEASED
+
+### Added
+
+- `check-picture` gates the sync audit's continuity. It refuses each seat, a mark that stands in speech for more than 0.6 s before a name is legible at it, and each run of a thought's speech longer than 1 s with no legible name, naming each with its thought and time. It lists each thought that keeps the previous picture for more than 1 s in the gate record without refusing it, since a deliberate index may stay while the first new name arrives.
+- The seat check judges a dashed closed outline on its own where a link or a touch joins it to a larger mark: only a name within its reach, or a mark or text inside it, names it. The canvas stand-in records whether each stroke is dashed. The dashed box at the end of the link in ETHOS v2's 09.1, which stood 5–6 s before its seal and name, was judged with the card and the Agent the link joins, a mark that counted as named in every frame because its box held the Agent's inner dot.
+- The sync audit lists the caption cues that labels repeat. `check-picture` refuses a cue of three or more words that one label legible during the cue holds exactly, in order, and records a cue at least 80% of whose words labels drawn during it repeat. The frame audit's `caption_echoes`, never gated, is retired.
+- The frame audit reports `mixed_case`, the names of one set or of one row of one size, anywhere across the frame, that begin in both cases, and `check-picture` refuses it. A name counts once by its whole text; a CJK name, a quotation and a name whose first word holds a later capital are not judged. The frame audit reads a name's whole text, set and role from the record a composition publishes with each text.
+- Packaging writes the edition's language into each film's chapter track in place, because FFmpeg tags that track English in every edition, and refuses a film any of whose tracks, the attached cover aside, carries another language.
+- The concept check reads each edition's release synopsis, comment and description and the text its player page shows outside its scripts and styles, and refuses a counterexample there as in the narration.
+
+### Changed
+
+- A frame counts as named by what it holds only through a text, a named mark or, once it holds a mark, a name within its reach, so a pictogram drawn in a tool's frame no longer names the frame.
+- The transcript's title and headings, `chapters.json`, the chapter metadata and the films' title, comment, description and synopsis tags set quotation marks as the captions do. On the current inputs of DDWG, ETHOS v2 and the essentials film, only ETHOS v2's English edition changes: the part title “Done” in the transcript and the player's transcript, the chapter title One requirement’s life in the transcript, the player's transcript and chapters, `chapters.json` and the chapter metadata, the part title of the same name in both transcripts, and the quotes of the synopsis tag. Each film's Chinese films change one more thing: their chapter track's language, English until now.
+- The sample film tags each card with its kind of file or its step until the narration names it, so no card waits empty for its name.
+- On the ETHOS v2 composition its round-4 review judged, the new gates refuse 11 seats in each edition, the English unnamed speech of 03.7 and 11 English runs of mixed case in 07–09, and record two held pictures in each edition and 41 Chinese and 23 English cues mostly drawn as labels, among them the three English cues that review named. Its seat repair leaves the dashed stand-in of 09.1 and the two tool frames of 03.6 in each edition, which the repair did not address. The concept check refuses the Chinese player of `411dd65^` for 模型提升 and passes every film's current inputs.
+- The supply moves to ETHOS 0.2.0-alpha.29 and uv 0.13.7, and the CI projection to `jdx/mise-action` 5.2.6.
+
 ## [0.8.1] - 2026-11-04
 
 ### Fixed
@@ -135,7 +154,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/HengYangDS/filmkit/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/HengYangDS/filmkit/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/HengYangDS/filmkit/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/HengYangDS/filmkit/compare/v0.6.0...v0.7.0
