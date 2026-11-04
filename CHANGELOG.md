@@ -4,6 +4,13 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-04
+
+### Fixed
+
+- A Chinese caption line keeps the closing quotes and brackets that follow its last mark, as an English one already does, so no cue begins with one: in 。” the quote ends the line that 。 ends. A brief cue that ends in such a mark takes the same early start as one that ends at the mark, and a passage that ends in a closing quote no longer leaves the quote alone as a line its timing cannot place. A passage without such a mark is set as before.
+- The display copy of cues, subtitles and transcripts sets each straight double quote as a typographic one: an opening quote at the start of the text or after a space, an opening bracket or a dash, and a closing quote elsewhere. A cue's text, its timing and the waveform do not change. A film refreshes its captions with `produce refresh-captions` to take both. On the current timelines this moves three closing quotes in the Chinese captions of ETHOS v2 and one in those of the essentials film, sets the quotes of twelve and four of their English cues, and changes no DDWG cue and no cue's timing.
+
 ## [0.8.0] - 2026-11-04
 
 ### Added
@@ -128,7 +135,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/HengYangDS/filmkit/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/HengYangDS/filmkit/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/HengYangDS/filmkit/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/HengYangDS/filmkit/compare/v0.5.0...v0.6.0
