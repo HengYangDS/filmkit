@@ -188,13 +188,15 @@ def test_picture_text_sources_are_read_by_line_outside_packages(root):
     ]
 
 
-def test_edition_places_name_titles_thoughts_and_caption_terms():
+def test_edition_places_name_titles_thoughts_caption_terms_release_and_player():
     script = {
         "title": "Film",
         "chapters": [{"id": "sources", "title": "Where it begins"}],
         "segments": [segment("01", ["First. ", "Second."])],
+        "release": {"synopsis": "A film.", "comment": "For tests.", "description": "English"},
     }
-    assert concepts.edition_places("en", script) == [
+    places = concepts.edition_places("en", script)
+    assert places[:-1] == [
         Place("en title", "Film"),
         Place("en chapter sources title", "Where it begins"),
         Place("en 01 title", "Part 01"),
@@ -202,7 +204,34 @@ def test_edition_places_name_titles_thoughts_and_caption_terms():
         Place("en 01.2", "Second."),
         Place("en caption term", "reference recording"),
         Place("en caption term", "build folder"),
+        Place("en release synopsis", "A film."),
+        Place("en release comment", "For tests."),
+        Place("en release description", "English"),
     ]
+    # The player's prose: what its page shows, outside its scripts and styles.
+    assert places[-1].where == "en player"
+    assert "A one-minute film that shows how a film is rebuilt from its sources." in places[-1].text
+    assert "/*CHAPTERS*/" not in places[-1].text
+
+
+def test_a_counterexample_in_the_player_or_the_synopsis_refuses(tmp_path, monkeypatch):
+    shutil.copytree(repository.ROOT / "content", tmp_path / "content")
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    player = tmp_path / "content/player.html"
+    page = player.read_text(encoding="utf-8")
+    player.write_text(
+        page.replace("</body>", "<p>它能复刻影片</p><script>const 复刻 = 1;</script></body>"),
+        encoding="utf-8",
+    )
+    path = tmp_path / "content/en/film-script.json"
+    script = json.loads(path.read_text(encoding="utf-8"))
+    script["release"]["synopsis"] = "How to remake a film."
+    path.write_text(json.dumps(script, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    with pytest.raises(ConceptError) as refused:
+        concepts.check()
+    failures = str(refused.value).splitlines()
+    assert [line.split(" at ")[0] for line in failures] == ["zh player", "en release synopsis"]
+    assert failures[1] == "en release synopsis at 7: 'remake', a counterexample of rebuild"
 
 
 def test_the_cli_prints_the_report_and_refuses_with_every_failure(monkeypatch, capsys):

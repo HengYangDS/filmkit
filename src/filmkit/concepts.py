@@ -8,10 +8,11 @@ narration may also use, and the counterexamples it must not use.
 The check reads both editions' scripts, the film's caption terms and its picture sources. Each
 segment declares the concepts it states; both editions of a segment declare the same ones, and
 each appears in that segment's narration by its rendering or a form. No counterexample appears
-in any narration, title, caption term or picture source. With a local clone of the source
-repository, named by `FILM_SOURCE_CHECKOUT`, each quotation must be in its document at the
-pinned commit; without one the quotations are reported as not checked. Every failure is
-reported at once, and thoughts are numbered from 1 within their segment.
+in any narration, title, caption term, release synopsis, comment or description, player prose
+(the text the edition's player page shows, outside its scripts and styles) or picture source.
+With a local clone of the source repository, named by `FILM_SOURCE_CHECKOUT`, each quotation
+must be in its document at the pinned commit; without one the quotations are reported as not
+checked. Every failure is reported at once, and thoughts are numbered from 1 within their segment.
 
 Usage: python -m filmkit.concepts
 """
@@ -23,6 +24,7 @@ import os
 import re
 import subprocess
 import tomllib
+from html.parser import HTMLParser
 from typing import Annotated, NamedTuple
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
@@ -36,6 +38,8 @@ from filmkit.production import CODES, Edition
 # The folder of picture sources, and the files below it that hold words a viewer may see.
 PICTURE = "picture"
 PICTURE_SUFFIXES = (".js", ".mjs", ".html", ".json")
+# The release fields a viewer reads in a film's metadata, in the order they are checked.
+RELEASE_PROSE = ("synopsis", "comment", "description")
 # A lowercase name of words joined by hyphens.
 Id = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")]
 Words = Annotated[str, StringConstraints(min_length=1)]
@@ -166,8 +170,37 @@ def found(text: str, phrase: str, code: str) -> list[int]:
     return [match.start() for match in re.finditer(pattern, text, flags)]
 
 
+class _Prose(HTMLParser):
+    """The text a page shows: its character data outside its script and style elements."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.hidden = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in ("script", "style"):
+            self.hidden += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in ("script", "style") and self.hidden:
+            self.hidden -= 1
+
+    def handle_data(self, data: str) -> None:
+        if not self.hidden and data.strip():
+            self.parts.append(data.strip())
+
+
+def page_prose(page: str) -> str:
+    """The prose of an HTML page, its shown texts joined by spaces."""
+    parser = _Prose()
+    parser.feed(page)
+    parser.close()
+    return " ".join(parser.parts)
+
+
 def edition_places(code: str, script: dict) -> list[Place]:
-    """The edition's words a viewer meets: its titles, its thoughts and its caption terms."""
+    """The edition's words a viewer meets: titles, thoughts, caption terms, release and player."""
     places = [Place(f"{code} title", script["title"])]
     places += [
         Place(f"{code} chapter {chapter['id']} title", chapter["title"])
@@ -180,6 +213,13 @@ def edition_places(code: str, script: dict) -> list[Place]:
             for index, thought in enumerate(authored_groups(segment), 1)
         ]
     places += [Place(f"{code} caption term", term) for term in FILM.editions[code].caption_terms]
+    release = script.get("release", {})
+    places += [
+        Place(f"{code} release {key}", release[key]) for key in RELEASE_PROSE if key in release
+    ]
+    player = repository.ROOT / Edition(code).player
+    if player.is_file():
+        places.append(Place(f"{code} player", page_prose(player.read_text(encoding="utf-8"))))
     return places
 
 
