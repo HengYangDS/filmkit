@@ -4,7 +4,7 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
-## [0.10.0] - UNRELEASED
+## [0.10.0] - 2026-11-06
 
 ### Added
 
