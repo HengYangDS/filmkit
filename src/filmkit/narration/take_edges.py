@@ -1,14 +1,16 @@
-"""How a take begins and ends: its opening level, its final syllable's decay and its ending.
+"""How a take begins and ends: its opening level and onset, its final syllable's decay and ending.
 
-A take that opens its recording must begin in heard quiet, and every take must end
-naturally: quiet at its end, with a final syllable that dies away rather than being cut.
+A take that opens its recording must begin its clip in quiet, in its own heard quiet or in its
+released onset, and every take must end naturally: quiet at its end, with a final syllable that
+dies away rather than being cut.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-from filmkit.soundtrack.quiet import HEARD_QUIET_DBFS
+from filmkit.soundtrack.pauses import opening_onset
+from filmkit.soundtrack.quiet import HEARD_QUIET_DBFS, clip_start
 
 # A voiced final syllable that falls from LOUD_DBFS to STOPPED_DBFS in under FALL_MS stops
 # inside the syllable instead of dying away; round-21 takes that a listener heard cut fell in
@@ -184,12 +186,27 @@ def ending(pcm: np.ndarray, rate: int, gains: tuple[float, ...] = FALL_GAINS) ->
     }
 
 
-def opening(pcm: np.ndarray, rate: int) -> dict:
-    """The level of a mono 16-bit take's first 10 ms and whether it is heard as quiet.
+def opening(pcm: np.ndarray, rate: int, first_word: float | None = None) -> dict:
+    """How a mono 16-bit take begins: its first 10 ms, its onset and whether its clip opens quiet.
 
-    A take that opens its recording begins its clip, which starts in the take's own
-    quiet, so a take heard from its first sample would step out of digital silence.
+    A take that opens its recording begins its clip after digital silence, where the assembly
+    begins it (`soundtrack.pauses.begin_clip`): in the take's own heard quiet before its first
+    aligned item, which starts at `first_word` seconds, or else in its codec onset released to
+    digital silence when the onset is releasable. A take heard from its first sample without
+    such an onset would step out of digital silence. Without a first word, only a take whose
+    first 10 ms are heard as quiet opens its clip in quiet.
     """
     head = pcm[: round(0.01 * rate)].astype(np.float64) / 32768
     level = float(20 * np.log10(np.sqrt(np.mean(head**2)) + 1e-12))
-    return {"first_dbfs": round(level, 1), "opens_quiet": level <= HEARD_QUIET_DBFS}
+    quiet = level <= HEARD_QUIET_DBFS
+    if first_word is None:
+        releasable, clip_quiet = False, quiet
+    else:
+        releasable = bool(opening_onset(pcm, first_word, rate))
+        clip_quiet = clip_start(pcm, first_word, rate) is not None or releasable
+    return {
+        "first_dbfs": round(level, 1),
+        "opens_quiet": quiet,
+        "onset_releasable": releasable,
+        "clip_opens_quiet": clip_quiet,
+    }

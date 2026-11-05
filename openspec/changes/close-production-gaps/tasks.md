@@ -28,6 +28,13 @@
 - [x] 5.1 Document the review-round options, the clarity floors and measure, the title and contrast gates, the text trace and the pre-render check in `README.md`; done when the README names each command, option and field.
 - [x] 5.2 Set `VERSION` and the README pin to 0.10.0 and add a `[0.10.0] - UNRELEASED` entry to the Changelog; done when no tracked file outside the Changelog history names 0.9.0 as the current version and every `mise run check` command passes.
 
+## 6. Take onsets
+
+- [x] 6.1 Release a take's codec onset between a thought join's digital silence and its native quiet in `soundtrack/pauses.py`, recording `released_onset_samples` for each join; done when pause tests release a 40 ms onset with no quiet edge above −45 dBFS and bit-identical speech, and keep a longer sound, one an aligned item covers and a join without digital silence.
+- [x] 6.2 Begin a clip that has no heard quiet before its first word in its released onset, recording `released_onset_samples` in its boundary fades, and qualify a take that opens its recording by `clip_opens_quiet` with `onset_releasable` in the audition; done when pause tests release an opening onset, still refuse speech from the first sample and change no quiet opening, and take-edge and proposal tests accept a releasable onset.
+- [x] 6.3 Assemble the ETHOS film's round-6 Chinese inputs with the patched engine; done when only the joins 03.6>03.7 and 08.8>08.9 differ from the round-6 soundtrack, its quiet edges leave none above −45 dBFS and it lasts 900 s (design §8).
+- [x] 6.4 Name the onset release and the opening qualification in `README.md` and the `[0.10.0]` Changelog entry; done when both name `released_onset_samples`, `onset_releasable` and `clip_opens_quiet`.
+
 ## Workflow follow-up
 
 - Before the release: `mise run sample:build` and its verification on the narrated sample.

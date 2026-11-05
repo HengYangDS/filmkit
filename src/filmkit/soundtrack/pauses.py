@@ -3,7 +3,8 @@
 A statement pause grows with the thought it follows and a paragraph gap with the paragraph it
 follows, at their declared means. Each thought join is then set to its designed quiet inside the
 part of its native quiet heard as quiet, and the remaining runtime is shared among the gaps
-before each segment within their declared limits.
+before each segment within their declared limits. A take's codec onset that follows digital
+silence, at a thought join or where a recording's clip begins, is released to digital silence.
 """
 
 from __future__ import annotations
@@ -17,7 +18,9 @@ import numpy as np
 from filmkit.narration.spoken_units import QUESTION_MARKS, item_joins, units
 from filmkit.soundtrack.quiet import (
     FADE_SECONDS,
+    FRAME_SECONDS,
     RELEASE_SECONDS,
+    clip_start,
     fade_into_quiet,
     heard_before,
     heard_quiet_run,
@@ -39,6 +42,10 @@ DIGITAL_SILENCE_SECONDS = 0.01
 SILENT_EDGE_DBFS = -70.0
 # A thought join holds at least this much native quiet to design.
 JOIN_QUIET_SECONDS = 0.1
+# Sound after digital silence that meets quiet within this long and holds no aligned item is a
+# take's codec onset, not speech. In the ETHOS round-6 joins it sounded 6-15 ms before the
+# native quiet and in the round-7 openings 10-60 ms before heard quiet; a syllable lasts longer.
+ONSET_SECONDS = 0.1
 # Bisection steps for the one shift that keeps a pause shape at its declared mean.
 SHAPE_STEPS = 80
 # How far a shaped pause's mean may lie from the declared mean, in seconds.
@@ -188,7 +195,8 @@ class ThoughtJoin:
     """A complete-thought join: its native quiet, the part of it heard as quiet, and the rest.
 
     `group` numbers the thought the join follows from 1; `begin` and `end` bound the native
-    quiet in samples; `overhead` is the native quiet not heard as quiet, in seconds.
+    quiet in samples; `overhead` is the native quiet not heard as quiet, in seconds; and
+    `spoken_end` is the sample where the thought's last aligned item ends.
     """
 
     group: int
@@ -196,6 +204,7 @@ class ThoughtJoin:
     end: int
     heard: tuple[int, int] | None
     overhead: float
+    spoken_end: int
 
 
 def thought_joins(
@@ -220,7 +229,8 @@ def thought_joins(
         begin, end = run
         heard = heard_quiet_run(audio, begin, end, rate)
         overhead = (end - begin - (heard[1] - heard[0] if heard else 0)) / rate
-        joins.append(ThoughtJoin(group, begin, end, heard, overhead))
+        spoken_end = round(items[join.left]["end_time"] * rate)
+        joins.append(ThoughtJoin(group, begin, end, heard, overhead, spoken_end))
     return joins
 
 
@@ -238,6 +248,39 @@ def _edge_dbfs(part: np.ndarray) -> float:
     return float(20 * np.log10(np.sqrt(np.mean(x**2)) + 1e-12)) if x.size else -120.0
 
 
+def _digital_silence(audio: np.ndarray, start: int, stop: int, rate: int) -> tuple[int, int] | None:
+    """The first and last sample of the digital silence in [start, stop); None without any.
+
+    Only runs of exact zeros at least DIGITAL_SILENCE_SECONDS long are digital silence, so a
+    zero crossing in a decaying voice is never taken for one.
+    """
+    run = round(DIGITAL_SILENCE_SECONDS * rate)
+    if stop - start < run:
+        return None
+    zero = np.all(audio[start:stop] == 0, axis=1)
+    silent = np.flatnonzero(np.convolve(zero, np.ones(run, dtype=int), "valid") == run)
+    if not len(silent):
+        return None
+    return start + int(silent[0]), start + int(silent[-1]) + run
+
+
+def _release_onset(audio: np.ndarray, join: ThoughtJoin, rate: int) -> int:
+    """Release a take's onset between digital silence and a join's native quiet, in place.
+
+    Between the thought's last aligned item and the join's native quiet, sound that follows
+    digital silence and lasts at most ONSET_SECONDS before the native quiet begins is the next
+    take's codec onset: it holds no aligned item, since the next thought's first item begins
+    after the native quiet does. It is released to digital silence, which leaves into the
+    native quiet through a soft fade. Return the released samples.
+    """
+    silence = _digital_silence(audio, join.spoken_end, join.begin, rate)
+    if silence is None or join.begin - silence[1] > round(ONSET_SECONDS * rate):
+        return 0
+    audio[silence[1] : join.begin] = 0
+    _soften(audio, join.begin, join.begin + round(EDGE_FADE_SECONDS * rate), rising=True)
+    return join.begin - silence[1]
+
+
 def _enter_digital_silence(
     audio: np.ndarray, join: ThoughtJoin, rate: int, release_seconds: float
 ) -> int:
@@ -246,16 +289,12 @@ def _enter_digital_silence(
     Digital silence where two thought recordings meet is entered and left through a short
     fade of the soft edge beside it; a recording still heard as it reaches the silence is
     released instead, and an edge too quiet to make a step keeps its samples, so a decay
-    keeps its tail. Only runs of exact zeros at least DIGITAL_SILENCE_SECONDS long are
-    digital silence, so a zero crossing in a decaying voice is never taken for one. Return
-    the released samples.
+    keeps its tail. Return the released samples.
     """
-    zero = np.all(audio[join.begin : join.end] == 0, axis=1)
-    run = round(DIGITAL_SILENCE_SECONDS * rate)
-    silent = np.flatnonzero(np.convolve(zero, np.ones(run, dtype=int), "valid") == run)
-    if not len(silent):
+    silence = _digital_silence(audio, join.begin, join.end, rate)
+    if silence is None:
         return 0
-    first, last = join.begin + int(silent[0]), join.begin + int(silent[-1]) + run
+    first, last = silence
     edge, released = round(EDGE_FADE_SECONDS * rate), 0
     if heard_before(audio, first, rate):
         released = release_tail(audio, first, rate, release_seconds)
@@ -288,7 +327,8 @@ def design_thought_pauses(
 
     Designed quiet is inserted into, or removed from, the middle of the part of the
     native quiet heard as quiet, so a decaying tail or a rising onset keeps its native
-    quiet beside it. releases maps a thought's index to its declared release seconds.
+    quiet beside it. A take's codec onset before the native quiet is released first.
+    releases maps a thought's index to its declared release seconds.
     """
     joins = thought_joins(audio, items, text, groups, rate)
     if len(targets) != len(groups) - 1:
@@ -297,6 +337,7 @@ def design_thought_pauses(
     audio, fade, releases = audio.copy(), round(FADE_SECONDS * rate), releases or {}
     shifts, edits = [], []
     for join, target in zip(joins, targets, strict=True):
+        onset = _release_onset(audio, join, rate)
         released = _enter_digital_silence(
             audio, join, rate, releases.get(join.group, RELEASE_SECONDS)
         )
@@ -322,9 +363,43 @@ def design_thought_pauses(
                 "removed_quiet_samples": max(0, -delta),
                 "fade_samples": span,
                 "released_tail_samples": released,
+                "released_onset_samples": onset,
             }
         )
     return splice_quiet(audio, shifts), shifted_items(items, shifts, rate), edits
+
+
+def opening_onset(audio: np.ndarray, first_word: float, rate: int) -> int:
+    """The samples of a take's onset where its recording begins, or 0 without one to release.
+
+    A recording's clip follows digital silence. The sound before its first 10 ms frame heard
+    as quiet, on frames from its first sample, is a take's codec onset when that frame begins
+    within ONSET_SECONDS and by `first_word`, the first aligned item's start in seconds, so the
+    sound holds no aligned item. A recording that begins in heard quiet has no onset.
+    """
+    frame = round(FRAME_SECONDS * rate)
+    limit = min(round(ONSET_SECONDS * rate), round(first_word * rate), len(audio) - frame)
+    for start in range(0, limit + 1, frame):
+        if not heard_before(audio, start + frame, rate):
+            return start
+    return 0
+
+
+def begin_clip(audio: np.ndarray, first_word: float, rate: int) -> tuple[int | None, int]:
+    """Where a recording's clip begins in its own heard quiet, and the onset samples released.
+
+    The clip begins as `clip_start` places it before `first_word`. A recording heard there and
+    from its first sample has its onset (`opening_onset`) released to digital silence in place,
+    leaving into the quiet after it through a soft fade, so its clip begins in quiet; without
+    such an onset it has no quiet to begin in, and the start is None.
+    """
+    start = clip_start(audio, first_word, rate)
+    onset = 0 if start is not None else opening_onset(audio, first_word, rate)
+    if onset:
+        audio[:onset] = 0
+        _soften(audio, onset, onset + round(EDGE_FADE_SECONDS * rate), rising=True)
+        start = clip_start(audio, first_word, rate)
+    return start, onset
 
 
 def allocate_designed_gaps(

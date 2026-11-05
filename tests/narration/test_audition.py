@@ -28,6 +28,7 @@ def take(
     end_ratio=0.1,
     seconds=3.0,
     quiet=True,
+    clip_quiet=None,
     stops=(),
 ):
     return {
@@ -39,6 +40,7 @@ def take(
         "end_ratio": end_ratio,
         "seconds": seconds,
         "opens_quiet": quiet,
+        "clip_opens_quiet": quiet if clip_quiet is None else clip_quiet,
     }
 
 
@@ -71,6 +73,13 @@ def test_propose_requires_a_recording_opening_thought_to_begin_in_quiet():
     assert narration_audition.propose(takes) == 1
     assert narration_audition.propose(takes, opens_recording=True) == 2
     assert narration_audition.propose(takes[:1], opens_recording=True) is None
+
+
+def test_propose_accepts_an_opening_take_whose_clip_opens_in_its_released_onset():
+    # A take heard in its first 10 ms opens its recording when the assembly begins its clip in
+    # quiet, as it does by releasing a codec onset.
+    onset = take(1, end_ratio=0.05, quiet=False, clip_quiet=True)
+    assert narration_audition.propose([onset, take(2, end_ratio=0.08)], opens_recording=True) == 1
 
 
 THOUGHTS = ["按及时性的标准，这次交付不合格。", "把调度窗口提前，是有权的人做的决定。"]
@@ -290,6 +299,8 @@ def test_audition_records_each_take_with_its_waveform_hash(auditioned, monkeypat
         assert take_row["wav_sha256"] == sha256(recording.read_bytes())
         assert (take_row["required_heard"], take_row["differing_units"]) == (True, 0)
         assert take_row["natural"] is False
+        # Heard from its first sample up to its first aligned word, it has no onset to release.
+        assert (take_row["onset_releasable"], take_row["clip_opens_quiet"]) == (False, False)
         # The thought holds no phrase end before its own.
         assert take_row["phrase_stops"] == []
     assert row["proposed_seed"] is None

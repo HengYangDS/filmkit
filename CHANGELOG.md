@@ -18,6 +18,11 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 - The still scan records the composition it judged beside the film and the timeline, and with `--language` judges the edition's draft against its timeline into `build/evidence/editions/<edition>/draft-stills.json`, which the pre-render check reads. A film's draft tooling moves to it; a record written by 0.9.0 binds no composition and is reported as stale.
 - `filmkit.review.round` keeps its command and options; its prompts move to `filmkit.review.prompts`, its set-aside to `filmkit.review.set_aside` and the files every step reads to `filmkit.review.files`, so a script that imported them from `filmkit.review.round` imports them from their owners.
+- The audition proposes a take that opens its recording when the assembly would begin its clip in quiet (`clip_opens_quiet`), in the take's own heard quiet or in its released onset, and records whether its onset is releasable (`onset_releasable`) beside the raw level of its first 10 ms (`first_dbfs`, `opens_quiet`). It formerly required those 10 ms to be heard as quiet, which refused takes the assembly accepts.
+
+### Fixed
+
+- The assembly releases a take's codec onset that would sound out of digital silence. At a thought join, sound of at most 0.1 s between digital silence after the thought's last word and the join's native quiet is released, and the silence leaves into that quiet through a soft fade; a recording that offers its clip no heard quiet before its first word begins the clip in its onset released the same way, when that onset meets heard quiet within 0.1 s and by the first aligned word. Each designed thought pause and each clip's boundary fades record `released_onset_samples`. On the ETHOS film's round-6 Chinese inputs exactly its two thumps change, at the joins 03.6>03.7 and 08.8>08.9 (693 and 293 samples): the review's quiet edges leave no digital silence above −45 dBFS where they left two, the runtime stays 900 s, the timeline is unchanged and every other sample is identical.
 
 ## [0.9.0] - 2026-11-04
 

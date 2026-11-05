@@ -177,6 +177,9 @@ def test_assembly_lays_out_each_recording_with_its_own_level_and_exact_samples(t
     pauses = [record["designed_thought_pauses"] for record in records]
     assert [len(designed) for designed in pauses] == [1, 1]
     assert all(designed[0]["designed_quiet_seconds"] == 0.45 for designed in pauses)
+    # Takes that begin and meet in quiet release no onset, at a join or where a clip begins.
+    assert [designed[0]["released_onset_samples"] for designed in pauses] == [0, 0]
+    assert [record["boundary_fades"]["released_onset_samples"] for record in records] == [0, 0]
     # The timeline places each voice where its samples are, with its words inside it.
     for segment, record in zip(timeline["segments"], records, strict=True):
         assert segment["voice_start"] == record["start_sample"] / RATE

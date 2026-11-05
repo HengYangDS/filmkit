@@ -2,11 +2,12 @@
 
 audition synthesizes each target thought's spoken text from the narration receipt at
 seed + k * 7919, through the narration's own native ICL path and sampling, then
-measures how each take begins and ends and transcribes it. The pinned aligner locates
-each take's phrase ends, and those followed by heard quiet are judged as its end is. A
-take qualifies when it ends naturally, cuts none of those phrase ends and its transcript
-contains the target's required phrase, and a thought
-that opens its recording qualifies only when its take begins in heard quiet; the
+measures how each take begins and ends and transcribes it. The pinned aligner places
+each take's first item and its phrase ends; the phrase ends followed by heard quiet are
+judged as its end is. A take qualifies when it ends naturally, cuts none of those phrase
+ends and its transcript contains the target's required phrase, and a thought that opens
+its recording qualifies only when its clip opens in quiet as the assembly begins it: in
+the take's own heard quiet or in its released codec onset. The
 qualified take with the fewest differing units is proposed, ties going to the quietest
 ending or, with --prefer slower or brisker, to the longest or the shortest take. The
 receipt, by default the one the cast declares, must hold each thought's current text, so
@@ -61,7 +62,15 @@ from filmkit.production import CODES, Edition
 
 AUDITIONS = "build/runtime/work/auditions"
 STRIDE = 7919
-SUMMARY = ("seed", "opens_quiet", "natural", "required_heard", "differing_units", "seconds")
+SUMMARY = (
+    "seed",
+    "opens_quiet",
+    "clip_opens_quiet",
+    "natural",
+    "required_heard",
+    "differing_units",
+    "seconds",
+)
 
 
 def propose(
@@ -71,7 +80,8 @@ def propose(
 
     A qualified take ends naturally and cuts none of its phrase ends; a take whose phrase ends
     could not be aligned does not qualify. A thought that opens its recording qualifies only
-    with a take that begins in heard quiet.
+    with a take whose clip opens in quiet, as the assembly begins it: in the take's own heard
+    quiet or in its released onset.
     """
     qualified = [
         take
@@ -79,7 +89,7 @@ def propose(
         if take["natural"]
         and take["phrase_stops"] == []
         and take["required_heard"]
-        and (take["opens_quiet"] or not opens_recording)
+        and (take["clip_opens_quiet"] or not opens_recording)
     ]
     if not qualified:
         return None
@@ -277,27 +287,30 @@ def _run_on_measured(path, audio: np.ndarray, model, aligner: dict, run_on: str,
 
 
 def _measured(path, aligner: dict, asr, language: str, spoken_text: str, phrase: str) -> dict:
-    """A written take's waveform hash, its opening, ending and phrase ends, and what was heard."""
+    """A written take's waveform hash, its opening, ending and phrase ends, and what was heard.
+
+    The take's alignment places its first item for the opening and its phrase ends.
+    """
     with wave.open(str(path)) as source:
         rate = source.getframerate()
         pcm = np.frombuffer(source.readframes(source.getnframes()), dtype="<i2")
     heard = transcribe(asr, path, language)
+    found = aligner["model"].generate(str(path), text=spoken_text, language=language)
+    items = [dataclasses.asdict(item) for item in found.items]
     return {
         "path": str(path.relative_to(repository.ROOT)),
         "wav_sha256": repository.sha(path),
-        **opening(pcm, rate),
+        **opening(pcm, rate, items[0]["start_time"] if items else None),
         **ending(pcm, rate),
-        "phrase_stops": _phrase_stops(path, pcm, rate, aligner, language, spoken_text),
+        "phrase_stops": _phrase_stops(pcm, rate, items, spoken_text),
         "heard": heard,
         "required_heard": heard_phrase(heard, phrase),
         "differing_units": unit_distance(recognition_units(spoken_text), recognition_units(heard)),
     }
 
 
-def _phrase_stops(path, pcm, rate: int, aligner: dict, language: str, spoken_text: str):
+def _phrase_stops(pcm, rate: int, items: list[dict], spoken_text: str):
     """The take's phrase ends that it cuts, or None when its alignment misses its text."""
-    found = aligner["model"].generate(str(path), text=spoken_text, language=language)
-    items = [dataclasses.asdict(item) for item in found.items]
     try:
         joins = phrase_joins(spoken_text, items, [spoken_text])
     except AlignmentError:

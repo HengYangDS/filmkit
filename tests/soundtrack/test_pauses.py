@@ -5,7 +5,9 @@ import re
 import numpy as np
 import pytest
 
+import filmkit.review.measurement as review_measurement
 import filmkit.soundtrack.pauses as soundtrack_pauses
+import filmkit.soundtrack.quiet as soundtrack_quiet
 
 
 def test_statement_pauses_grow_with_the_thought_and_keep_their_mean(designed_policy):
@@ -282,6 +284,155 @@ def test_a_tail_too_quiet_to_step_keeps_its_samples_beside_digital_silence():
         audio, items, "先。看", ["先。", "看"], rate, targets=[0.3]
     )
     assert np.array_equal(designed[:240], audio[:240])
+
+
+# The onset rule is shown on 48 kHz stereo signals, as the assembly decodes recordings.
+RATE = 48000
+
+
+def stereo(signal: np.ndarray) -> np.ndarray:
+    """Round a signal in [-1, 1) to 16-bit samples in both channels."""
+    return np.repeat(np.rint(signal * 32768).astype(np.int16)[:, None], 2, axis=1)
+
+
+def tone(seconds: float, dbfs: float = -20.0, hz: float = 220.0) -> np.ndarray:
+    """A sine at the given RMS level: a spoken word."""
+    t = np.arange(round(seconds * RATE)) / RATE
+    return np.sqrt(2) * 10 ** (dbfs / 20) * np.sin(2 * np.pi * hz * t)
+
+
+def thump(seconds: float) -> np.ndarray:
+    """A take's codec onset: 100 Hz that steps in at -30 dBFS and decays over its length."""
+    t = np.arange(round(seconds * RATE)) / RATE
+    return np.sqrt(2) * 10 ** (-30 / 20) * np.cos(2 * np.pi * 100 * t) * np.exp(-4 * t / seconds)
+
+
+def hush(seconds: float) -> np.ndarray:
+    """A take's noise floor, about -82 dBFS."""
+    return np.random.default_rng(7).integers(-4, 5, round(seconds * RATE)) / 32768
+
+
+def edges(pcm: np.ndarray) -> dict:
+    """How the review hears the signal enter and leave its digital silence."""
+    return review_measurement.quiet_edges(pcm, pcm.astype(np.float64).mean(axis=1) / 32768, RATE)
+
+
+def onset_join(onset: np.ndarray, before: np.ndarray, *, spoken_end: float = 0.3) -> tuple:
+    """A word that decays, `before` (a take's trailing silence), an onset, quiet and a word.
+
+    Returns the signal, its aligned items and the sample where the onset begins.
+    """
+    word = tone(0.36)
+    word[-round(0.06 * RATE) :] *= np.exp(-np.arange(round(0.06 * RATE)) / (0.01 * RATE))
+    audio = stereo(np.concatenate([word, before, onset, hush(0.5), tone(0.3)]))
+    start = round(0.36 * RATE) + len(before)
+    following = (len(audio) - round(0.3 * RATE)) / RATE
+    items = [
+        {"text": "先", "start_time": 0.0, "end_time": spoken_end},
+        {"text": "看", "start_time": following, "end_time": following + 0.3},
+    ]
+    return audio, items, start
+
+
+def test_a_take_onset_after_digital_silence_is_released_at_a_thought_join():
+    audio, items, start = onset_join(thump(0.04), np.zeros(round(0.16 * RATE)))
+    (join,) = soundtrack_pauses.thought_joins(audio, items, "先。看", ["先。", "看"], RATE)
+    # The onset is the sound between the take's leading digital silence and the native quiet.
+    assert 0 < join.begin - start <= soundtrack_pauses.ONSET_SECONDS * RATE
+    assert edges(audio)["left_with_a_step_above_minus_45_dbfs"] == 1
+    designed, aligned, edits = soundtrack_pauses.design_thought_pauses(
+        audio, items, "先。看", ["先。", "看"], RATE, targets=[0.8]
+    )
+    assert edits[0]["released_onset_samples"] == join.begin - start
+    assert edits[0]["released_tail_samples"] == 0
+    # The join leaves its digital silence only into quiet.
+    assert not designed[round(0.36 * RATE) : join.begin].any()
+    heard = edges(designed)
+    assert heard["left_with_a_step_above_minus_45_dbfs"] == 0
+    assert heard["left_above_minus_45_dbfs"] == 0
+    # Speech never moves, and its samples are bit-identical.
+    assert np.array_equal(designed[: round(0.36 * RATE)], audio[: round(0.36 * RATE)])
+    assert np.array_equal(designed[-round(0.3 * RATE) :], audio[-round(0.3 * RATE) :])
+    assert aligned[0] == items[0]
+    assert len(designed) == len(audio) + edits[0]["inserted_quiet_samples"]
+
+
+@pytest.mark.parametrize(
+    ("onset", "spoken_end"),
+    [
+        # Sound that lasts longer than an onset before the native quiet.
+        (thump(0.3), 0.3),
+        # Sound that the thought's last aligned item still covers.
+        (thump(0.04), 0.54),
+    ],
+)
+def test_sound_after_digital_silence_that_is_no_onset_keeps_its_samples(onset, spoken_end):
+    audio, items, _ = onset_join(onset, np.zeros(round(0.16 * RATE)), spoken_end=spoken_end)
+    (join,) = soundtrack_pauses.thought_joins(audio, items, "先。看", ["先。", "看"], RATE)
+    designed, _, edits = soundtrack_pauses.design_thought_pauses(
+        audio, items, "先。看", ["先。", "看"], RATE, targets=[0.8]
+    )
+    assert edits[0]["released_onset_samples"] == 0
+    assert np.array_equal(designed[: join.begin], audio[: join.begin])
+
+
+def test_a_join_without_digital_silence_before_its_native_quiet_keeps_its_samples():
+    # The previous take ends in its own noise floor, so the onset steps out of no silence.
+    audio, items, _ = onset_join(thump(0.04), hush(0.16))
+    (join,) = soundtrack_pauses.thought_joins(audio, items, "先。看", ["先。", "看"], RATE)
+    designed, _, edits = soundtrack_pauses.design_thought_pauses(
+        audio, items, "先。看", ["先。", "看"], RATE, targets=[0.8]
+    )
+    assert edits[0]["released_onset_samples"] == 0
+    assert np.array_equal(designed[: join.begin], audio[: join.begin])
+
+
+def test_a_clip_that_cannot_begin_in_quiet_begins_in_its_released_onset():
+    audio = stereo(np.concatenate([thump(0.04), hush(0.05), tone(0.4)]))
+    # The first word starts 0.09 s in, so the onset fills the lead a clip begins in.
+    assert soundtrack_quiet.clip_start(audio, 0.09, RATE) is None
+    # The onset meets heard quiet in its fourth 10 ms frame.
+    assert soundtrack_pauses.opening_onset(audio, 0.09, RATE) == round(0.03 * RATE)
+    released = audio.copy()
+    assert soundtrack_pauses.begin_clip(released, 0.09, RATE) == (0, round(0.03 * RATE))
+    assert not released[: round(0.03 * RATE)].any()
+    assert np.array_equal(released[round(0.04 * RATE) :], audio[round(0.04 * RATE) :])
+    # An onset that a word begins inside holds an aligned item and is no onset.
+    assert soundtrack_pauses.opening_onset(audio, 0.02, RATE) == 0
+
+
+@pytest.mark.parametrize(
+    ("signal", "first_word"),
+    [
+        # Speech from the first sample.
+        (tone(0.4), 0.0),
+        # A sound longer than an onset that runs into the first word.
+        (np.concatenate([tone(0.2, -40.0, 100.0), tone(0.4)]), 0.2),
+    ],
+)
+def test_a_clip_heard_from_its_first_sample_without_an_onset_still_has_no_start(signal, first_word):
+    audio = stereo(signal)
+    unchanged = audio.copy()
+    assert soundtrack_pauses.begin_clip(audio, first_word, RATE) == (None, 0)
+    assert np.array_equal(audio, unchanged)
+
+
+@pytest.mark.parametrize(
+    "signal",
+    [
+        # A recording already quiet from its first sample.
+        np.concatenate([hush(0.3), tone(0.4)]),
+        # An onset followed by enough quiet that the clip begins after it.
+        np.concatenate([thump(0.04), hush(0.26), tone(0.4)]),
+    ],
+)
+def test_a_clip_that_begins_in_heard_quiet_releases_nothing(signal):
+    audio = stereo(signal)
+    unchanged = audio.copy()
+    start = soundtrack_quiet.clip_start(audio, 0.3, RATE)
+    assert start == round(0.2 * RATE)
+    assert soundtrack_pauses.begin_clip(audio, 0.3, RATE) == (start, 0)
+    assert np.array_equal(audio, unchanged)
 
 
 def test_paragraph_pauses_grow_with_the_paragraph_and_keep_their_mean(designed_policy):

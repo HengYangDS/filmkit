@@ -10,6 +10,8 @@ Three films were produced on 2026-11-05 with filmkit 0.9.0, and each gap of the 
 - The frame audit's label trace (`TRACE`) records only scene texts of role `label` that hold a letter, so it sees neither the title signature (role `title`, in or out of a scene) nor the running head and other texts; the contrast of DDWG's dimmed list was found by a reviewer and a scan of that trace.
 - Each film's production chain ran the cover check, the draft still scan, the concept check and the gate record by its own scripts, and lost render slots when one of them refused after an earlier step had passed.
 
+No bridge closed the seventh gap: two low thumps that the ETHOS film's sixth review measured in its Chinese thought pauses (§8).
+
 `review/round.py` and `review/measurement.py` (417 and 442 effective lines) were near the 500-effective-line code-size limit that ETHOS's paradigm gate counts per module, tests included: physical lines that hold a token, with comments, blank lines and Python's docstrings and other bare strings left out (`ethos.measure`).
 
 ## Goals / Non-Goals
@@ -18,7 +20,7 @@ Three films were produced on 2026-11-05 with filmkit 0.9.0, and each gap of the 
 
 - Close each gap in the engine with the owners that already decide it, so that no film needs a bridge.
 - Measure clarity exactly as the reviewers state it, and gate the title and resting contrast before a render.
-- Keep every existing film's output bytes; only the gate verdicts, the review records and the round tools change.
+- Keep every existing film's output bytes, except a soundtrack where a take's codec onset is released (§8); only the gate verdicts, the review and assembly records and the round tools change.
 
 **Non-Goals:**
 
@@ -60,6 +62,16 @@ A text's contrast is the frame audit's reading load: WCAG relative luminance of 
 
 The draft record lives at `build/evidence/editions/<code>/draft-stills.json` beside the edition's other records. The still scan binds the composition as it stands when the scan runs, as the sync audit binds the composition its trace samples; a draft scanned as soon as it renders is bound to the composition it shows.
 
+### 8. A take's codec onset after digital silence is released
+
+The ETHOS film's round-6 Chinese soundtrack leaves digital silence on a step above −45 dBFS twice (`quiet_edges.left_with_a_step_above_minus_45_dbfs = 2`), each where a run-on retake (03.7, 08.9) follows a take that ends in digital silence. The retake opens with a codec transient from −31 to −39 dBFS (1 ms peak about −28 dBFS, 98–99 % of its energy below 500 Hz) that decays into its noise floor, about −84 dBFS, within 35–60 ms, and the join's native quiet follows. All 18 auditioned seeds of 03.7's text open with it, so a film cannot choose it away. Digital silence was treated only inside the native quiet, and here it lies before the transient.
+
+At each complete-thought join, the sound between digital silence after the thought's last aligned word and the join's native quiet is released when it lasts at most 0.1 s. It holds no aligned word, since the native quiet lies in the join window and begins before the next thought's first word. The zeros then leave into the native quiet through the soft 10 ms fade that leaves digital silence inside a join, because a native quiet of up to PCM 260 still steps above −45 dBFS after the program gain. The two thumps sound 14.4 and 6.1 ms before the native quiet in the assembly's samples, and the onsets of the round-7 opening takes 10–60 ms before heard quiet, while a syllable lasts longer; 0.1 s covers them with margin, and a breath keeps its samples.
+
+The same onset blocks a take that opens its recording, whose clip must begin in heard quiet at least 0.1 s before the first word. Only when no such quiet exists, the sound before the recording's first 10 ms heard as quiet is released if it lasts at most 0.1 s and ends by the first aligned word, and the clip begins in it; every clip the assembly already begins keeps its bytes. The audition judges each take by the same functions on its own alignment: `opens_quiet` keeps the raw first 10 ms, `onset_releasable` states the onset, and `clip_opens_quiet`, which a take opening its recording needs, whether the assembly would begin its clip in quiet. Each designed thought pause and each clip's boundary fades record `released_onset_samples`.
+
+On the round-6 Chinese inputs the patched assembly changes exactly the joins 03.6>03.7 and 08.8>08.9, 693 and 293 samples released; the quiet edges then leave no digital silence above −45 dBFS, the runtime stays 900 s, the timeline is identical and every other sample is equal (`build/runtime/work/onset/comparison.txt`).
+
 ## Risks / Trade-offs
 
 - [A title card that adds words to the declared title is refused] → The card and the release metadata should agree; the film corrects one of them.
@@ -67,10 +79,12 @@ The draft record lives at `build/evidence/editions/<code>/draft-stills.json` bes
 - [The reading load assumes a text lighter than the ground] → Every film's ground is dark; a light ground would need the symmetric ratio.
 - [The draft record binds the composition at scan time] → A composition edited between the draft's render and its scan is bound wrongly; the films render and scan in one step.
 - [Existing films are refused by the new gates] → That is the intent; each adopts 0.10.0 with its next edition.
+- [The aligner places words in 0.08 s steps] → A first word aligned at 0 s covers any opening onset, so its take stays refused by both the audition and the assembly; another seed is auditioned.
+- [The audition judges a take alone, the assembly the take in its recording after the thought gain] → A first word aligned one step apart, or a frame moved across −55 dBFS, can judge a borderline opening differently; the assembly's refusal still names the segment.
 
 ## Migration Plan
 
-A film adopts 0.10.0 with its next edition: its picture must pass the title and contrast gates before `render-picture` starts; its draft tooling scans with `still_scan --language`; its prompt template may move to `{previous_review}` and `{clarity}`; it may declare `review.clarity_minimum_db`; and it sets aside a watched preview with `set-aside --unreviewed --consumer`. Rollback is the previous pin; nothing a film tracks changes.
+A film adopts 0.10.0 with its next edition: its picture must pass the title and contrast gates before `render-picture` starts; its draft tooling scans with `still_scan --language`; its prompt template may move to `{previous_review}` and `{clarity}`; it may declare `review.clarity_minimum_db`; and it sets aside a watched preview with `set-aside --unreviewed --consumer`. A film whose takes hold a releasable onset assembles a different soundtrack with the same timeline and packages its films again. Rollback is the previous pin; nothing a film tracks changes.
 
 ## Open Questions
 

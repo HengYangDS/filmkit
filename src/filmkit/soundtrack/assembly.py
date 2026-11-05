@@ -38,6 +38,7 @@ from filmkit.soundtrack.level import (
 )
 from filmkit.soundtrack.pauses import (
     allocate_designed_gaps,
+    begin_clip,
     design_thought_pauses,
     gap_kinds,
     gap_pause_targets,
@@ -48,7 +49,6 @@ from filmkit.soundtrack.policy import designed_pause_policy, segment_releases
 from filmkit.soundtrack.quiet import (
     cap_inner_quiet,
     clip_end,
-    clip_start,
     heard_before,
     lengthen_inner_quiet,
     release_tail,
@@ -258,7 +258,8 @@ def _designed_clip(
         edit["inner_quiet_seconds"] = inner[index - 1]
         edit["next_inner_quiet_seconds"] = inner[index]
     _, times = aligned_lookup(text, items)
-    start = clip_start(designed, times[0][0], RATE)
+    # A recording heard from its first sample begins its clip in its released onset, if any.
+    start, onset = begin_clip(designed, times[0][0], RATE)
     if start is None:
         msg = f"Narration is heard from its first sample: {segment['id']}"
         raise AssemblyError(msg)
@@ -272,6 +273,7 @@ def _designed_clip(
     level_gain_db = _record_gain(record)
     clip, fades = fade_narration_boundaries(correct_narration_level(clip, level_gain_db))
     fades["released_tail_samples"] = released
+    fades["released_onset_samples"] = onset
     return Clip(
         segment,
         record,

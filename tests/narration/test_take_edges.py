@@ -147,3 +147,44 @@ def test_opening_tells_a_take_that_begins_in_quiet_from_one_heard_at_once():
     heard_at_once = narration_take_edges.opening(pcm(voiced(0.5)), RATE)
     assert not heard_at_once["opens_quiet"]
     assert heard_at_once["first_dbfs"] > -55
+    # Without its first aligned word, a take's clip opens quiet only when its first 10 ms do.
+    assert begins_quiet["clip_opens_quiet"]
+    assert not heard_at_once["clip_opens_quiet"]
+
+
+def thump(seconds: float) -> np.ndarray:
+    """A codec onset: 100 Hz that steps in at -30 dBFS and decays over its length."""
+    t = np.arange(round(seconds * RATE)) / RATE
+    return np.sqrt(2) * 10 ** (-30 / 20) * np.cos(2 * np.pi * 100 * t) * np.exp(-4 * t / seconds)
+
+
+def hush(seconds: float) -> np.ndarray:
+    """A take's noise floor, about -82 dBFS."""
+    return np.random.default_rng(3).integers(-4, 5, round(seconds * RATE)) / 32767
+
+
+def test_opening_accepts_the_takes_whose_clip_the_assembly_begins_in_quiet():
+    # A codec onset that meets heard quiet before the first word is released by the assembly.
+    onset = narration_take_edges.opening(
+        pcm(np.concatenate([thump(0.04), hush(0.05), voiced(0.5)])), RATE, 0.09
+    )
+    assert -34 < onset["first_dbfs"] < -33
+    assert not onset["opens_quiet"]
+    assert onset["onset_releasable"]
+    assert onset["clip_opens_quiet"]
+    # Speech from the first sample has no quiet and no onset to release.
+    speech = narration_take_edges.opening(pcm(voiced(0.5)), RATE, 0.0)
+    assert not speech["onset_releasable"]
+    assert not speech["clip_opens_quiet"]
+    # A take that begins in heard quiet has no onset.
+    quiet = narration_take_edges.opening(pcm(np.concatenate([hush(0.2), voiced(0.5)])), RATE, 0.2)
+    assert quiet["opens_quiet"]
+    assert not quiet["onset_releasable"]
+    assert quiet["clip_opens_quiet"]
+    # A longer sound is no onset: its clip opens quiet only in heard quiet after it.
+    breath = 0.03 * np.random.default_rng(5).standard_normal(round(0.2 * RATE))
+    for lead, opens in ((0.3, True), (0.02, False)):
+        take = pcm(np.concatenate([breath, hush(lead), voiced(0.5)]))
+        longer = narration_take_edges.opening(take, RATE, 0.2 + lead)
+        assert not longer["onset_releasable"]
+        assert longer["clip_opens_quiet"] is opens
