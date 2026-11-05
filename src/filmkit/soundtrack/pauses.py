@@ -195,8 +195,9 @@ class ThoughtJoin:
     """A complete-thought join: its native quiet, the part of it heard as quiet, and the rest.
 
     `group` numbers the thought the join follows from 1; `begin` and `end` bound the native
-    quiet in samples; `overhead` is the native quiet not heard as quiet, in seconds; and
-    `spoken_end` is the sample where the thought's last aligned item ends.
+    quiet in samples; `overhead` is the native quiet not heard as quiet, in seconds;
+    `spoken_end` is the sample where the thought's last aligned item ends; and `spoken_start`
+    is the sample where the next thought's first aligned item begins.
     """
 
     group: int
@@ -205,6 +206,7 @@ class ThoughtJoin:
     heard: tuple[int, int] | None
     overhead: float
     spoken_end: int
+    spoken_start: int
 
 
 def thought_joins(
@@ -230,7 +232,8 @@ def thought_joins(
         heard = heard_quiet_run(audio, begin, end, rate)
         overhead = (end - begin - (heard[1] - heard[0] if heard else 0)) / rate
         spoken_end = round(items[join.left]["end_time"] * rate)
-        joins.append(ThoughtJoin(group, begin, end, heard, overhead, spoken_end))
+        spoken_start = round(items[join.right]["start_time"] * rate)
+        joins.append(ThoughtJoin(group, begin, end, heard, overhead, spoken_end, spoken_start))
     return joins
 
 
@@ -281,6 +284,31 @@ def _release_onset(audio: np.ndarray, join: ThoughtJoin, rate: int) -> int:
     return join.begin - silence[1]
 
 
+def _release_leaving_onset(audio: np.ndarray, join: ThoughtJoin, rate: int) -> int:
+    """Release a take's onset where a join's digital silence ends its native quiet, in place.
+
+    When the native quiet ends within ONSET_SECONDS after its digital silence, the sound the
+    silence is left into is the next take's codec onset if it meets heard quiet as a clip's
+    opening onset does (`opening_onset`): within ONSET_SECONDS and before the next thought's
+    first aligned item. It is released to digital silence, which then leaves into that quiet
+    through a soft fade. Return the released samples.
+    """
+    silence = _digital_silence(audio, join.begin, join.end, rate)
+    if silence is None or join.end - silence[1] > round(ONSET_SECONDS * rate):
+        return 0
+    last = silence[1]
+    onset = opening_onset(audio[last:], (join.spoken_start - last) / rate, rate)
+    if onset:
+        audio[last : last + onset] = 0
+        _soften(
+            audio,
+            last + onset,
+            last + onset + round(EDGE_FADE_SECONDS * rate),
+            rising=True,
+        )
+    return onset
+
+
 def _enter_digital_silence(
     audio: np.ndarray, join: ThoughtJoin, rate: int, release_seconds: float
 ) -> int:
@@ -327,7 +355,8 @@ def design_thought_pauses(
 
     Designed quiet is inserted into, or removed from, the middle of the part of the
     native quiet heard as quiet, so a decaying tail or a rising onset keeps its native
-    quiet beside it. A take's codec onset before the native quiet is released first.
+    quiet beside it. A take's codec onset before the native quiet, or where the join's
+    digital silence ends it, is released first.
     releases maps a thought's index to its declared release seconds.
     """
     joins = thought_joins(audio, items, text, groups, rate)
@@ -337,7 +366,7 @@ def design_thought_pauses(
     audio, fade, releases = audio.copy(), round(FADE_SECONDS * rate), releases or {}
     shifts, edits = [], []
     for join, target in zip(joins, targets, strict=True):
-        onset = _release_onset(audio, join, rate)
+        onset = _release_onset(audio, join, rate) + _release_leaving_onset(audio, join, rate)
         released = _enter_digital_silence(
             audio, join, rate, releases.get(join.group, RELEASE_SECONDS)
         )

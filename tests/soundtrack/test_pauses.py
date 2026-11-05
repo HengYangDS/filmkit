@@ -387,6 +387,67 @@ def test_a_join_without_digital_silence_before_its_native_quiet_keeps_its_sample
     assert np.array_equal(designed[: join.begin], audio[: join.begin])
 
 
+def leaving_join(after: np.ndarray, quiet: float = 0.06) -> tuple:
+    """A word, its floor and digital silence that ends the native quiet, `after`, quiet, a word.
+
+    Returns the signal, its aligned items and the sample where the silence ends.
+    """
+    word = tone(0.36)
+    word[-round(0.06 * RATE) :] *= np.exp(-np.arange(round(0.06 * RATE)) / (0.01 * RATE))
+    lead = np.concatenate([word, hush(0.5), np.zeros(round(0.16 * RATE))])
+    audio = stereo(np.concatenate([lead, after, hush(quiet), tone(0.3)]))
+    following = (len(audio) - round(0.3 * RATE)) / RATE
+    items = [
+        {"text": "先", "start_time": 0.0, "end_time": 0.3},
+        {"text": "看", "start_time": following, "end_time": following + 0.3},
+    ]
+    return audio, items, len(lead)
+
+
+def test_a_take_onset_where_digital_silence_ends_the_native_quiet_is_released():
+    audio, items, last = leaving_join(thump(0.04))
+    (join,) = soundtrack_pauses.thought_joins(audio, items, "先。看", ["先。", "看"], RATE)
+    # The digital silence ends the native quiet: the next take's onset follows it at once.
+    assert 0 <= join.end - last <= soundtrack_pauses.ONSET_SECONDS * RATE
+    assert edges(audio)["left_above_minus_45_dbfs"] == 1
+    designed, aligned, edits = soundtrack_pauses.design_thought_pauses(
+        audio, items, "先。看", ["先。", "看"], RATE, targets=[0.8]
+    )
+    # The onset meets heard quiet in its fourth 10 ms frame.
+    assert edits[0]["released_onset_samples"] == round(0.03 * RATE)
+    heard = edges(designed)
+    assert heard["left_with_a_step_above_minus_45_dbfs"] == 0
+    assert heard["left_above_minus_45_dbfs"] == 0
+    # Speech never moves, and its samples are bit-identical.
+    assert np.array_equal(designed[: round(0.36 * RATE)], audio[: round(0.36 * RATE)])
+    assert np.array_equal(designed[-round(0.3 * RATE) :], audio[-round(0.3 * RATE) :])
+    assert aligned[0] == items[0]
+    assert len(designed) == len(audio) + edits[0]["inserted_quiet_samples"]
+
+
+@pytest.mark.parametrize(
+    ("after", "quiet", "word_at"),
+    [
+        # The next word itself, without quiet before it.
+        (np.zeros(0), 0.0, None),
+        # Sound longer than an onset before the quiet.
+        (thump(0.3), 0.06, None),
+        # An onset that the next word begins inside.
+        (thump(0.04), 0.0, 0.02),
+    ],
+)
+def test_sound_that_leaves_digital_silence_as_no_onset_keeps_its_samples(after, quiet, word_at):
+    audio, items, last = leaving_join(after, quiet)
+    if word_at is not None:
+        items[1] = {**items[1], "start_time": last / RATE + word_at}
+    designed, _, edits = soundtrack_pauses.design_thought_pauses(
+        audio, items, "先。看", ["先。", "看"], RATE, targets=[0.8]
+    )
+    assert edits[0]["released_onset_samples"] == 0
+    kept = len(audio) - last - round(0.01 * RATE)
+    assert np.array_equal(designed[-kept:], audio[-kept:])
+
+
 def test_a_clip_that_cannot_begin_in_quiet_begins_in_its_released_onset():
     audio = stereo(np.concatenate([thump(0.04), hush(0.05), tone(0.4)]))
     # The first word starts 0.09 s in, so the onset fills the lead a clip begins in.

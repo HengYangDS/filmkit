@@ -72,6 +72,8 @@ The same onset blocks a take that opens its recording, whose clip must begin in 
 
 On the round-6 Chinese inputs the patched assembly changes exactly the joins 03.6>03.7 and 08.8>08.9, 693 and 293 samples released; the quiet edges then leave no digital silence above −45 dBFS, the runtime stays 900 s, the timeline is identical and every other sample is equal (`build/runtime/work/onset/comparison.txt`).
 
+The round-7 Chinese retakes put the same onset after the native quiet. A take with little quiet before its first word leaves the previous take's decay and digital silence as the join's native quiet, and the silence ends it where the onset begins: at 03.6>03.7 with seed 202655, 40 ms from −35 to −53 dBFS, then −60 to −76 dBFS until the word 0.1 s after the silence. So where a join's digital silence ends within 0.1 s of its native quiet's end, the sound it is left into is released as a clip's opening onset is (`opening_onset`): when it meets heard quiet within 0.1 s and before the next thought's first aligned word, and the silence then leaves into that quiet through the same soft fade. On the round-7 pre-run the amended assembly differs from the first cut of 0.10.0 only at 03.6>03.7 (1,440 samples) and leaves no digital silence above −45 dBFS; on the round-6 inputs it also releases 05.1>05.2 (960 samples), a burst up to −38 dBFS with 99 % of its energy below 500 Hz, which the review's 5 ms edge window misses because its first 5 ms stay at −54 dBFS. Both soundtracks keep 900 s and their timelines.
+
 ## Risks / Trade-offs
 
 - [A title card that adds words to the declared title is refused] → The card and the release metadata should agree; the film corrects one of them.

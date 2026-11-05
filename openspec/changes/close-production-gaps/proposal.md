@@ -10,7 +10,7 @@ Producing three films on 2026-11-05/06 exposed seven gaps that the engine left t
 - A composition refactor dropped the ETHOS title signature from the opening, and no gate noticed.
 - Dimmed DDWG text rested below 4.5:1 against the ground, which only a review found.
 - Before a render nothing checks the inputs that later steps refuse: the cover, an earlier package, the draft scan, the concepts and the gate record.
-- Codec onsets after digital silence thump in two ETHOS thought pauses and block takes that open a recording.
+- Codec onsets after digital silence thump in ETHOS thought pauses and block takes that open a recording.
 
 ## What Changes
 
@@ -19,7 +19,7 @@ Producing three films on 2026-11-05/06 exposed seven gaps that the engine left t
 - `review.measurement` records each edition's clarity over its soundtrack and each segment's voice, by the reviewers' method, against floors a film declares in `review.clarity_minimum_db`.
 - `check-picture` refuses an opening that shows the declared title for less than 1 s before the first word, and each run of 0.7 s or more in which a text stands below 4.5:1 against the ground, from a new trace of every text.
 - `produce preflight` reports every stale or missing input of a render at once and refuses while one remains. The draft still scan binds the composition, and `--language` writes the edition's draft record.
-- The assembly releases a take's codec onset to digital silence: at a thought join, sound of at most 0.1 s between digital silence and the join's native quiet; where a recording heard from its first sample begins its clip, sound of at most 0.1 s before its first heard quiet and first word. Each join and each clip records the samples released. The audition proposes a take that opens its recording when the assembly would begin its clip in quiet.
+- The assembly releases a take's codec onset to digital silence: at a thought join, sound of at most 0.1 s between digital silence and the join's native quiet, or after the digital silence that ends the native quiet when it meets heard quiet within 0.1 s and before the next word; where a recording heard from its first sample begins its clip, sound of at most 0.1 s before its first heard quiet and first word. Each join and each clip records the samples released. The audition proposes a take that opens its recording when the assembly would begin its clip in quiet.
 - `VERSION` 0.10.0 and an `UNRELEASED` Changelog entry.
 
 Out of scope: pixel scans of rendered films, contrast against panels, a native draft render, and repairs of any film.

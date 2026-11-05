@@ -32,8 +32,10 @@
 
 - [x] 6.1 Release a take's codec onset between a thought join's digital silence and its native quiet in `soundtrack/pauses.py`, recording `released_onset_samples` for each join; done when pause tests release a 40 ms onset with no quiet edge above −45 dBFS and bit-identical speech, and keep a longer sound, one an aligned item covers and a join without digital silence.
 - [x] 6.2 Begin a clip that has no heard quiet before its first word in its released onset, recording `released_onset_samples` in its boundary fades, and qualify a take that opens its recording by `clip_opens_quiet` with `onset_releasable` in the audition; done when pause tests release an opening onset, still refuse speech from the first sample and change no quiet opening, and take-edge and proposal tests accept a releasable onset.
-- [x] 6.3 Assemble the ETHOS film's round-6 Chinese inputs with the patched engine; done when only the joins 03.6>03.7 and 08.8>08.9 differ from the round-6 soundtrack, its quiet edges leave none above −45 dBFS and it lasts 900 s (design §8).
+- [x] 6.3 Assemble the ETHOS film's round-6 Chinese inputs with the patched engine; done when only the joins 03.6>03.7, 05.1>05.2 and 08.8>08.9 differ from the round-6 soundtrack, its quiet edges leave none above −45 dBFS and it lasts 900 s (design §8).
 - [x] 6.4 Name the onset release and the opening qualification in `README.md` and the `[0.10.0]` Changelog entry; done when both name `released_onset_samples`, `onset_releasable` and `clip_opens_quiet`.
+- [x] 6.5 Release a take's onset where a join's digital silence ends its native quiet, as a clip's opening onset is released, in `soundtrack/pauses.py`; done when pause tests release a 40 ms onset after such silence with no quiet edge above −45 dBFS and bit-identical speech, and keep the next word, a longer sound and an onset the next word begins inside.
+- [x] 6.6 Assemble the ETHOS round-7 Chinese pre-run with the amended engine; done when it differs from the first cut of 0.10.0 only at 03.6>03.7, leaves no digital silence above −45 dBFS and lasts 900 s (design §8).
 
 ## Workflow follow-up
 

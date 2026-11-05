@@ -19,6 +19,20 @@ At a complete-thought join, the assembly SHALL release to digital silence the so
 - **WHEN** no digital silence lies between the thought's last aligned word and the join's native quiet
 - **THEN** the join keeps every sample before its native quiet
 
+### Requirement: A take's onset where a join's digital silence ends its native quiet is released
+
+Where a join's digital silence ends within 0.1 seconds of the end of its native quiet, the assembly SHALL release the sound the silence is left into when that sound meets heard quiet within 0.1 seconds and before the next thought's first aligned word, and SHALL record the samples. Speech, the aligned words, the designed quiet and every timing SHALL stay unchanged.
+
+#### Scenario: A take's onset after the silence that ends the native quiet
+
+- **WHEN** a join's native quiet ends with its digital silence and the next take opens with a 40 ms low-frequency onset from −30 dBFS that falls into heard quiet before the next word
+- **THEN** the assembly releases the onset and records its samples, the review's quiet edges find no edge above −45 dBFS where the join leaves its digital silence, and the speech samples are bit-identical
+
+#### Scenario: Sound after the silence that is no onset
+
+- **WHEN** the next word begins at the silence, the sound after it lasts longer than 0.1 seconds before heard quiet, or the next word begins inside it
+- **THEN** the join keeps that sound's samples and records no released samples
+
 ### Requirement: A clip heard from its first sample begins in its released onset
 
 When a recording offers its clip no heard quiet before its first aligned word, the assembly SHALL release its sound before its first 10 ms heard as quiet if that sound lasts at most 0.1 seconds and ends by the first word, begin the clip there and record the samples, and refuse the recording otherwise. The audition SHALL propose a take that opens its recording only when the assembly would begin its clip in quiet, and record its first 10 ms level and whether its onset is releasable.
