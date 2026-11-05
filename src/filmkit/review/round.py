@@ -1,20 +1,26 @@
 """Prepare and record one independent review round of both editions.
 
-A round sets the reviewed packages aside before the next render, binds the packaged
-members for the real-browser player check, writes each edition's reviewer prompt with
-the exact media hashes and the previous round's findings, and records the finished
-reviews as the production reviews that `filmkit.delivery.verification` accepts. A film
-that declares a concept contract gets prompts only when its prompt template cites the
-contract and the reading occurrence plans and its dimensions score concept fidelity. A
-round's directory defaults to build/evidence/reviews/round-<n>/. Setting aside and
-recording are planned and checked in full before anything moves or is written, and
---dry-run stops after the plan. A refused input raises `ReviewError`, which each command
-reports as its refusal.
+A round sets the packages of the previous build aside before the next render
+(`filmkit.review.set_aside`), binds the packaged members for the real-browser player check,
+writes each edition's reviewer prompt with the exact media hashes and the previous round's
+findings, or states that the round is the first (`filmkit.review.prompts`), and records the
+finished reviews as the production reviews that `filmkit.delivery.verification` accepts. A
+round's directory defaults to build/evidence/reviews/round-<n>/. Setting aside and recording
+are planned and checked in full before anything moves or is written, and --dry-run stops after
+the plan. A refused input raises `ReviewError`, which each command reports as its refusal.
+
+A reviewed round's packages are set aside by the round's reviews; an unreviewed build's, such as
+a preview the owner watched, with --unreviewed by the consumer folder that holds its films, under
+the round's label or one given with --label. --language limits a set-aside to one edition, and
+--without-picture leaves the rendered picture in place, for the editions it names or for both.
 
 Usage: python -m filmkit.review.round set-aside --round <n> --purpose <text>
-           [--review-dir <dir>] [--without-picture] [--dry-run]
+           [--review-dir <dir>] [--language zh|en] [--without-picture [zh|en ...]] [--dry-run]
+       python -m filmkit.review.round set-aside --unreviewed --consumer <dir>
+           (--round <n> | --label <label>) --purpose <text>
+           [--language zh|en] [--without-picture [zh|en ...]] [--dry-run]
        python -m filmkit.review.round bind --out <file>
-       python -m filmkit.review.round prompts --round <n> --previous <dir>
+       python -m filmkit.review.round prompts --round <n> [--previous <dir>]
            [--changes <file>] [--out-dir <dir>]
        python -m filmkit.review.round record --round-dir <dir> [--dry-run]
 """
@@ -24,45 +30,27 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-import string
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
 
 import filmkit.repository as repository
-import filmkit.sources as sources
-import filmkit.specification as specification
+import filmkit.review.prompts as round_prompts
+import filmkit.review.set_aside as set_aside
 from filmkit.delivery.packaging import BOUND_FILM
-from filmkit.film import FILM
-from filmkit.narration.readings import plan_path
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
+from filmkit.review.files import edition_review, present, round_directory
 from filmkit.review.record import DIMENSIONS, SCHEMA_VERSION, overall
 
-EXIT_CONDITION = "Retire after the successor delivery is accepted"
 HUMAN_LISTENING = (
     "Audio is scored from automated evidence: recognition, word timings, rate, the "
     "pause hierarchy, quiet edges, thought levels, endings and waveforms. Human "
     "listening is a separate acceptance after delivery and does not affect the scores."
 )
-# The round's own inputs that each reviewer prompt names.
-ROUND_INPUTS = (
-    "pronunciation-listening-plan.json",
-    "measurements.json",
-    "player-check-artifacts.json",
-)
 # A reported overall score may differ from the mean of its scores by this much rounding.
 OVERALL_ROUNDING = 0.05
-
-
-class SetAside(NamedTuple):
-    """One edition's reviewed members, the folder they move to and its manifest."""
-
-    code: str
-    target: Path
-    sources: list[Path]
-    manifest: dict
 
 
 class ProductionReview(NamedTuple):
@@ -71,122 +59,6 @@ class ProductionReview(NamedTuple):
     target: Path
     report: Path
     record: dict
-
-
-def cited(path: Path) -> str:
-    """A path as the prompts cite it: ROOT/<path> inside the repository."""
-    text = repository.relative(path)
-    return text if Path(text).is_absolute() else f"ROOT/{text}"
-
-
-def present(paths: list[Path]) -> list[Path]:
-    """The given files, refused when any is missing."""
-    missing = [repository.relative(path) for path in paths if not path.is_file()]
-    if missing:
-        msg = f"missing {', '.join(missing)}"
-        raise ReviewError(msg)
-    return paths
-
-
-def round_directory(number: int) -> Path:
-    return repository.ROOT / "build/evidence/reviews" / f"round-{number}"
-
-
-def edition_review(path: Path, code: str) -> tuple[dict, dict]:
-    """A round's review file and its entry for one edition, refused when either is absent."""
-    review = repository.read(present([path])[0])
-    entry = review.get("editions", {}).get(code)
-    if not isinstance(entry, dict):
-        msg = f"{repository.relative(path)} reviews no {code} edition"
-        raise ReviewError(msg)
-    return review, entry
-
-
-def plan_set_aside(
-    number: int, purpose: str, review_dir: Path, *, picture: bool = True
-) -> list[SetAside]:
-    """Plan moving a reviewed round's packages aside before the next render and package.
-
-    package-film refuses to extend a package bound to changed inputs, and the next
-    render would overwrite the reviewed picture. Each edition's two films and package
-    record, and its rendered picture unless picture is false (when the successor's
-    render has already replaced it; the UHD film carries the same picture stream), are
-    to be renamed within the volume into build/artifacts/film/superseded/round-<n>/<code>/
-    and recorded in manifest.json with their hashes, consumer and exit condition. The plan
-    is refused unless, for both editions, the target is new, every member exists on the
-    target's volume and the round's review binds both film hashes.
-    """
-    plans = []
-    for code in CODES:
-        edition = Edition(code)
-        target = repository.ROOT / "build/artifacts/film/superseded" / f"round-{number}" / code
-        if target.exists():
-            msg = f"{repository.relative(target)} exists; inspect it before setting aside again"
-            raise ReviewError(msg)
-        sources = [*edition.films, edition.film_package, *([edition.picture] if picture else [])]
-        present(sources)
-        volume = next(parent for parent in target.parents if parent.exists()).stat().st_dev
-        if any(path.stat().st_dev != volume for path in sources):
-            msg = f"{code}: a member lies outside the volume of {repository.relative(target)}"
-            raise ReviewError(msg)
-        review = review_dir / f"review-{code}.json"
-        bound = {item["sha256"] for item in edition_review(review, code)[1].get("media", [])}
-        hashes = {path: repository.sha(path) for path in sources}
-        if not all(hashes[film] in bound for film in edition.films):
-            msg = f"{code}: the packaged films are not the ones round {number} reviewed"
-            raise ReviewError(msg)
-        members = [
-            {
-                "source": repository.relative(path),
-                "path": repository.relative(target / path.name),
-                "sha256": hashes[path],
-                "bytes": path.stat().st_size,
-            }
-            for path in sources
-        ]
-        manifest = {
-            "purpose": f"{code} package and picture reviewed in round {number}: {purpose}",
-            "consumer": f"{repository.relative(review)} binds the two film hashes",
-            "exit_condition": EXIT_CONDITION,
-            "moved_at": None,
-            "members": members,
-        }
-        plans.append(SetAside(code, target, sources, manifest))
-    return plans
-
-
-def move_aside(plans: list[SetAside]) -> None:
-    """Move each planned member aside and read it back by its hash.
-
-    Each target's manifest is written before its first move, with moved_at null, so an
-    interrupted set-aside still names every member it was moving; once every member has
-    moved, the manifest records when.
-    """
-    for plan in plans:
-        plan.target.mkdir(parents=True)
-        repository.write(plan.target / "manifest.json", plan.manifest)
-        for source, member in zip(plan.sources, plan.manifest["members"], strict=True):
-            moved = source.rename(plan.target / source.name)
-            if source.exists() or repository.sha(moved) != member["sha256"]:
-                msg = f"{member['path']}: set-aside readback differs"
-                raise ReviewError(msg)
-        moved_at = datetime.now(UTC).isoformat()
-        repository.write(plan.target / "manifest.json", {**plan.manifest, "moved_at": moved_at})
-
-
-def set_aside_report(plans: list[SetAside], *, dry_run: bool) -> dict:
-    """Each edition's set-aside target and members, as the command prints them."""
-    return {
-        "dry_run": dry_run,
-        "editions": [
-            {
-                "language": plan.code,
-                "target": repository.relative(plan.target),
-                "members": [member["path"] for member in plan.manifest["members"]],
-            }
-            for plan in plans
-        ],
-    }
 
 
 def bind(out: Path) -> dict:
@@ -209,172 +81,6 @@ def bind(out: Path) -> dict:
         out, {"destination": str(destination), "film": dict(BOUND_FILM), "members": members}
     )
     return {"members": len(members), "binding": repository.relative(out)}
-
-
-# The reviewer prompt, filled per edition: the str.format template the film declares.
-TEMPLATE = (repository.ROOT / FILM.review.prompt).read_text(encoding="utf-8")
-# How the prompt names an optional field that the film or a script does not declare.
-NOT_DECLARED = "none declared"
-# The dimension that scores a declared concept contract, and the prompt fields that cite it
-# and the reading occurrence plans.
-CONCEPT_DIMENSION = "concept_fidelity"
-CONTRACT_FIELDS = ("concepts", "readings")
-
-
-def contract_gaps(template: str, dimensions: dict[str, str]) -> list[str]:
-    """What a film's review configuration leaves out of the concept contract it declares.
-
-    A film that declares a contract cites it and the reading occurrence plans in its prompt
-    template and scores concept fidelity; a film without one owes neither.
-    """
-    if not FILM.concepts:
-        return []
-    fields = {name for _, name, _, _ in string.Formatter().parse(template) if name}
-    gaps = [
-        f"{FILM.review.prompt} never cites {{{name}}}"
-        for name in CONTRACT_FIELDS
-        if name not in fields
-    ]
-    if CONCEPT_DIMENSION not in dimensions:
-        gaps.append(f"review.dimensions has no {CONCEPT_DIMENSION}")
-    return gaps
-
-
-def declared_seconds(policy: dict, key: str) -> str:
-    """A script's declared duration, or "none declared" for an optional one it omits."""
-    value = policy.get(key)
-    return NOT_DECLARED if value is None else f"{value:.2f} s"
-
-
-def inner_caps(policy: dict) -> str:
-    marks = policy.get("inner_pause_caps_seconds") or {}
-    names = {",": "commas", "，": "commas", "、": "enumeration commas"}
-    extra = ", ".join(f"{value:.2f} s at {names.get(mark, mark)}" for mark, value in marks.items())
-    cap = declared_seconds(policy, "inner_pause_cap_seconds")
-    return f"{cap} ({extra})" if extra else cap
-
-
-def inner_floors(policy: dict) -> str:
-    floors = policy.get("inner_pause_floors_seconds")
-    if not floors:
-        return NOT_DECLARED
-    return ", ".join(f"{marks} {value:.3g} s" for marks, value in floors.items())
-
-
-def inner_breath(policy: dict) -> str:
-    breath = policy.get("inner_breath")
-    if not breath:
-        return NOT_DECLARED
-    seconds, pause = breath["longest_group_seconds"], breath["pause_seconds"]
-    return f"{seconds:g} s with a {pause:g} s pause"
-
-
-def boundary(policy: dict) -> str:
-    """A script's declared thought boundary ratio and the margin each floored boundary adds."""
-    if policy.get("thought_boundary_ratio") is None:
-        return NOT_DECLARED
-    margin = policy.get("thought_boundary_margin_seconds", 0)
-    return f"{policy['thought_boundary_ratio']} and {margin:.2f} s"
-
-
-def finding_index(findings: list[dict]) -> str:
-    """Finding identifiers grouped by severity, in order of first appearance."""
-    groups: dict[str, list[str]] = {}
-    for finding in findings:
-        groups.setdefault(finding["severity"], []).append(finding["id"])
-    return "; ".join(f"{severity} {', '.join(ids)}" for severity, ids in groups.items())
-
-
-def prompt_context(out_dir: Path, previous: Path, changes: Path | None) -> dict:
-    """The template fields both editions' prompts share.
-
-    They name the canonical source, the film's concept contract and the readings' occurrence
-    plans, the round's places, the delivery format and the pause and level policies the
-    current scripts and assemblies declare.
-    """
-    zh, en = (repository.read(Edition(code).script)["voice_performance"] for code in CODES)
-    manifest = sources.manifest()
-    assemblies = [repository.read(Edition(code).audio_assembly) for code in CODES]
-    levels = {item["program_level"]["policy"]["integrated_lufs"] for item in assemblies}
-    if len(levels) != 1:
-        msg = f"the soundtracks declare different program levels: {sorted(levels)}"
-        raise ReviewError(msg)
-    return {
-        "root": repository.ROOT,
-        "source": sources.location(),
-        "documents": ", ".join(Path(member["path"]).stem for member in manifest["members"]),
-        "concepts": cited(repository.ROOT / FILM.concepts) if FILM.concepts else NOT_DECLARED,
-        "readings": " and ".join(cited(repository.ROOT / plan_path(code)) for code in CODES),
-        "out": cited(out_dir),
-        "previous": cited(previous),
-        "changes": "" if changes is None else changes.read_text().strip() + "\n",
-        "duration": specification.DURATION,
-        "fps": specification.FPS,
-        "rate": f"{specification.RATE / 1000:g}",
-        "program": f"{levels.pop():g}",
-        "caps": f"{inner_caps(zh)} Chinese; {inner_caps(en)} English",
-        "floors": f"Chinese {inner_floors(zh)}; English {inner_floors(en)}",
-        "breath": f"Chinese {inner_breath(zh)}; English {inner_breath(en)}",
-        "tolerances": f"{zh['thought_level_tolerance_db']} dB Chinese, "
-        f"{en['thought_level_tolerance_db']} dB English",
-        "ratios": f"{boundary(zh)} Chinese, {boundary(en)} English",
-        "codas": f"{declared_seconds(zh, 'coda_thought_pause_seconds')} Chinese, "
-        f"{declared_seconds(en, 'coda_thought_pause_seconds')} English",
-        "dimensions": "\n".join(
-            f"{index}. {name}: {text}" for index, (name, text) in enumerate(DIMENSIONS.items(), 1)
-        ),
-    }
-
-
-def prompts(previous: Path, out_dir: Path, changes: Path | None = None) -> dict:
-    """Write each edition's independent reviewer prompt for one round.
-
-    Each prompt names the exact packaged films with their SHA-256, the previous round's
-    review and its findings, the round's own inputs and the pause policy the current
-    scripts declare. changes holds Markdown context bullets for this round, such as the
-    repairs since the previous review and their dispositions. The previous review is
-    context to verify, never a score to inherit. Nothing is written unless both
-    editions' films and previous reviews and the round's inputs exist, and the review
-    configuration keeps the concept contract the film declares (`contract_gaps`).
-    """
-    gaps = contract_gaps(TEMPLATE, DIMENSIONS)
-    if gaps:
-        msg = "the review omits the concept contract the film declares: " + "; ".join(gaps)
-        raise ReviewError(msg)
-    present([out_dir / name for name in ROUND_INPUTS])
-    context = prompt_context(out_dir, previous, changes)
-    texts = {}
-    for code in CODES:
-        edition = Edition(code)
-        other = next(name for name in CODES if name != code)
-        media = "\n".join(
-            f"- {film} (SHA-256 {repository.sha(film)})" for film in present(edition.films)
-        )
-        review = present([previous / f"review-{code}.json", previous / f"{code}-review.md"])[0]
-        findings = edition_review(review, code)[1]["findings"]
-        working = previous / code
-        scripts = (
-            f" The previous reviewer's working files are in {cited(working)}/; you may "
-            "copy and adapt its scripts under your own output directory."
-            if working.is_dir()
-            else ""
-        )
-        texts[code] = TEMPLATE.format(
-            **context,
-            language=edition.language,
-            code=code,
-            other=other,
-            other_language=Edition(other).language,
-            media=media,
-            findings=f"findings: {finding_index(findings)}" if findings else "no findings",
-            scripts=scripts,
-        )
-    written = []
-    for code, text in texts.items():
-        path = out_dir / f"prompt-{code}.md"
-        path.write_text(text)
-        written.append(repository.relative(path))
-    return {"prompts": written}
 
 
 def reviewed_scores(code: str, review: dict) -> dict:
@@ -479,13 +185,28 @@ def record_report(records: list[ProductionReview], *, dry_run: bool) -> dict:
 
 
 def run_set_aside(options: argparse.Namespace) -> dict:
-    review_dir = (options.review_dir or round_directory(options.round)).resolve()
-    plans = plan_set_aside(
-        options.round, options.purpose, review_dir, picture=not options.without_picture
-    )
+    codes = CODES if options.language is None else (options.language,)
+    kept = codes if options.without_picture == [] else tuple(options.without_picture or ())
+    pictures = tuple(code for code in codes if code not in kept)
+    if options.unreviewed:
+        if options.consumer is None or options.review_dir is not None:
+            msg = "an unreviewed set-aside names its --consumer and reads no reviews"
+            raise ReviewError(msg)
+        label = options.label or set_aside.round_label(options.round)
+        plans = set_aside.plan_unreviewed(
+            label, options.purpose, options.consumer.resolve(), codes=codes, pictures=pictures
+        )
+    else:
+        if options.round is None or options.consumer is not None:
+            msg = "a reviewed set-aside names its --round and no consumer; see --unreviewed"
+            raise ReviewError(msg)
+        review_dir = (options.review_dir or round_directory(options.round)).resolve()
+        plans = set_aside.plan_set_aside(
+            options.round, options.purpose, review_dir, codes=codes, pictures=pictures
+        )
     if not options.dry_run:
-        move_aside(plans)
-    return set_aside_report(plans, dry_run=options.dry_run)
+        set_aside.move_aside(plans)
+    return set_aside.set_aside_report(plans, dry_run=options.dry_run)
 
 
 def run_bind(options: argparse.Namespace) -> dict:
@@ -493,8 +214,8 @@ def run_bind(options: argparse.Namespace) -> dict:
 
 
 def run_prompts(options: argparse.Namespace) -> dict:
-    return prompts(
-        options.previous.resolve(),
+    return round_prompts.prompts(
+        options.previous.resolve() if options.previous else None,
         (options.out_dir or round_directory(options.round)).resolve(),
         options.changes.resolve() if options.changes else None,
     )
@@ -507,16 +228,17 @@ def run_record(options: argparse.Namespace) -> dict:
     return record_report(records, dry_run=options.dry_run)
 
 
-def command_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    commands = parser.add_subparsers(dest="command", required=True)
-    aside = commands.add_parser("set-aside", help="move a reviewed round's packages aside")
-    aside.add_argument("--round", type=int, required=True, metavar="N")
+def set_aside_options(aside: argparse.ArgumentParser) -> None:
+    label = aside.add_mutually_exclusive_group(required=True)
+    label.add_argument("--round", type=int, metavar="N", help="the round, labelled round-N")
+    label.add_argument(
+        "--label", metavar="NAME", help="an unreviewed build's own label, in lowercase words"
+    )
     aside.add_argument(
         "--purpose",
         required=True,
         metavar="TEXT",
-        help="why the reviewed packages are superseded, recorded in each manifest",
+        help="why the packages are superseded, recorded in each manifest",
     )
     aside.add_argument(
         "--review-dir",
@@ -525,12 +247,34 @@ def command_parser() -> argparse.ArgumentParser:
         help="the round's reviews (default build/evidence/reviews/round-N)",
     )
     aside.add_argument(
-        "--without-picture",
+        "--unreviewed",
         action="store_true",
-        help="leave the rendered picture in place once its successor has replaced it",
+        help="set aside a build nobody reviewed, bound by the copies --consumer holds",
+    )
+    aside.add_argument(
+        "--consumer",
+        type=Path,
+        metavar="DIR",
+        help="the folder whose <edition>/ holds each edition's two films byte-identical",
+    )
+    aside.add_argument("--language", choices=CODES, help="set aside this edition only")
+    aside.add_argument(
+        "--without-picture",
+        nargs="*",
+        choices=CODES,
+        metavar="CODE",
+        help="leave the rendered picture in place, for the editions named or for every edition",
     )
     aside.add_argument("--dry-run", action="store_true", help="plan without moving anything")
     aside.set_defaults(run=run_set_aside)
+
+
+def command_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    commands = parser.add_subparsers(dest="command", required=True)
+    set_aside_options(
+        commands.add_parser("set-aside", help="move the previous build's packages aside")
+    )
     binding = commands.add_parser("bind", help="bind the packaged members for the player check")
     binding.add_argument("--out", type=Path, required=True, metavar="FILE")
     binding.set_defaults(run=run_bind)
@@ -539,9 +283,8 @@ def command_parser() -> argparse.ArgumentParser:
     prompt.add_argument(
         "--previous",
         type=Path,
-        required=True,
         metavar="DIR",
-        help="the previous round's review directory",
+        help="the previous round's review directory; without it the round is the first",
     )
     prompt.add_argument(
         "--changes",

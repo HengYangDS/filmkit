@@ -30,16 +30,16 @@ Every other file is named by the declaration, a script or a cast: the entry page
 
 ## The declaration
 
-| Field                            | Meaning                                                                                                                                                                |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `slug`                           | The prefix of every delivered file, in lowercase words joined by hyphens                                                                                               |
-| `documents_folder`               | The folder in `~/Documents` that a delivery fills                                                                                                                      |
-| `entry`                          | The template of the page that leads to each edition's player                                                                                                           |
-| `source_manifest`                | The commit and digests of the document the film explains                                                                                                               |
-| `concepts`                       | The concept contract (optional): what each concept the film names means in its source, and the words each edition uses for it                                          |
-| `[editions.zh]`, `[editions.en]` | Each edition's `sources` folder, its 16:9 `cover` and the `caption_terms` that stay on one caption line                                                                |
-| `[picture] fonts`                | The font files the picture stages below `fonts/`, in order                                                                                                             |
-| `[review]`                       | The reviewer `prompt`, the listening-plan `readings` (optional), the verifier's `overall_minimum` and `dimension_minimum`, and the scored `dimensions` in record order |
+| Field                            | Meaning                                                                                                                                                                                                                          |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `slug`                           | The prefix of every delivered file, in lowercase words joined by hyphens                                                                                                                                                         |
+| `documents_folder`               | The folder in `~/Documents` that a delivery fills                                                                                                                                                                                |
+| `entry`                          | The template of the page that leads to each edition's player                                                                                                                                                                     |
+| `source_manifest`                | The commit and digests of the document the film explains                                                                                                                                                                         |
+| `concepts`                       | The concept contract (optional): what each concept the film names means in its source, and the words each edition uses for it                                                                                                    |
+| `[editions.zh]`, `[editions.en]` | Each edition's `sources` folder, its 16:9 `cover` and the `caption_terms` that stay on one caption line                                                                                                                          |
+| `[picture] fonts`                | The font files the picture stages below `fonts/`, in order                                                                                                                                                                       |
+| `[review]`                       | The reviewer `prompt`, the listening-plan `readings` (optional), the verifier's `overall_minimum` and `dimension_minimum`, the voice-clarity floors `clarity_minimum_db` (optional), and the scored `dimensions` in record order |
 
 Each script declares the edition's title, author, language, duration, frame rate, credits duration, chapters, release metadata, pause policy and pronunciation contract, and its segments, each split into utterance groups that end at sentence punctuation. Both editions declare the same duration, author and chapter count, at 60 fps. The engine refuses a declaration or a script that differs from this contract before any work, naming each failing field. [`examples/sample-film`](examples/sample-film) is a complete film to follow.
 
@@ -70,6 +70,20 @@ The frame audit also measures how text lines up, from the exact anchors, sizes a
 
 The gate reads the sync audit's continuity too. It refuses each seat, a mark that stands in speech for more than 0.6 s before a name is legible at it, and each run of a thought's speech longer than 1 s with no legible name. It lists in the record, without refusing them, the thoughts that keep the previous picture for more than 1 s, since a deliberate index may stay while the first new name arrives. The seat check judges a dashed closed outline on its own even where a link joins it to a larger mark, and counts a frame as named by what it holds only when that is a text or a named mark, or when it holds a mark and a name stands within reach; a pictogram in a frame names nothing. The sync audit also compares each caption cue of three or more words with the labels: the gate refuses a cue whose words one label legible during the cue holds exactly, in order, and records a cue at least 80% of whose words labels drawn during it repeat, and a cue that is itself one quotation, since the narration then reads out what the picture shows. A composition registers a name's whole text, set and role with each text it paints, as `whole`, `set` and `role` in `window.__filmLayout`, for these measures to read.
 
+The frame audit also traces every text of every frame, whatever its role and whether or not a scene draws it, with its contrast and opacity (`TEXTS`, read by `filmkit.picture.text_trace`), and the gate reads two more measures from that trace. The frames before the first word must show every word of the title the edition's script declares, at 3:1 or more, for at least 1 s: a text counts for the title words it repeats as one run, so the title may stand in parts and on several lines, and a card whose wording departs from the declared title does not count. And no text at rest may stand below 4.5:1: the gate refuses each run of 0.7 s or more in which a text that holds a letter or a digit shows above 4% opacity at a WCAG contrast below 4.5:1 against the ground, its colour composited over the ground at its opacity. A shorter run is a text entering or leaving the picture. A colour other than `#rrggbb` counts as the film's ink, and contrast is measured against the ground, not against a panel behind the text.
+
+## Before a render
+
+`filmkit.produce preflight --language zh|en` reports every stale or missing input of an edition's render at once, each by the owner that would refuse it later, and refuses while one remains: a stage that is not the current UHD picture, a tracked cover other than the one the current stage paints (the `player-check cover` comparison, its painting below `build/runtime/work/preflight/<edition>/`), an earlier `film-package.json`, which packaging would refuse to extend once the render replaces its picture, a draft still scan that is missing, failing or bound to another timeline or composition, a failing concept check, and a picture gate record that has not passed on the current inputs. A film scans its 10 fps draft with `python -m filmkit.picture.still_scan <draft> --language zh|en`, which judges it against the edition's timeline and writes `build/evidence/editions/<edition>/draft-stills.json`, bound to the draft, the timeline and the composition.
+
+## Review rounds
+
+`filmkit.review.round` prepares and records an independent review round. `prompts --round <n>` fills the film's reviewer prompt for each edition; with `--previous <dir>`, `{previous_review}` cites that round's review and findings and asks the reviewer to verify each repair, and without it the round is the film's first production review and `{previous_review}` says that no earlier one exists. A template that cites `{previous}` or `{findings}` itself still works with `--previous` and is refused without it. `{clarity}` states the declared clarity floors.
+
+`set-aside` moves the previous build's two films, package record and rendered picture of each edition into `build/artifacts/film/superseded/<label>/<edition>/` with a manifest of their hashes, and reads each back, before the next render and package. A reviewed round's packages, labelled `round-<n>`, are bound by its reviews. An unreviewed build, such as a preview the owner watched, is set aside with `--unreviewed --consumer <dir>`, which requires `<dir>/<edition>/` to hold both films byte-identical and records that folder as their consumer, under `--round <n>` or a `--label` of its own. `--language` limits a set-aside to one edition, and `--without-picture` leaves the picture in place for the editions it names, or for both when it names none.
+
+`filmkit.review.measurement` records, among the measurements a round's reviewers read, each edition's voice clarity: the median cepstral peak prominence over the loud frames of its soundtrack and of each segment's voice, computed as the reviewers state it (16 kHz mono, 1024-sample frames every 256 samples, frames within 18 dB of the 95th-percentile energy, periodic Hann window, quefrency bins 40–266, the highest level minus the least-squares line at its bin), each value to 0.01 dB beside the edition's floor. A film declares the floors in dB for both editions, as `clarity_minimum_db = { zh = 18.0, en = 17.0 }` in `[review]`.
+
 ## Installing the engine in a film
 
 A film pins a release tag in its Python project and locks it:
@@ -79,7 +93,7 @@ A film pins a release tag in its Python project and locks it:
 dependencies = ["filmkit"]
 
 [tool.uv.sources]
-filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.9.0" }
+filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.10.0" }
 ```
 
 Its `package.json` declares the npm packages the engine runs, at these versions: `hyperframes` 0.9.9, the renderer, which the engine checks before it stages, renders or runs a tool; `gsap` 3.15.0, which each staged document loads; and `puppeteer-core` 25.16.0 and `@puppeteer/browsers` 3.2.6, which drive and install the browser build. It also overrides `undici` to 7.30.1, because HyperFrames 0.9.9 pins 7.25.0, which known advisories affect.
@@ -88,19 +102,21 @@ Its `package.json` declares the npm packages the engine runs, at these versions:
 
 Run each command at the film's root, for example from a Mise task, with `uv run python -m <command>`:
 
-| Command                                                | What it does                                                                                                                                                                       |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `filmkit.supply`                                       | Installs the pinned browser build and speech models below `build/runtime/tool-cache/`                                                                                              |
-| `filmkit.narration.narrate --language zh\|en`          | Narrates an edition from its cast's seeds, then aligns and transcribes it                                                                                                          |
-| `filmkit.narration.audition audition\|apply`           | Auditions other seeds or run-on takes of chosen thoughts, then binds the chosen ones into the cast's retakes                                                                       |
-| `filmkit.concepts`                                     | Checks the film's words against its concept contract                                                                                                                               |
-| `filmkit.narration.readings [--language zh\|en]`       | Checks every declared reading and name, and writes the occurrence plans; `--propose` proposes Chinese declarations                                                                 |
-| `filmkit.produce <action> --language zh\|en`           | Runs one production action: `select`, `assemble`, `refresh-captions`, `stage-picture`, `check-picture`, `render-picture`, `validate-picture`, `package-metadata` or `package-film` |
-| `filmkit.tools <tool> [arguments]`                     | Runs a Node tool with the film's npm packages: `geometry-check`, `frame-audit`, `motion-audit` or `player-check`                                                                   |
-| `filmkit.delivery.verification --language zh\|en\|all` | Verifies the films and every input they bind; `--technical-only` leaves out the review                                                                                             |
-| `filmkit.delivery.documents_folder`                    | Delivers the reviewed editions to the film's Documents folder with rsync and reads them back                                                                                       |
-| `filmkit.delivery.reproduction`                        | Compares a rebuild with the published release                                                                                                                                      |
-| `filmkit.review.round <step>`                          | Prepares and records an independent review round                                                                                                                                   |
+| Command                                                | What it does                                                                                                                                                                                    |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `filmkit.supply`                                       | Installs the pinned browser build and speech models below `build/runtime/tool-cache/`                                                                                                           |
+| `filmkit.narration.narrate --language zh\|en`          | Narrates an edition from its cast's seeds, then aligns and transcribes it                                                                                                                       |
+| `filmkit.narration.audition audition\|apply`           | Auditions other seeds or run-on takes of chosen thoughts, then binds the chosen ones into the cast's retakes                                                                                    |
+| `filmkit.concepts`                                     | Checks the film's words against its concept contract                                                                                                                                            |
+| `filmkit.narration.readings [--language zh\|en]`       | Checks every declared reading and name, and writes the occurrence plans; `--propose` proposes Chinese declarations                                                                              |
+| `filmkit.produce <action> --language zh\|en`           | Runs one production action: `select`, `assemble`, `refresh-captions`, `stage-picture`, `check-picture`, `preflight`, `render-picture`, `validate-picture`, `package-metadata` or `package-film` |
+| `filmkit.tools <tool> [arguments]`                     | Runs a Node tool with the film's npm packages: `geometry-check`, `frame-audit`, `motion-audit` or `player-check`                                                                                |
+| `filmkit.delivery.verification --language zh\|en\|all` | Verifies the films and every input they bind; `--technical-only` leaves out the review                                                                                                          |
+| `filmkit.delivery.documents_folder`                    | Delivers the reviewed editions to the film's Documents folder with rsync and reads them back                                                                                                    |
+| `filmkit.delivery.reproduction`                        | Compares a rebuild with the published release                                                                                                                                                   |
+| `filmkit.picture.still_scan <film> --language zh\|en`  | Scans a rendered draft for still pictures under speech and records the edition's draft scan                                                                                                     |
+| `filmkit.review.measurement --out <file>`              | Measures both editions for a review round, voice clarity included                                                                                                                               |
+| `filmkit.review.round <step>`                          | Prepares and records an independent review round                                                                                                                                                |
 
 ## Whole endings
 
@@ -120,7 +136,7 @@ mise run sample:build
 
 The build writes only below `examples/sample-film/build/`. Its text is written for this repository and is no film's source.
 
-Packaging refuses to extend films bound to other inputs. A film sets a reviewed round's films aside with `filmkit.review.round set-aside`; to rebuild the unreviewed sample after a change, first delete each edition's two films below `build/artifacts/film/<edition>/` and its `build/evidence/editions/<edition>/film-package.json`.
+Packaging refuses to extend films bound to other inputs. A film sets a reviewed round's films aside with `filmkit.review.round set-aside`, and a build nobody reviewed whose films a consumer folder holds with `set-aside --unreviewed --consumer <dir>`; to rebuild the unreviewed sample after a change, first delete each edition's two films below `build/artifacts/film/<edition>/` and its `build/evidence/editions/<edition>/film-package.json`.
 
 ## Development
 

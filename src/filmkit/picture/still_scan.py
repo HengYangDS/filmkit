@@ -8,6 +8,14 @@ carries, from the timeline's aligned words. A 10 fps sample can land either side
 that moves for one frame, so the film is read twice, 0.05 s apart, and the worse reading
 decides. The specification allows no 3.5 s of speech over a still picture; the scan refuses
 a draft before the final render and confirms the final film before it is reviewed.
+
+The record names the film, the timeline and the composition script it judged, the composition as
+it stands when the scan runs, so a draft is scanned as soon as it is rendered. With --language the
+timeline is the edition's and the record is its draft's (`Edition.draft_stills`), which
+`filmkit.preflight` requires bound to the current timeline and composition before a render.
+
+Usage: python -m filmkit.picture.still_scan <movie> --language zh|en [--limit <seconds>]
+       python -m filmkit.picture.still_scan <movie> <timeline> --out <record> [--limit <seconds>]
 """
 
 from __future__ import annotations
@@ -21,6 +29,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 import filmkit.repository as repository
+from filmkit.picture.rendering import COMPOSITION_SCRIPT
+from filmkit.production import CODES, Edition
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
@@ -189,12 +199,23 @@ def main(argv: list[str] | None = None) -> None:
         description="Report still pictures with speech in a rendered film."
     )
     parser.add_argument("movie")
-    parser.add_argument("timeline")
-    parser.add_argument("--out", required=True)
+    parser.add_argument("timeline", nargs="?", help="the timeline, unless --language names it")
+    parser.add_argument("--out", help="the record, unless --language names it")
+    parser.add_argument(
+        "--language", choices=CODES, help="scan the edition's draft against its timeline"
+    )
     parser.add_argument(
         "--limit", type=float, default=LIMIT_SECONDS, help="Fail a still run with this much speech"
     )
     options = parser.parse_args(argv)
+    if options.language is not None:
+        if options.timeline is not None or options.out is not None:
+            parser.error("--language names the timeline and the record")
+        edition = Edition(options.language)
+        options.timeline = repository.relative(edition.timeline)
+        options.out = repository.relative(edition.draft_stills)
+    elif options.timeline is None or options.out is None:
+        parser.error("give the timeline and --out, or --language")
     timeline = repository.read(options.timeline)
     movie = repository.ROOT / options.movie
     report = worst([scan(decode(movie, phase), timeline) for phase in PHASES])
@@ -205,6 +226,10 @@ def main(argv: list[str] | None = None) -> None:
         "timeline": {
             "path": options.timeline,
             "sha256": repository.sha(repository.ROOT / options.timeline),
+        },
+        "composition": {
+            "path": str(COMPOSITION_SCRIPT),
+            "sha256": repository.sha(repository.ROOT / COMPOSITION_SCRIPT),
         },
     }
     repository.write(

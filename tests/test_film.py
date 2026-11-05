@@ -91,6 +91,18 @@ def test_an_unknown_field_refuses(declared):
         film.load(declared)
 
 
+def test_clarity_floors_name_both_editions_in_decibels(declared):
+    assert film.FILM.review.clarity_minimum_db == {"zh": 18.0, "en": 17.0}
+    floors = "clarity_minimum_db = { zh = 18.0, en = 17.0 }"
+    for wrong in ("{ zh = 18.0 }", "{ zh = 18.0, fr = 17.0 }", "{ zh = 0, en = 17.0 }"):
+        rewrite(declared, floors, f"clarity_minimum_db = {wrong}")
+        with pytest.raises(FilmError, match=r"review\.clarity_minimum_db"):
+            film.load(declared)
+        floors = f"clarity_minimum_db = {wrong}"
+    rewrite(declared, floors + "\n", "")
+    assert film.load(declared).review.clarity_minimum_db is None
+
+
 def test_both_editions_are_declared(declared):
     rewrite(declared, "[editions.en]", "[editions.fr]")
     with pytest.raises(FilmError, match="editions"):

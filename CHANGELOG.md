@@ -4,6 +4,21 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.10.0] - UNRELEASED
+
+### Added
+
+- `review.round prompts` writes a film's first production review: `--previous` is optional, and the template field `{previous_review}` cites the previous round's review files and findings, or states that no earlier production review exists. A template that cites `{previous}` and `{findings}` itself keeps working with `--previous` and is refused without it. `{clarity}` states the declared clarity floors. The sample film's prompt cites both.
+- `review.round set-aside --unreviewed --consumer <dir>` sets aside a build nobody reviewed, such as a preview the owner watched, in the layout, manifest, move and readback of a reviewed round, bound by the consumer folder's byte-identical copies of each edition's two films and labelled `round-<n>` or by `--label`. Every set-aside takes `--language` for one edition, and `--without-picture` names the editions whose rendered picture stays; named alone it keeps both, as before.
+- `review.measurement` records each edition's voice clarity, the median cepstral peak prominence over the loud frames of its soundtrack and of each segment's voice, computed as the reviewers' prompts state it, each value to 0.01 dB beside the floor a film declares for the edition in `[review] clarity_minimum_db`. On the six current soundtracks of the three films it keeps the reviewers' tool's frames and its medians, 17.35 to 19.64 dB, within 4e-15 dB. The sample film declares 18 and 17 dB.
+- `check-picture` refuses an opening whose frames before the first word show the title the script declares for less than 1 s, in texts at 3:1 or more, and each run of 0.7 s or more in which a text holding a letter or a digit shows below 4.5:1 against the ground, its colour composited at its opacity. The frame audit writes a trace of every text of every frame, whatever its role, for both measures (`TEXTS`). On the current compositions of DDWG, ETHOS v2 and the essentials film both measures pass both editions, each opening on its title for 2.40–4.00 s; the ETHOS composition that lost its title signature (`28a177a`) shows none, and the DDWG composition before its legibility repair holds 143 Chinese and 145 English texts at rest below 4.5:1, among them every dimmed level its round-30 review measured.
+- `produce preflight` reports at once every stale or missing input of an edition's render, by the owner that would refuse it later, and refuses while one remains: a stage that is not the current UHD picture, a tracked cover other than the one the stage paints, an earlier film package record, a draft still scan that is missing, failing or bound to another timeline or composition, a failing concept check, and a picture gate record that has not passed on the current inputs.
+
+### Changed
+
+- The still scan records the composition it judged beside the film and the timeline, and with `--language` judges the edition's draft against its timeline into `build/evidence/editions/<edition>/draft-stills.json`, which the pre-render check reads. A film's draft tooling moves to it; a record written by 0.9.0 binds no composition and is reported as stale.
+- `filmkit.review.round` keeps its command and options; its prompts move to `filmkit.review.prompts`, its set-aside to `filmkit.review.set_aside` and the files every step reads to `filmkit.review.files`, so a script that imported them from `filmkit.review.round` imports them from their owners.
+
 ## [0.9.0] - 2026-11-04
 
 ### Added
@@ -154,7 +169,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/HengYangDS/filmkit/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/HengYangDS/filmkit/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/HengYangDS/filmkit/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/HengYangDS/filmkit/compare/v0.7.0...v0.8.0

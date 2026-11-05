@@ -9,6 +9,7 @@ import pytest
 
 import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
+from filmkit.production import Edition
 
 
 def timeline(*spans):
@@ -106,9 +107,11 @@ def test_each_phase_reads_ten_frames_a_second_at_any_frame_rate(tmp_path, rate):
     assert len(list(still_scan.decode(movie, 1))) == 20
 
 
-def test_the_scan_record_names_the_film_and_timeline_it_judged(tmp_path, monkeypatch):
+def test_the_scan_record_names_the_film_timeline_and_composition_it_judged(tmp_path, monkeypatch):
     monkeypatch.setattr(repository, "ROOT", tmp_path)
     (tmp_path / "film.mp4").write_bytes(b"a rendered film")
+    (tmp_path / "picture").mkdir()
+    (tmp_path / "picture/film.js").write_text("scenes = {};\n")
     repository.write("timeline.json", timeline((1.0, 1.5)))
     monkeypatch.setattr(still_scan, "decode", lambda _movie, _phase: iter(frames(40, 0)))
     still_scan.main(["film.mp4", "timeline.json", "--out", "scan.json"])
@@ -119,3 +122,27 @@ def test_the_scan_record_names_the_film_and_timeline_it_judged(tmp_path, monkeyp
     }
     assert record["timeline"]["path"] == "timeline.json"
     assert record["timeline"]["sha256"] == repository.sha(tmp_path / "timeline.json")
+    assert record["composition"] == {
+        "path": "picture/film.js",
+        "sha256": repository.sha(tmp_path / "picture/film.js"),
+    }
+
+
+def test_an_edition_draft_is_scanned_against_its_timeline_into_its_record(tmp_path, monkeypatch):
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    (tmp_path / "draft.mp4").write_bytes(b"a draft")
+    (tmp_path / "picture").mkdir()
+    (tmp_path / "picture/film.js").write_text("scenes = {};\n")
+    edition = Edition("en")
+    repository.write(edition.timeline, timeline((1.0, 1.5)))
+    monkeypatch.setattr(still_scan, "decode", lambda _movie, _phase: iter(frames(40, 0)))
+    still_scan.main(["draft.mp4", "--language", "en"])
+    record = json.loads(edition.draft_stills.read_text())
+    assert record["timeline"] == {
+        "path": "build/artifacts/film/en/timeline.json",
+        "sha256": repository.sha(edition.timeline),
+    }
+    assert record["over_limit"] == []
+    for wrong in (["draft.mp4", "--language", "en", "--out", "x.json"], ["draft.mp4"]):
+        with pytest.raises(SystemExit):
+            still_scan.main(wrong)

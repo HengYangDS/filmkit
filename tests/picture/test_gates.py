@@ -17,7 +17,17 @@ from filmkit.production import Edition
 # The sample film, whose stylesheet and fonts the gate's film declares.
 SAMPLE = Path(__file__).resolve().parents[2] / "examples/sample-film"
 
-# Reports of a clean picture: no gated frame finding, every label in sync, no long still.
+
+def opening(title, seconds, *, contrast=15.6, step=1 / 30):
+    """Text trace rows of a title card shown from the start for `seconds`."""
+    return "".join(
+        f"{k * step:.2f}\t\ttitle\t{contrast:.3f}\t1.000\t{title}\n"
+        for k in range(round(seconds / step))
+    )
+
+
+# Reports of a clean picture: no gated frame finding, every label in sync, no long still, and a
+# title card through the 2 s before the first word.
 CLEAN = {
     "frame": {
         **dict.fromkeys(gates.FRAME_GATES, {}),
@@ -33,6 +43,7 @@ CLEAN = {
         "continuity": {"unnamed_speech": [], "held_over": [], "seats": [], "caption_echoes": []},
     },
     "motion": {"still": [{"start": 4.0, "end": 7.2, "seconds": 3.2}], "pops": [1]},
+    "texts": opening("示例影片", 2.0),
 }
 # A caption cue that labels drawn during it repeat, as the sync audit lists it.
 ECHO = {
@@ -76,7 +87,8 @@ def film(tmp_path, monkeypatch):
     for path in (STYLE, *FILM.picture.fonts):
         (root / path).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(SAMPLE / path, root / path)
-    put(Edition("zh").timeline, {"segments": [], "captions": []})
+    segment = {"id": "01", "words": [{"text": "构建", "start": 2.0, "end": 2.4}]}
+    put(Edition("zh").timeline, {"title": "示例影片", "segments": [segment], "captions": []})
     return root
 
 
@@ -89,6 +101,7 @@ def audits(monkeypatch, reports, *, change=None):
         calls.append((tool, arguments, environment))
         if tool == "frame-audit":
             put(stdout, reports["frame"])
+            put(Path(environment["TEXTS"]), reports["texts"])
             if change is not None:
                 change()
         else:
@@ -117,14 +130,14 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
         font: repository.sha(film / font) for font in FILM.picture.fonts
     }
     assert record["frames_checked"] == 301
-    assert sorted(record["reports"]) == ["frame", "motion", "sync"]
+    assert sorted(record["reports"]) == ["frame", "motion", "sync", "texts"]
     for report in record["reports"].values():
         assert report["sha256"] == repository.sha(film / report["path"])
     # The frame audit runs at one thirtieth of a second with its traces, the motion audit at
     # 30 frames per second, both on the edition's timeline.
     (frame_tool, frame_args, frame_env), (motion_tool, motion_args, motion_env) = calls
     assert (frame_tool, frame_args) == ("frame-audit", [str(edition.timeline), "0.0333333"])
-    assert sorted(frame_env) == [VARIABLE, "MARKS", "TRACE"]
+    assert sorted(frame_env) == [VARIABLE, "MARKS", "TEXTS", "TRACE"]
     assert (motion_tool, motion_args[:2]) == ("motion-audit", [str(edition.timeline), "30"])
     assert motion_env == {VARIABLE: frame_env[VARIABLE]}
     table = repository.read(Path(frame_env[VARIABLE]))
@@ -204,6 +217,19 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
         (
             {**CLEAN, "frame": {**CLEAN["frame"], "mixed_case": {"08": [RAGGED_ROW]}}},
             "frame mixed_case",
+        ),
+        (
+            {**CLEAN, "texts": opening("示例", 2.0)},
+            "text title '示例影片' shown 0.00 s before the first word at 2.00 s; "
+            "never shown: 影, 片",
+        ),
+        (
+            {
+                **CLEAN,
+                "texts": CLEAN["texts"]
+                + "".join(f"{3 + k / 30:.2f}\t02\tlabel\t3.340\t0.580\t音轨\n" for k in range(30)),
+            },
+            "text contrast 02 '音轨' 3.00-4.00 s at 3.34:1",
         ),
     ],
 )

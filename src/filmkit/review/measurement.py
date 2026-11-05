@@ -2,11 +2,12 @@
 
 Speaking rate, pause distribution and hierarchy, the heard ratio of each thought
 boundary to the quiet inside the thoughts beside it, quiet edges, level continuity, the
-chapter profile of rate, pitch and level, thought endings, recognition differences,
-loudness, captions and the picture checks. The review scores the audio from these
+chapter profile of rate, pitch and level, thought endings, voice clarity, recognition
+differences, loudness, captions and the picture checks. The review scores the audio from these
 measurements and its own analysis; taste remains its judgment, and human listening is
 a later acceptance. Thought endings are measured by `filmkit.review.endings`, on the takes
-the current narration receipts bind and, as delivered, on the soundtrack.
+the current narration receipts bind and, as delivered, on the soundtrack, and voice clarity by
+`filmkit.review.clarity` against the floors the film declares.
 
 It loads no speech runtime, so it runs without a Metal device. Each measurement reads the
 current records it measures and refuses one that is not bound to the current timeline,
@@ -31,6 +32,7 @@ import filmkit.media as media
 import filmkit.narration.recognition as narration_recognition
 import filmkit.production as production
 import filmkit.repository as repository
+import filmkit.review.clarity as review_clarity
 import filmkit.review.endings as review_endings
 import filmkit.soundtrack.level as soundtrack_level
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
@@ -521,6 +523,7 @@ def measure_edition(code: str) -> dict:
             "single_line": all("\n" not in c["text"] for c in captions),
         },
         "audio_structure": audio_structure(code, soundtrack, timeline, assembly),
+        "voice_clarity": review_clarity.voice_clarity(code, soundtrack, timeline),
         "picture": picture,
         "picture_sync": sync,
         "timeline_sha256": timeline_sha256,
@@ -562,6 +565,7 @@ def main(argv: list[str] | None = None) -> None:
             "boundary_to_inner_quiet_ratio": {
                 key: value for key, value in ratios.items() if key not in ("method", "lowest")
             },
+            "voice_clarity": review_clarity.summary(data["voice_clarity"]),
         }
     print(json.dumps(summary, ensure_ascii=False))
 

@@ -1,4 +1,5 @@
-/** Exercise the frame audit on a stretch of the sample film: its report, its label trace, its marks and its bounds. */
+/** Exercise the frame audit on a stretch of the sample film: its report, its label and text traces, its marks and its
+ * bounds. */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -14,11 +15,12 @@ const AUDIT_FRAMES = fileURLToPath(
   new URL("../../src/filmkit/picture/frame-audit.mjs", import.meta.url),
 );
 
-test("the frame audit reports a stretch of the film, its label trace, its marks and its bounds", async () => {
+test("the frame audit reports a stretch of the film, its traces, its marks and its bounds", async () => {
   const film = await authoredTimeline("zh"),
     folder = await scratchFolder();
   const path = join(folder, "timeline.json"),
     trace = join(folder, "trace.tsv"),
+    texts = join(folder, "texts.tsv"),
     marks = join(folder, "marks.tsv"),
     bounds = join(folder, "bounds.json"),
     balance = join(folder, "balance.json");
@@ -29,7 +31,14 @@ test("the frame audit reports a stretch of the film, its label trace, its marks 
       process.execPath,
       [AUDIT_FRAMES, path, "0.5", "--from", String(at), "--to", String(at + 6)],
       {
-        env: { ...process.env, TRACE: trace, MARKS: marks, BOUNDS: bounds, BALANCE: balance },
+        env: {
+          ...process.env,
+          TRACE: trace,
+          TEXTS: texts,
+          MARKS: marks,
+          BOUNDS: bounds,
+          BALANCE: balance,
+        },
         encoding: "utf8",
       },
     ),
@@ -93,6 +102,23 @@ test("the frame audit reports a stretch of the film, its label trace, its marks 
   assert.ok(
     rows.length > 0 && rows.every((row) => row.length === 5 && Number.isFinite(Number(row[2]))),
   );
+  // Every text of every frame, whatever its role: its time, scene, role, contrast, opacity and whole text. The
+  // captions are traced with the scene's names, and every label of the label trace is among them.
+  const written = (await readFile(texts, "utf8"))
+    .trim()
+    .split("\n")
+    .map((line) => line.split("\t"));
+  assert.ok(
+    written.every(
+      (row) =>
+        row.length === 6 &&
+        [row[0], row[3], row[4]].every((v) => Number.isFinite(Number(v))) &&
+        row[5].length > 0,
+    ),
+  );
+  assert.ok(written.some((row) => row[2] === "caption" && row[1] === ""));
+  const traced = new Set(written.map((row) => `${row[0]}\t${row[1]}\t${row[5]}`));
+  assert.ok(rows.every((row) => traced.has(`${row[0]}\t${row[1]}\t${row[4]}`)));
   // Each firm mark of a voiced frame: its time, scene, box and whether a legible name stands at it.
   const marked = (await readFile(marks, "utf8"))
     .trim()

@@ -24,6 +24,7 @@ def test_the_actions_are_the_documented_ones_in_order():
         "refresh-captions",
         "stage-picture",
         "check-picture",
+        "preflight",
         "render-picture",
         "package-metadata",
         "validate-picture",

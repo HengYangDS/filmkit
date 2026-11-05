@@ -250,15 +250,33 @@ def package_metadata(edition: Edition) -> None:
     print(json.dumps({"package": str(output), "members": members}), flush=True)
 
 
+def film_inputs(edition: Edition) -> dict[str, Path]:
+    """The production inputs of both delivered films, by the record field of each SHA-256."""
+    return {
+        "picture_sha256": edition.picture,
+        "soundtrack_sha256": edition.soundtrack,
+        "cover_sha256": edition.artifacts / COVER_JPEG,
+        "script_sha256": repository.ROOT / edition.script,
+        "chapters_sha256": edition.artifacts / "chapters.ffmeta",
+    }
+
+
 def film_bindings(edition: Edition) -> dict:
     """The production inputs of both delivered films, by SHA-256, in record order."""
-    return {
-        "picture_sha256": sha(edition.picture),
-        "soundtrack_sha256": sha(edition.soundtrack),
-        "cover_sha256": sha(edition.artifacts / COVER_JPEG),
-        "script_sha256": sha(edition.script),
-        "chapters_sha256": sha(edition.artifacts / "chapters.ffmeta"),
-    }
+    return {key: sha(path) for key, path in film_inputs(edition).items()}
+
+
+def stale_bindings(edition: Edition, package: dict) -> list[str]:
+    """The fields of a film package record that the current inputs no longer match.
+
+    An input that is missing now matches no record.
+    """
+    stale = [
+        key
+        for key, path in film_inputs(edition).items()
+        if not path.is_file() or package.get(key) != sha(path)
+    ]
+    return stale + (["caption_owner"] if package.get("caption_owner") != CAPTION_OWNER else [])
 
 
 def resume_package(edition: Edition) -> dict:
@@ -266,7 +284,7 @@ def resume_package(edition: Edition) -> dict:
     package = {**film_bindings(edition), "editions": [], "caption_owner": CAPTION_OWNER}
     if edition.film_package.exists():
         previous = read(edition.film_package)
-        if any(previous.get(key) != value for key, value in package.items() if key != "editions"):
+        if stale_bindings(edition, previous):
             msg = "Existing package is bound to different production inputs"
             raise PackagingError(msg)
         package["editions"] = previous["editions"]

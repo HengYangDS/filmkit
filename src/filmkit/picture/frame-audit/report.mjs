@@ -293,8 +293,9 @@ export function frameReport({
   };
 }
 
-export function writeRequestedFiles({ trace, thoughts, marks, extents, drawn }) {
+export function writeRequestedFiles({ trace, texts, thoughts, marks, extents, drawn }) {
   if (process.env.TRACE) writeFileSync(process.env.TRACE, trace.join("\n") + "\n");
+  if (process.env.TEXTS) writeFileSync(process.env.TEXTS, texts.join("\n") + "\n");
   if (process.env.BALANCE)
     writeFileSync(
       process.env.BALANCE,

@@ -1,17 +1,19 @@
 """The picture's gate before a render: the headless audits of an edition's picture and their record.
 
 `check_picture` runs, from the film's root, the frame audit over every frame of the edition's
-timeline at one thirtieth of a second with its label and mark traces, the sync audit on those
-traces, and the motion audit at 30 frames per second, both audits measuring text by the advance
-widths of the film's declared faces (`filmkit.picture.metrics`). Their reports go to
-build/runtime/work/picture-gates/<code>/. The edition's gate record binds the SHA-256 of the
-composition, the timeline, the stylesheet and each declared font, the engine version and the
-frames the frame audit checked; it holds each report's SHA-256, every gated finding and every
-recorded finding, and passes only when there is no gated one. Besides the labels out of sync, the
-sync audit's seats, its unnamed speech and its caption cues drawn whole as one label are gated;
-the thoughts that hold the previous picture and the cues mostly drawn as labels are recorded. A
-gated finding refuses with `PictureError`, after the record is written, and so does an audit
-that fails or a composition or timeline that changes while it is checked.
+timeline at one thirtieth of a second with its label, text and mark traces, the sync audit on
+those traces, the text measures of `filmkit.picture.text_trace`, and the motion audit at 30
+frames per second, both audits measuring text by the advance widths of the film's declared faces
+(`filmkit.picture.metrics`). Their reports go to build/runtime/work/picture-gates/<code>/. The
+edition's gate record binds the SHA-256 of the composition, the timeline, the stylesheet and each
+declared font, the engine version and the frames the frame audit checked; it holds each report's
+SHA-256, every gated finding and every recorded finding, and passes only when there is no gated
+one. Besides the labels out of sync, the sync audit's seats, its unnamed speech and its caption
+cues drawn whole as one label are gated, and so are an opening that shows the declared title for
+less than a second before the first word and every text at rest below 4.5:1; the thoughts that
+hold the previous picture and the cues mostly drawn as labels are recorded. A gated finding
+refuses with `PictureError`, after the record is written, and so does an audit that fails or a
+composition or timeline that changes while it is checked.
 `render-picture` reads the record before it starts the renderer
 (`filmkit.picture.rendering.require_passing_gates`).
 
@@ -27,7 +29,7 @@ from typing import TYPE_CHECKING
 
 import filmkit.repository as repository
 import filmkit.tools as tools
-from filmkit.picture import metrics, sync_audit
+from filmkit.picture import metrics, sync_audit, text_trace
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, PictureError, face_bindings
 
 if TYPE_CHECKING:
@@ -79,6 +81,8 @@ FRAME_GATES = (
 FRAME_RECORDED = ("off_centre_settled",)
 # Seconds a still picture may hold under speech: the reviewers' limit for a held picture.
 STILL_LIMIT = 3.5
+# Seconds of the frames before the first word that show every word of the declared title.
+TITLE_SECONDS = 1.0
 # The frame audit's sampling step and the motion audit's frame rate.
 FRAME_STEP = 1 / 30
 MOTION_FPS = 30
@@ -118,6 +122,25 @@ def gated_findings(frame: dict, sync: dict, motion: dict) -> list[str]:
         if run["seconds"] > STILL_LIMIT
     ]
     return findings
+
+
+def text_findings(texts: dict) -> list[str]:
+    """The text measures' gated findings: an opening that does not show the declared title for
+    `TITLE_SECONDS`, and each text at rest below 4.5:1."""
+    title, found = texts["opening_title"], []
+    if title["shown_seconds"] < TITLE_SECONDS:
+        missing = ", ".join(title["missing_words"])
+        shown = (
+            f"text title {title['title']!r} shown {title['shown_seconds']:.2f} s before the first"
+            f" word at {title['first_word']:.2f} s"
+        )
+        found.append(f"{shown}; never shown: {missing}" if missing else shown)
+    found += [
+        f"text contrast {run['scene'] or run['role']} {run['text']!r} {run['from']:.2f}-"
+        f"{run['to']:.2f} s at {run['lowest']:.2f}:1"
+        for run in texts["low_contrast"]
+    ]
+    return found
 
 
 def recorded_findings(frame: dict, sync: dict) -> list[str]:
@@ -173,12 +196,13 @@ def check_picture(edition: Edition) -> dict:
     timeline = str(edition.timeline)
     frame_path, trace, marks = work / "frame.json", work / "trace.tsv", work / "marks.tsv"
     sync_path, motion_path = work / "sync.json", work / "motion.json"
+    texts_trace, texts_path = work / "texts.tsv", work / "texts.json"
     faces = {metrics.VARIABLE: str(metrics.current_table())}
     run_audit(
         "frame-audit",
         [timeline, f"{FRAME_STEP:.7f}"],
         frame_path,
-        {"TRACE": str(trace), "MARKS": str(marks), **faces},
+        {"TRACE": str(trace), "TEXTS": str(texts_trace), "MARKS": str(marks), **faces},
     )
     run_audit(
         "motion-audit",
@@ -188,17 +212,25 @@ def check_picture(edition: Edition) -> dict:
     )
     sync = sync_audit.full_report(repository.read(edition.timeline), trace, marks, FRAME_STEP)
     repository.write(sync_path, sync)
+    lines = sync_audit.read_trace(texts_trace)
+    texts = text_trace.report(repository.read(edition.timeline), lines, FRAME_STEP)
+    repository.write(texts_path, texts)
     if current_bindings(edition) != bound:
         msg = "The composition or the timeline changed while it was checked"
         raise PictureError(msg)
     frame, motion = repository.read(frame_path), repository.read(motion_path)
-    findings = gated_findings(frame, sync, motion)
+    findings = gated_findings(frame, sync, motion) + text_findings(texts)
     record = {
         **bound,
         "frames_checked": frame["frames_checked"],
         "reports": {
             name: {"path": repository.relative(path), "sha256": repository.sha(path)}
-            for name, path in (("frame", frame_path), ("sync", sync_path), ("motion", motion_path))
+            for name, path in (
+                ("frame", frame_path),
+                ("sync", sync_path),
+                ("texts", texts_path),
+                ("motion", motion_path),
+            )
         },
         "gated_findings": findings,
         "recorded_findings": recorded_findings(frame, sync),

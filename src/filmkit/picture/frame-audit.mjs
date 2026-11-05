@@ -2,7 +2,8 @@
  * lines up and its pacing.
  * Usage: python -m filmkit.tools frame-audit <timeline.json> [step-seconds] [--from s] [--to s] [--at s]
  * --from and --to limit the frames exercised to one stretch of the film, such as the scenes being rebuilt; --at
- * reports one frame in detail. TRACE=<file> writes the label trace that filmkit.picture.sync_audit reads; MARKS=<file> writes the
+ * reports one frame in detail. TRACE=<file> writes the label trace that filmkit.picture.sync_audit reads; TEXTS=<file> writes
+ * every text of every frame, whatever its role, which filmkit.picture.text_trace reads; MARKS=<file> writes the
  * firm marks and repeated members of each voiced frame, with whether a legible name stands at each, for its seat
  * check (src/filmkit/picture/seat-marks.mjs); BOUNDS=<file> writes each scene's drawn extent; BALANCE=<file> writes
  * each thought's lit offsets and band cover at the reviewers' two instants. FILMKIT_TEXT_METRICS=<file> names the
@@ -200,7 +201,8 @@ const errors = new Map(),
   firstWords = {},
   density = new Map(),
   clutter = [],
-  trace = [];
+  trace = [],
+  texts = [];
 /* The visual system's positive layout measures: names placed by hand, more than two text sizes or a dot-joined name at
  * once, a list whose names do not leave together, and a stage whose content stands off the content centre. */
 const unplaced = new Map(),
@@ -245,6 +247,21 @@ function labelTrace(f) {
   for (const v of f.labels)
     trace.push(
       `${f.t.toFixed(2)}\t${v.scene}\t${contrast(v.color, v.alpha).toFixed(2)}\t${v.alpha.toFixed(3)}\t${v.whole ?? v.text}`,
+    );
+}
+/* TEXTS: every text of every frame, in or out of a scene and whatever its role, a placed name whole, with its role, its
+ * contrast and its opacity. */
+function textTrace(f) {
+  for (const v of f.layout.texts)
+    texts.push(
+      [
+        f.t.toFixed(2),
+        v.scene ?? "",
+        v.role ?? "",
+        contrast(v.color, v.alpha).toFixed(3),
+        v.alpha.toFixed(3),
+        (v.whole ?? v.text).replace(/[\t\n]/g, " "),
+      ].join("\t"),
     );
 }
 /* A list's names are followed in every frame of their scene, voiced or not, so a name that leaves early is seen,
@@ -330,6 +347,7 @@ const measures = [
   thinSpeech,
   emptySpeech,
   ...(process.env.TRACE ? [labelTrace] : []),
+  ...(process.env.TEXTS ? [textTrace] : []),
   ...(process.env.MARKS ? [composition.seats] : []),
   listSets,
   nameLoad,
@@ -419,6 +437,7 @@ const report = frameReport({
 });
 writeRequestedFiles({
   trace,
+  texts,
   thoughts,
   marks: composition.marks,
   extents: composition.extents,

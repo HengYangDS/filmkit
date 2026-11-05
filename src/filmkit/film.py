@@ -33,6 +33,9 @@ EDITION_FILES = ("film-script.json", "voice-reference.json", "player.html")
 # A lowercase name of words joined by hyphens.
 Name = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")]
 Floor = Annotated[int, Field(ge=0, le=100)]
+# A voice-clarity floor in dB of cepstral peak prominence, and one for each edition.
+ClarityFloor = Annotated[float, Field(gt=0, le=60)]
+ClarityFloors = Annotated[dict[Literal["zh", "en"], ClarityFloor], Field(min_length=2)]
 
 
 class FilmError(ValueError):
@@ -73,7 +76,8 @@ class Review(Declared):
     """The reviewer prompt, the verifier's floors, the scored dimensions and the plan readings.
 
     The dimensions keep their record order. The readings file holds the listening plan's
-    analyst readings; without one the plan adds none.
+    analyst readings; without one the plan adds none. The clarity floors, one for each edition,
+    are what the review's measurement records each voice's clarity against (`review.clarity`).
     """
 
     prompt: str
@@ -81,6 +85,7 @@ class Review(Declared):
     dimension_minimum: Floor
     dimensions: dict[str, str] = Field(min_length=1)
     readings: str | None = None
+    clarity_minimum_db: ClarityFloors | None = None
 
 
 class Film(Declared):

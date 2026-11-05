@@ -30,6 +30,7 @@ from filmkit.picture.rendering import (
     stage_picture,
     validate_picture,
 )
+from filmkit.preflight import PreflightError, preflight
 from filmkit.production import CODES, Edition
 from filmkit.soundtrack.assembly import AssemblyError, assemble
 from filmkit.soundtrack.level import LevelError
@@ -52,6 +53,7 @@ EDITION_ACTIONS: dict[str, Callable[[Edition, argparse.Namespace], object]] = {
         edition, options.output, options.duration, options.width, options.height, options.start
     ),
     "check-picture": lambda edition, _: check_picture(edition),
+    "preflight": lambda edition, _: preflight(edition),
     "render-picture": lambda edition, options: render_picture(edition, options.deadline),
     "package-metadata": lambda edition, _: package_metadata(edition),
     "validate-picture": lambda edition, _: validate_picture(edition),
@@ -72,6 +74,7 @@ REFUSALS = (
     ToolError,
     MediaError,
     PackagingError,
+    PreflightError,
 )
 
 

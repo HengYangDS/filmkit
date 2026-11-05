@@ -1,11 +1,15 @@
-"""Fixtures of the review tool tests: a repository root and a writer of its fixture files."""
+"""Fixtures of the review tool tests: a repository root, a writer of its fixture files and a
+writer of a round's reviews."""
 
 import json
 
 import pytest
 
 import filmkit.repository as repository
+import filmkit.review.record as review_record
 from filmkit.production import CODES, Edition
+
+SCORES = dict.fromkeys(review_record.DIMENSIONS, 96)
 
 
 def write_fixture(path, data):
@@ -33,3 +37,24 @@ def root(tmp_path, monkeypatch):
         for path in (*edition.films, edition.picture, edition.film_package):
             write_fixture(path, f"{code} {path.name}")
     return root
+
+
+@pytest.fixture
+def review(put):
+    """Write one edition's review and report into a round directory."""
+
+    def write(folder, code, *, media=None, findings=(), **edition):
+        media = media or [
+            {"path": str(film), "sha256": repository.sha(film)} for film in Edition(code).films
+        ]
+        edition = {
+            "media": media,
+            "scores": SCORES,
+            "overall": 96.0,
+            "findings": list(findings),
+            "human_listening_checklist": ["Listen to 24.3 in its clause."],
+        } | edition
+        put(folder / f"review-{code}.json", {"reviewer": "Reviewer", "editions": {code: edition}})
+        put(folder / f"{code}-review.md", f"# {code} review\n")
+
+    return write
