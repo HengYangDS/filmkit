@@ -214,6 +214,28 @@ def test_the_audio_structure_reports_what_reviewers_read(narration):
     }
 
 
+def test_the_speech_flow_records_pauses_by_their_marks_and_steps_between_thoughts(narration):
+    path, timeline, _ = narration
+    measured = review_measurement.speech_flow("en", path, timeline)
+    heard = measured["narration_flow"]
+    assert (heard["boundaries"], heard["above_limit"], measured["narration_terms"]) == (7, [], [])
+    # The 0.15 s of digital zero between "the" and "data." is unmarked and within its limit.
+    assert [(row["left"], row["right"], row["pause_s"]) for row in heard["listen"]] == [
+        ("the", "data.", 0.15)
+    ]
+    assert heard["marked_pause_seconds"]["."] == {
+        "count": 2,
+        "median": 0.45,
+        "p99": 0.5,
+        "max": 0.5,
+    }
+    steps = measured["thought_continuity"]["steps"]
+    assert [(step["thoughts"], step["pitch_semitones"]) for step in steps] == [
+        ("01.1>01.2", 0.0),
+        ("02.1>02.2", 0.0),
+    ]
+
+
 def test_thought_spans_are_filled_by_their_aligned_words(narration):
     _, timeline, _ = narration
     spans = [review_support.thought_spans(segment) for segment in timeline["segments"]]

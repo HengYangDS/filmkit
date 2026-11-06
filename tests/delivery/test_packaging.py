@@ -1,4 +1,4 @@
-"""The delivery index, the player, the viewing members and the packaged films."""
+"""The delivery index, the viewing members and the packaged films."""
 
 import json
 import re
@@ -13,23 +13,6 @@ import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.specification as specification
 from filmkit.delivery.packaging import PackagingError
-
-
-def test_the_player_transcript_keeps_chapters_segments_and_escaped_text():
-    transcript = (
-        "# Sample Reel · Title\n\nYang HENG · English · 25 min\n\n## 01 Opening\n\n"
-        "00:00:02.118 · First <scene>\n\nA & B < C.\n\n## 02 Next\n\n"
-        "00:01:00.000 · Second\n\nMore.\n"
-    )
-    assert delivery_packaging.transcript_html(transcript) == (
-        "<h2>01 Opening</h2><h3>00:00:02.118 · First &lt;scene&gt;</h3>"
-        "<p>A &amp; B &lt; C.</p><h2>02 Next</h2><h3>00:01:00.000 · Second</h3>"
-        "<p>More.</p>"
-    )
-    english = (repository.ROOT / production.Edition("en").player).read_text()
-    assert english.count("/*TRANSCRIPT*/") == 1
-    assert '<a href="#transcript">Transcript</a>' in english
-    assert '<a href="sample-reel-en-transcript.md">Transcript (Markdown)</a>' in english
 
 
 def test_the_runtime_and_viewing_members_follow_the_edition():
@@ -220,6 +203,22 @@ def test_each_film_is_encoded_finished_and_checked_in_work_before_it_is_linked_i
         calls[:4] = []
     assert list(work.rglob("*.mp4")) == []
     assert not (edition.evidence / "packaging-failure.json").exists()
+
+
+def test_the_viewing_package_is_derived_again_once_the_films_are_in_place(
+    packaging_root, monkeypatch
+):
+    _, edition, _ = packaging_root
+    seen = []
+    monkeypatch.setattr(
+        delivery_packaging,
+        "package_metadata",
+        lambda current: seen.append([film.is_file() for film in current.films]),
+    )
+    delivery_packaging.package_film(edition)
+    # Before the films, for the cover and chapters they carry; after them, for the sizes the
+    # player names.
+    assert seen == [[False, False], [True, True]]
 
 
 def test_the_commands_carry_the_release_metadata(packaging_root):

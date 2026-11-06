@@ -12,6 +12,12 @@ build/evidence/delivery/SHA256SUMS, and the readback, which the player check rea
 each member with the film's file prefix and duration in
 build/evidence/delivery/delivery-readback.json.
 
+Before rsync changes anything, the player check (`filmkit.tools player-check players`) reads
+the entry page and both players back in a real browser from build/artifacts/film, which holds
+the members as the destination will, and delivery refuses a page that fails, naming the page
+and its problems; its receipt is build/evidence/delivery/player-check.json, which the readback
+names with its SHA-256. A dry run reads no player.
+
 The film verifier binds every member to its package records; the delivery task runs it first.
 A refusal before rsync leaves the destination unchanged and exits with status 1.
 
@@ -28,8 +34,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import filmkit.repository as repository
+import filmkit.tools as tools
 from filmkit.delivery.packaging import BOUND_FILM, LANGUAGE_INDEX, viewing_members
 from filmkit.film import FILM
+from filmkit.picture.rendering import PictureError
 from filmkit.production import CODES, Edition
 
 DESTINATION = Path.home() / "Documents" / FILM.documents_folder
@@ -39,6 +47,9 @@ PREDECESSORS = Path("build/artifacts/delivery/predecessors")
 SUMS = Path("build/evidence/delivery/SHA256SUMS")
 READBACK = Path("build/evidence/delivery/delivery-readback.json")
 FILTER = Path("build/runtime/work/delivery/members.filter")
+# The members as the player check reads them from their sources, and its receipt.
+PLAYERS_BINDING = Path("build/runtime/work/delivery/players.json")
+PLAYERS = Path("build/evidence/delivery/player-check.json")
 # The destination entries a delivery preserves: Finder's files and the app-managed folder.
 FINDER_METADATA = ".DS_Store"
 APP_FOLDER = ".claude"
@@ -136,6 +147,40 @@ def readback(root: Path, destination: Path) -> dict:
     }
 
 
+def check_players(binding: Path, receipt: Path) -> int:
+    """Read the bound delivery's pages back in a real browser; return the check's status."""
+    return tools.run("player-check", ["players", str(binding), str(receipt)])
+
+
+def read_players(root: Path, members: list[tuple[Path, str]]) -> dict:
+    """Read every page back from the members' sources, and refuse a page that fails."""
+    binding = {
+        "destination": str(root / SOURCE),
+        "film": dict(BOUND_FILM),
+        "members": [{"path": path, "sha256": repository.sha(source)} for source, path in members],
+    }
+    repository.write(root / PLAYERS_BINDING, binding)
+    (root / PLAYERS).unlink(missing_ok=True)
+    try:
+        status = check_players(root / PLAYERS_BINDING, root / PLAYERS)
+    except (PictureError, tools.ToolError) as error:
+        msg = f"The player check cannot run, so nothing is delivered: {error}"
+        raise DeliveryRefusedError(msg) from error
+    if status != 0:
+        failed = []
+        if (root / PLAYERS).is_file():
+            pages = repository.read(root / PLAYERS).get("pages", [])
+            failed = [
+                f"{page['page']}: {'; '.join(page['problems'])}"
+                for page in pages
+                if page["verdict"] != "pass"
+            ]
+        reason = " | ".join(failed) or f"The player check exited with status {status}"
+        msg = f"The players fail their readback, so nothing is delivered: {reason}"
+        raise DeliveryRefusedError(msg)
+    return {"receipt": str(PLAYERS), "sha256": repository.sha(root / PLAYERS)}
+
+
 def deliver(root: Path, destination: Path, *, dry_run: bool = False) -> dict:
     """Replace the destination's delivery with the current members and read it back."""
     members = plan(root)
@@ -154,6 +199,7 @@ def deliver(root: Path, destination: Path, *, dry_run: bool = False) -> dict:
     ):
         (root / place).parent.mkdir(parents=True, exist_ok=True)
         (root / place).write_text(text)
+    players = None if dry_run else read_players(root, members)
     kept = PREDECESSORS / datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     command = [
         "rsync",
@@ -179,6 +225,7 @@ def deliver(root: Path, destination: Path, *, dry_run: bool = False) -> dict:
     if dry_run:
         return {"destination": str(destination), "changes": changes, "dry_run": True}
     report = readback(root, destination)
+    report["players"] = players
     report["predecessors"] = kept.as_posix() if (root / kept).exists() else None
     report["changes"] = changes
     repository.write(root / READBACK, report)

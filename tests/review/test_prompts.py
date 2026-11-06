@@ -72,11 +72,21 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
     (previous / "zh").mkdir()
     out = root / "build/evidence/reviews/round-5"
     changes = put(root / "changes.md", "- Repairs: 07.6 names all seven checks.\n\n")
+    disposed = put(
+        root / "dispositions.json",
+        {
+            "round": 4,
+            "findings": {
+                name: {"disposition": "fixed", "evidence": f"{name} reverified."}
+                for name in ("R4-1", "R4-2", "R4-3")
+            },
+        },
+    )
     with pytest.raises(ReviewError, match="missing build/evidence/reviews/round-5/pronun"):
-        review_prompts.prompts(previous, out, changes)
+        review_prompts.prompts(previous, out, changes, disposed)
     for name in review_prompts.ROUND_INPUTS:
         put(out / name, {})
-    assert review_prompts.prompts(previous, out, changes) == {
+    assert review_prompts.prompts(previous, out, changes, disposed) == {
         "prompts": [
             "build/evidence/reviews/round-5/prompt-zh.md",
             "build/evidence/reviews/round-5/prompt-en.md",
@@ -103,9 +113,10 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
             "ROOT/build/evidence/readings/zh-plan.json and "
             "ROOT/build/evidence/readings/en-plan.json."
         ),
+        "your own output directory.\n- Dispositions of round 4's findings. Re-verify ",
         (
-            "your own output directory.\n- Repairs: 07.6 names all seven checks.\n"
-            "- Pause policy the scripts declare:"
+            "    - R4-3: R4-3 reverified.\n  - Declared: none.\n  - Deferred: none.\n"
+            "- Repairs: 07.6 names all seven checks.\n- Pause policy the scripts declare:"
         ),
         "Write only under ROOT/build/evidence/reviews/round-5/.",
         "inner pauses at most 0.33 s Chinese; 0.33 s (0.22 s at commas) English;",
@@ -131,7 +142,9 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
         ),
     ):
         assert expected in zh
-    assert "(no findings)" in en
+    assert "(no findings). Verify" in en
+    # An edition whose previous review holds no findings has none to dispose of.
+    assert "everything independently.\n- Repairs: 07.6 names all seven checks.\n" in en
     assert "working files are in" not in en
     assert "The Chinese (zh) edition is the same film in its own language" in en
     for text in (zh, en):
@@ -143,7 +156,7 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
     monkeypatch.setattr(
         review_prompts, "FILM", review_prompts.FILM.model_copy(update={"concepts": None})
     )
-    review_prompts.prompts(previous, out, changes)
+    review_prompts.prompts(previous, out, changes, disposed)
     assert "exactly 1260 s, 16:9 pure 2D" in (out / "prompt-en.md").read_text()
     assert "44.1 kHz stereo narration" in (out / "prompt-en.md").read_text()
     assert "Concept contract: none declared;" in (out / "prompt-en.md").read_text()
@@ -151,7 +164,7 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
     with pytest.raises(
         ReviewError, match=re.escape("missing build/artifacts/film/en/sample-reel-en-uhd.mp4")
     ):
-        review_prompts.prompts(previous, out, changes)
+        review_prompts.prompts(previous, out, changes, disposed)
 
 
 def test_prompts_name_the_optional_pause_fields_a_script_omits(root, put, monkeypatch):
@@ -241,7 +254,8 @@ def test_a_first_round_states_that_no_earlier_review_exists(root, put, monkeypat
     review_round.main(["prompts", "--round", "1"])
     for code in CODES:
         text = (out / f"prompt-{code}.md").read_text()
-        assert f"- {review_prompts.FIRST_ROUND}\n" in text
+        # A first round has no dispositions to state, so its prompts read as before.
+        assert f"- {review_prompts.FIRST_ROUND}\n- Pause policy the scripts declare:" in text
         assert "previous review is in" not in text
         assert "working files are in" not in text
         assert not re.search(r"\{[a-z_]+\}", text)
@@ -261,7 +275,7 @@ def test_a_template_that_cites_the_previous_review_needs_a_previous_round(
     out = round_inputs(root, put, monkeypatch)
     template = (
         "{media}\n- The previous review is in {previous}/{code}-review.md ({findings}).{scripts}\n"
-        "{concepts} {readings}\n"
+        "{dispositions}{concepts} {readings}\n"
     )
     monkeypatch.setattr(review_prompts, "TEMPLATE", template)
     with pytest.raises(ReviewError) as refusal:
@@ -275,7 +289,9 @@ def test_a_template_that_cites_the_previous_review_needs_a_previous_round(
     previous = root / "build/evidence/reviews/round-0"
     review(previous, "zh", findings=[{"id": "R0-1", "severity": "minor"}])
     review(previous, "en")
-    review_prompts.prompts(previous, out)
+    fixed = {"disposition": "fixed", "evidence": "The card names all seven checks."}
+    disposed = put(root / "dispositions.json", {"round": 0, "findings": {"R0-1": fixed}})
+    review_prompts.prompts(previous, out, dispositions=disposed)
     assert (
         "- The previous review is in ROOT/build/evidence/reviews/round-0/zh-review.md "
         "(findings: minor R0-1).\n"
@@ -293,7 +309,156 @@ def test_the_previous_review_field_cites_the_previous_round(root, review, put, m
         "ROOT/build/evidence/reviews/round-0/review-en.json (no findings). Verify on these media "
         "whether each repair landed, and judge everything independently."
     )
-    review_prompts.prompts(previous, out)
+    # A previous round without findings still has its dispositions file, which names none.
+    disposed = put(root / "dispositions.json", {"round": 0, "findings": {}})
+    review_prompts.prompts(previous, out, dispositions=disposed)
     text = (out / "prompt-en.md").read_text()
     assert review_prompts.FIRST_ROUND not in text
     assert "ROOT/build/evidence/reviews/round-0/review-en.json (no findings)." in text
+
+
+def test_a_round_after_the_first_needs_the_dispositions_of_the_previous_findings(
+    root, review, put, monkeypatch
+):
+    out = round_inputs(root, put, monkeypatch)
+    previous = root / "build/evidence/reviews/round-0"
+    review(previous, "zh", findings=[{"id": "R0-1", "severity": "minor"}])
+    review(previous, "en")
+    fixed = {"disposition": "fixed", "evidence": "The card names all seven checks."}
+    disposed = put(root / "dispositions.json", {"round": 0, "findings": {"R0-1": fixed}})
+    later = ["prompts", "--round", "1", "--previous", str(previous)]
+    refusals = [
+        (
+            later,
+            "--previous build/evidence/reviews/round-0 needs --dispositions <file>, a disposition "
+            "of each of its findings",
+        ),
+        (
+            ["prompts", "--round", "1", "--dispositions", str(disposed)],
+            "--dispositions needs --previous; a first round has no findings to dispose of",
+        ),
+    ]
+    for command, refusal in refusals:
+        with pytest.raises(SystemExit) as stopped:
+            review_round.main(command)
+        assert str(stopped.value) == f"prompts: {refusal}"
+    # The previous round's number is the n of its directory round-<n>.
+    renamed = root / "build/evidence/reviews/recheck"
+    previous.rename(renamed)
+    with pytest.raises(ReviewError) as refusal:
+        review_prompts.prompts(renamed, out, dispositions=disposed)
+    assert str(refusal.value) == (
+        "the previous round's directory build/evidence/reviews/recheck is not named round-<n>"
+    )
+    renamed.rename(previous)
+    # A template that would not state the dispositions is refused when they are given.
+    template = review_prompts.TEMPLATE.replace("{dispositions}", "")
+    monkeypatch.setattr(review_prompts, "TEMPLATE", template)
+    with pytest.raises(ReviewError) as refusal:
+        review_prompts.prompts(previous, out, dispositions=disposed)
+    assert str(refusal.value) == (
+        "content/review/prompt.md never cites {dispositions}, which states the dispositions of "
+        "the previous round's findings"
+    )
+    assert not list(out.glob("prompt-*.md"))
+
+
+def test_the_dispositions_answer_each_previous_finding_once(root, review, put, monkeypatch):
+    out = round_inputs(root, put, monkeypatch)
+    previous = root / "build/evidence/reviews/round-0"
+    review(previous, "zh", findings=[{"id": f"R0-{n}", "severity": "note"} for n in (1, 2, 3, 4)])
+    review(previous, "en", findings=[{"id": "EN0-1", "severity": "minor"}])
+    findings = {
+        "R0-1": {"disposition": "fixed", "evidence": " "},
+        "R0-2": {"disposition": "deferred", "owner": "filmkit 0.12.0"},
+        "R0-3": {"disposition": "accepted", "reason": "It reads well."},
+        "R0-9": {"disposition": "fixed", "evidence": "Reverified."},
+        "EN0-1": {"disposition": "declared", "design": "Design §8.", "reason": "Kept."},
+    }
+    disposed = put(root / "dispositions.json", {"round": 0, "findings": findings})
+    with pytest.raises(ReviewError) as refusal:
+        review_prompts.prompts(previous, out, dispositions=disposed)
+    assert str(refusal.value) == (
+        "dispositions.json does not dispose of round 0's findings: no disposition of R0-4; "
+        "round 0 holds no finding R0-9; R0-1: a fixed disposition states its evidence; "
+        "R0-2: a deferred disposition states its owner and reason; "
+        "R0-3: a disposition is fixed, declared or deferred; "
+        "EN0-1: a declared disposition holds no reason"
+    )
+    complete = {
+        name: {"disposition": "fixed", "evidence": "Reverified."}
+        for name in ("R0-1", "R0-2", "R0-3", "R0-4", "EN0-1")
+    }
+    for record, message in (
+        ({"round": 3, "findings": complete}, "names round 3, but the previous round is round 0"),
+        (
+            {"round": 0, "findings": list(complete)},
+            'is not {"round": <n>, "findings": {<finding id>: <disposition>}}',
+        ),
+    ):
+        put(disposed, record)
+        with pytest.raises(ReviewError) as refusal:
+            review_prompts.prompts(previous, out, dispositions=disposed)
+        assert str(refusal.value) == f"dispositions.json {message}"
+    # A disposition keyed by an identifier that names two findings would answer both.
+    review(previous, "en", findings=[{"id": "R0-1", "severity": "minor"}])
+    put(disposed, {"round": 0, "findings": complete})
+    with pytest.raises(ReviewError) as refusal:
+        review_prompts.prompts(previous, out, dispositions=disposed)
+    assert (
+        str(refusal.value) == "build/evidence/reviews/round-0 gives R0-1 to more than one finding"
+    )
+    assert not list(out.glob("prompt-*.md"))
+
+
+def test_each_edition_s_prompt_states_its_dispositions_in_three_groups(
+    root, review, put, monkeypatch
+):
+    out = round_inputs(root, put, monkeypatch)
+    previous = root / "build/evidence/reviews/round-0"
+    review(previous, "zh", findings=[{"id": f"R0-{n}", "severity": "note"} for n in (1, 2, 3, 4)])
+    review(previous, "en", findings=[{"id": "EN0-1", "severity": "minor"}])
+    findings = {
+        "R0-4": {
+            "disposition": "deferred",
+            "owner": "filmkit 0.12.0",
+            "reason": "The engine\n  cannot measure it yet.",
+        },
+        "R0-3": {"disposition": "fixed", "evidence": "The cover names the author."},
+        "R0-2": {"disposition": "declared", "design": "Design §8 keeps the two-line title."},
+        "R0-1": {"disposition": "fixed", "evidence": "07.6 names all seven checks."},
+        "EN0-1": {"disposition": "fixed", "evidence": "08.2 stands on one line."},
+    }
+    disposed = put(root / "dispositions.json", {"round": 0, "findings": findings})
+    review_round.main(
+        ["prompts", "--round", "1", "--previous", str(previous), "--dispositions", str(disposed)]
+    )
+    zh, en = ((out / f"prompt-{code}.md").read_text() for code in CODES)
+    statement = (
+        "- Dispositions of round 0's findings. Re-verify each fixed finding on these media by its "
+        "own reverification line; judge a declared finding against the design that keeps it, and "
+        "a deferred one as it stands.\n"
+    )
+    # Each group lists its findings in the order of the previous review.
+    assert (
+        f"judge everything independently.\n{statement}"
+        "  - Fixed:\n"
+        "    - R0-1: 07.6 names all seven checks.\n"
+        "    - R0-3: The cover names the author.\n"
+        "  - Declared:\n"
+        "    - R0-2: Design §8 keeps the two-line title.\n"
+        "  - Deferred:\n"
+        "    - R0-4 (owner: filmkit 0.12.0): The engine cannot measure it yet.\n"
+        "- Pause policy the scripts declare:"
+    ) in zh
+    assert (
+        f"judge everything independently.\n{statement}"
+        "  - Fixed:\n"
+        "    - EN0-1: 08.2 stands on one line.\n"
+        "  - Declared: none.\n"
+        "  - Deferred: none.\n"
+        "- Pause policy the scripts declare:"
+    ) in en
+    # Each edition's reviewer is given the dispositions of its own edition's findings.
+    assert "EN0-1" not in zh
+    assert "R0-" not in en

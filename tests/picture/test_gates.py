@@ -9,7 +9,7 @@ import pytest
 
 import filmkit.picture.gates as gates
 import filmkit.repository as repository
-from filmkit.film import FILM
+from filmkit.film import FILM, Wrapping
 from filmkit.picture.metrics import VARIABLE
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, STYLE, PictureError
 from filmkit.production import Edition
@@ -69,6 +69,20 @@ RAGGED_ROW = {
     "baselines": [500.0, 506.0],
     "gap": 199.2,
 }
+
+
+def wrapped(lines, breaks, at=12.25):
+    """A wrapped label as the frame audit reports it per scene."""
+    shares = [1.0] * len(lines)
+    return {"lines": lines, "seen": at - 0.5, "at": at, "breaks": breaks, "shares": shares}
+
+
+# A label that ends a line on a preposition, and its finding.
+BROKEN = wrapped(["A trade in", "the market"], ['line 1 ends on the lead word "in"'])
+BROKEN_FINDING = (
+    'frame wrapped label 10 "A trade in" / "the market" at rest 12.25 s: '
+    'line 1 ends on the lead word "in"'
+)
 
 
 def put(path, data):
@@ -137,7 +151,10 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
     # 30 frames per second, both on the edition's timeline.
     (frame_tool, frame_args, frame_env), (motion_tool, motion_args, motion_env) = calls
     assert (frame_tool, frame_args) == ("frame-audit", [str(edition.timeline), "0.0333333"])
-    assert sorted(frame_env) == [VARIABLE, "MARKS", "TEXTS", "TRACE"]
+    assert sorted(frame_env) == [VARIABLE, gates.WRAPPING_VARIABLE, "MARKS", "TEXTS", "TRACE"]
+    # The frame audit judges wrapped labels by the declared shares and lead words.
+    rules = repository.read(Path(frame_env[gates.WRAPPING_VARIABLE]))
+    assert rules == {"line_share": 0.8, "last_share": 0.6, "lead_words": []}
     assert (motion_tool, motion_args[:2]) == ("motion-audit", [str(edition.timeline), "30"])
     assert motion_env == {VARIABLE: frame_env[VARIABLE]}
     table = repository.read(Path(frame_env[VARIABLE]))
@@ -219,6 +236,10 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
             "frame mixed_case",
         ),
         (
+            {**CLEAN, "frame": {**CLEAN["frame"], "wrapped_labels": {"10": [BROKEN]}}},
+            BROKEN_FINDING,
+        ),
+        (
             {**CLEAN, "texts": opening("示例", 2.0)},
             "text title '示例影片' shown 0.00 s before the first word at 2.00 s; "
             "never shown: 影, 片",
@@ -297,3 +318,55 @@ def test_a_failed_audit_is_refused_with_its_report(film, monkeypatch):
     monkeypatch.setattr(gates.tools, "run", lambda *arguments, **options: 1)
     with pytest.raises(PictureError, match="frame-audit exited with status 1"):
         gates.check_picture(Edition("zh"))
+
+
+def declaring(monkeypatch, **wrapping):
+    """Stand in for the film's declaration with these wrapping rules."""
+    picture = FILM.picture.model_copy(update={"wrapping": Wrapping(**wrapping)})
+    monkeypatch.setattr(gates, "FILM", FILM.model_copy(update={"picture": picture}))
+
+
+def test_wrapped_labels_are_judged_by_the_declared_rules_and_refused_by_name(film, monkeypatch):
+    # A label that breaks no rule, and one that never stands at rest, refuse nothing.
+    clean = wrapped(["A trade", "on the market"], [])
+    entering = {**wrapped(["Bias may hide", "elsewhere"], []), "at": None}
+    later = wrapped(["Rollback or", "degradation"], ['line 1 ends on the lead word "or"'], 30.5)
+    labels = {"11": [later], "10": [clean, BROKEN, entering]}
+    calls = audits(monkeypatch, {**CLEAN, "frame": {**CLEAN["frame"], "wrapped_labels": labels}})
+    declaring(monkeypatch, line_share=0.75, last_share=0.5, lead_words=["versus"])
+    with pytest.raises(PictureError, match="2 gated findings"):
+        gates.check_picture(Edition("zh"))
+    record = repository.read(Edition("zh").picture_gates)
+    assert record["gated_findings"] == [
+        BROKEN_FINDING,
+        'frame wrapped label 11 "Rollback or" / "degradation" at rest 30.50 s: '
+        'line 1 ends on the lead word "or"',
+    ]
+    rules = repository.read(Path(calls[0][2][gates.WRAPPING_VARIABLE]))
+    assert rules == {"line_share": 0.75, "last_share": 0.5, "lead_words": ["versus"]}
+
+
+def test_a_declared_exception_is_recorded_with_its_reason_and_a_stale_one_refuses(
+    film, monkeypatch
+):
+    frame = {**CLEAN["frame"], "wrapped_labels": {"10": [BROKEN]}}
+    audits(monkeypatch, {**CLEAN, "frame": frame})
+    reason = "the market names the venue the narration quotes"
+    kept = {"edition": "zh", "lines": ["A trade in", "the market"], "reason": reason}
+    # An exception of the other edition is judged in its own edition only.
+    other = {"edition": "en", "lines": ["Stated", "assumptions"], "reason": "a term"}
+    declaring(monkeypatch, exceptions=[kept, other])
+    record = gates.check_picture(Edition("zh"))
+    assert record["verdict"] == "pass" and record["gated_findings"] == []
+    assert record["recorded_findings"] == [f"{BROKEN_FINDING}; declared: {reason}"]
+    # A label painted but never at rest is painted; lines no frame paints make a stale exception.
+    entering = {**wrapped(["Bias may hide", "elsewhere"], []), "at": None}
+    frame["wrapped_labels"]["12"] = [entering]
+    painted = {**other, "edition": "zh", "lines": ["Bias may hide", "elsewhere"]}
+    declaring(monkeypatch, exceptions=[kept, painted, {**other, "edition": "zh"}])
+    with pytest.raises(PictureError, match="1 gated findings"):
+        gates.check_picture(Edition("zh"))
+    assert repository.read(Edition("zh").picture_gates)["gated_findings"] == [
+        'frame wrapping exception "Stated" / "assumptions" is stale: no frame of the edition'
+        " paints it"
+    ]

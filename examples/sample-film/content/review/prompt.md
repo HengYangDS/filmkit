@@ -12,7 +12,7 @@ Each edition: exactly {duration} s, 16:9 pure 2D, {fps} fps, UHD master and a ca
 - Scripts: ROOT/content/film-script.json, ROOT/content/en/film-script.json. Timelines with word timings and captions: ROOT/build/artifacts/film/{{zh,en}}/timeline.json. Subtitles, transcripts, chapters and players beside the movies in ROOT/build/artifacts/film/{{zh,en}}/.
 - Canonical source: {documents} in {source}. Concept contract: {concepts}; judge each concept's words in narration, captions and picture against it. Reading occurrence plans: {readings}.
 - {previous_review}{scripts}
-{changes}- Pause policy the scripts declare: inner pauses at most {caps}; inner pause floors {floors}; breaths {breath}; thought boundary ratios and margins {ratios}; level tolerances {tolerances}; coda thought pauses {codas}.
+{dispositions}{changes}- Pause policy the scripts declare: inner pauses at most {caps}; inner pause floors {floors}; breaths {breath}; thought boundary ratios and margins {ratios}; level tolerances {tolerances}; coda thought pauses {codas}.
 - Voice clarity floors the film declares: {clarity}. {out}/measurements.json records the cepstral peak prominence of each soundtrack and each segment's voice against them.
 - The {other_language} ({other}) edition is the same film in its own language; compare with it only for shared terms and structure.
 

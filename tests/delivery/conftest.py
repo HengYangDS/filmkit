@@ -14,6 +14,7 @@ import pytest
 
 import filmkit.delivery.documents_folder as delivery_documents_folder
 import filmkit.delivery.packaging as delivery_packaging
+import filmkit.delivery.player as delivery_player
 import filmkit.delivery.verification as delivery_verification
 import filmkit.narration.selection as narration_selection
 import filmkit.narration.thought_groups as narration_thought_groups
@@ -65,12 +66,26 @@ class Folder(NamedTuple):
 
 
 @pytest.fixture
-def film(tmp_path) -> Folder:
-    """A root whose current members are small texts, and an absent destination."""
+def film(tmp_path, monkeypatch) -> Folder:
+    """A root whose current members are small texts, and an absent destination.
+
+    The players' real-browser readback passes every page, as its own tests read real pages.
+    """
     folder = Folder(tmp_path / "root", tmp_path / "Documents" / FILM.documents_folder)
     for source, path in delivery_documents_folder.plan(folder.root):
         write_input(source, f"current {path}\n")
+    monkeypatch.setattr(delivery_documents_folder, "check_players", passing_players)
     return folder
+
+
+def passing_players(binding: Path, receipt: Path) -> int:
+    """Stand in for the player check: every page of the bound delivery passes."""
+    pages = [
+        {"page": page, "verdict": "pass", "problems": []}
+        for page in ("index.html", "zh/index.html", "en/index.html")
+    ]
+    write_input(receipt, {"pass": True, "pages": pages, "binding": str(binding)})
+    return 0
 
 
 def write_soundtrack(
@@ -209,7 +224,7 @@ def picture(inputs: Inputs) -> None:
 
 
 def packages(inputs: Inputs) -> None:
-    """Both films, the viewing members, the player sources and both package records."""
+    """Both films, the viewing members, the entry page and both package records."""
     root, edition, sha = inputs.root, inputs.edition, repository.sha
     output = edition.artifacts
     write_input(root / edition.cover, b"cover png")
@@ -231,7 +246,6 @@ def packages(inputs: Inputs) -> None:
         },
     )
     for path, body in (
-        (edition.player, "<player>"),
         (delivery_packaging.INDEX, "<entry template>"),
         (delivery_packaging.LANGUAGE_INDEX, "<entry page>"),
     ):
@@ -241,7 +255,7 @@ def packages(inputs: Inputs) -> None:
         {
             "script_sha256": sha(root / edition.script),
             "timeline_sha256": sha(edition.timeline),
-            "player_source_sha256": sha(root / edition.player),
+            "player": delivery_player.player_binding(edition),
             "language_index": {
                 "source": str(delivery_packaging.INDEX),
                 "source_sha256": sha(root / delivery_packaging.INDEX),

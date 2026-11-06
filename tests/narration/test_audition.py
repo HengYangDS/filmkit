@@ -9,8 +9,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+import filmkit.film as film
 import filmkit.narration.audition as narration_audition
 import filmkit.narration.group_generation as narration_group_generation
+import filmkit.narration.terms as narration_terms
 import filmkit.repository as repository
 from filmkit.production import Edition
 
@@ -30,6 +32,8 @@ def take(
     quiet=True,
     clip_quiet=None,
     stops=(),
+    fluent=True,
+    terms=True,
 ):
     return {
         "seed": seed,
@@ -41,6 +45,8 @@ def take(
         "seconds": seconds,
         "opens_quiet": quiet,
         "clip_opens_quiet": quiet if clip_quiet is None else clip_quiet,
+        "fluent": fluent,
+        "terms_pass": terms,
     }
 
 
@@ -80,6 +86,21 @@ def test_propose_accepts_an_opening_take_whose_clip_opens_in_its_released_onset(
     # quiet, as it does by releasing a codec onset.
     onset = take(1, end_ratio=0.05, quiet=False, clip_quiet=True)
     assert narration_audition.propose([onset, take(2, end_ratio=0.08)], opens_recording=True) == 1
+
+
+def test_propose_prefers_fluent_takes_that_say_their_terms_like_the_reference():
+    # A take that halts 0.45 s where the script switches is proposed only while no other
+    # qualified take is fluent.
+    halting = take(1, end_ratio=0.05, fluent=False)
+    assert narration_audition.propose([halting, take(2, differing=1)]) == 2
+    assert narration_audition.propose([halting, take(3, natural=False)]) == 1
+    # So is a take that says a declared term unlike its reference.
+    misread = take(4, end_ratio=0.05, terms=False)
+    assert narration_audition.propose([misread, take(5, differing=2)]) == 5
+    # A take that passes both is proposed; where each passes only what another fails, none is.
+    assert narration_audition.propose([halting, misread, take(6, differing=3)]) == 6
+    assert narration_audition.propose([halting, misread]) is None
+    assert narration_audition.propose([halting, take(7, fluent=False, terms=False)]) == 1
 
 
 THOUGHTS = ["按及时性的标准，这次交付不合格。", "把调度窗口提前，是有权的人做的决定。"]
@@ -303,6 +324,22 @@ def test_audition_records_each_take_with_its_waveform_hash(auditioned, monkeypat
         assert (take_row["onset_releasable"], take_row["clip_opens_quiet"]) == (False, False)
         # The thought holds no phrase end before its own.
         assert take_row["phrase_stops"] == []
+        # Spoken without a pause, it is fluent, and it says no declared term.
+        assert take_row["longest_unmarked_pause"] == {
+            "thought": "26.2",
+            "left": "Second",
+            "right": "thought",
+            "at": 0.5,
+            "pause_s": 0.0,
+            "marks": "",
+            "switch": False,
+            "limit_s": 0.4,
+        }
+        assert (take_row["fluent"], take_row["terms_pass"], take_row["term_occurrences"]) == (
+            True,
+            True,
+            [],
+        )
     assert row["proposed_seed"] is None
     assert json.loads(capsys.readouterr().out.splitlines()[-1])["proposed"] == {"26.2": None}
 
@@ -380,3 +417,71 @@ def test_a_run_on_target_is_read_on_into_the_next_thought_and_cut_before_it(
     with wave.open(str(auditioned["root"] / taken["path"])) as source:
         assert source.getnframes() == cut["cut_sample"]
     assert (auditioned["root"] / taken["run_on_take"]["path"]).exists()
+
+
+def declare_term(monkeypatch, thought: str) -> None:
+    """Declare "Second" a Latin-script term whose English reference is said in a thought."""
+    reference = {"en": {"thought": thought, "index": 0}}
+    term = film.NarrationTerm(term="Second", spoken="Second", ipa="ˈsɛkənd", reference=reference)
+    narration = film.Narration(terms=(term,))
+    monkeypatch.setattr(
+        narration_audition, "FILM", film.FILM.model_copy(update={"narration": narration})
+    )
+
+
+def test_a_reference_the_receipt_does_not_hold_refuses_before_any_model_loads(
+    auditioned, monkeypatch
+):
+    declare_term(monkeypatch, "26.1")
+    with pytest.raises(narration_terms.TermError, match="Second reference 26.1 #0 is not in"):
+        narration_audition.audition("en", "targets.json")
+    assert not (auditioned["root"] / narration_audition.AUDITIONS).exists()
+
+
+def test_each_take_says_its_terms_against_the_vowel_of_the_receipts_reference(
+    auditioned, monkeypatch
+):
+    declare_term(monkeypatch, "26.2")
+    levels = iter((0.2, 0.3))
+
+    class Voice:
+        sample_rate = 24000
+
+        def generate(self, **_request):
+            yield SimpleNamespace(audio=np.full(30000, next(levels), dtype=np.float32))
+
+    class Aligner:
+        def generate(self, _path, *, text, language):
+            assert (text, language) == (" Second thought.", "English")
+            return SimpleNamespace(
+                items=[Aligned("Second", 0.1, 0.5), Aligned("thought", 0.5, 1.0)]
+            )
+
+    # The receipt's thought take and the quieter take say the vowel of the reference; the
+    # louder take another.
+    def vowel(recording, _start, _end, _after=None):
+        close = recording.mono.max() < 0.25
+        return narration_terms.Vowel(250.0 if close else 650.0, 2750.0 if close else 2000.0, 6)
+
+    identity = {"repo": "aligner", "revision": "r", "weights_sha256": "0" * 64}
+    monkeypatch.setattr(narration_group_generation, "load_voice_model", Voice)
+    monkeypatch.setattr(narration_group_generation.mx.random, "seed", lambda _: None)
+    monkeypatch.setattr(
+        narration_audition,
+        "load_asr",
+        lambda: SimpleNamespace(generate=lambda *_, **__: SimpleNamespace(text="Second thought.")),
+    )
+    monkeypatch.setattr(
+        narration_audition, "load_aligner", lambda: {"identity": identity, "model": Aligner()}
+    )
+    monkeypatch.setattr(narration_terms, "first_vowel", vowel)
+    narration_audition.audition("en", "targets.json", takes=2, first=11)
+    folder = auditioned["root"] / narration_audition.AUDITIONS / "en"
+    (row,) = json.loads((folder / "audition.json").read_text())
+    said = [(take["terms_pass"], take["term_occurrences"]) for take in row["takes"]]
+    occurrence = {"term": "Second", "index": 0, "at": 0.1, "frames": 6}
+    same, opened = {"f1_ratio": 1.0, "f2_ratio": 1.0}, {"f1_ratio": 2.6, "f2_ratio": 0.727}
+    assert said == [
+        (True, [{**occurrence, "f1_hz": 250, "f2_hz": 2750, "passes": True} | same]),
+        (False, [{**occurrence, "f1_hz": 650, "f2_hz": 2000, "passes": False} | opened]),
+    ]

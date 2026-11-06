@@ -264,3 +264,35 @@ def test_natural_thought_takes_assemble_the_same_soundtrack(two_chapters):
     bind_thought_takes(two_chapters)
     soundtrack_assembly.assemble(two_chapters)
     assert two_chapters.soundtrack.read_bytes() == unbound
+
+
+@pytest.mark.ffmpeg
+def test_assembly_refuses_an_unmarked_pause_above_its_limit_before_writing(two_chapters):
+    # The second recording halts 0.6 s between 甲 and 乙, where its text has no mark.
+    words = (("甲", 0.4, 0.9), ("乙", 1.5, 2.0), ("丙", 2.6, 3.1), ("丁", 3.1, 3.6))
+    pcm = np.zeros(round(4.1 * RATE))
+    for _, start, end in words:
+        span = np.arange(round(start * RATE), round(end * RATE))
+        pcm[span] = 9000 * np.sin(2 * np.pi * 440 * span / RATE)
+    path = repository.ROOT / "take-02.wav"
+    with wave.open(str(path), "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(RATE)
+        audio.writeframes(np.rint(pcm).astype("<i2").tobytes())
+    for record_file, key in (
+        (two_chapters.narration_selected, "records"),
+        (two_chapters.alignment_selected, "records"),
+    ):
+        bound = json.loads(record_file.read_text())
+        bound[key][1]["wav_sha256"] = sha256(path)
+        if "items" in bound[key][1]:
+            bound[key][1]["items"] = [
+                {"text": word, "start_time": start, "end_time": end} for word, start, end in words
+            ]
+        record_file.write_text(json.dumps(bound, ensure_ascii=False))
+    refusal = r"^zh 02\.1: a 0\.(59|60) s pause between 甲 and 乙, where the text has no mark, "
+    with pytest.raises(soundtrack_assembly.AssemblyError, match=refusal + r"exceeds its 0\.40 s"):
+        soundtrack_assembly.assemble(two_chapters)
+    for written in (two_chapters.soundtrack, two_chapters.timeline, two_chapters.audio_assembly):
+        assert not written.exists()

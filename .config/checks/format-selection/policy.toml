@@ -1,5 +1,5 @@
 # The sample film's sources whose bytes the engine owns: its writers rewrite the scripts and casts
-# as two-space JSON, the pages and the composition template hold the exact placeholders and
+# as two-space JSON, the entry page and the composition template hold the exact placeholders and
 # patterns the engine substitutes, each narration text equals its script's segment texts joined
 # by one blank line, and the listening plan reads the readings as written. The suites load and
 # check them in every proof.
@@ -8,12 +8,10 @@ id = "sample-film-sources"
 paths = [
   "examples/sample-film/content/en/film-script.json",
   "examples/sample-film/content/en/narration.md",
-  "examples/sample-film/content/en/player.html",
   "examples/sample-film/content/en/voice-reference.json",
   "examples/sample-film/content/film-script.json",
   "examples/sample-film/content/index.html",
   "examples/sample-film/content/narration.md",
-  "examples/sample-film/content/player.html",
   "examples/sample-film/content/review/readings.json",
   "examples/sample-film/content/source-manifest.json",
   "examples/sample-film/content/voice-performance.json",

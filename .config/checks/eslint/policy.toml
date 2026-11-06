@@ -1,5 +1,9 @@
 [[environment]]
-paths = ["src/filmkit/picture/geometry-check.mjs", "src/filmkit/delivery/player-check.mjs"]
+paths = [
+  "src/filmkit/picture/geometry-check.mjs",
+  "src/filmkit/delivery/player-check.mjs",
+  "src/filmkit/delivery/player-read.mjs",
+]
 globals = ["browser"]
 reason = "page.evaluate, page.evaluateOnNewDocument and page.waitForFunction run these callbacks in the rendered page, where window, document and CanvasRenderingContext2D are browser globals"
 

@@ -76,7 +76,7 @@ class Edition:
 
     @property
     def sources(self) -> str:
-        """The folder of the edition's script, cast, player and narration mirror."""
+        """The folder of the edition's script, cast and narration mirror."""
         return FILM.editions[self.code].sources
 
     @property
@@ -96,11 +96,6 @@ class Edition:
     def mirror(self) -> str:
         """The narration text, which equals the script's segment texts joined by blank lines."""
         return f"{self.sources}/narration.md"
-
-    @property
-    def player(self) -> str:
-        """The player page template, in the edition's language."""
-        return f"{self.sources}/player.html"
 
     @property
     def cover(self) -> str:

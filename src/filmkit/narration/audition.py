@@ -7,7 +7,11 @@ each take's first item and its phrase ends; the phrase ends followed by heard qu
 judged as its end is. A take qualifies when it ends naturally, cuts none of those phrase
 ends and its transcript contains the target's required phrase, and a thought that opens
 its recording qualifies only when its clip opens in quiet as the assembly begins it: in
-the take's own heard quiet or in its released codec onset. The
+the take's own heard quiet or in its released codec onset. Each take also records its
+longest unmarked pause and the first vowel of every declared term it says (see flow and
+terms): a take with an unmarked pause above its limit, or a term said beyond its reference's
+bounds, is proposed only when no other qualified take passes that check, and no take is
+proposed when each passes only a check that another fails. The
 qualified take with the fewest differing units is proposed, ties going to the quietest
 ending or, with --prefer slower or brisker, to the longest or the shortest take. The
 receipt, by default the one the cast declares, must hold each thought's current text, so
@@ -37,6 +41,7 @@ Paths are relative to the repository root.
 
 import argparse
 import dataclasses
+import functools
 import json
 import wave
 
@@ -44,8 +49,11 @@ import numpy as np
 from mlx_audio.audio_io import write
 from mlx_audio.stt.utils import load_model
 
+import filmkit.narration.flow as flow
 import filmkit.narration.group_generation as group_generation
+import filmkit.narration.terms as terms
 import filmkit.repository as repository
+from filmkit.film import FILM
 from filmkit.narration.alignment import verify_aligner
 from filmkit.narration.narrate import ALIGNER
 from filmkit.narration.pronunciation import pronunciation_contract
@@ -70,6 +78,8 @@ SUMMARY = (
     "required_heard",
     "differing_units",
     "seconds",
+    "fluent",
+    "terms_pass",
 )
 
 
@@ -91,6 +101,7 @@ def propose(
         and take["required_heard"]
         and (take["clip_opens_quiet"] or not opens_recording)
     ]
+    qualified = _preferred(qualified)
     if not qualified:
         return None
     tiebreak = {
@@ -99,6 +110,21 @@ def propose(
         "brisker": lambda take: take["seconds"],
     }[prefer]
     return min(qualified, key=lambda take: (take["differing_units"], tiebreak(take)))["seed"]
+
+
+def _preferred(qualified: list[dict]) -> list[dict]:
+    """The qualified takes that may be proposed, by their flow and the terms they say.
+
+    A take that fails the flow limits or a term's reference may be proposed only when no
+    other qualified take passes that check; where each take passes only a check that another
+    fails, none may.
+    """
+    fluent = [take for take in qualified if take["fluent"]]
+    sound = [take for take in qualified if take["terms_pass"]]
+    both = [take for take in fluent if take["terms_pass"]]
+    if both or (fluent and sound):
+        return both
+    return fluent or sound or qualified
 
 
 def audition(
@@ -128,9 +154,11 @@ def audition(
         for record, child, (_, run_on) in chosen
         if run_on
     }
+    references = terms.receipt_references(code, FILM.narration.terms, records)
     model = group_generation.load_voice_model()
     asr = load_asr()
     aligner = load_aligner()
+    standards = _standards(code, references, aligner, edition.language)
     folder.mkdir(parents=True, exist_ok=True)
     rows = []
     for record, child, (phrase, _) in chosen:
@@ -158,7 +186,9 @@ def audition(
                 seed,
             )
             path = folder / f"{record['id']}-{child['index']:02d}-{seed}.wav"
-            heard = (aligner, asr, edition.language, child["spoken_text"], phrase)
+            thought = f"{record['id']}.{child['index']}"
+            judge = functools.partial(_spoken, code, thought, child["spoken_text"], standards)
+            heard = (aligner, asr, edition.language, child["spoken_text"], phrase, judge)
             if run_on is None:
                 write(str(path), audio, model.sample_rate)
                 take = {"seed": seed, **_measured(path, *heard)}
@@ -260,7 +290,7 @@ def _run_on_measured(path, audio: np.ndarray, model, aligner: dict, run_on: str,
     The whole take is retained beside the cut one, and its alignment locates the thought. A
     take without heard quiet before its next words is measured whole and does not qualify.
     """
-    _, _, language, spoken_text, _ = heard
+    _, _, language, spoken_text, *_ = heard
     whole = path.with_name(f"{path.stem}-run-on.wav")
     write(str(whole), audio, model.sample_rate)
     with wave.open(str(whole)) as source:
@@ -286,10 +316,13 @@ def _run_on_measured(path, audio: np.ndarray, model, aligner: dict, run_on: str,
     }
 
 
-def _measured(path, aligner: dict, asr, language: str, spoken_text: str, phrase: str) -> dict:
+def _measured(
+    path, aligner: dict, asr, language: str, spoken_text: str, phrase: str, judge
+) -> dict:
     """A written take's waveform hash, its opening, ending and phrase ends, and what was heard.
 
-    The take's alignment places its first item for the opening and its phrase ends.
+    The take's alignment places its first item for the opening and its phrase ends, and `judge`
+    measures its flow and the terms it says from its samples and alignment.
     """
     with wave.open(str(path)) as source:
         rate = source.getframerate()
@@ -306,6 +339,36 @@ def _measured(path, aligner: dict, asr, language: str, spoken_text: str, phrase:
         "heard": heard,
         "required_heard": heard_phrase(heard, phrase),
         "differing_units": unit_distance(recognition_units(spoken_text), recognition_units(heard)),
+        **judge(pcm, rate, items),
+    }
+
+
+def _standards(code: str, references: list, aligner: dict, language: str) -> list:
+    """Each declared term's reference vowel, measured on the receipt's thought take that says it."""
+    standards = []
+    for term, forms, reference, child in references:
+        path = repository.ROOT / child["path"]
+        found = aligner["model"].generate(str(path), text=child["spoken_text"], language=language)
+        words = terms.said_after(
+            flow.timed([dataclasses.asdict(item) for item in found.items]), forms
+        )
+        vowel = None
+        if len(words) > reference.index:
+            word, after = words[reference.index]
+            vowel = terms.first_vowel(flow.Recording.read(path), word["start"], word["end"], after)
+        if vowel is None:
+            msg = f"{code}: the {term.term} reference {reference} shows no two formants on its take"
+            raise terms.TermError(msg)
+        standards.append(terms.Standard(term, forms, reference, vowel))
+    return standards
+
+
+def _spoken(code: str, thought: str, spoken_text: str, standards: list, pcm, rate, items) -> dict:
+    """A take's flow and the first vowels of the declared terms it says."""
+    words, recording = flow.timed(items), flow.Recording.of(pcm, rate)
+    return {
+        **flow.take_flow(code, thought, spoken_text, words, recording, FILM.narration.flow),
+        **terms.take_terms(standards, words, recording),
     }
 
 

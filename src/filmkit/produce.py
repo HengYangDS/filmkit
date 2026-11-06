@@ -4,8 +4,9 @@ Each action belongs to its owning module, which derives its media and receipts f
 current production contract; the command parses the options and calls that owner. Every
 action needs --language.
 A refusal by an action's owner exits with status 1 and "<action>: <reason>" on standard
-error. The command owns no goal, approval, repository
-lifecycle, service or task state.
+error. Assembling a soundtrack and refreshing captions first refuse while a review round binds
+the edition's films and has not set them aside (`filmkit.review.set_aside.require_set_aside`).
+The command owns no goal, approval, repository lifecycle, service or task state.
 
 Usage: python -m filmkit.produce <edition action> --language zh|en [options]
 """
@@ -32,6 +33,8 @@ from filmkit.picture.rendering import (
 )
 from filmkit.preflight import PreflightError, preflight
 from filmkit.production import CODES, Edition
+from filmkit.review import ReviewError
+from filmkit.review.set_aside import require_set_aside
 from filmkit.soundtrack.assembly import AssemblyError, assemble
 from filmkit.soundtrack.level import LevelError
 from filmkit.soundtrack.pauses import PauseError
@@ -43,12 +46,22 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
+def after_set_aside(edition: Edition, owner: Callable[[Edition], object]) -> object:
+    """Run an owner that rewrites the edition's build in place, unless a round still binds it.
+
+    Refused while a review round's prompts bind the edition's films and that round has not set
+    them aside (`require_set_aside`).
+    """
+    require_set_aside(edition)
+    return owner(edition)
+
+
 # Each edition action's adapter from the parsed options to its owner. The adapters name their
 # owners when they run, so a test can replace an owner.
 EDITION_ACTIONS: dict[str, Callable[[Edition, argparse.Namespace], object]] = {
     "select": lambda edition, _: select(edition),
-    "assemble": lambda edition, _: assemble(edition),
-    "refresh-captions": lambda edition, _: refresh_captions(edition),
+    "assemble": lambda edition, _: after_set_aside(edition, assemble),
+    "refresh-captions": lambda edition, _: after_set_aside(edition, refresh_captions),
     "stage-picture": lambda edition, options: stage_picture(
         edition, options.output, options.duration, options.width, options.height, options.start
     ),
@@ -75,6 +88,7 @@ REFUSALS = (
     MediaError,
     PackagingError,
     PreflightError,
+    ReviewError,
 )
 
 

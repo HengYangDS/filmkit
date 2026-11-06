@@ -73,6 +73,7 @@ export function frameReport({
   thinRuns,
   underfilled,
   textLayout,
+  wrappedLabels,
 }) {
   const listsLeft = Object.groupBy(lists.findings(), (v) =>
     v.kind === "list_leaving_early" ? "early" : "dimmed",
@@ -290,6 +291,10 @@ export function frameReport({
     touching_marks: layoutByScene(textLayout.touching_marks),
     /* The names of one set, or of one row of one size, that begin in both cases, with those in each case. */
     mixed_case: layoutByScene(textLayout.mixed_case),
+    /* Every label painted on more than one line, per scene (frame-audit/typography/breaks.mjs): its lines, when it
+     * was first seen and first at rest, and at rest its lines' sizes, the share of the widest line of its size that
+     * each spans and the rules its lines break. filmkit.picture.gates gates each break a film does not declare. */
+    wrapped_labels: wrappedLabels,
   };
 }
 

@@ -14,14 +14,17 @@ source_manifest = "content/source-manifest.json"
 # What each concept the film names means in that document, and each edition's words for it.
 concepts = "content/concepts.toml"
 
-# Each edition's folder of script, cast and player, and its 16:9 cover.
+# Each edition's folder of script and cast, its 16:9 cover, and the summary its player shows
+# under the film.
 [editions.zh]
 sources = "content"
 cover = "assets/cover/sample-reel-cover.png"
+summary = "这部一分钟的短片演示一部影片怎样从源文件重建出来。片中的步骤依据 ddwg-film 的 README。"
 
 [editions.en]
 sources = "content/en"
 cover = "assets/cover/sample-reel-cover-en.png"
+summary = "A one-minute film that shows how a film is rebuilt from its sources. The steps it names follow the ddwg-film README."
 # A term that reads as one name stays on one caption line.
 caption_terms = ["reference recording", "build folder"]
 
@@ -35,6 +38,15 @@ fonts = [
   "assets/fonts/ibm-plex-sans-regular.ttf",
   "assets/fonts/ibm-plex-sans-bold.ttf",
 ]
+
+# The colours of each edition's player page: its ground, text, quieter text, rules and outlines,
+# and the accent of a chosen or focused control.
+[player]
+background = "#0F1519"
+text = "#ECE8DF"
+muted = "#9BA8B1"
+line = "#34424E"
+accent = "#7DB7D8"
 
 [review]
 # The reviewer prompt: a str.format template that each round fills for each edition.

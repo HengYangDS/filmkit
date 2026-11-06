@@ -2,7 +2,9 @@
 
 import json
 import re
+import wave
 
+import numpy as np
 import pytest
 
 import filmkit.repository as repository
@@ -24,6 +26,7 @@ def test_the_listening_plan_derives_for_the_current_scripts(tmp_path):
     written = json.loads((tmp_path / "plan.json").read_text())
     contract = repository.read(Edition("zh").script)["pronunciation_contract"]
     assert written["derived_from"] == {"path": contract, "sha256": repository.sha(contract)}
+    assert set(written["heard_moments"]) == {"zh", "en"}
 
 
 def test_listening_plan_binds_each_occurrence_and_refuses_unrecorded_readings(root, put):
@@ -165,3 +168,32 @@ def test_an_occurrence_outside_every_thought_is_refused():
     segment = {"id": "07", "text": "先看调度。", "utterance_groups": ["先看"]}
     with pytest.raises(ReviewError, match="07: 调度 at 2 lies outside every thought"):
         review_listening_plan.target_entries("zh", target, [segment], {})
+
+
+def test_the_plan_names_the_pauses_and_steps_of_each_assembled_soundtrack(root, put):
+    # 0.3 s of quiet between 据 and 再, where the text has no mark, stays within 0.4 s.
+    words = [("先", 0.2, 0.4), ("看", 0.4, 0.6), ("数", 0.6, 0.8), ("据", 0.8, 1.0)]
+    words += [("再", 1.3, 1.5), ("决", 1.5, 1.7), ("定", 1.7, 1.9)]
+    edition = Edition("zh")
+    put(root / edition.script, {"segments": []})
+    segment = {"id": "01", "text": "先看数据再决定。", "utterance_groups": ["先看数据再决定。"]}
+    segment["words"] = [{"text": text, "start": start, "end": end} for text, start, end in words]
+    put(edition.timeline, {"segments": [segment]})
+    mono = np.zeros(round(2.2 * 48000))
+    for _, start, end in words:
+        span = np.arange(round(start * 48000), round(end * 48000))
+        mono[span] = 9000 * np.sin(2 * np.pi * 200 * span / 48000)
+    with wave.open(str(edition.soundtrack), "wb") as audio:
+        audio.setnchannels(2)
+        audio.setsampwidth(2)
+        audio.setframerate(48000)
+        audio.writeframes(np.repeat(mono, 2).astype("<i2").tobytes())
+    moments = review_listening_plan.heard_moments(edition)
+    assert moments["status"] == "planned-not-listened"
+    assert moments["soundtrack"]["sha256"] == repository.sha(edition.soundtrack)
+    assert [
+        (row["thought"], row["left"], row["right"], row["pause_s"]) for row in moments["pauses"]
+    ] == [("01.1", "据", "再", 0.3)]
+    assert moments["steps"] == {"rate_ratio": [], "pitch_semitones": [], "level_db": []}
+    assert moments["narration_terms"] == []
+    assert review_listening_plan.heard_moments(Edition("en")) == {"status": "not-assembled"}

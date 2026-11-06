@@ -4,8 +4,10 @@ The selected recordings are bound to the script, and every bound thought take mu
 naturally unless the film declares a release for its join. The recordings are then decoded
 and shaped in turn: the pauses inside each thought are capped and lengthened, every thought
 boundary is measured, each thought join takes its designed quiet, each thought and chapter is
-leveled, and the clips are laid out with the designed gaps at one program level. The timeline,
-the captions and the receipt record the result.
+leveled, and the clips are laid out with the designed gaps at one program level. The laid-out
+soundtrack is refused, before anything is written, for an unmarked pause above the film's limit
+(`narration.flow`) or a declared term said unlike its reference (`narration.terms`). The
+timeline, the captions and the receipt record the result.
 """
 
 from __future__ import annotations
@@ -18,10 +20,13 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+import filmkit.narration.flow as flow
+import filmkit.narration.terms as terms
 import filmkit.repository as repository
 from filmkit.captions.documents import subtitle_files
 from filmkit.captions.phrasing import segment_caption_phrases
 from filmkit.captions.timing import caption_receipt_fields, timed_caption_cues
+from filmkit.film import FILM
 from filmkit.narration.selection import validate_aligned_recording
 from filmkit.narration.spoken_units import aligned_lookup
 from filmkit.narration.take_edges import ending
@@ -384,6 +389,18 @@ def _lay_out(
     return soundtrack, segments, records
 
 
+def _speech_refusals(edition: Edition, soundtrack: np.ndarray, segments: list[dict]) -> list[str]:
+    """What the laid-out soundtrack says against the film's pause limits and declared terms.
+
+    It is measured before its program gain: one gain moves no formant, and moves a heard
+    pause only where frames cross the -45 dBFS floor of the speech median.
+    """
+    narrated = flow.segments_of(flow.Recording.of(soundtrack, RATE), segments)
+    return flow.gate(edition.code, narrated, FILM.narration.flow) + terms.refusals(
+        edition.code, FILM.narration.terms, narrated
+    )
+
+
 def _write_pcm(path: Path, samples: np.ndarray) -> None:
     """Write 16-bit stereo samples at the film's rate as a WAV file."""
     with wave.open(str(path), "wb") as file:
@@ -517,6 +534,9 @@ def assemble(edition: Edition) -> None:
     if sum(gaps) + speech + closing != total:
         msg = "Designed assembly failed exact sample accounting"
         raise AssemblyError(msg)
+    refused = _speech_refusals(edition, soundtrack, timeline_segments)
+    if refused:
+        raise AssemblyError("\n".join(refused))
     soundtrack, program_level, peak = _reach_program_level(soundtrack, edition.soundtrack)
     timeline = {
         **script,

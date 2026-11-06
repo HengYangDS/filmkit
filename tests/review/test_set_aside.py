@@ -234,3 +234,58 @@ def test_a_reviewed_set_aside_keeps_the_pictures_it_is_told_to(root, review, cap
     assert [len(edition["members"]) for edition in printed] == [3, 3]
     assert not any("final-picture" in path for edition in printed for path in edition["members"])
     assert not (root / "build/artifacts/film/superseded").exists()
+
+
+def test_the_rounds_whose_prompts_bind_an_edition_s_films_hold_them_until_set_aside(
+    root, review, put, monkeypatch
+):
+    zh, en = Edition("zh"), Edition("en")
+
+    def named(*films):
+        return "".join(f"- {film} (SHA-256 {repository.sha(film)})\n" for film in films)
+
+    for number in (9, 10):
+        put(review_files.round_directory(number) / "prompt-zh.md", named(*zh.films))
+    put(review_files.round_directory(10) / "prompt-en.md", named(*en.films))
+    # Prompts that name another build or only one of the films bind nothing, and neither does a
+    # prompt outside a round's directory.
+    put(review_files.round_directory(8) / "prompt-zh.md", f"- other.mp4 (SHA-256 {'0' * 64})\n")
+    put(review_files.round_directory(7) / "prompt-zh.md", named(zh.film("uhd")))
+    put(root / "build/evidence/reviews/typography/prompt-zh.md", named(*zh.films))
+    with pytest.raises(ReviewError) as refusal:
+        review_set_aside.require_set_aside(zh)
+    assert str(refusal.value) == (
+        "the current zh films are bound by the prompts of review round 9 and round 10 and have "
+        "not been set aside; first run python -m filmkit.review.round set-aside --round 10 "
+        "--purpose <text> --language zh"
+    )
+    # Setting the Chinese edition aside moves its films, and the English stays bound.
+    reviews = review_files.round_directory(10)
+    review(reviews, "zh")
+    review_set_aside.move_aside(
+        review_set_aside.plan_set_aside(10, PURPOSE, reviews, codes=("zh",))
+    )
+    review_set_aside.require_set_aside(zh)
+    with pytest.raises(ReviewError, match="bound by the prompts of review round 10 and have not"):
+        review_set_aside.require_set_aside(en)
+    # A build rebuilt to the same bytes stays bound by the round that has not been set aside.
+    record = root / "build/artifacts/film/superseded/round-10/zh/manifest.json"
+    for member in json.loads(record.read_text())["members"]:
+        (root / member["source"]).write_bytes((root / member["path"]).read_bytes())
+    with pytest.raises(ReviewError, match=r"review round 9 and have not been set aside; .* 9 "):
+        review_set_aside.require_set_aside(zh)
+    # A set-aside interrupted before its first move has not set the round aside.
+    reviews = review_files.round_directory(9)
+    review(reviews, "zh")
+    plans = review_set_aside.plan_set_aside(9, PURPOSE, reviews, codes=("zh",))
+
+    def interrupted(self, target):
+        message = "interrupted"
+        raise OSError(message)
+
+    monkeypatch.setattr(review_set_aside.Path, "rename", interrupted)
+    with pytest.raises(OSError, match="interrupted"):
+        review_set_aside.move_aside(plans)
+    assert (root / "build/artifacts/film/superseded/round-9/zh/manifest.json").is_file()
+    with pytest.raises(ReviewError, match="bound by the prompts of review round 9 and have not"):
+        review_set_aside.require_set_aside(zh)

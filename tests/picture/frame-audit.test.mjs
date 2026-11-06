@@ -160,6 +160,8 @@ test("the frame audit finds the sample film's closing checklist on one left edge
     );
     assert.deepEqual(report.errors, [], code);
     for (const key of TEXT_LAYOUT) assert.deepEqual(report[key], {}, `${code} ${key}`);
+    // The sample film sets every name on one line.
+    assert.deepEqual(report.wrapped_labels, {}, code);
   }
 });
 
@@ -315,4 +317,103 @@ test("the frame audit measures balance as the reviewers do, with the widths of t
   assert.deepEqual(estimated.off_centre_settled, {
     "01": ["0.00-2.00 -220.5 px", "2.00-6.10 79.5 px"],
   });
+});
+
+/* A composition of one scene whose names wrap onto two lines: "A trade in" over "the market", fading in over its
+ * first second, and from 3 s "Risk versus" over "reward taken". */
+const WRAPPED = `"use strict";
+const ctx = document.getElementById("picture").getContext("2d");
+const P = { ground: "#0F1519", panel: "#1E2932", line: "#63758B", ink: "#ECE8DF", muted: "#9BA8B1" };
+let texts = [];
+function name(lines, x, alpha) {
+  lines.forEach((value, k) => {
+    const y = 500 + 40 * k;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = P.ink;
+    ctx.font = "30px Sample";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(value, x, y);
+    const width = ctx.measureText(value).width;
+    texts.push({ text: value, bounds: [x - width / 2, y - 24, x + width / 2, y + 7], color: P.ink, alpha,
+      role: "label", scene: "01", whole: lines.join(" "), placed: true, size: 30 });
+  });
+}
+window.renderFrame = (t) => {
+  texts = [];
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = P.ground;
+  ctx.fillRect(0, 0, 1920, 1080);
+  window.__sceneId = "01";
+  name(["A trade in", "the market"], 760, Math.min(1, t));
+  if (t >= 3) name(["Risk versus", "reward taken"], 1160, 1);
+  window.__sceneId = null;
+  window.__filmLayout = { time: t, texts };
+};
+`;
+
+test("the frame audit reports each wrapped label with when it first rests and the declared rules it breaks", async () => {
+  const root = await scratchFolder(),
+    path = join(root, "timeline.json"),
+    rules = join(root, "wrapping.json");
+  await mkdir(join(root, "picture"));
+  await writeFile(join(root, "picture/film.js"), WRAPPED);
+  const words = ["A", "trade", "in", "the", "market"].map((text, i) => ({
+    text,
+    start: 0.5 + i,
+    end: 1.3 + i,
+  }));
+  const segment = {
+    id: "01",
+    chapter: "sample",
+    start: 0,
+    end: 6,
+    voice_start: 0.5,
+    voice_end: 5.3,
+    utterance_groups: ["A trade in the market"],
+    words,
+  };
+  await writeFile(
+    path,
+    JSON.stringify({ language: "English", duration: 6, segments: [segment], captions: [] }),
+  );
+  await writeFile(rules, JSON.stringify({ lead_words: ["versus"] }));
+  const audit = (env) =>
+    JSON.parse(
+      execFileSync(process.execPath, [AUDIT_FRAMES, path, "0.25"], {
+        cwd: root,
+        env: { ...process.env, FILMKIT_TEXT_METRICS: "", ...env },
+        encoding: "utf8",
+      }),
+    );
+  const labels = (report) =>
+    report.wrapped_labels["01"].map(({ lines, seen, at, breaks, sizes }) => ({
+      lines,
+      seen,
+      at,
+      breaks,
+      sizes,
+    }));
+  // The first name rests once it stands at 0.9 opacity, and the declared lead word breaks the second.
+  assert.deepEqual(labels(audit({ FILMKIT_WRAPPING: rules })), [
+    {
+      lines: ["A trade in", "the market"],
+      seen: 0.25,
+      at: 1,
+      breaks: ['line 1 ends on the lead word "in"'],
+      sizes: [30, 30],
+    },
+    {
+      lines: ["Risk versus", "reward taken"],
+      seen: 3,
+      at: 3,
+      breaks: ['line 1 ends on the lead word "versus"'],
+      sizes: [30, 30],
+    },
+  ]);
+  // Without the film's rules the defaults judge them.
+  assert.deepEqual(
+    labels(audit({ FILMKIT_WRAPPING: "" })).map((v) => v.breaks),
+    [['line 1 ends on the lead word "in"'], []],
+  );
 });

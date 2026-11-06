@@ -1,12 +1,14 @@
 """Package each edition's metadata, player and delivered films.
 
 `package_metadata` derives the viewing package: the cover as PNG and JPEG, the subtitles,
-transcript and chapters, the edition's player and the language entry page, each recorded with
-its SHA-256 in the edition's viewing package. It refuses an edition whose declared cover has not
-been painted yet. `package_film` muxes the rendered picture with the soundtrack and chapters
-into every rendition in `production.RENDITIONS`, attaches the cover and the QuickTime keys in
-the packaging work folder, checks the finished film and only then links it into place, recording
-its SHA-256 and commands in the edition's film package.
+transcript and chapters, the edition's player, which the engine renders from the declared
+words and colours (`filmkit.delivery.player`), and the language entry page, each recorded with
+its SHA-256 in the edition's viewing package beside what the player shows. It refuses an
+edition whose declared cover has not been painted yet. `package_film` muxes the rendered
+picture with the soundtrack and chapters into every rendition in `production.RENDITIONS`,
+attaches the cover and the QuickTime keys in the packaging work folder, checks the finished
+film and only then links it into place, recording its SHA-256 and commands in the edition's
+film package; it then derives the viewing package again, so the player names the films' sizes.
 
 A film's release metadata comes from its script's "release": FFmpeg writes it as the iTunes
 item list (title, artist, collection, genre, year, comments, synopsis, copyright and media
@@ -20,11 +22,9 @@ language in place (`filmkit.delivery.track_language`), and every track must carr
 from __future__ import annotations
 
 import json
-import re
 import shutil
 import subprocess
 from datetime import UTC, datetime
-from html import escape
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -33,8 +33,15 @@ from PIL import Image
 import filmkit.media as media
 import filmkit.repository as repository
 from filmkit.captions.timing import typeset
+from filmkit.delivery.player import (
+    COVER_JPEG,
+    COVER_PNG,
+    player_binding,
+    player_page,
+    runtime_label,
+)
 from filmkit.delivery.track_language import set_chapter_language
-from filmkit.film import FILM
+from filmkit.film import FILM, copied_players
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, validate_picture
 from filmkit.production import CODES, RENDITIONS
 from filmkit.repository import read, run, sha, write
@@ -67,17 +74,8 @@ FAILURE_RECEIPT = "packaging-failure.json"
 CAPTION_OWNER = "Already drawn in source picture; no duplicate burn-in"
 # No encode's deadline is shorter, in seconds.
 DEADLINE_FLOOR = 600
-# Each edition's cover as delivered, PNG and JPEG.
-COVER_PNG = f"{FILM.slug}-cover.png"
-COVER_JPEG = f"{FILM.slug}-cover.jpg"
 # The film that a delivery binding names for the real-browser player check.
 BOUND_FILM = {"slug": FILM.slug, "duration": DURATION}
-
-
-def runtime_label() -> str:
-    """The films' running time as the player and the entry page show it, minutes:seconds."""
-    minutes, seconds = divmod(DURATION, 60)
-    return f"{minutes:02d}:{seconds:02d}"
 
 
 def viewing_members(edition: Edition) -> tuple[str, ...]:
@@ -115,26 +113,6 @@ def package_language_index() -> dict:
         "sha256": sha(destination),
         "languages": list(CODES),
     }
-
-
-def transcript_html(transcript: str) -> str:
-    """Render the generated transcript for the player.
-
-    Chapter headings, timed segment headings and paragraphs are kept; the page
-    title and the byline that follows it are left to the page.
-    """
-    blocks = [block.strip() for block in transcript.split("\n\n") if block.strip()]
-    parts = []
-    for index, block in enumerate(blocks):
-        if block.startswith("# ") or (index and blocks[index - 1].startswith("# ")):
-            continue
-        if block.startswith("## "):
-            parts.append(f"<h2>{escape(block[3:])}</h2>")
-        elif re.match(r"\d{2}:\d{2}:\d{2}\.\d{3} · ", block):
-            parts.append(f"<h3>{escape(block)}</h3>")
-        else:
-            parts.append(f"<p>{escape(block)}</p>")
-    return "".join(parts)
 
 
 def refresh_shot_plan(edition: Edition, timeline: dict) -> None:
@@ -187,25 +165,11 @@ def refresh_shot_plan(edition: Edition, timeline: dict) -> None:
     )
 
 
-def player_page(edition: Edition, chapters: list[dict]) -> str:
-    """The edition's player: its template with the chapters, transcript and runtime."""
-    player = (repository.ROOT / edition.player).read_text()
-    if "/*CHAPTERS*/[]" not in player:
-        msg = "The player template lacks its chapter list"
-        raise PackagingError(msg)
-    player = player.replace("/*CHAPTERS*/[]", json.dumps(chapters, ensure_ascii=False))
-    if player.count("/*TRANSCRIPT*/") != 1:
-        msg = "The player template needs exactly one transcript place"
-        raise PackagingError(msg)
-    player = player.replace(
-        "/*TRANSCRIPT*/",
-        transcript_html((edition.artifacts / f"{edition.prefix}-transcript.md").read_text()),
-    )
-    return player.replace("/*RUNTIME*/", runtime_label())
-
-
 def package_metadata(edition: Edition) -> None:
     """Derive the viewing package from the current source-bound timeline."""
+    copied = copied_players(repository.ROOT, FILM)
+    if copied:
+        raise PackagingError(copied)
     output = edition.artifacts
     source_cover = repository.ROOT / edition.cover
     if not source_cover.is_file():
@@ -226,20 +190,20 @@ def package_metadata(edition: Edition) -> None:
     if len(chapters) != CHAPTERS:
         msg = f"The films have {CHAPTERS} chapters, not {len(chapters)}"
         raise PackagingError(msg)
-    (output / "index.html").write_text(player_page(edition, chapters))
     language_index = package_language_index()
     with Image.open(output / COVER_PNG) as cover:
         if cover.width * 9 != cover.height * 16:
             msg = f"The cover must be 16:9, not {cover.width}x{cover.height}"
             raise PackagingError(msg)
         cover.convert("RGB").save(output / COVER_JPEG, quality=95)
+    (output / "index.html").write_text(player_page(edition), encoding="utf-8")
     members = viewing_members(edition)
     write(
         edition.viewing_package,
         {
             "script_sha256": sha(edition.script),
             "timeline_sha256": sha(edition.timeline),
-            "player_source_sha256": sha(edition.player),
+            "player": player_binding(edition),
             "language_index": language_index,
             "author": AUTHOR,
             "chapters": CHAPTERS,
@@ -580,3 +544,5 @@ def package_film(edition: Edition) -> None:
         print(json.dumps({"film": target.name, "bytes": target.stat().st_size}), flush=True)
     write(edition.film_package, package)
     (edition.evidence / FAILURE_RECEIPT).unlink(missing_ok=True)
+    # The player names the films' sizes, known only now.
+    package_metadata(edition)

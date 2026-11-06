@@ -17,7 +17,10 @@ needs, are refused as stale.
 
 Every Latin word in the Chinese narration must be one of the names the Chinese contract lists in
 `embedded_english_targets`, and every word of the English narration written with two or more
-capitals an English target.
+capitals an English target. Every language's normalization must give each Latin-script term the
+film declares in `[[narration.terms]]` the term's declared spoken form, whatever the contract's
+schema version, and the text of each edition that says the term must hold its declared reference
+occurrence (`narration.terms`, which also measures how the recordings say it).
 
 The check writes each edition's occurrence plan, a view derived on every check, below
 build/evidence/readings/. Every failure is reported at once, and thoughts are numbered from 1
@@ -45,7 +48,9 @@ from pypinyin import Style, pinyin
 from pypinyin.constants import PHRASES_DICT
 from pypinyin.seg.mmseg import seg
 
+import filmkit.narration.terms as terms
 import filmkit.repository as repository
+from filmkit.film import FILM
 from filmkit.narration.pronunciation import HAN, native_utterance_plan
 from filmkit.production import CODES, Edition
 
@@ -349,6 +354,18 @@ def propose() -> dict:
     return report
 
 
+def term_failures(code: str, script: dict, performance: dict, contract: str) -> list[str]:
+    """What the contract and an edition's text leave wrong in the film's declared terms."""
+    declared = FILM.narration.terms
+    if not declared:
+        return []
+    languages = performance["languages"]
+    thoughts = edition_thoughts(script, languages[Edition(code).language])
+    return terms.parity_failures(declared, languages, contract) + terms.declaration_failures(
+        declared, [tuple(thought) for thought in thoughts], code
+    )
+
+
 def check(code: str) -> dict:
     """Check one edition's readings and names, write its occurrence plan, refuse every gap.
 
@@ -359,7 +376,10 @@ def check(code: str) -> dict:
     script = repository.read(edition.script)
     path = script["pronunciation_contract"]
     performance = repository.read(path)["pronunciation"]
+    declared = term_failures(code, script, performance, path)
     version = performance.get("schema_version")
+    if version != SCHEMA and declared:
+        raise ReadingError("\n".join(declared))
     if version != SCHEMA:
         return {
             "edition": code,
@@ -378,6 +398,7 @@ def check(code: str) -> dict:
         rows = []
         names = {target["term"] for target in contract.get("targets", [])}
         failures = undeclared_names(thoughts, names, chinese=False)
+    failures += declared
     if failures:
         raise ReadingError("\n".join(failures))
     report = {

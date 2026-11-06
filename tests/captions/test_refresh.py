@@ -2,12 +2,15 @@
 
 import hashlib
 import json
+import re
 
 import pytest
 
 import filmkit.captions.refresh as captions_refresh
+import filmkit.produce as produce
 import filmkit.production as production
 import filmkit.repository as repository
+import filmkit.review.round as review_round
 
 TEXT = "甲乙。丙丁。"
 WORDS = (("甲", 2.0, 2.4), ("乙", 2.4, 2.8), ("丙", 3.4, 3.8), ("丁", 3.8, 4.2))
@@ -157,3 +160,27 @@ def test_a_refresh_refuses_a_selection_of_other_copy(edition):
     write_json(edition.narration_selected, selected)
     with pytest.raises(ValueError, match="Selected narration differs"):
         captions_refresh.refresh_captions(edition)
+
+
+def test_a_refresh_over_a_reviewed_build_waits_for_its_set_aside(edition):
+    # The packaged build, whose films round 7's prompts and reviews bind.
+    for path in (*edition.films, edition.picture, edition.film_package):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(path.name.encode())
+    media = [{"path": str(film), "sha256": sha256(film)} for film in edition.films]
+    folder = repository.ROOT / "build/evidence/reviews/round-7"
+    write_json(
+        folder / "review-zh.json", {"reviewer": "Reviewer", "editions": {"zh": {"media": media}}}
+    )
+    named = "".join(f"- {item['path']} (SHA-256 {item['sha256']})\n" for item in media)
+    (folder / "prompt-zh.md").write_text(named)
+    written = {path: path.read_bytes() for path in (edition.timeline, edition.audio_assembly)}
+    refusal = "refresh-captions: the current zh films are bound by the prompts of review round 7"
+    with pytest.raises(SystemExit, match=re.escape(refusal)):
+        produce.main(["refresh-captions", "--language", "zh"])
+    assert {path: path.read_bytes() for path in written} == written
+    review_round.main(
+        ["set-aside", "--round", "7", "--purpose", "caption repairs", "--language", "zh"]
+    )
+    produce.main(["refresh-captions", "--language", "zh"])
+    assert [cue["text"] for cue in read(edition.timeline)["captions"]] == ["甲乙。", "丙丁。"]

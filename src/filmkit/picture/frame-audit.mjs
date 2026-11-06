@@ -8,13 +8,15 @@
  * check (src/filmkit/picture/seat-marks.mjs); BOUNDS=<file> writes each scene's drawn extent; BALANCE=<file> writes
  * each thought's lit offsets and band cover at the reviewers' two instants. FILMKIT_TEXT_METRICS=<file> names the
  * advance widths of the film's declared faces (filmkit.picture.metrics), by which the headless canvas measures text;
- * without it the canvas estimates text metrics (headless-composition.mjs). geometry-check.mjs measures real geometry. */
+ * without it the canvas estimates text metrics (headless-composition.mjs). FILMKIT_WRAPPING=<file> names the film's
+ * rules for wrapped labels (filmkit.picture.gates); without it the defaults of frame-audit/typography/breaks.mjs
+ * judge them. geometry-check.mjs measures real geometry. */
 import { parseArgs } from "node:util";
 
 import { compositionMeasures } from "./frame-audit/composition.mjs";
 import { inHead, spanOf, VISIBLE } from "./frame-audit/marks.mjs";
 import { frameReport, writeRequestedFiles } from "./frame-audit/report.mjs";
-import { textLayout } from "./frame-audit/typography/index.mjs";
+import { readWrapping, textLayout, wrapLayout } from "./frame-audit/typography/index.mjs";
 import { openComposition, readTextMetrics, readTimeline } from "./headless-composition.mjs";
 import { analysis } from "./rules/frame.mjs";
 import { inkLevel, readingLoad } from "./rules/ink.mjs";
@@ -336,8 +338,10 @@ function labelsAndShapes(f) {
 }
 
 const composition = compositionMeasures({ film, step, thoughts });
-/* How the settled text of each voiced frame lines up: rows, columns, leading, cards, pitch and clearance. */
-const typography = textLayout(step);
+/* How the settled text of each voiced frame lines up: rows, columns, leading, cards, pitch and clearance; and where
+ * every frame's wrapped labels break their lines. */
+const typography = textLayout(step),
+  wrapping = wrapLayout(readWrapping());
 /* What each frame is measured for; the trace, the marks and the bounds only when their file is asked for. */
 const measures = [
   blankBetweenScenes,
@@ -361,6 +365,7 @@ const measures = [
   ...(process.env.BOUNDS ? [composition.paintedExtent] : []),
   labelsAndShapes,
   typography.frame,
+  wrapping.frame,
 ];
 function* frameTimes() {
   if (probe !== null) yield probe;
@@ -434,6 +439,7 @@ const report = frameReport({
   thinRuns: composition.thinRuns,
   underfilled: composition.underfilled,
   textLayout: typography.finish(),
+  wrappedLabels: wrapping.finish(),
 });
 writeRequestedFiles({
   trace,

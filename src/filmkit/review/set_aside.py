@@ -12,6 +12,11 @@ A reviewed round's packages are bound by the round's review, which must name bot
 their label is round-<n>. An unreviewed build, such as a preview the owner watched, is bound by
 a consumer folder that holds both films byte-identical in <consumer>/<code>/, and is labelled
 round-<n> or by a name of its own. Every planned edition is checked before anything moves.
+
+Assembling an edition's soundtrack or refreshing its captions rewrites the inputs of its
+packaged build in place, so `filmkit.produce` refuses both while the prompts of a review round
+bind the edition's current films and that round has not set the edition aside
+(`require_set_aside`).
 """
 
 from __future__ import annotations
@@ -24,13 +29,17 @@ from typing import NamedTuple
 import filmkit.repository as repository
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
-from filmkit.review.files import edition_review, present
+from filmkit.review.files import REVIEWS, edition_review, present, round_number
 
 EXIT_CONDITION = "Retire after the successor delivery is accepted"
 # Below the film's root, the folder each set-aside label holds, with one folder per edition.
 SUPERSEDED = Path("build/artifacts/film/superseded")
 # A label is a lowercase name of words joined by hyphens, such as round-5 or preview-2026-11-05.
 LABEL = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+# The command that sets one edition of a reviewed round aside, as a refusal names it.
+SET_ASIDE_COMMAND = (
+    "python -m filmkit.review.round set-aside --round {number} --purpose <text> --language {code}"
+)
 
 
 class SetAside(NamedTuple):
@@ -186,3 +195,52 @@ def set_aside_report(plans: list[SetAside], *, dry_run: bool) -> dict:
             for plan in plans
         ],
     }
+
+
+def binding_rounds(edition: Edition) -> list[int]:
+    """The review rounds whose prompts name each of the edition's current films by its hash.
+
+    A round's prompt for the edition is prompt-<code>.md in its directory round-<n> below
+    `REVIEWS`. An edition whose films are not all in place is bound by none, and the films are
+    hashed only when a round holds such a prompt.
+    """
+    prompts = sorted(
+        (number, path)
+        for path in (repository.ROOT / REVIEWS).glob(f"round-*/prompt-{edition.code}.md")
+        if (number := round_number(path.parent)) is not None
+    )
+    if not prompts or not all(film.is_file() for film in edition.films):
+        return []
+    hashes = [repository.sha(film) for film in edition.films]
+    bound = []
+    for number, path in prompts:
+        text = path.read_text(encoding="utf-8")
+        if all(digest in text for digest in hashes):
+            bound.append(number)
+    return bound
+
+
+def set_aside_finished(number: int, code: str) -> bool:
+    """Whether a set-aside of the round has moved every member of the edition and recorded it."""
+    record = repository.ROOT / SUPERSEDED / round_label(number) / code / "manifest.json"
+    return record.is_file() and repository.read(record).get("moved_at") is not None
+
+
+def require_set_aside(edition: Edition) -> None:
+    """Refuse while a review round's prompts bind the edition's current films, not set aside.
+
+    A round has set the edition aside once its manifest below
+    build/artifacts/film/superseded/round-<n>/<code>/ records that every member moved. The
+    refusal names each round that binds the films and the command that sets the latest one
+    aside for this edition, which moves the films and so frees them from every such round.
+    """
+    code = edition.code
+    unset = [number for number in binding_rounds(edition) if not set_aside_finished(number, code)]
+    if unset:
+        rounds = " and ".join(f"round {number}" for number in unset)
+        command = SET_ASIDE_COMMAND.format(number=unset[-1], code=code)
+        msg = (
+            f"the current {code} films are bound by the prompts of review {rounds} and have not "
+            f"been set aside; first run {command}"
+        )
+        raise ReviewError(msg)

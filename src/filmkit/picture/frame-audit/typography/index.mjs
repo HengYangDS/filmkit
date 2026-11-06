@@ -1,11 +1,13 @@
-/* The frame audit's text-layout measures: how the settled names and marks of each voiced frame line up.
+/* The frame audit's text-layout measures: how the settled names and marks of each voiced frame line up, and how the
+ * wrapped labels of every frame break their lines.
  *
  * layout.mjs reads a frame's settled text and marks into lines, names, containers, blocks and columns, and
  * measures.mjs finds its ragged rows and columns, crammed lines, names off their card's centre, uneven pitch and
  * touching marks; case.mjs finds the sets and rows of names that begin in both cases. Each measure's findings are joined over consecutive voiced frames into runs per scene and texts, and
  * a run of 1 s or more is kept with its start, its end, its texts and the offsets of its worst frame. Every measure
  * rests on exact anchors, sizes and baselines and on the widths the canvas stand-in measures, which are the film's own
- * when the audit is given its faces; a text's height keeps the estimate. */
+ * when the audit is given its faces; a text's height keeps the estimate. breaks.mjs reads each frame's layout records
+ * into wrapped labels and judges each one's lines once, when it first stands at rest. */
 import { mixedCase } from "./case.mjs";
 import { frameLayout } from "./layout.mjs";
 import {
@@ -16,6 +18,8 @@ import {
   touchingMarks,
   unevenPitch,
 } from "./measures.mjs";
+
+export { labelBreaks, readWrapping, WRAPPING, wrapLayout, wrappedLabels } from "./breaks.mjs";
 
 /* A run must last this long, so a passing build-up or a fade is not a defect. */
 const RUN_SECONDS = 1;

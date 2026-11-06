@@ -45,8 +45,14 @@ def probe(changes: dict) -> dict:
     release = delivery_packaging.delivered_tags(
         production.Edition("zh"), production.RENDITIONS["uhd"]
     )
+    chapters = {"codec_type": "data", "tags": {"language": language, "handler_name": "Chapters"}}
     data = {
-        "streams": [video, audio, {"codec_type": "video", "disposition": {"attached_pic": 1}}],
+        "streams": [
+            video,
+            audio,
+            {"codec_type": "video", "disposition": {"attached_pic": 1}},
+            chapters,
+        ],
         "format": {"duration": seconds, "tags": {**release, "author": specification.AUTHOR}},
         "chapters": [{}] * delivery_packaging.CHAPTERS,
     }
@@ -128,6 +134,8 @@ def test_a_delivered_film_meeting_its_contract_is_decoded_completely(decoded):
         {"streams/0/tags": {"language": "zho", "handler_name": "VideoHandler"}},
         {"streams/0/tags": {"language": "eng"}},
         {"streams/1/tags": {}},
+        # The chapter track speaks the edition's language too.
+        {"streams/3/tags": {"language": "eng", "handler_name": "Chapters"}},
         {"chapters": []},
         {"streams/1/codec_type": "data"},
     ],

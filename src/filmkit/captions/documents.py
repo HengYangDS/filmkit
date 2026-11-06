@@ -2,8 +2,11 @@
 
 The SRT and VTT files show each cue's display copy on one line. chapters.json, the transcript
 and the FFmetadata chapters share one derivation of the chapters from the timeline: a chapter
-starts where the timeline's segments change chapter. Every title, heading and tag they write is
-typeset as the captions are, with typographic quotation marks (`filmkit.captions.timing.typeset`).
+starts where the timeline's segments change chapter. The transcript, which the player shows too
+(`filmkit.delivery.player`), heads each chapter with its start and each scene with the start of
+its voice, as a player shows a time (`clock`), and gives each thought, an utterance group, a
+paragraph. Every title, heading and tag they write is typeset as the captions are, with
+typographic quotation marks (`filmkit.captions.timing.typeset`).
 """
 
 from __future__ import annotations
@@ -17,6 +20,13 @@ from filmkit.specification import AUTHOR, CHAPTER_CARD_SHOWN, DURATION
 
 if TYPE_CHECKING:
     from filmkit.production import Edition
+
+
+def clock(seconds: float) -> str:
+    """A time as a player shows it: minutes and whole seconds, and hours past the first hour."""
+    hours, rest = divmod(int(seconds), 3600)
+    minutes, whole = divmod(rest, 60)
+    return f"{hours}:{minutes:02}:{whole:02}" if hours else f"{minutes}:{whole:02}"
 
 
 def timecode(seconds: float, separator: str = ",") -> str:
@@ -34,6 +44,27 @@ class _Chapter:
 
     entry: dict
     segments: list[dict]
+
+
+@dataclass(frozen=True)
+class Scene:
+    """A scene as the transcript gives it: its id and title, when its voice starts, and its
+    thoughts."""
+
+    id: str
+    title: str
+    start: float
+    paragraphs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Part:
+    """A chapter as the transcript gives it: its number, title and start, and its scenes."""
+
+    number: int
+    title: str
+    start: float
+    sections: tuple[Scene, ...]
 
 
 def _chapters(segments: list[dict]) -> list[_Chapter]:
@@ -66,21 +97,45 @@ def _cue_documents(captions: list[dict]) -> tuple[str, str]:
     return "\n".join(srt), "\n".join(vtt)
 
 
-def _transcript(title: str, chapters: list[_Chapter], code: str) -> str:
-    """The transcript: the byline, then each chapter's heading and its timed scenes."""
+def transcript_parts(segments: list[dict]) -> list[Part]:
+    """Each chapter of the timeline's segments with its scenes, as the transcript gives them.
+
+    A chapter starts as chapters.json gives it, a scene where its voice starts, to the
+    millisecond, and each of a scene's utterance groups is one paragraph.
+    """
+    return [
+        Part(
+            number,
+            chapter.entry["title"],
+            chapter.entry["start"],
+            tuple(
+                Scene(
+                    segment["id"],
+                    typeset(segment["title"]),
+                    round(segment["voice_start"], 3),
+                    tuple(typeset(group).strip() for group in segment["utterance_groups"]),
+                )
+                for segment in chapter.segments
+            ),
+        )
+        for number, chapter in enumerate(_chapters(segments), 1)
+    ]
+
+
+def _transcript(title: str, segments: list[dict], code: str) -> str:
+    """The transcript: the byline, then each chapter and each of its scenes headed by its
+    time, and a paragraph for each thought."""
     byline = (
         f"{AUTHOR} · 中文 · {DURATION // 60} 分钟"
         if code == "zh"
         else f"{AUTHOR} · English · {DURATION // 60} min"
     )
     transcript = f"# {typeset(title)}\n\n{byline}\n"
-    for number, chapter in enumerate(chapters, 1):
-        transcript += f"\n## {number:02d} {chapter.entry['title']}\n"
-        for segment in chapter.segments:
-            transcript += (
-                f"\n{timecode(segment['voice_start'], '.')} · {typeset(segment['title'])}\n\n"
-                f"{typeset(segment['text']).strip()}\n"
-            )
+    for part in transcript_parts(segments):
+        transcript += f"\n## {clock(part.start)} · {part.number:02d} {part.title}\n"
+        for scene in part.sections:
+            transcript += f"\n### {clock(scene.start)} · {scene.title}\n"
+            transcript += "".join(f"\n{paragraph}\n" for paragraph in scene.paragraphs)
     return transcript
 
 
@@ -108,7 +163,7 @@ def subtitle_files(timeline: dict, edition: Edition) -> None:
     (output / f"{edition.prefix}.vtt").write_text(vtt)
     chapters = _chapters(timeline["segments"])
     write(output / "chapters.json", {"chapters": [chapter.entry for chapter in chapters]})
-    transcript = _transcript(timeline["title"], chapters, edition.code)
+    transcript = _transcript(timeline["title"], timeline["segments"], edition.code)
     (output / f"{edition.prefix}-transcript.md").write_text(transcript)
     metadata = _chapter_metadata(timeline["title"], edition.comment, chapters)
     (output / "chapters.ffmeta").write_text(metadata)

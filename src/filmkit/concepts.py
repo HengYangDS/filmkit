@@ -8,11 +8,19 @@ narration may also use, and the counterexamples it must not use.
 The check reads both editions' scripts, the film's caption terms and its picture sources. Each
 segment declares the concepts it states; both editions of a segment declare the same ones, and
 each appears in that segment's narration by its rendering or a form. No counterexample appears
-in any narration, title, caption term, release synopsis, comment or description, player prose
-(the text the edition's player page shows, outside its scripts and styles) or picture source.
+in any narration, title, caption term, release synopsis, comment or description, the summary
+the edition's player shows, or picture source; the engine renders the rest of the player.
 With a local clone of the source repository, named by `FILM_SOURCE_CHECKOUT`, each quotation
 must be in its document at the pinned commit; without one the quotations are reported as not
 checked. Every failure is reported at once, and thoughts are numbered from 1 within their segment.
+
+A Latin-script word keeps its base form in Chinese, so Chinese words must carry its number. Each
+Chinese thought pairs with the English thought of its segment and index when the segment has as
+many thoughts in both editions, and otherwise with the whole English segment. Where that
+counterpart names such a word only by its plural, each Chinese clause that says the word holds a
+number word, or a numeral with its classifier before the word, other than a lone 一 (`counted`).
+The contract's optional [number] table declares more number words and reasoned exceptions, each
+a thought and term; an exception that excuses nothing is stale.
 
 Usage: python -m filmkit.concepts
 """
@@ -24,7 +32,6 @@ import os
 import re
 import subprocess
 import tomllib
-from html.parser import HTMLParser
 from typing import Annotated, NamedTuple
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
@@ -43,6 +50,21 @@ RELEASE_PROSE = ("synopsis", "comment", "description")
 # A lowercase name of words joined by hyphens.
 Id = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")]
 Words = Annotated[str, StringConstraints(min_length=1)]
+# Words that hold more than spaces, kept without their outer spaces.
+Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+# The marks that bound a Chinese clause.
+CLAUSE_MARKS = re.compile(r"[，。；：、？！]")
+# A Latin-script word, which Chinese narration says in its base form whatever its number.
+LATIN_WORD = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]+(?![A-Za-z0-9])")
+# The words that carry a Chinese clause's number: each of these characters, a pronoun of a group
+# and a count repeated for each member, and a numeral counting with a classifier. The numeral is
+# the whole run before the classifier; a lone 一 states the singular.
+NUMBER_WORDS = (*"们些多几各每众两俩双", "它们", "他们", "一个个")
+SINGULAR = "一"
+COUNTED = re.compile(
+    r"(?<![一二三四五六七八九十百千万])([一二三四五六七八九十百千万]+)"
+    r"[个位名种类款套件条项份张台部本次步层级组批群家支只句段篇章节门处所座轮遍场笔例]"
+)
 
 
 class ConceptError(ValueError):
@@ -90,10 +112,26 @@ class Concept(Declared):
         return self.zh if code == "zh" else self.en
 
 
+class NumberException(Declared):
+    """A Chinese thought whose Latin-script term may stand without a number word, and why."""
+
+    thought: Words
+    term: Words
+    reason: Text
+
+
+class Number(Declared):
+    """The number words a film adds to `NUMBER_WORDS`, and its reasoned exceptions."""
+
+    words: tuple[Text, ...] = ()
+    exceptions: tuple[NumberException, ...] = ()
+
+
 class Contract(Declared):
-    """The concepts a film names."""
+    """The concepts a film names, and how its Chinese carries the number of Latin-script words."""
 
     concept: tuple[Concept, ...] = Field(min_length=1)
+    number: Number = Number()
 
 
 class Place(NamedTuple):
@@ -101,6 +139,16 @@ class Place(NamedTuple):
 
     where: str
     text: str
+
+
+class Unnumbered(NamedTuple):
+    """A Chinese clause that says a Latin-script term with no number word, where the English
+    names the term only by its plural."""
+
+    thought: str
+    term: str
+    plural: str
+    clause: str
 
 
 def load(path: str, pinned: dict) -> Contract:
@@ -122,6 +170,11 @@ def load(path: str, pinned: dict) -> Contract:
                 f"Concept {concept.id} cites {concept.source.path}, "
                 "which the source manifest does not pin"
             )
+    pairs = [(exception.thought, exception.term) for exception in contract.number.exceptions]
+    failures += [
+        f"Number exception {thought} {term} is declared more than once"
+        for thought, term in dict.fromkeys(pair for pair in pairs if pairs.count(pair) > 1)
+    ]
     if failures:
         raise ConceptError("\n".join(failures))
     return contract
@@ -170,35 +223,6 @@ def found(text: str, phrase: str, code: str) -> list[int]:
     return [match.start() for match in re.finditer(pattern, text, flags)]
 
 
-class _Prose(HTMLParser):
-    """The text a page shows: its character data outside its script and style elements."""
-
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=True)
-        self.parts: list[str] = []
-        self.hidden = 0
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag in ("script", "style"):
-            self.hidden += 1
-
-    def handle_endtag(self, tag: str) -> None:
-        if tag in ("script", "style") and self.hidden:
-            self.hidden -= 1
-
-    def handle_data(self, data: str) -> None:
-        if not self.hidden and data.strip():
-            self.parts.append(data.strip())
-
-
-def page_prose(page: str) -> str:
-    """The prose of an HTML page, its shown texts joined by spaces."""
-    parser = _Prose()
-    parser.feed(page)
-    parser.close()
-    return " ".join(parser.parts)
-
-
 def edition_places(code: str, script: dict) -> list[Place]:
     """The edition's words a viewer meets: titles, thoughts, caption terms, release and player."""
     places = [Place(f"{code} title", script["title"])]
@@ -217,9 +241,8 @@ def edition_places(code: str, script: dict) -> list[Place]:
     places += [
         Place(f"{code} release {key}", release[key]) for key in RELEASE_PROSE if key in release
     ]
-    player = repository.ROOT / Edition(code).player
-    if player.is_file():
-        places.append(Place(f"{code} player", page_prose(player.read_text(encoding="utf-8"))))
+    # The engine renders the rest of each player page from these words and its own.
+    places.append(Place(f"{code} player summary", FILM.editions[code].summary))
     return places
 
 
@@ -290,6 +313,77 @@ def counterexamples(contract: Contract, places: dict[str, list[Place]]) -> list[
     return failures
 
 
+def english_plural(term: str, text: str) -> str | None:
+    """The plural, term+s or term+es, by which English text names a term it never says itself.
+
+    Each is a whole word in its own case.
+    """
+
+    def said(word: str) -> bool:
+        return re.search(rf"(?<![A-Za-z0-9]){re.escape(word)}(?![A-Za-z0-9])", text) is not None
+
+    if said(term):
+        return None
+    return next((plural for plural in (f"{term}s", f"{term}es") if said(plural)), None)
+
+
+def counted(clause: str, term: str, words: tuple[str, ...]) -> bool:
+    """Whether a Chinese clause carries the number of a term it says.
+
+    A number word or a declared word carries it anywhere in the clause, and a numeral with its
+    classifier only before the term, since a count after the term counts another thing; a lone
+    一 with its classifier states the singular and carries no plural.
+    """
+    said = max(match.start() for match in LATIN_WORD.finditer(clause) if match[0] == term)
+    if any(count[1] != SINGULAR for count in COUNTED.finditer(clause[:said])):
+        return True
+    return any(word in clause for word in (*NUMBER_WORDS, *words))
+
+
+def unnumbered(scripts: dict[str, dict], words: tuple[str, ...]) -> list[Unnumbered]:
+    """Each Chinese clause that says a Latin-script term its English counterpart names only by
+    its plural, and holds no number word."""
+    english = {segment["id"]: authored_groups(segment) for segment in scripts["en"]["segments"]}
+    clauses = []
+    for segment in scripts["zh"]["segments"]:
+        others = english.get(segment["id"])
+        if others is None:
+            continue
+        thoughts = authored_groups(segment)
+        for index, thought in enumerate(thoughts, 1):
+            counterpart = others[index - 1] if len(others) == len(thoughts) else " ".join(others)
+            for term in dict.fromkeys(LATIN_WORD.findall(thought)):
+                plural = english_plural(term, counterpart)
+                clauses += [
+                    Unnumbered(f"{segment['id']}.{index}", term, plural, clause.strip())
+                    for clause in CLAUSE_MARKS.split(thought)
+                    if plural
+                    and term in LATIN_WORD.findall(clause)
+                    and not counted(clause, term, words)
+                ]
+    return clauses
+
+
+def number_parity(number: Number, scripts: dict[str, dict]) -> list[str]:
+    """Each unnumbered Chinese clause that no exception excuses, and each stale exception."""
+    clauses = unnumbered(scripts, number.words)
+    excused = {(exception.thought, exception.term) for exception in number.exceptions}
+    failures = [
+        f"zh {item.thought}: {item.term!r} in {item.clause!r} carries no number word, where the "
+        f"English says {item.plural!r}"
+        for item in clauses
+        if (item.thought, item.term) not in excused
+    ]
+    flagged = {(item.thought, item.term) for item in clauses}
+    failures += [
+        f"Number exception {exception.thought} {exception.term} is stale: it names no current "
+        "occurrence"
+        for exception in number.exceptions
+        if (exception.thought, exception.term) not in flagged
+    ]
+    return failures
+
+
 def check() -> dict:
     """Check the film's words against its concept contract, refusing every departure at once.
 
@@ -306,6 +400,7 @@ def check() -> dict:
     places["picture"] = picture_places()
     failures += declarations(contract, scripts)
     failures += counterexamples(contract, places)
+    failures += number_parity(contract.number, scripts)
     if failures:
         raise ConceptError("\n".join(failures))
     return {
@@ -318,6 +413,7 @@ def check() -> dict:
             for script in scripts.values()
             for segment in script["segments"]
         ),
+        "number_exceptions": len(contract.number.exceptions),
     }
 
 

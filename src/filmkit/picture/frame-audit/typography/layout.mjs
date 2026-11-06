@@ -15,11 +15,11 @@ const SETTLED = 0.85;
 /* The frame audit's content band (composition.mjs): below the head band, above the caption band. */
 const BAND = [HEAD, 950];
 /* The characters the headless canvas sets a full size wide, and the ink of a line above and below its baseline. */
-const CJK = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/u;
+export const CJK = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/u;
 const INK = { cjk: [0.74, 0.18], latin: [0.72, 0.2] };
 /* Full-width punctuation sets its mark in one half of its em, so a CJK line that ends in a closing mark, or starts
  * with an opening one, may hang that half past its edge for its ink to line up. */
-const CLOSING = /[、，。；：！？）」』”》】]$/u,
+export const CLOSING = /[、，。；：！？）」』”》】]$/u,
   OPENING = /^[（「『“《【]/u,
   HUNG = 0.5;
 /* Names hold letters; a lone check, cross or question mark is a mark, as a drawn one is. */

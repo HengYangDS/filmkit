@@ -7,6 +7,12 @@ occurrence takes the part of speech the film's readings record for it, or the de
 refuses, so an edit that moves or adds one is re-read before the next review. A refusal
 raises `ReviewError`, which the command reports.
 
+For each assembled edition the plan also names the moments of its soundtrack a person should
+hear, bound to its timeline and soundtrack: the unmarked pauses from 0.15 s up to their limits
+and those the film keeps by an exception, the largest rate, pitch and level steps between
+adjacent thoughts (`filmkit.narration.flow`), and each declared Latin-script term's
+occurrences with their first vowels (`filmkit.narration.terms`).
+
 Usage: python -m filmkit.review.listening_plan --out <file>
 """
 
@@ -20,6 +26,8 @@ from typing import TYPE_CHECKING
 
 from pydantic import Field
 
+import filmkit.narration.flow as narration_flow
+import filmkit.narration.terms as narration_terms
 import filmkit.repository as repository
 import filmkit.sources as sources
 from filmkit.film import FILM, Declared
@@ -206,6 +214,23 @@ def target_entries(
     return entries
 
 
+def heard_moments(edition: Edition) -> dict:
+    """The moments of an edition's assembled soundtrack a person should hear, bound to it."""
+    if not (edition.timeline.is_file() and edition.soundtrack.is_file()):
+        return {"status": "not-assembled"}
+    timeline = repository.read(edition.timeline)
+    narrated = narration_flow.soundtrack(edition.soundtrack, timeline)
+    return {
+        "status": "planned-not-listened",
+        **{
+            name: {"path": repository.relative(path), "sha256": repository.sha(path)}
+            for name, path in (("timeline", edition.timeline), ("soundtrack", edition.soundtrack))
+        },
+        **narration_flow.listening(edition.code, narrated, FILM.narration.flow),
+        "narration_terms": narration_terms.records(edition.code, FILM.narration.terms, narrated),
+    }
+
+
 def listening_plan(out: Path) -> dict:
     """Derive the pronunciation listening plan from the contract and current scripts.
 
@@ -281,6 +306,7 @@ def listening_plan(out: Path) -> dict:
             "languages": contract["languages"],
             "script_bindings": bindings,
             "occurrence_plan": {"count": len(entries), "entries": entries},
+            "heard_moments": {code: heard_moments(Edition(code)) for code in CODES},
         },
     )
     return {

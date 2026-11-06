@@ -3,11 +3,12 @@
 A round sets the packages of the previous build aside before the next render
 (`filmkit.review.set_aside`), binds the packaged members for the real-browser player check,
 writes each edition's reviewer prompt with the exact media hashes and the previous round's
-findings, or states that the round is the first (`filmkit.review.prompts`), and records the
-finished reviews as the production reviews that `filmkit.delivery.verification` accepts. A
-round's directory defaults to build/evidence/reviews/round-<n>/. Setting aside and recording
-are planned and checked in full before anything moves or is written, and --dry-run stops after
-the plan. A refused input raises `ReviewError`, which each command reports as its refusal.
+findings with the disposition of each, or states that the round is the first
+(`filmkit.review.prompts`), and records the finished reviews as the production reviews that
+`filmkit.delivery.verification` accepts. A round's directory defaults to
+build/evidence/reviews/round-<n>/. Setting aside and recording are planned and checked in full
+before anything moves or is written, and --dry-run stops after the plan. A refused input raises
+`ReviewError`, which each command reports as its refusal.
 
 A reviewed round's packages are set aside by the round's reviews; an unreviewed build's, such as
 a preview the owner watched, with --unreviewed by the consumer folder that holds its films, under
@@ -20,8 +21,8 @@ Usage: python -m filmkit.review.round set-aside --round <n> --purpose <text>
            (--round <n> | --label <label>) --purpose <text>
            [--language zh|en] [--without-picture [zh|en ...]] [--dry-run]
        python -m filmkit.review.round bind --out <file>
-       python -m filmkit.review.round prompts --round <n> [--previous <dir>]
-           [--changes <file>] [--out-dir <dir>]
+       python -m filmkit.review.round prompts --round <n>
+           [--previous <dir> --dispositions <file>] [--changes <file>] [--out-dir <dir>]
        python -m filmkit.review.round record --round-dir <dir> [--dry-run]
 """
 
@@ -218,6 +219,7 @@ def run_prompts(options: argparse.Namespace) -> dict:
         options.previous.resolve() if options.previous else None,
         (options.out_dir or round_directory(options.round)).resolve(),
         options.changes.resolve() if options.changes else None,
+        options.dispositions.resolve() if options.dispositions else None,
     )
 
 
@@ -291,6 +293,12 @@ def command_parser() -> argparse.ArgumentParser:
         type=Path,
         metavar="FILE",
         help="Markdown context bullets: the repairs since the previous review",
+    )
+    prompt.add_argument(
+        "--dispositions",
+        type=Path,
+        metavar="FILE",
+        help="the disposition of each finding of the previous round, as JSON; with --previous",
     )
     prompt.add_argument(
         "--out-dir",

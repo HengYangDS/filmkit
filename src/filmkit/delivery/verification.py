@@ -18,6 +18,7 @@ import wave
 from pathlib import Path
 
 import filmkit.delivery.packaging as packaging
+import filmkit.delivery.player as player
 import filmkit.media as media
 import filmkit.narration.selection as narration_selection
 import filmkit.narration.spoken_units as narration_spoken_units
@@ -210,7 +211,7 @@ def verify_package(edition: production.Edition) -> dict:
     if (
         viewing["script_sha256"] != repository.sha(repository.ROOT / edition.script)
         or viewing["timeline_sha256"] != repository.sha(edition.timeline)
-        or viewing["player_source_sha256"] != repository.sha(repository.ROOT / edition.player)
+        or viewing.get("player") != player.player_binding(edition)
         or viewing["author"] != specification.AUTHOR
         or viewing["chapters"] != specification.CHAPTERS
         or any(
@@ -258,8 +259,11 @@ def verify_media(edition: production.Edition, path: Path, size: tuple[int, int])
         and tags.get("artist") == specification.AUTHOR
         and tags.get("author", tags.get("com.apple.quicktime.author")) == specification.AUTHOR
         and all(tags.get(key) == release.get(key) for key in {*release, "hd_video"})
-        and video.get("tags", {}).get("language") == language
-        and audio.get("tags", {}).get("language") == language
+        and all(
+            stream.get("tags", {}).get("language") == language
+            for stream in data["streams"]
+            if not stream.get("disposition", {}).get("attached_pic")
+        )
         and video.get("tags", {}).get("handler_name") == names["picture"]
         and audio.get("tags", {}).get("handler_name") == names["narration"]
         and len(data["chapters"]) == specification.CHAPTERS

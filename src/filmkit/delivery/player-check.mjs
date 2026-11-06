@@ -2,10 +2,14 @@
  *
  * players: a binding names the destination, the film's file prefix and duration, and the SHA-256 of each of the 21
  * delivery members (the delivery readback, or a review round's artifacts binding). The member bytes are checked before and after the browser read.
- * The read opens the language entry page and each language's player: page language, the delivered chapters, the
- * captioned viewing edition playing by default without a text track (captions are drawn in the picture), both
- * editions' duration and dimensions with decoding at three seek points, a chapter jump and the rendered transcript.
- * Requests outside the destination are refused and recorded; screenshots are written beside the receipt.
+ * The read (player-read.mjs, judged by player-verdict.mjs) opens the language entry page and each language's player, and records each page with a
+ * verdict of its own in the receipt's `pages`: every link leads to a member or a sibling page; the captioned viewing
+ * edition plays first; the one track, which embeds the delivered WebVTT and whose cues equal the SRT's, stays hidden on
+ * every version since every picture draws its captions, and no control of the page or the browser can show it; a cue
+ * marks its transcript paragraph; a version switch keeps the time; both editions' duration and dimensions with
+ * decoding at three seek points; a chapter jump and a transcript time that play from their time; the language links;
+ * the sizes the files list names, no link that opens raw text, and the bytes each download saves without leaving the
+ * page. Requests outside the destination are refused and recorded; screenshots are written beside the receipt.
  * cover: paints window.renderCover() from a staged UHD document and compares its pixels with the tracked cover; a
  * painting with no tracked cover yet is written, reported uncompared and fails, so the painting can become the cover.
  * No human hearing or complete-film playback is claimed.
@@ -13,7 +17,6 @@
  *        python -m filmkit.tools player-check cover <stage-dir> <cover.png> <output.png> */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -21,27 +24,19 @@ import { parseArgs } from "node:util";
 import { inflateSync } from "node:zlib";
 
 import { launchBrowser } from "../picture/headless-browser.mjs";
+import { digestFile, readDelivery, seekPoints } from "./player-read.mjs";
+import { LANGUAGES } from "./player-verdict.mjs";
+
+export { digestFile, seekPoints };
 
 const USAGE =
   "Usage: python -m filmkit.tools player-check players <binding.json> <receipt.json>\n" +
   "       python -m filmkit.tools player-check cover <stage-dir> <cover.png> <output.png>";
-const LANGUAGES = { zh: "zh-CN", en: "en" };
 /* A film's file prefix: lowercase words joined by hyphens. */
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-const EDITIONS = [
-  ["-uhd.mp4", [3840, 2160]],
-  ["-1080p-captioned.mp4", [1920, 1080]],
-];
-const DEADLINE = 240000;
+const DEADLINE = 300000;
 
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
-
-/** A file's SHA-256, streamed so that a film need not fit in memory. */
-export async function digestFile(path) {
-  const hash = createHash("sha256");
-  for await (const block of createReadStream(path)) hash.update(block);
-  return hash.digest("hex");
-}
 
 /** A film's 21 delivery members: the language entry page, then per language both movies, the cover as PNG and JPEG,
  * SRT and VTT subtitles, the transcript, chapters as JSON and FFmetadata, and the player. */
@@ -102,9 +97,6 @@ export async function changedMembers(binding) {
   }
   return changed;
 }
-
-/** Two seconds in, the middle, and four seconds before the end. */
-export const seekPoints = (duration) => [2, duration / 2, duration - 4];
 
 const paeth = (a, b, c) => {
   const p = a + b - c,
@@ -202,7 +194,6 @@ export function compareImages(a, b) {
 }
 
 async function readPlayers(browser, binding, receiptPath, report) {
-  const root = binding.destination;
   assert.deepEqual(
     await changedMembers(binding),
     [],
@@ -222,7 +213,7 @@ async function readPlayers(browser, binding, receiptPath, report) {
   await page.setRequestInterception(true);
   page.on("request", (request) => {
     if (
-      request.url().startsWith(pathToFileURL(root + "/").href) ||
+      request.url().startsWith(pathToFileURL(binding.destination + "/").href) ||
       request.url().startsWith("data:")
     )
       request.continue();
@@ -231,117 +222,14 @@ async function readPlayers(browser, binding, receiptPath, report) {
       request.abort();
     }
   });
-  await page.goto(pathToFileURL(join(root, "index.html")).href, { waitUntil: "networkidle0" });
-  report.language_links = await page.$$eval("nav a", (links) =>
-    links.map((a) => a.getAttribute("href")),
-  );
-  assert.deepEqual(
-    report.language_links,
-    Object.keys(LANGUAGES).map((code) => `${code}/index.html`),
-  );
-  for (const [language, lang] of Object.entries(LANGUAGES)) {
-    const { duration } = binding.film;
-    const { chapters } = JSON.parse(await readFile(join(root, language, "chapters.json"), "utf8"));
-    await page.goto(pathToFileURL(join(root, language, "index.html")).href, {
-      waitUntil: "networkidle0",
-    });
-    await page.waitForFunction(() => document.querySelector("video").readyState >= 1);
-    const item = {
-      language,
-      editions: [],
-      chapters: await page.$$eval("#chapters button", (buttons) =>
-        buttons.map((b) => b.textContent),
-      ),
-    };
-    assert.equal(await page.$eval("html", (e) => e.lang), lang);
-    assert.deepEqual(
-      item.chapters,
-      chapters.map((chapter) => chapter.title),
-    );
-    // The viewing edition plays by default, and burned-in captions are not doubled by a text track.
-    item.default_source = await page.$eval("video", (video) => video.currentSrc.split("/").pop());
-    item.text_tracks = await page.$eval("video", (video) => video.textTracks.length);
-    assert.equal(item.default_source, `${binding.film.slug}-${language}-1080p-captioned.mp4`);
-    assert.equal(item.text_tracks, 0);
-    for (const [file, dimensions] of EDITIONS) {
-      await page.click(`[data-file$="${file}"]`);
-      await page.waitForFunction(
-        (suffix) =>
-          document.querySelector("video").currentSrc.endsWith(suffix) &&
-          document.querySelector("video").readyState >= 1,
-        {},
-        file,
-      );
-      const state = await page.$eval("video", (video) => ({
-        duration: video.duration,
-        width: video.videoWidth,
-        height: video.videoHeight,
-        src: video.currentSrc,
-        error: video.error?.code ?? null,
-      }));
-      assert.equal(state.duration, duration);
-      assert.deepEqual([state.width, state.height], dimensions);
-      assert.equal(state.error, null);
-      state.seek_checks = [];
-      for (const time of seekPoints(duration)) {
-        await page.$eval(
-          "video",
-          (video, target) => {
-            video.pause();
-            video.muted = true;
-            video.currentTime = target;
-          },
-          time,
-        );
-        await page.waitForFunction(
-          (target) => {
-            const v = document.querySelector("video");
-            return !v.seeking && v.readyState >= 2 && Math.abs(v.currentTime - target) < 0.2;
-          },
-          {},
-          time,
-        );
-        await page.$eval("video", (video) => video.play());
-        await page.waitForFunction(
-          (target) => document.querySelector("video").currentTime > target + 0.35,
-          {},
-          time,
-        );
-        const decoded = await page.$eval("video", (video) => {
-          video.pause();
-          const q = video.getVideoPlaybackQuality();
-          return {
-            time: video.currentTime,
-            ready_state: video.readyState,
-            error: video.error?.code ?? null,
-            decoded_frames: q.totalVideoFrames,
-            dropped_frames: q.droppedVideoFrames,
-          };
-        });
-        assert.equal(decoded.error, null);
-        assert.ok(decoded.decoded_frames > 0);
-        state.seek_checks.push(decoded);
-      }
-      item.editions.push(state);
-    }
-    await page.click("#chapters button:nth-child(2)");
-    await page.waitForFunction(() => !document.querySelector("video").paused);
-    item.chapter_jump = await page.$eval("video", (video) => {
-      video.pause();
-      return video.currentTime;
-    });
-    assert.ok(item.chapter_jump >= chapters[1].start && item.chapter_jump < duration);
-    const screenshot = join(dirname(receiptPath), `player-${language}.png`);
-    await page.screenshot({ path: screenshot, fullPage: true });
-    report.screenshots.push({ path: screenshot, sha256: await digestFile(screenshot) });
-    // The rendered transcript holds every chapter, and the footer link opens it.
-    item.transcript_chapters = await page.$$eval("#transcript h2", (headings) => headings.length);
-    assert.equal(item.transcript_chapters, chapters.length);
-    await page.click('footer a[href="#transcript"]');
-    item.transcript_open = await page.$eval("#transcript details", (details) => details.open);
-    assert.equal(item.transcript_open, true);
-    report.languages.push(item);
+  report.pages = await readDelivery(page, binding, receiptPath);
+  for (const code of Object.keys(LANGUAGES)) {
+    const screenshot = join(dirname(receiptPath), `player-${code}.png`);
+    const sha256 = await digestFile(screenshot).catch(() => null);
+    if (sha256) report.screenshots.push({ path: screenshot, sha256 });
   }
+  const failed = report.pages.filter((item) => item.verdict !== "pass").map((item) => item.page);
+  assert.deepEqual(failed, [], "Pages failed their checks");
   assert.deepEqual(report.external_requests, []);
   assert.deepEqual(report.request_failures, []);
   assert.deepEqual(report.console_errors, []);
@@ -358,8 +246,8 @@ export async function checkPlayers(bindingPath, receiptPath) {
     destination: binding.destination,
     binding_sha256: await digestFile(bindingPath),
     scope:
-      "Real-browser metadata, decode at seek points, chapter navigation and edition selection; no human hearing or complete-film playback",
-    languages: [],
+      "Real-browser links, the hidden caption track and every control that could show it, version switching, decode at seek points, chapter and transcript seeking, the files list and its downloads, with a verdict per page; no human hearing or complete-film playback",
+    pages: [],
     console_errors: [],
     console_warnings: [],
     request_failures: [],
@@ -462,7 +350,7 @@ if (import.meta.main) {
       JSON.stringify({
         pass: report.pass,
         error: report.error,
-        languages: report.languages.length,
+        pages: report.pages.map((item) => `${item.page}: ${item.verdict}`),
       }),
     );
     process.exitCode = report.pass ? 0 : 1;

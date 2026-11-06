@@ -1,4 +1,9 @@
-"""Select the narration recordings and validate their voice, text and alignment."""
+"""Select the narration recordings and validate their voice, text, alignment and speech.
+
+Selection refuses a recording whose voice, text or alignment differs from what binds it, an
+unmarked pause above the film's limit (`narration.flow`) and a declared term said unlike its
+reference occurrence (`narration.terms`), naming each before it writes anything.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +12,10 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import filmkit.narration.flow as flow
+import filmkit.narration.terms as terms
 import filmkit.repository as repository
+from filmkit.film import FILM
 from filmkit.narration.pronunciation import pronunciation_contract, pronunciation_text
 from filmkit.narration.thought_groups import validate_group_inputs
 from filmkit.repository import read, sha, write
@@ -83,6 +91,9 @@ def select(edition: Edition) -> None:
     aligned = {record["id"]: record for record in alignment["records"]}
     for record in records:
         validate_aligned_recording(record, aligned[record["id"]])
+    refused = speech_refusals(edition, script, records, aligned)
+    if refused:
+        raise SelectionError("\n".join(refused))
     write(
         edition.narration_selected,
         {
@@ -95,6 +106,28 @@ def select(edition: Edition) -> None:
     )
     write(edition.alignment_selected, alignment)
     print(json.dumps({"selected": len(records), "seconds": sum(r["duration"] for r in records)}))
+
+
+def speech_refusals(
+    edition: Edition, script: dict, records: list[dict], aligned: dict[str, dict]
+) -> list[str]:
+    """What the selected recordings say against the film's pause limits and declared terms.
+
+    Each segment's recording is measured with its own speech median and its aligned words.
+    """
+    narrated = [
+        flow.Narrated(
+            segment["id"],
+            segment["text"],
+            segment.get("utterance_groups") or [segment["text"]],
+            flow.timed(aligned[record["id"]]["items"]),
+            flow.Recording.read(repository.ROOT / record["path"]),
+        )
+        for segment, record in zip(script["segments"], records, strict=True)
+    ]
+    return flow.gate(edition.code, narrated, FILM.narration.flow) + terms.refusals(
+        edition.code, FILM.narration.terms, narrated
+    )
 
 
 def _check_recording(record: dict, segment: dict, contract: dict) -> None:

@@ -1,14 +1,42 @@
 """The production command runs each action's owner for the selected edition."""
 
+import json
 import sys
 
 import pytest
 
 import filmkit.produce as produce
 import filmkit.production as production
+import filmkit.repository as repository
+import filmkit.review.round as review_round
 from filmkit.picture.rendering import PictureError
 
 
+@pytest.fixture
+def root(tmp_path, monkeypatch):
+    """An empty film root, which no review round binds."""
+    monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
+    return tmp_path.resolve()
+
+
+@pytest.fixture
+def reviewed(root):
+    """The Chinese edition's packaged build, whose films round 7's prompts and reviews bind."""
+    edition = production.Edition("zh")
+    for path in (*edition.films, edition.picture, edition.film_package):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"zh {path.name}")
+    media = [{"path": str(film), "sha256": repository.sha(film)} for film in edition.films]
+    folder = root / "build/evidence/reviews/round-7"
+    folder.mkdir(parents=True)
+    named = "".join(f"- {item['path']} (SHA-256 {item['sha256']})\n" for item in media)
+    (folder / "prompt-zh.md").write_text(f"## Media under review (the exact files)\n{named}")
+    review = {"reviewer": "Reviewer", "editions": {"zh": {"media": media, "findings": []}}}
+    (folder / "review-zh.json").write_text(json.dumps(review))
+    return edition
+
+
+@pytest.mark.usefixtures("root")
 def test_an_action_runs_its_owner_for_the_selected_edition(monkeypatch):
     calls = []
     monkeypatch.setattr(produce, "assemble", calls.append)
@@ -83,3 +111,27 @@ def test_any_other_error_keeps_its_traceback(monkeypatch):
     monkeypatch.setattr(produce, "package_film", defect)
     with pytest.raises(ValueError, match="a programming error"):
         produce.main(["package-film", "--language", "en"])
+
+
+@pytest.mark.parametrize(
+    ("action", "owner"), [("assemble", "assemble"), ("refresh-captions", "refresh_captions")]
+)
+def test_a_rebuild_over_a_reviewed_build_waits_for_its_set_aside(
+    reviewed, monkeypatch, action, owner
+):
+    calls = []
+    monkeypatch.setattr(produce, owner, calls.append)
+    with pytest.raises(SystemExit) as stopped:
+        produce.main([action, "--language", "zh"])
+    assert stopped.value.code == (
+        f"{action}: the current zh films are bound by the prompts of review round 7 and have not "
+        "been set aside; first run python -m filmkit.review.round set-aside --round 7 "
+        "--purpose <text> --language zh"
+    )
+    assert calls == []
+    # The English edition's films are bound by no round.
+    produce.main([action, "--language", "en"])
+    assert calls == [production.Edition("en")]
+    review_round.main(["set-aside", "--round", "7", "--purpose", "retakes", "--language", "zh"])
+    produce.main([action, "--language", "zh"])
+    assert calls == [production.Edition("en"), reviewed]

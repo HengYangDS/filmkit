@@ -11,6 +11,13 @@ reading occurrence plans and its dimensions score concept fidelity.
 be verified, or, for a film's first production review, that no earlier production review exists;
 it cites no previous review then. A template may instead cite `{previous}` and `{findings}`
 itself, and is then filled only from a previous round.
+
+A round after the first gives each finding of the previous round's reviews one disposition in a
+dispositions file: fixed, with the evidence that its reverification holds; declared, with the
+design that keeps it; or deferred, with its owner and reason (`DISPOSITIONS`). `{dispositions}`
+states those of the edition's previous findings in these three groups, and a first round states
+none. A round after the first is refused without the file or with a template that does not cite
+the field.
 """
 
 from __future__ import annotations
@@ -25,7 +32,7 @@ from filmkit.film import FILM
 from filmkit.narration.readings import plan_path
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
-from filmkit.review.files import cited, edition_review, present
+from filmkit.review.files import cited, edition_review, present, round_findings, round_number
 from filmkit.review.record import DIMENSIONS
 
 # The round's own inputs that each reviewer prompt names.
@@ -47,6 +54,19 @@ PREVIOUS_FIELDS = ("previous", "findings")
 FIRST_ROUND = (
     "This is the first production review of these films; no earlier production review "
     "exists. Judge everything independently."
+)
+# Each disposition of a previous finding and how the prompts state a finding's entry, which
+# holds exactly the fields its form names, each as text.
+DISPOSITIONS = {
+    "fixed": "{id}: {evidence}",
+    "declared": "{id}: {design}",
+    "deferred": "{id} (owner: {owner}): {reason}",
+}
+# The sentence that opens an edition's dispositions, before their three groups.
+DISPOSED = (
+    "Dispositions of round {number}'s findings. Re-verify each fixed finding on these media by "
+    "its own reverification line; judge a declared finding against the design that keeps it, and "
+    "a deferred one as it stands."
 )
 
 
@@ -205,17 +225,135 @@ def previous_context(previous: Path | None, code: str) -> dict:
     }
 
 
-def prompts(previous: Path | None, out_dir: Path, changes: Path | None = None) -> dict:
+def disposition_fields(kind: str) -> list[str]:
+    """The fields a disposition's entry holds, in the order the prompts state them."""
+    form = DISPOSITIONS[kind]
+    return [name for _, name, _, _ in string.Formatter().parse(form) if name and name != "id"]
+
+
+def entry_problem(name: str, entry: object) -> str | None:
+    """What keeps one finding's entry from being a disposition with its fields, if anything."""
+    kind = entry.get("disposition") if isinstance(entry, dict) else None
+    if kind not in tuple(DISPOSITIONS):
+        return f"{name}: a disposition is fixed, declared or deferred"
+    fields = disposition_fields(kind)
+    if not all(isinstance(entry.get(field), str) and entry[field].strip() for field in fields):
+        return f"{name}: a {kind} disposition states its {' and '.join(fields)}"
+    extra = [key for key in entry if key not in ("disposition", *fields)]
+    if extra:
+        return f"{name}: a {kind} disposition holds no {', '.join(extra)}"
+    return None
+
+
+def checked_dispositions(path: Path, previous: Path) -> tuple[int, dict[str, list[str]], dict]:
+    """The previous round's number, each edition's findings in it, and the file's dispositions.
+
+    Refused unless the previous round's directory is named by its number, round-<n>, and the
+    file is {"round": <n>, "findings": {<finding id>: <disposition>}} for that round, giving
+    each finding of the round's reviews one disposition that holds its fields and no others; the
+    refusal names each finding without one, each identifier the round does not hold and each
+    entry that is not a disposition.
+    """
+    number = round_number(previous)
+    if number is None:
+        where = repository.relative(previous)
+        msg = f"the previous round's directory {where} is not named round-<n>"
+        raise ReviewError(msg)
+    record, where = repository.read(present([path])[0]), repository.relative(path)
+    if (
+        not isinstance(record, dict)
+        or set(record) != {"round", "findings"}
+        or not isinstance(record["findings"], dict)
+    ):
+        msg = f'{where} is not {{"round": <n>, "findings": {{<finding id>: <disposition>}}}}'
+        raise ReviewError(msg)
+    if isinstance(record["round"], bool) or record["round"] != number:
+        msg = f"{where} names round {record['round']}, but the previous round is round {number}"
+        raise ReviewError(msg)
+    findings = round_findings(previous)
+    held = [name for names in findings.values() for name in names]
+    entries = record["findings"]
+    problems = []
+    if missing := [name for name in held if name not in entries]:
+        problems.append(f"no disposition of {', '.join(missing)}")
+    if unknown := [name for name in entries if name not in held]:
+        problems.append(f"round {number} holds no finding {', '.join(unknown)}")
+    problems += [
+        problem
+        for name, entry in entries.items()
+        if name in held and (problem := entry_problem(name, entry))
+    ]
+    if problems:
+        msg = f"{where} does not dispose of round {number}'s findings: " + "; ".join(problems)
+        raise ReviewError(msg)
+    return number, findings, entries
+
+
+def disposition_text(number: int, names: list[str], entries: dict) -> str:
+    """An edition's `{dispositions}`: those of its previous findings, in three groups.
+
+    Each group lists its findings in the order of the previous review and an empty group says
+    none; an edition whose previous review holds no findings states nothing. Each field's text
+    is stated on one line.
+    """
+    if not names:
+        return ""
+    lines = [f"- {DISPOSED.format(number=number)}"]
+    for kind, form in DISPOSITIONS.items():
+        group = [name for name in names if entries[name]["disposition"] == kind]
+        lines.append(f"  - {kind.capitalize()}:" if group else f"  - {kind.capitalize()}: none.")
+        fields = disposition_fields(kind)
+        for name in group:
+            text = {field: " ".join(entries[name][field].split()) for field in fields}
+            lines.append(f"    - {form.format(id=name, **text)}")
+    return "\n".join(lines) + "\n"
+
+
+def stated_dispositions(previous: Path | None, path: Path | None) -> dict[str, str]:
+    """Each edition's `{dispositions}`: none in a first round, else from the dispositions file.
+
+    Refused when a round after the first has no dispositions file or a template that does not
+    cite the field, and when a first round, which has no findings to dispose of, has one. The
+    file is checked by `checked_dispositions`.
+    """
+    if previous is None:
+        if path is not None:
+            msg = "--dispositions needs --previous; a first round has no findings to dispose of"
+            raise ReviewError(msg)
+        return dict.fromkeys(CODES, "")
+    if path is None:
+        msg = (
+            f"--previous {repository.relative(previous)} needs --dispositions <file>, a "
+            "disposition of each of its findings"
+        )
+        raise ReviewError(msg)
+    if "dispositions" not in template_fields(TEMPLATE):
+        msg = (
+            f"{FILM.review.prompt} never cites {{dispositions}}, which states the dispositions of "
+            "the previous round's findings"
+        )
+        raise ReviewError(msg)
+    number, findings, entries = checked_dispositions(path, previous)
+    return {code: disposition_text(number, findings[code], entries) for code in CODES}
+
+
+def prompts(
+    previous: Path | None,
+    out_dir: Path,
+    changes: Path | None = None,
+    dispositions: Path | None = None,
+) -> dict:
     """Write each edition's independent reviewer prompt for one round.
 
     Each prompt names the exact packaged films with their SHA-256, the previous round's
     review and its findings, or that the round is the first, the round's own inputs and the
     policies the film declares. changes holds Markdown context bullets for this round, such
-    as the repairs since the previous review and their dispositions. The previous review is
-    context to verify, never a score to inherit. Nothing is written unless both editions'
-    films, the previous reviews when a previous round is named and the round's inputs exist,
-    a first round's template cites no previous review, and the review configuration keeps the
-    concept contract the film declares (`contract_gaps`).
+    as the repairs since the previous review, and dispositions the disposition of each finding
+    of the previous round (`stated_dispositions`). The previous review is context to verify,
+    never a score to inherit. Nothing is written unless both editions' films, the previous
+    reviews when a previous round is named and the round's inputs exist, a first round's
+    template cites no previous review, a later round disposes of every previous finding, and the
+    review configuration keeps the concept contract the film declares (`contract_gaps`).
     """
     gaps = contract_gaps(TEMPLATE, DIMENSIONS)
     if gaps:
@@ -229,6 +367,7 @@ def prompts(previous: Path | None, out_dir: Path, changes: Path | None = None) -
             "round's template cites {previous_review}"
         )
         raise ReviewError(msg)
+    stated = stated_dispositions(previous, dispositions)
     present([out_dir / name for name in ROUND_INPUTS])
     context = prompt_context(out_dir, previous, changes)
     texts = {}
@@ -241,6 +380,7 @@ def prompts(previous: Path | None, out_dir: Path, changes: Path | None = None) -
         texts[code] = TEMPLATE.format(
             **context,
             **previous_context(previous, code),
+            dispositions=stated[code],
             language=edition.language,
             code=code,
             other=other,

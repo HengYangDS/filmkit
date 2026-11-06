@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from pypinyin import Style, pinyin
 
+import filmkit.film as film_declaration
 import filmkit.narration.readings as readings
 import filmkit.repository as repository
 from filmkit.narration.readings import Thought, Word
@@ -268,3 +269,66 @@ def test_the_cli_refuses_with_every_edition_failure(film, capsys):
 
 def test_dictionary_readings_match_pypinyin():
     assert readings.dictionary_readings("重") == pinyin("重", style=Style.TONE, heteronym=True)[0]
+
+
+def test_a_declared_term_is_spelled_alike_and_its_reference_is_in_the_text(film, monkeypatch):
+    root, edit = film
+    path = root / "content/film-script.json"
+    script = json.loads(path.read_text(encoding="utf-8"))
+    segment = script["segments"][2]
+    segment["utterance_groups"][0] = segment["utterance_groups"][0].replace(
+        "接着渲染", "接着用 HyperFrames 渲染"
+    )
+    segment["text"] = segment["spoken_text"] = "".join(segment["utterance_groups"])
+    path.write_text(json.dumps(script, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    edit(
+        lambda contract: contract["languages"]["Chinese"].update(
+            embedded_english_targets=["HyperFrames"]
+        )
+    )
+
+    def declare(**reference) -> None:
+        term = film_declaration.NarrationTerm(
+            term="HyperFrames", spoken="HyperFrames", ipa="ˈhaɪpərfreɪmz", reference=reference
+        )
+        narration = film_declaration.Narration(terms=(term,))
+        monkeypatch.setattr(
+            readings, "FILM", film_declaration.FILM.model_copy(update={"narration": narration})
+        )
+
+    def spell(chinese: str, english: str) -> None:
+        def spelled(contract) -> None:
+            for language, spoken in (("Chinese", chinese), ("English", english)):
+                rule = {"display": "HyperFrames", "spoken": spoken, "kind": "english-name"}
+                contract["languages"][language]["normalization"] = [rule]
+
+        edit(spelled)
+
+    declare(zh={"thought": "03.1", "index": 0})
+    # Every language's normalization must give the term its declared spoken form.
+    with pytest.raises(readings.ReadingError) as refusal:
+        readings.check("en")
+    assert str(refusal.value).splitlines() == [
+        f"content/voice-performance.json: the {language} normalization gives HyperFrames no "
+        "spoken form; the film declares HyperFrames in [[narration.terms]]"
+        for language in ("Chinese", "English")
+    ]
+    spell("HyperFrames", "HyperFrames")
+    assert readings.check("zh")["occurrences"] == 38
+    assert readings.check("en")["occurrences"] == 0
+    spell("HyperFrames", "Hyperframes")
+    other = "the English normalization gives HyperFrames the spoken form Hyperframes"
+    with pytest.raises(readings.ReadingError, match=other):
+        readings.check("zh")
+    # The contract's schema version does not spare a term its spelling.
+    edit(lambda contract: contract.update(schema_version=1))
+    with pytest.raises(readings.ReadingError, match=other):
+        readings.check("zh")
+    edit(lambda contract: contract.update(schema_version=readings.SCHEMA))
+    spell("HyperFrames", "HyperFrames")
+    declare(zh={"thought": "03.1", "index": 1})
+    with pytest.raises(readings.ReadingError, match="03.1 #1 is not in the narration; 03.1 says"):
+        readings.check("zh")
+    declare(zh={"thought": "03.1", "index": 0}, en={"thought": "03.1", "index": 0})
+    with pytest.raises(readings.ReadingError, match="reference for en, but the narration never"):
+        readings.check("en")

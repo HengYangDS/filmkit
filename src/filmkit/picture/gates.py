@@ -11,7 +11,11 @@ SHA-256, every gated finding and every recorded finding, and passes only when th
 one. Besides the labels out of sync, the sync audit's seats, its unnamed speech and its caption
 cues drawn whole as one label are gated, and so are an opening that shows the declared title for
 less than a second before the first word and every text at rest below 4.5:1; the thoughts that
-hold the previous picture and the cues mostly drawn as labels are recorded. A gated finding
+hold the previous picture and the cues mostly drawn as labels are recorded. The frame audit also
+judges every wrapped label at rest by the film's `[picture.wrapping]` rules, which it reads from
+the file `FILMKIT_WRAPPING` names: each label that breaks one is gated unless one of the
+edition's declared exceptions names its lines, which records it with the exception's reason,
+and an exception whose lines no frame of the edition paints is gated as stale. A gated finding
 refuses with `PictureError`, after the record is written, and so does an audit that fails or a
 composition or timeline that changes while it is checked.
 `render-picture` reads the record before it starts the renderer
@@ -29,10 +33,12 @@ from typing import TYPE_CHECKING
 
 import filmkit.repository as repository
 import filmkit.tools as tools
+from filmkit.film import FILM
 from filmkit.picture import metrics, sync_audit, text_trace
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, PictureError, face_bindings
 
 if TYPE_CHECKING:
+    from filmkit.film import Wrapping
     from filmkit.production import Edition
 
 # The frame audit's findings that refuse a render. The DDWG reviews turned each into a rule
@@ -88,6 +94,9 @@ FRAME_STEP = 1 / 30
 MOTION_FPS = 30
 # The audits' reports, in a folder for each edition below the film's root.
 WORK = Path("build/runtime/work/picture-gates")
+# The variable that names the film's wrapping rules to the frame audit
+# (frame-audit/typography/breaks.mjs).
+WRAPPING_VARIABLE = "FILMKIT_WRAPPING"
 
 
 def gated_findings(frame: dict, sync: dict, motion: dict) -> list[str]:
@@ -169,6 +178,48 @@ def recorded_findings(frame: dict, sync: dict) -> list[str]:
     return found
 
 
+def shown_lines(lines: tuple[str, ...]) -> str:
+    """A label's lines as a finding names them, each quoted, top to bottom."""
+    return " / ".join(json.dumps(line, ensure_ascii=False) for line in lines)
+
+
+def wrapping_rules(wrapping: Wrapping) -> dict:
+    """The rules the frame audit judges wrapped labels by: the declared shares and lead words."""
+    return wrapping.model_dump(mode="json", include={"line_share", "last_share", "lead_words"})
+
+
+def wrapping_findings(frame: dict, wrapping: Wrapping, code: str) -> tuple[list[str], list[str]]:
+    """The gated and the recorded findings of an edition's wrapped labels.
+
+    Each label at rest that breaks a rule is gated, by its scene, its lines, when it first
+    stands at rest and each rule it breaks, unless one of the edition's exceptions names its
+    lines, which records it with the exception's reason. An exception of the edition whose lines
+    no frame paints is gated as stale.
+    """
+    declared = {e.lines: e.reason for e in wrapping.exceptions if e.edition == code}
+    painted, gated, recorded = set(), [], []
+    for scene, labels in sorted(frame.get("wrapped_labels", {}).items()):
+        for label in labels:
+            lines = tuple(label["lines"])
+            painted.add(lines)
+            if not label["breaks"]:
+                continue
+            named = (
+                f"frame wrapped label {scene} {shown_lines(lines)} at rest {label['at']:.2f} s: "
+                + "; ".join(label["breaks"])
+            )
+            if lines in declared:
+                recorded.append(f"{named}; declared: {declared[lines]}")
+            else:
+                gated.append(named)
+    gated += [
+        f"frame wrapping exception {shown_lines(lines)} is stale: no frame of the edition paints it"
+        for lines in declared
+        if lines not in painted
+    ]
+    return gated, recorded
+
+
 def current_bindings(edition: Edition) -> dict:
     """The inputs a gate record binds: the composition, the timeline, the engine version, and the
     stylesheet and fonts from which the audits measure text."""
@@ -198,11 +249,15 @@ def check_picture(edition: Edition) -> dict:
     sync_path, motion_path = work / "sync.json", work / "motion.json"
     texts_trace, texts_path = work / "texts.tsv", work / "texts.json"
     faces = {metrics.VARIABLE: str(metrics.current_table())}
+    wrapping = FILM.picture.wrapping
+    rules = work / "wrapping.json"
+    repository.write(rules, wrapping_rules(wrapping))
+    traces = {"TRACE": str(trace), "TEXTS": str(texts_trace), "MARKS": str(marks)}
     run_audit(
         "frame-audit",
         [timeline, f"{FRAME_STEP:.7f}"],
         frame_path,
-        {"TRACE": str(trace), "TEXTS": str(texts_trace), "MARKS": str(marks), **faces},
+        {**traces, WRAPPING_VARIABLE: str(rules), **faces},
     )
     run_audit(
         "motion-audit",
@@ -219,7 +274,8 @@ def check_picture(edition: Edition) -> dict:
         msg = "The composition or the timeline changed while it was checked"
         raise PictureError(msg)
     frame, motion = repository.read(frame_path), repository.read(motion_path)
-    findings = gated_findings(frame, sync, motion) + text_findings(texts)
+    wrapped, declared = wrapping_findings(frame, wrapping, edition.code)
+    findings = gated_findings(frame, sync, motion) + text_findings(texts) + wrapped
     record = {
         **bound,
         "frames_checked": frame["frames_checked"],
@@ -233,7 +289,7 @@ def check_picture(edition: Edition) -> dict:
             )
         },
         "gated_findings": findings,
-        "recorded_findings": recorded_findings(frame, sync),
+        "recorded_findings": recorded_findings(frame, sync) + declared,
         "verdict": "refuse" if findings else "pass",
     }
     repository.write(edition.picture_gates, record)

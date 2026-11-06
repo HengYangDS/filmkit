@@ -7,7 +7,10 @@ differences, loudness, captions and the picture checks. The review scores the au
 measurements and its own analysis; taste remains its judgment, and human listening is
 a later acceptance. Thought endings are measured by `filmkit.review.endings`, on the takes
 the current narration receipts bind and, as delivered, on the soundtrack, and voice clarity by
-`filmkit.review.clarity` against the floors the film declares.
+`filmkit.review.clarity` against the floors the film declares. The heard pause at every word
+boundary, by the marks between its words, and the rate, pitch and level steps between adjacent
+thoughts are measured by `filmkit.narration.flow`, and each declared Latin-script term's first
+vowels by `filmkit.narration.terms`.
 
 It loads no speech runtime, so it runs without a Metal device. Each measurement reads the
 current records it measures and refuses one that is not bound to the current timeline,
@@ -29,12 +32,15 @@ from pathlib import Path
 import numpy as np
 
 import filmkit.media as media
+import filmkit.narration.flow as narration_flow
 import filmkit.narration.recognition as narration_recognition
+import filmkit.narration.terms as narration_terms
 import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.review.clarity as review_clarity
 import filmkit.review.endings as review_endings
 import filmkit.soundtrack.level as soundtrack_level
+from filmkit.film import FILM
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
 from filmkit.picture.sync_audit import SUMMARY_KEYS
 from filmkit.review import ReviewError
@@ -473,6 +479,19 @@ def picture_geometry(edition: production.Edition) -> dict:
     }
 
 
+def speech_flow(code: str, soundtrack: Path, timeline: dict) -> dict:
+    """The soundtrack's heard pauses, continuity steps and declared terms, as they flow.
+
+    Each is recorded for the review; the gates that refuse them are selection and assembly.
+    """
+    narrated = narration_flow.soundtrack(soundtrack, timeline)
+    return {
+        "narration_flow": narration_flow.flow_record(code, narrated, FILM.narration.flow),
+        "thought_continuity": narration_flow.continuity_record(code, narrated),
+        "narration_terms": narration_terms.records(code, FILM.narration.terms, narrated),
+    }
+
+
 def measure_edition(code: str) -> dict:
     """Every measurement of one edition's current media and production records."""
     edition = production.Edition(code)
@@ -524,6 +543,7 @@ def measure_edition(code: str) -> dict:
         },
         "audio_structure": audio_structure(code, soundtrack, timeline, assembly),
         "voice_clarity": review_clarity.voice_clarity(code, soundtrack, timeline),
+        **speech_flow(code, soundtrack, timeline),
         "picture": picture,
         "picture_sync": sync,
         "timeline_sha256": timeline_sha256,
@@ -566,6 +586,8 @@ def main(argv: list[str] | None = None) -> None:
                 key: value for key, value in ratios.items() if key not in ("method", "lowest")
             },
             "voice_clarity": review_clarity.summary(data["voice_clarity"]),
+            "pauses_above_limit": len(data["narration_flow"]["above_limit"]),
+            "term_failures": sum(len(term["failures"]) for term in data["narration_terms"]),
         }
     print(json.dumps(summary, ensure_ascii=False))
 
