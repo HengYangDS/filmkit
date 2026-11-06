@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import filmkit.repository as repository
+from filmkit.picture.gates import MOTION_GATES as GATED
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
 from filmkit.review import ReviewError
 from filmkit.review.files import present
@@ -28,6 +29,8 @@ METHOD = (
     "all outside stage cuts; each finding is a run of frames of one kind, scene and line"
 )
 KINDS = ("halts", "starts", "races", "pops")
+# The prefixes of the gate record's motion findings.
+MOTION_GATES = tuple(f"{name} " for name in GATED.values())
 
 
 def bound_report(edition: Edition) -> tuple[dict, dict]:
@@ -63,7 +66,7 @@ def picture_motion(edition: Edition) -> dict:
         "method": METHOD,
         "counts": {kind: len(followed[kind]) for kind in KINDS},
         "findings": len(followed["findings"]),
-        "declared": sum(row.startswith("motion ") for row in record["recorded_findings"]),
+        "declared": sum(row.startswith(MOTION_GATES) for row in record["recorded_findings"]),
         "speeds": followed["speeds"],
         "largest": largest,
         "events": followed["findings"],

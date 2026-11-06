@@ -225,7 +225,13 @@ def wrapping_findings(frame: dict, wrapping: Wrapping, code: str) -> tuple[list[
     return gated, recorded
 
 
-# What each kind of motion finding does, as a finding states it.
+# The measure each kind of motion finding is gated as, and what it does, as a finding states it.
+MOTION_GATES = {
+    "halt": "motion_halts",
+    "start": "motion_starts",
+    "race": "motion_races",
+    "pop": "motion_pops",
+}
 MOTION_WORDS = {
     "halt": "falls from {speed} px/s to rest",
     "start": "sets off from rest at {speed} px/s",
@@ -245,8 +251,8 @@ def motion_finding(finding: dict) -> str:
         **finding, appears="appears" if way == "in" else "vanishes"
     )
     drawn = finding["origin"] + (f" ({finding['module']})" if finding["module"] else "")
-    kind = finding["kind"] + (f" {way}" if way else "")
-    return f"motion {kind} {finding['scene']} {span}: {marks} {words}, drawn at {drawn}"
+    measure = MOTION_GATES[finding["kind"]]
+    return f"{measure} {finding['scene']} {span}: {marks} {words}, drawn at {drawn}"
 
 
 def motion_findings(motion: dict, policy: Motion, code: str) -> tuple[list[str], list[str]]:

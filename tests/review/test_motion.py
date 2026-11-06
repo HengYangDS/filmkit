@@ -77,9 +77,9 @@ def gated(root, put):
                 "motion": {"path": repository.relative(report), "sha256": repository.sha(report)}
             },
             "recorded_findings": [
-                "motion halt 02 12.30 s: fill falls from 240 px/s to rest, drawn at film.js:120;"
+                "motion_halts 02 12.30 s: fill falls from 240 px/s to rest, drawn at film.js:120;"
                 " declared: a stamp",
-                "motion pop in 06 51.00 s: stroke at ink 132 appears within one frame, drawn at"
+                "motion_pops 06 51.00 s: stroke at ink 132 appears within one frame, drawn at"
                 " film.js:410 (picture/film/scenes/p06/beats.js); declared: a beat",
                 "sync held over 02.2 2.85 s",
             ],

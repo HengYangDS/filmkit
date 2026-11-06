@@ -423,7 +423,7 @@ POP = {
 }
 del POP["speed"]
 HALT_FINDING = (
-    "motion halt 02 12.30 s: fill falls from 240 px/s to rest, drawn at film.js:120"
+    "motion_halts 02 12.30 s: fill falls from 240 px/s to rest, drawn at film.js:120"
     " (picture/film/scenes/p02/flow.js)"
 )
 
@@ -439,17 +439,17 @@ def moving(*findings):
         (HALT, HALT_FINDING),
         (
             START,
-            "motion start 02 14.10 s: fill sets off from rest at 300 px/s, drawn at film.js:120"
+            "motion_starts 02 14.10 s: fill sets off from rest at 300 px/s, drawn at film.js:120"
             " (picture/film/scenes/p02/flow.js)",
         ),
         (
             RACE,
-            "motion race 03 40.10-40.27 s: text '原意会走样' moves at 1896 px/s for 6 frames, drawn"
-            " at film.js:300",
+            "motion_races 03 40.10-40.27 s: text '原意会走样' moves at 1896 px/s for 6 frames,"
+            " drawn at film.js:300",
         ),
         (
             POP,
-            "motion pop in 06 51.00 s: stroke at ink 132 appears within one frame, drawn at"
+            "motion_pops 06 51.00 s: stroke at ink 132 appears within one frame, drawn at"
             " film.js:410 (picture/film/scenes/p06/beats.js)",
         ),
     ],
@@ -479,9 +479,9 @@ def test_a_declared_motion_finding_is_recorded_and_a_stale_exception_refuses(fil
     assert record["verdict"] == "pass" and record["gated_findings"] == []
     assert record["recorded_findings"] == [
         f"{HALT_FINDING}; declared: a stamp",
-        "motion pop in 06 51.00 s: stroke at ink 132 appears within one frame, drawn at"
+        "motion_pops 06 51.00 s: stroke at ink 132 appears within one frame, drawn at"
         f" film.js:410 (picture/film/scenes/p06/beats.js); declared: {beat}",
-        "motion pop out 06 51.50 s: stroke at ink 132 vanishes within one frame, drawn at"
+        "motion_pops 06 51.50 s: stroke at ink 132 vanishes within one frame, drawn at"
         f" film.js:410 (picture/film/scenes/p06/beats.js); declared: {beat}",
     ]
     # An exception whose kind, scene or source matches no finding of its edition is stale.
