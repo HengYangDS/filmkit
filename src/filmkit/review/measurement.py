@@ -10,7 +10,9 @@ the current narration receipts bind and, as delivered, on the soundtrack, and vo
 `filmkit.review.clarity` against the floors the film declares. The heard pause at every word
 boundary, by the marks between its words, and the rate, pitch and level steps between adjacent
 thoughts are measured by `filmkit.narration.flow`, and each declared Latin-script term's first
-vowels by `filmkit.narration.terms`.
+vowels by `filmkit.narration.terms`. The picture's motion, every mark followed as a viewer sees
+it move with its halts, starts, races and pops and the speeds a viewer meets, is reported from
+the motion report the edition's picture gate judged (`filmkit.review.motion`).
 
 It loads no speech runtime, so it runs without a Metal device. Each measurement reads the
 current records it measures and refuses one that is not bound to the current timeline,
@@ -39,6 +41,7 @@ import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.review.clarity as review_clarity
 import filmkit.review.endings as review_endings
+import filmkit.review.motion as review_motion
 import filmkit.soundtrack.level as soundtrack_level
 from filmkit.film import FILM
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
@@ -479,6 +482,16 @@ def picture_geometry(edition: production.Edition) -> dict:
     }
 
 
+def picture_measures(edition: production.Edition, timeline_sha256: str) -> dict:
+    """The picture's measurements: the real-browser geometry, the sound-picture sync and the
+    motion, each bound to the edition's current picture."""
+    return {
+        "picture": picture_geometry(edition),
+        "picture_sync": picture_sync(edition, timeline_sha256),
+        "picture_motion": review_motion.picture_motion(edition),
+    }
+
+
 def speech_flow(code: str, soundtrack: Path, timeline: dict) -> dict:
     """The soundtrack's heard pauses, continuity steps and declared terms, as they flow.
 
@@ -497,8 +510,7 @@ def measure_edition(code: str) -> dict:
     edition = production.Edition(code)
     timeline = repository.read(edition.timeline)
     timeline_sha256 = repository.sha(edition.timeline)
-    sync = picture_sync(edition, timeline_sha256)
-    picture = picture_geometry(edition)
+    pictured = picture_measures(edition, timeline_sha256)
     heard = recognition(edition)
     assembly = repository.read(edition.audio_assembly)
     soundtrack = edition.soundtrack
@@ -544,8 +556,7 @@ def measure_edition(code: str) -> dict:
         "audio_structure": audio_structure(code, soundtrack, timeline, assembly),
         "voice_clarity": review_clarity.voice_clarity(code, soundtrack, timeline),
         **speech_flow(code, soundtrack, timeline),
-        "picture": picture,
-        "picture_sync": sync,
+        **pictured,
         "timeline_sha256": timeline_sha256,
     }
 
@@ -588,6 +599,7 @@ def main(argv: list[str] | None = None) -> None:
             "voice_clarity": review_clarity.summary(data["voice_clarity"]),
             "pauses_above_limit": len(data["narration_flow"]["above_limit"]),
             "term_failures": sum(len(term["failures"]) for term in data["narration_terms"]),
+            "motion": data["picture_motion"]["counts"],
         }
     print(json.dumps(summary, ensure_ascii=False))
 

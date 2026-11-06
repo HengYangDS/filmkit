@@ -23,8 +23,8 @@
 
 ## 4. Motion in the review's measurements
 
-- [ ] 4.1 Record each edition's motion in `review.measurement` from its picture gate record, in `review/motion.py`. Done when measurement tests record the counts, declared findings, speeds and findings of a current record and refuse a record or report bound to another composition or timeline.
-- [ ] 4.2 Document the motion measurement in `README.md`. Done when the README's measurement passage names it.
+- [x] 4.1 Record each edition's motion in `review.measurement` from its picture gate record, in `review/motion.py`. Done when measurement tests record the counts, declared findings, speeds and findings of a current record and refuse a record or report bound to another composition or timeline.
+- [x] 4.2 Document the motion measurement in `README.md`. Done when the README's measurement passage names it.
 
 ## 5. The sample film and the release
 
