@@ -9,7 +9,7 @@ import pytest
 
 import filmkit.picture.gates as gates
 import filmkit.repository as repository
-from filmkit.film import FILM, Wrapping
+from filmkit.film import FILM, Motion, Wrapping
 from filmkit.picture.metrics import VARIABLE
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, STYLE, PictureError
 from filmkit.production import Edition
@@ -42,7 +42,11 @@ CLEAN = {
         "labels_judged": 12,
         "continuity": {"unnamed_speech": [], "held_over": [], "seats": [], "caption_echoes": []},
     },
-    "motion": {"still": [{"start": 4.0, "end": 7.2, "seconds": 3.2}], "pops": [1]},
+    "motion": {
+        "still": [{"start": 4.0, "end": 7.2, "seconds": 3.2}],
+        "pops": [1],
+        "followed": {"findings": []},
+    },
     "texts": opening("示例影片", 2.0),
 }
 # A caption cue that labels drawn during it repeat, as the sync audit lists it.
@@ -214,7 +218,13 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
             "sync 05 ETHOS: after-words",
         ),
         (
-            {**CLEAN, "motion": {"still": [{"start": 4.0, "end": 7.6, "seconds": 3.6}]}},
+            {
+                **CLEAN,
+                "motion": {
+                    **CLEAN["motion"],
+                    "still": [{"start": 4.0, "end": 7.6, "seconds": 3.6}],
+                },
+            },
             "motion still 4.00-7.60 s",
         ),
         (
@@ -369,4 +379,116 @@ def test_a_declared_exception_is_recorded_with_its_reason_and_a_stale_one_refuse
     assert repository.read(Edition("zh").picture_gates)["gated_findings"] == [
         'frame wrapping exception "Stated" / "assumptions" is stale: no frame of the edition'
         " paints it"
+    ]
+
+
+# Motion findings as the motion audit groups them: one run of frames of one kind, scene and line.
+HALT = {
+    "kind": "halt",
+    "scene": "02",
+    "origin": "film.js:120",
+    "module": "picture/film/scenes/p02/flow.js",
+    "start": 12.3,
+    "end": 12.3,
+    "speed": 240,
+    "frames": 1,
+    "paints": ["fill"],
+    "texts": [],
+}
+START = {**HALT, "kind": "start", "start": 14.1, "end": 14.1, "speed": 300}
+RACE = {
+    **HALT,
+    "kind": "race",
+    "scene": "03",
+    "origin": "film.js:300",
+    "module": None,
+    "start": 40.1,
+    "end": 40.27,
+    "speed": 1896,
+    "frames": 6,
+    "paints": ["text"],
+    "texts": ["原意会走样"],
+}
+POP = {
+    **HALT,
+    "kind": "pop",
+    "way": "in",
+    "scene": "06",
+    "origin": "film.js:410",
+    "module": "picture/film/scenes/p06/beats.js",
+    "start": 51.0,
+    "end": 51.0,
+    "level": 132,
+    "paints": ["stroke"],
+}
+del POP["speed"]
+HALT_FINDING = (
+    "motion halt 02 12.30 s: fill falls from 240 px/s to rest, drawn at film.js:120"
+    " (picture/film/scenes/p02/flow.js)"
+)
+
+
+def moving(*findings):
+    """The clean reports with these motion findings."""
+    return {**CLEAN, "motion": {**CLEAN["motion"], "followed": {"findings": list(findings)}}}
+
+
+@pytest.mark.parametrize(
+    ("finding", "named"),
+    [
+        (HALT, HALT_FINDING),
+        (
+            START,
+            "motion start 02 14.10 s: fill sets off from rest at 300 px/s, drawn at film.js:120"
+            " (picture/film/scenes/p02/flow.js)",
+        ),
+        (
+            RACE,
+            "motion race 03 40.10-40.27 s: text '原意会走样' moves at 1896 px/s for 6 frames, drawn"
+            " at film.js:300",
+        ),
+        (
+            POP,
+            "motion pop in 06 51.00 s: stroke at ink 132 appears within one frame, drawn at"
+            " film.js:410 (picture/film/scenes/p06/beats.js)",
+        ),
+    ],
+)
+def test_each_motion_finding_refuses_by_its_time_scene_and_line(film, monkeypatch, finding, named):
+    audits(monkeypatch, moving(finding))
+    with pytest.raises(PictureError, match="1 gated findings"):
+        gates.check_picture(Edition("zh"))
+    assert repository.read(Edition("zh").picture_gates)["gated_findings"] == [named]
+
+
+def keeping(monkeypatch, *exceptions):
+    """Stand in for the film's declaration with these motion exceptions."""
+    picture = FILM.picture.model_copy(update={"motion": Motion(exceptions=exceptions)})
+    monkeypatch.setattr(gates, "FILM", FILM.model_copy(update={"picture": picture}))
+
+
+def test_a_declared_motion_finding_is_recorded_and_a_stale_exception_refuses(film, monkeypatch):
+    audits(monkeypatch, moving(HALT, POP, {**POP, "way": "out", "start": 51.5, "end": 51.5}))
+    beat = "the beat ring marks each condition on its word"
+    by_module = {"edition": "zh", "scene": "06", "source": POP["module"], "kind": "pop"}
+    by_line = {"edition": "zh", "scene": "02", "source": "film.js:120", "kind": "halt"}
+    # An exception of the other edition is judged in its own edition only.
+    other = {**by_line, "edition": "en", "reason": "the English flow"}
+    keeping(monkeypatch, {**by_module, "reason": beat}, {**by_line, "reason": "a stamp"}, other)
+    record = gates.check_picture(Edition("zh"))
+    assert record["verdict"] == "pass" and record["gated_findings"] == []
+    assert record["recorded_findings"] == [
+        f"{HALT_FINDING}; declared: a stamp",
+        "motion pop in 06 51.00 s: stroke at ink 132 appears within one frame, drawn at"
+        f" film.js:410 (picture/film/scenes/p06/beats.js); declared: {beat}",
+        "motion pop out 06 51.50 s: stroke at ink 132 vanishes within one frame, drawn at"
+        f" film.js:410 (picture/film/scenes/p06/beats.js); declared: {beat}",
+    ]
+    # An exception whose kind, scene or source matches no finding of its edition is stale.
+    keeping(monkeypatch, {**by_module, "reason": beat}, {**by_line, "kind": "start", "reason": "x"})
+    with pytest.raises(PictureError, match="2 gated findings"):
+        gates.check_picture(Edition("zh"))
+    assert repository.read(Edition("zh").picture_gates)["gated_findings"] == [
+        HALT_FINDING,
+        "motion exception start 02 film.js:120 is stale: no finding of the edition matches it",
     ]

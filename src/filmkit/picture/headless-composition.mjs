@@ -292,19 +292,31 @@ export function canvasStandIn(deliver, faces = null) {
 /** Load film.js on `timeline`, measuring text with the declared `faces` (readTextMetrics) when they are given.
  * Returns `palette`, the film's colours; `render(t, onPaint)`, which renders the frame at t, hands each of its paints
  * to `onPaint` and returns the layout film.js publishes; `framed`, whether film.js defines a camera `cameraOf`;
- * `camera(segment, t)`, that camera of a segment at t; and `origin()`, called while a paint is handed over, the
- * innermost line of a scene body in film.js that made it, as `film.js:<line>`, or null. */
+ * `camera(segment, t)`, that camera of a segment at t; `origin()`, called while a paint is handed over, the line of
+ * film.js that drew it, as `film.js:<line>`, or null; and `module(origin)`, the module of the bundle that holds such a
+ * line, or null.
+ *
+ * The origin is the innermost line of a scene's own code on the call stack, rather than a helper that scenes share:
+ * a line in a scene's body, `scenes["NN"] = function`, or in a module the bundle places in a folder below `scenes/`,
+ * as the path comments esbuild writes before each module name it (`// picture/film/scenes/p02/hard.js`). A paint
+ * that no scene's own code drew takes the innermost line of film.js that drew it. */
 export function openComposition(timeline, { faces = null } = {}) {
   const composition = resolve(COMPOSITION),
     source = readFileSync(composition, "utf8");
-  // The scene whose body each line of film.js lies in, so a paint can be traced to the scene line that made it.
-  const sceneOfLine = [];
-  let open = null;
+  // The scene whose body each line of film.js lies in, and the module of the bundle that holds it.
+  const sceneOfLine = [],
+    moduleOfLine = [];
+  let open = null,
+    module = null;
   for (const line of source.split("\n")) {
     open = /^scenes\["(\d+)"\] = function/.exec(line)?.[1] ?? open;
+    module = /^\/\/ (\S+\.m?js)$/.exec(line)?.[1] ?? module;
     sceneOfLine.push(open);
+    moduleOfLine.push(module);
     if (line === "};") open = null;
   }
+  const sceneCode = (n) =>
+    sceneOfLine[n - 1] !== null || /(^|\/)scenes\/[^/]+\//.test(moduleOfLine[n - 1] ?? "");
   const window = { FILM: timeline };
   // Paints reach the caller only while it renders a frame, not while film.js paints its first frame on loading.
   let onPaint = null;
@@ -361,9 +373,15 @@ export function openComposition(timeline, { faces = null } = {}) {
       Error.stackTraceLimit = Infinity;
       Error.captureStackTrace(trace, deliver);
       Error.stackTraceLimit = limit;
-      for (const match of trace.stack.matchAll(/film\.js:(\d+):\d+/g))
-        if (sceneOfLine[Number(match[1]) - 1]) return `film.js:${match[1]}`;
-      return null;
+      const lines = [...trace.stack.matchAll(/film\.js:(\d+):\d+/g)].map((match) =>
+        Number(match[1]),
+      );
+      const line = lines.find(sceneCode) ?? lines[0];
+      return line === undefined ? null : `film.js:${line}`;
+    },
+    module(origin) {
+      const line = Number(/^film\.js:(\d+)$/.exec(origin ?? "")?.[1]);
+      return (line && moduleOfLine[line - 1]) || null;
     },
   };
 }

@@ -1,5 +1,7 @@
 /* Motion and transition audit of the picture: ghosts and residue, double exposure, stalls, pops and jumps, type scale
- * and camera framing, measured headlessly from the composition.
+ * and camera framing, measured headlessly from the composition, and in `followed` every mark followed as a viewer sees
+ * it move (motion-audit/follow.mjs) with the halts, starts, races and pops it finds and each scene's fastest glide and
+ * flow (motion-audit/followed.mjs).
  * Usage: python -m filmkit.tools motion-audit <timeline.json> [fps] [--from s] [--to s] [--out report.json]
  * Every mark a scene paints is recorded with its ink level (opacity times its colour's rise above the ground), its
  * screen box, its box in its own drawing coordinates (its identity across frames) and, for words, the size shown.
@@ -8,6 +10,8 @@ import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
 import { openComposition, readTextMetrics, readTimeline } from "./headless-composition.mjs";
+import { follower, VIEWER } from "./motion-audit/follow.mjs";
+import { followedReport } from "./motion-audit/followed.mjs";
 import { motionReport, round } from "./motion-audit/report.mjs";
 import { inkLevel } from "./rules/ink.mjs";
 
@@ -123,6 +127,7 @@ const typeSizes = new Map(),
   cameras = new Map();
 let previous = [],
   previousSeen = new Map();
+const viewer = follower(dt);
 for (let i = Math.round(from * fps); i * dt < to; i++) {
   const t = i * dt;
   const { marks, texts } = marksAt(t);
@@ -133,6 +138,10 @@ for (let i = Math.round(from * fps); i * dt < to; i++) {
       v.role = texts[k].role;
     });
   const current = marks.filter((v) => v.scene && v.level >= SEEN && v.role !== "caption");
+  viewer.frame(
+    t,
+    current.filter((v) => v.level >= VIEWER.VISIBLE),
+  );
   const seen = new Map();
   // Two marks drawn on one geometry in the same frame are a layered crossfade (a dashed place filling, a colour
   // blending through two strokes), not one mark changing colour.
@@ -393,5 +402,8 @@ const { report, summary } = motionReport({
   typeSizes,
   cameras,
 });
+const { followed, summary: counts } = followedReport({ film, markOf, dt, found: viewer.finish() });
+report.followed = followed;
+summary.followed = counts;
 if (values.out) writeFileSync(values.out, JSON.stringify(report, null, 1) + "\n");
 console.log(JSON.stringify(summary));

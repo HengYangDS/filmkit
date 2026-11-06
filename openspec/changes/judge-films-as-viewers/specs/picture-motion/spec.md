@@ -25,12 +25,17 @@ The motion audit SHALL follow each mark a scene draws at ink level 25 or more fr
 
 ### Requirement: The picture gate refuses motion a viewer sees as not smooth
 
-`check-picture` SHALL refuse `motion_halts`, a mark whose speed falls from 60 px/s or more to under 1.5 px/s within one frame; `motion_starts`, the reverse, for a mark followed for two frames or more; `motion_races`, a mark at 900 px/s or more; and `motion_pops`, a mark at ink level 60 or more and 12 px or more across that appears or vanishes within one frame, continuing no like mark, outside a stage cut. Each SHALL name its time, scene, kind, words and the line that drew it.
+`check-picture` SHALL refuse, outside a stage cut, `motion_halts`, a mark falling from 60 px/s or more to under 1.5 px/s within one frame, unless that step is under half the one before it; `motion_starts`, the reverse, for a mark followed two frames or more; `motion_races`, a mark at 900 px/s or more; and `motion_pops`, a mark at ink 60 or more, 12 px or more across, appearing or vanishing within one frame. Each SHALL name its time, scene, kind, words and drawing line.
 
 #### Scenario: A flow that halts dead at the end of a thought
 
 - **WHEN** a dot moving at 240 px/s stands still in the next frame
 - **THEN** `check-picture` writes a refused record that names the halt with its time, scene and line, and exits with a refusal
+
+#### Scenario: An eased end
+
+- **WHEN** a dot eases to rest, its last steps 90 px/s and then 40 px/s before it stands still
+- **THEN** `check-picture` refuses no halt for it
 
 #### Scenario: A structure that glides too fast
 

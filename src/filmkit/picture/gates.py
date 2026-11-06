@@ -18,6 +18,11 @@ edition's declared exceptions names its lines, which records it with the excepti
 and an exception whose lines no frame of the edition paints is gated as stale. A gated finding
 refuses with `PictureError`, after the record is written, and so does an audit that fails or a
 composition or timeline that changes while it is checked.
+The motion audit follows every mark as a viewer sees it move, and each of its findings, a halt,
+start, race or pop outside a stage cut, is gated by its time, scene, marks and the line that drew
+it, unless one of the edition's `[[picture.motion.exceptions]]` names its scene, its line or
+module and its kind, which records it with the exception's reason; an exception that matches no
+finding of the edition is gated as stale.
 `render-picture` reads the record before it starts the renderer
 (`filmkit.picture.rendering.require_passing_gates`).
 
@@ -38,7 +43,7 @@ from filmkit.picture import metrics, sync_audit, text_trace
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, PictureError, face_bindings
 
 if TYPE_CHECKING:
-    from filmkit.film import Wrapping
+    from filmkit.film import Motion, Wrapping
     from filmkit.production import Edition
 
 # The frame audit's findings that refuse a render. The DDWG reviews turned each into a rule
@@ -220,6 +225,64 @@ def wrapping_findings(frame: dict, wrapping: Wrapping, code: str) -> tuple[list[
     return gated, recorded
 
 
+# What each kind of motion finding does, as a finding states it.
+MOTION_WORDS = {
+    "halt": "falls from {speed} px/s to rest",
+    "start": "sets off from rest at {speed} px/s",
+    "race": "moves at {speed} px/s for {frames} frames",
+    "pop": "at ink {level} {appears} within one frame",
+}
+
+
+def motion_finding(finding: dict) -> str:
+    """A motion finding as the record names it: its kind, scene, time, marks and drawing line."""
+    start, end = finding["start"], finding["end"]
+    span = f"{start:.2f} s" if start == end else f"{start:.2f}-{end:.2f} s"
+    texts = ", ".join(repr(text) for text in finding["texts"])
+    marks = "/".join(finding["paints"]) + (f" {texts}" if texts else "")
+    way = finding.get("way")
+    words = MOTION_WORDS[finding["kind"]].format(
+        **finding, appears="appears" if way == "in" else "vanishes"
+    )
+    drawn = finding["origin"] + (f" ({finding['module']})" if finding["module"] else "")
+    kind = finding["kind"] + (f" {way}" if way else "")
+    return f"motion {kind} {finding['scene']} {span}: {marks} {words}, drawn at {drawn}"
+
+
+def motion_findings(motion: dict, policy: Motion, code: str) -> tuple[list[str], list[str]]:
+    """The gated and the recorded motion findings of an edition.
+
+    Each finding is gated unless one of the edition's exceptions names its scene, its kind and
+    its line or module, which records it with the exception's reason. An exception of the
+    edition that matches no finding is gated as stale.
+    """
+    exceptions = [e for e in policy.exceptions if e.edition == code]
+    matched, gated, recorded = set(), [], []
+    for finding in motion["followed"]["findings"]:
+        named = motion_finding(finding)
+        kept = next(
+            (
+                e
+                for e in exceptions
+                if (e.scene, e.kind) == (finding["scene"], finding["kind"])
+                and e.source in (finding["origin"], finding["module"])
+            ),
+            None,
+        )
+        if kept is None:
+            gated.append(named)
+        else:
+            matched.add(kept)
+            recorded.append(f"{named}; declared: {kept.reason}")
+    gated += [
+        f"motion exception {e.kind} {e.scene} {e.source} is stale: no finding of the edition"
+        " matches it"
+        for e in exceptions
+        if e not in matched
+    ]
+    return gated, recorded
+
+
 def current_bindings(edition: Edition) -> dict:
     """The inputs a gate record binds: the composition, the timeline, the engine version, and the
     stylesheet and fonts from which the audits measure text."""
@@ -275,7 +338,8 @@ def check_picture(edition: Edition) -> dict:
         raise PictureError(msg)
     frame, motion = repository.read(frame_path), repository.read(motion_path)
     wrapped, declared = wrapping_findings(frame, wrapping, edition.code)
-    findings = gated_findings(frame, sync, motion) + text_findings(texts) + wrapped
+    moved, kept = motion_findings(motion, FILM.picture.motion, edition.code)
+    findings = gated_findings(frame, sync, motion) + text_findings(texts) + wrapped + moved
     record = {
         **bound,
         "frames_checked": frame["frames_checked"],
@@ -289,7 +353,7 @@ def check_picture(edition: Edition) -> dict:
             )
         },
         "gated_findings": findings,
-        "recorded_findings": recorded_findings(frame, sync) + declared,
+        "recorded_findings": recorded_findings(frame, sync) + declared + kept,
         "verdict": "refuse" if findings else "pass",
     }
     repository.write(edition.picture_gates, record)

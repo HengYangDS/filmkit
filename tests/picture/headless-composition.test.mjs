@@ -180,11 +180,13 @@ test("a scene's paints are traced to their line of film.js and a composition's c
     const composition = openComposition({}),
       origins = [];
     composition.render(2, (paint) => origins.push([paint.scene, composition.origin()]));
-    // The scene's mark comes from line 11 inside its body, through the helper; the mark outside every scene has none.
+    // The scene's mark comes from line 11 inside its body, through the helper; the mark outside every scene comes from
+    // the innermost line that drew it, the helper's stroke.
     assert.deepEqual(origins, [
-      [null, null],
+      [null, "film.js:8"],
       ["01", "film.js:11"],
     ]);
+    assert.equal(composition.module("film.js:11"), null);
     // The camera's values belong to the composition's realm, so they are copied before comparing.
     assert.equal(composition.framed, true);
     assert.deepEqual(
@@ -198,6 +200,68 @@ test("a scene's paints are traced to their line of film.js and a composition's c
   const sample = openComposition(await authoredTimeline("zh"));
   assert.equal(sample.framed, false);
   assert.throws(() => sample.camera({ id: "01" }, 1), /The composition defines no cameraOf/);
+});
+
+/* A composition bundled from modules, as esbuild writes it: each module after a comment naming its path. A shared
+ * drawing helper paints a ring; a scene's own module calls it, and so does a helper shared by scenes. */
+const BUNDLED = [
+  'var P = { ground: "#0F1519", ink: "#ECE8DF" };',
+  "var ctx = document.getElementById('picture').getContext('2d');",
+  "var scenes = {};",
+  "",
+  "// picture/film/drawing/rings.js",
+  "function ring(x) {",
+  "  ctx.beginPath();",
+  "  ctx.arc(x, 300, 10, 0, 6.3);",
+  "  ctx.stroke();",
+  "}",
+  "",
+  "// picture/film/scenes/claim.js",
+  "function claim(x) {",
+  "  ring(x);",
+  "}",
+  "",
+  "// picture/film/scenes/p01/stage.js",
+  "function stage(t) {",
+  "  ring(300 + t);",
+  "}",
+  'scenes["01"] = function (t) {',
+  "  stage(t);",
+  "  claim(600);",
+  "};",
+  "",
+  "// picture/film/playback.js",
+  "window.renderFrame = (t) => {",
+  '  window.__sceneId = "01";',
+  '  scenes["01"](t);',
+  "  window.__sceneId = null;",
+  "  window.__filmLayout = { time: t, texts: [] };",
+  "};",
+  "",
+];
+
+test("a paint is traced to the scene's own line that called a shared helper, with its module", async () => {
+  const root = await scratchFolder();
+  await mkdir(join(root, "picture"));
+  await writeFile(join(root, "picture/film.js"), BUNDLED.join("\n"));
+  const lineOf = (code) => `film.js:${BUNDLED.indexOf(code) + 1}`;
+  process.chdir(root);
+  try {
+    const composition = openComposition({}),
+      origins = [];
+    composition.render(2, () => origins.push(composition.origin()));
+    // The ring of the scene's own module names the module's line, not the helper's; the ring of a helper that scenes
+    // share, at the top of scenes/, names the line of the scene's body that called it.
+    assert.deepEqual(origins, [lineOf("  ring(300 + t);"), lineOf("  claim(600);")]);
+    assert.deepEqual(origins.map(composition.module), [
+      "picture/film/scenes/p01/stage.js",
+      "picture/film/scenes/p01/stage.js",
+    ]);
+    assert.equal(composition.module(lineOf("  ctx.stroke();")), "picture/film/drawing/rings.js");
+    assert.equal(composition.module(null), null);
+  } finally {
+    process.chdir(SAMPLE);
+  }
 });
 
 test("the canvas stand-in paints what film.js draws and refuses any other member", () => {

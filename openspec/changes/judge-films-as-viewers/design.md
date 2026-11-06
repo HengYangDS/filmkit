@@ -60,10 +60,12 @@ Weighing by box area also lets one large outline outweigh many names. Across the
 ### The thresholds are the brief's, and the following limits are measured
 
 - **Kept from the brief.** The halt and start bounds (60 px/s and 1.5 px/s), the race (900 px/s), the pop's ink level (60) and size (12 px across) and the cut (35%) are the brief's.
-- **What the films show.** The halts and starts found on the films' committed compositions fall from or rise to 60–900 px/s. Most are under 300 px/s, the pace of a flow. The ETHOS round-9 composition, which the owner watched, holds 37 halts and 40 starts of flow dots in its English edition, 67 of them within 0.25 s of a word's end. After the voice clock eases to rest, 7 and 7 remain. The glides that race peak at 900–2,000 px/s.
-- **The turn limit.** 1,200 px/s within one frame keeps every eased glide the films show (at most about 630 px/s per frame), and stops a mark at rest from jumping to a like mark more than 40 px away.
-- **The 6 px size.** It spares the dots entering and leaving by size, which are under 3 px across when they wrap.
+- **The eased end.** A halt whose last step is under half the step before it, or a start whose next step is more than twice its own, is the end of an eased move sampled at 30 fps: the mark slows or gathers speed over frames, and the frame step alone crosses the bounds. Without this rule the gate also refuses 46 such starts on ETHOS Chinese, 23 on ETHOS English and 65 and 133 on DDWG.
+- **The turn limit.** A followed mark changes its velocity within one frame by at most 1,200 px/s, or its own speed when that is larger. The followed marks of the six editions change their velocity by at most 280–306 px/s at the 99th percentile and 492–745 px/s at the 99.9th. The few larger changes, up to 3,202 px/s, are a ticker that sweeps its values and a flight that turns a corner, which the larger own speed admits. Without the limit, a mark at rest jumps to a like mark that appears elsewhere: 2–11 more halts and 2–9 more starts per edition.
+- **The 6 px size.** A move is judged only on marks 6 px or more across. The dots entering and leaving by size are under 3 px across when they wrap, and the films' flow dots that a viewer follows are 8–10 px. Without the size the gate reports the wrapping as races and starts, 18–19 more races on the essentials film and 27 more halts and 26 more starts on DDWG.
+- **The stage cut.** Without the cut, every designed stage change is a pop: 1,242–4,895 pops per edition in place of 60–298.
 - **The reach.** 4,500 px/s is the probe's.
+- **What the films show.** The halts and starts found on the committed compositions fall from or rise to 60–900 px/s, most under 300 px/s, the pace of a flow. The ETHOS round-9 composition, which the owner watched, holds 27 halts and 29 starts of flow dots in English, every halt within 0.25 s of a word's end. After the voice clock eases to rest, 6 and 5 remain. The glides that race peak at 900–2,000 px/s.
 - **Calibration evidence.** The per-film counts are in tasks.md 1.4's evidence and in the Changelog.
 
 ### A finding names the scene line that drew it

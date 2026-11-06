@@ -161,6 +161,57 @@ def test_two_exceptions_of_one_label_refuse(declared):
         film.load(declared)
 
 
+# A motion declaration that keeps one pop of one edition by its module.
+MOTION = """[[picture.motion.exceptions]]
+edition = "zh"
+scene = "06"
+source = "picture/film/scenes/p06/beats.js"
+kind = "pop"
+reason = "the beat ring marks each condition on its word"
+
+"""
+
+
+def test_motion_exceptions_default_and_are_declared(declared):
+    assert film.FILM.picture.motion == film.Motion()
+    rewrite(declared, "[review]\n", MOTION + "[review]\n")
+    kept = film.load(declared).picture.motion.exceptions
+    assert kept == (
+        film.MotionException(
+            edition="zh",
+            scene="06",
+            source="picture/film/scenes/p06/beats.js",
+            kind="pop",
+            reason="the beat ring marks each condition on its word",
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "field"),
+    [
+        ('kind = "pop"', 'kind = "jump"', "picture.motion.exceptions.0.kind"),
+        ('source = "picture/film/scenes/p06/beats.js"', 'source = "line 5"', "0.source"),
+        ('source = "picture/film/scenes/p06/beats.js"', 'source = "film.js:0"', "0.source"),
+        ('reason = "the beat ring marks each condition on its word"', 'reason = " "', "0.reason"),
+        ('edition = "zh"\n', "", "picture.motion.exceptions.0.edition"),
+    ],
+)
+def test_a_motion_declaration_refuses_naming_its_field(declared, old, new, field):
+    # An unknown kind, a source that is neither a line of film.js nor a module, and an exception
+    # without a reason or its edition.
+    rewrite(declared, "[review]\n", MOTION + "[review]\n")
+    rewrite(declared, old, new)
+    with pytest.raises(FilmError, match=re.escape(field)):
+        film.load(declared)
+
+
+def test_two_exceptions_of_one_motion_finding_refuse(declared):
+    rewrite(declared, "[review]\n", MOTION + MOTION + "[review]\n")
+    with pytest.raises(FilmError, match="two exceptions name the same motion of one edition"):
+        film.load(declared)
+
+
 def identities() -> set[str]:
     """What names this film.
 

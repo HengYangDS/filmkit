@@ -4,6 +4,20 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.12.0] - UNRELEASED
+
+### Added
+
+- The motion audit follows every mark a scene draws as a viewer sees it move (`followed` in the motion report), at 30 fps in 1080p pixels per second. A mark keeps its identity by its scene, kind, words and line width, through moving whole, through growing, shrinking or redrawing in place or while it moves, and through words that change in place. A group of like marks continues the previous frame's by the least total miss from where each mark's own motion puts it.
+- `check-picture` refuses, outside stage cuts, `motion_halts` (a mark falling from 60 px/s or more to rest, under 1.5 px/s, within one frame), `motion_starts` (the reverse), `motion_races` (900 px/s or more) and `motion_pops` (a mark at ink level 60 or more and 12 px or more across that appears or vanishes within one frame). The thresholds are the brief's; an eased end, a last step under half the one before it, is not a halt or a start. A stage cut is a frame in which 35% or more of a scene's firm marks, counted or weighed by their ink, vanish or appear. Each finding names its time, scene, paints and words, its speed or ink and the composition line that drew it: the scene's own line rather than a shared helper, with its module where the composition is bundled from modules.
+- `[[picture.motion.exceptions]]` declares each motion finding a film keeps, by its `edition`, `scene`, `source` (`film.js:<line>` or the composition's module), `kind` and `reason`; the gate record lists each kept finding and refuses an exception that matches no finding of its edition.
+- The motion report records, for each scene, the fastest glide (a text or a mark more than 16 px across) and flow (a smaller mark) with their times.
+
+### Changed
+
+- **Breaking:** the motion gate applies to every film from 0.12.0, whatever it declares. On the films' committed compositions it refuses ETHOS with 219 Chinese and 239 English findings (18 and 19 halts, 23 and 20 starts, 125 and 140 races, 53 and 60 pops), the essentials film with 64 and 68 (3 halts, 3 starts, 6 races and 52 and 56 pops in each) and DDWG with 437 and 465 (10 and 14 halts, 9 starts, 149 and 172 races, 269 and 270 pops), and passes the sample film. The brief's prototype probe, run on the same compositions, left 797 to 1,423 events per edition without an origin and reported growing marks as pop pairs, a flow's dot wrapping by size as a race, a dot jumping to a like dot that appears elsewhere, rules halting in step as swapped halts and stage handoffs that keep a large frame as pops; the gate follows the first four and counts the last as stage cuts. Every finding names its line. On the ETHOS round-9 composition the owner watched, the gate finds 27 halts and 29 starts of flow dots in the English edition, every halt within 0.25 s of a word's end; on the committed composition, whose voice clock eases to rest between thoughts, 6 and 5 remain.
+- A paint's origin (`openComposition().origin()`) is the innermost line of a scene's own code on its call stack, a scene's body or a module below `scenes/`, and otherwise the innermost line of the composition that drew it, where it was null before; `module(origin)` names the module of a bundled composition.
+
 ## [0.11.0] - 2026-11-06
 
 ### Added

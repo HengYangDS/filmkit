@@ -118,12 +118,47 @@ class Wrapping(Declared):
         return exceptions
 
 
+class MotionException(Declared):
+    """One motion finding an edition keeps against the motion gate: its scene, the composition's
+    `source`, the line that drew it as `film.js:<line>` or its module, its kind and why it stays."""
+
+    edition: Literal["zh", "en"]
+    scene: Stated
+    source: Annotated[str, StringConstraints(pattern=r"^(film\.js:[1-9][0-9]*|[^\s:]+\.m?js)$")]
+    kind: Literal["halt", "start", "race", "pop"]
+    reason: Stated
+
+
+class Motion(Declared):
+    """The motion findings the film keeps (`filmkit.picture.gates`).
+
+    A finding of an edition that one of the edition's exceptions names by its scene, its line or
+    module and its kind is recorded with the reason instead of refused, and an exception that no
+    finding of its edition matches is refused.
+    """
+
+    exceptions: tuple[MotionException, ...] = ()
+
+    @field_validator("exceptions")
+    @classmethod
+    def distinct_findings(
+        cls, exceptions: tuple[MotionException, ...]
+    ) -> tuple[MotionException, ...]:
+        """Refuse two exceptions of one motion."""
+        keys = [(e.edition, e.scene, e.source, e.kind) for e in exceptions]
+        if len(set(keys)) != len(keys):
+            message = "two exceptions name the same motion of one edition"
+            raise ValueError(message)
+        return exceptions
+
+
 class Picture(Declared):
-    """The font files the picture stages below fonts/, in their order, and how its wrapped labels
-    break."""
+    """The font files the picture stages below fonts/, in their order, how its wrapped labels
+    break, and the motion it keeps."""
 
     fonts: tuple[str, ...] = Field(min_length=1)
     wrapping: Wrapping = Field(default_factory=Wrapping)
+    motion: Motion = Field(default_factory=Motion)
 
     @field_validator("fonts")
     @classmethod
