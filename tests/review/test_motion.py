@@ -113,7 +113,18 @@ def test_a_gate_record_or_report_bound_to_other_inputs_is_refused(gated, put, ro
     ):
         review_motion.picture_motion(edition)
     put(root / picture_rendering.COMPOSITION_SCRIPT, "composition")
+    # A report written before the motion gate holds no followed marks; check-picture writes them.
+    put(report, {"pops": []})
+    record = repository.read(edition.picture_gates)
+    record["reports"]["motion"]["sha256"] = repository.sha(report)
+    put(edition.picture_gates, record)
+    with pytest.raises(
+        ReviewError, match="zh: the motion report follows no marks; run check-picture again"
+    ):
+        review_motion.picture_motion(edition)
     put(report, {"followed": {**FOLLOWED, "halts": []}})
+    record["reports"]["motion"]["sha256"] = "0" * 64
+    put(edition.picture_gates, record)
     with pytest.raises(
         ReviewError, match="zh: the motion report differs from the one its gate record binds"
     ):

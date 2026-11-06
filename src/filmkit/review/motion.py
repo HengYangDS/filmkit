@@ -56,7 +56,10 @@ def bound_report(edition: Edition) -> tuple[dict, dict]:
 def picture_motion(edition: Edition) -> dict:
     """The edition's motion: its counts, findings, declared findings, speeds and events."""
     record, report = bound_report(edition)
-    followed = report["followed"]
+    followed = report.get("followed")
+    if followed is None:
+        msg = f"{edition.code}: the motion report follows no marks; run check-picture again"
+        raise ReviewError(msg)
     largest = {}
     for scene, kinds in followed["speeds"].items():
         for kind, best in kinds.items():
