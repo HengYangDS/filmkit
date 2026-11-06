@@ -71,7 +71,7 @@ On the current builds the within-part steps reach rate ratios of 1.49 and 0.70, 
 
 ### A term has one spoken form, and its first vowel is compared with a reference a person heard
 
-The root cause on ETHOS was upstream of any take. The shared pronunciation contract normalized ETHOS to Eethos for Chinese and to Ethos for English. The Chinese edition said /iː/ at all 20 occurrences; in the round-9 auditions the English narrator said /ɛ/ in about half of all takes (03.1: 10 of 16). Choosing takes hid the fault without removing it.
+The root cause on ETHOS was upstream of any take. The shared pronunciation contract normalized ETHOS to Eethos for Chinese and to `Ethos` for English. The Chinese edition said /iː/ at all 20 occurrences; in the round-9 auditions the English narrator said /ɛ/ in about half of all takes (03.1: 10 of 16). Choosing takes hid the fault without removing it.
 
 - **Declaration.** A film declares each term in `[[narration.terms]]` of its declaration: the term, the spoken form every language gives it, its IPA and a reference occurrence per edition. The pronunciation contract's hash binds every recording, so a declaration there would re-record a whole film.
 - **Spelling parity.** Before any speech model loads, the readings check refuses a language whose contract normalization gives a declared term another spoken form, or none.

@@ -16,7 +16,7 @@
 
 - [x] 3.1 Declare `[[narration.terms]]` (term, spoken form, IPA, reference occurrence per edition) in `film.py`, outside the pronunciation contract, and measure each occurrence's first-vowel formants in a module that `narration/readings.py` calls. Done when tests on synthetic vowels separate /iː/ from /ɛ/, refuse a stale reference, and show that adding a declaration leaves every recording's fingerprint unchanged.
 - [x] 3.2 Refuse an occurrence whose F1 exceeds 1.5 times the reference's or whose F2 falls below 0.85 times, at selection and on the soundtrack, and in the audition prefer a take whose occurrences pass. Done when tests refuse an /ɛ/ occurrence against an /iː/ reference by name with both ratios, pass an occurrence at 1.35 times the reference's F1, and propose the passing take.
-- [x] 3.3 Refuse, in the readings check before narration, a language whose contract normalization gives a declared term another spoken form or none. Done when tests refuse English Ethos against a declared Eethos, naming the language, the term and both forms, and the ETHOS film's committed contract is refused the same way.
+- [x] 3.3 Refuse, in the readings check before narration, a language whose contract normalization gives a declared term another spoken form or none. Done when tests refuse English `Ethos` against a declared Eethos, naming the language, the term and both forms, and the ETHOS film's committed contract is refused the same way.
 
 ## 4. Review rounds
 

@@ -20,8 +20,8 @@ Before any speech model loads, the readings check SHALL refuse when a language's
 
 #### Scenario: One spelling per language
 
-- **WHEN** ETHOS is declared with the spoken form Eethos, and the contract normalizes it to Eethos in Chinese and to Ethos in English
-- **THEN** the readings check refuses before narration and names English, ETHOS, Ethos and Eethos
+- **WHEN** ETHOS is declared with the spoken form Eethos, and the contract normalizes it to Eethos in Chinese and to `Ethos` in English
+- **THEN** the readings check refuses before narration and names English, ETHOS, `Ethos` and Eethos
 
 #### Scenario: The same spoken form everywhere
 
