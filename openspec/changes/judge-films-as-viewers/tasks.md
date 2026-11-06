@@ -29,7 +29,7 @@
 ## 5. The sample film and the release
 
 - [x] 5.1 Declare `[review.levels]` for the sample film and cite `{levels}` and `{sentences}` in its prompt. Done when the sample's prompts state its three levels and the suites pass on its declaration.
-- [ ] 5.2 Set `VERSION` and the README pin to 0.12.0 and add a `[0.12.0] - Unreleased` Changelog entry that states the motion gate applies to every film from this release. Done when every `mise run check` command and `openspec validate judge-films-as-viewers --strict` pass.
+- [x] 5.2 Set `VERSION` and the README pin to 0.12.0 and add a `[0.12.0] - Unreleased` Changelog entry that states the motion gate applies to every film from this release. Done when every `mise run check` command and `openspec validate judge-films-as-viewers --strict` pass.
 
 ## Workflow follow-up
 
