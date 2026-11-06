@@ -51,7 +51,7 @@ Each edition's script SHALL declare the edition's title, author, language, durat
 
 ### Requirement: The engine carries no film's content
 
-The engine SHALL NOT contain any film's title, identity, script, voice, source, player page, review policy or picture composition. It SHALL take them from the film it builds.
+The engine SHALL NOT contain any film's title, identity, script, voice, source, player prose, review policy or picture composition. It SHALL take them from the film it builds; the player's structure and interface text are the engine's own.
 
 #### Scenario: The engine names no film
 
