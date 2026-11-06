@@ -17,14 +17,18 @@ const AUDIT_MOTION = fileURLToPath(
  * along a link at 300 px/s, entering and leaving by size; a dot moves at 240 px/s, halts dead and sets off again; a
  * name eases 440 px across 0.8 s; a name races 600 px in 0.4 s; a counter changes its words in place; a name pops in
  * and out; a card glides while a link draws on from it; a rule is drawn on in place, 1,200 px in eight frames, its end
- * at up to 225 px a frame; a larger dot around a standing dot vanishes at frame 120. Scene 02 hands five names to five
- * others below them in one frame. */
+ * at up to 225 px a frame; a larger dot around a standing dot vanishes at frame 120. None of these follows and
+ * nothing is found: a name gives way to another at the stage cut the composition declares at frame 102; a bracket's
+ * second end enters 360 px from its first by size, from frame 40; a span's moving end slides through its fixed end at
+ * frame 101; a ring is drawn on from a point, from frame 31; a slab eases down and joins its stack at frame 60. Scene 02
+ * hands five names to five others below them in one frame. */
 const MOTIONS = [
   'var P = { ground: "#0F1519", ink: "#ECE8DF" };',
   'var ctx = document.getElementById("picture").getContext("2d");',
   "var scenes = {};",
   "var layout = [];",
   "var ease = (q) => (q <= 0 ? 0 : q >= 1 ? 1 : q * q * (3 - 2 * q));",
+  "var stageCuts = new Map([['01', new Set([101.5 / 30])]]);",
   "function dot(x, y, r) {",
   "  ctx.globalAlpha = 1;",
   "  ctx.fillStyle = P.ink;",
@@ -72,6 +76,33 @@ const MOTIONS = [
   "  if (n >= 170) rule(300, 1000, 304 + 1200 * ease((n - 170) / 8), 1000);",
   "  dot(1700, 900, 8);",
   "  if (n < 120) dot(1700, 900, 14);",
+  '  name(n < 102 ? "Swap" : "Swapped", 1000, 200);',
+  "  ctx.strokeStyle = P.ink;",
+  "  ctx.lineWidth = 3;",
+  "  ctx.beginPath();",
+  "  ctx.moveTo(400, 1030);",
+  "  ctx.lineTo(400, 1050);",
+  "  const g = Math.min(1, (n - 39) / 6);",
+  "  if (g > 0) ctx.moveTo(760, 1040 - 10 * g), ctx.lineTo(760, 1040 + 10 * g);",
+  "  ctx.stroke();",
+  "  ctx.beginPath();",
+  "  ctx.moveTo(500, 60);",
+  "  ctx.lineTo(500, 80);",
+  "  ctx.moveTo(505 + 10 * (100 - n), 60);",
+  "  ctx.lineTo(505 + 10 * (100 - n), 80);",
+  "  ctx.stroke();",
+  "  if (n > 30) ctx.beginPath(), ctx.arc(1800, 650, 30, 0, Math.PI * Math.min(2, (n - 30) / 10)), ctx.stroke();",
+  "  ctx.lineWidth = 2;",
+  "  ctx.beginPath();",
+  "  for (let k = 0; k < (n >= 60 ? 3 : 2); k++) ctx.roundRect(1600, 100 - 14 * k, 60, 10, 2);",
+  "  ctx.stroke();",
+  "  if (n >= 50 && n < 60) {",
+  "    ctx.globalAlpha = Math.min(1, (n - 49) / 4);",
+  "    ctx.beginPath();",
+  "    ctx.roundRect(1600, 72 - 30 * (1 - ease((n - 50) / 9)), 60, 10, 2);",
+  "    ctx.stroke();",
+  "    ctx.globalAlpha = 1;",
+  "  }",
   "};",
   'scenes["02"] = function (t) {',
   "  const n = Math.round(t * 30);",

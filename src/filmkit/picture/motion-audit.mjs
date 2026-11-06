@@ -76,7 +76,13 @@ const markOf = (paint) =>
         width: paint.lineWidth,
         local: bbox(paint.points),
         screen: bbox(paint.points.map(paint.toScreen)),
-        ...(paint.kind === "text" ? { text: paint.text, size: paint.size * paint.scale } : {}),
+        ...(paint.kind === "text"
+          ? { text: paint.text, size: paint.size * paint.scale }
+          : {
+              // Its drawn pieces on the screen: each subpath's box and its first and last points.
+              pieces: paint.subs.filter((sub) => sub.length).map(bbox),
+              ends: paint.subs.filter((sub) => sub.length).map((sub) => [sub[0], sub.at(-1)]),
+            }),
       }
     : null;
 /* The marks of the frame at t, in paint order. */
@@ -138,9 +144,14 @@ for (let i = Math.round(from * fps); i * dt < to; i++) {
       v.role = texts[k].role;
     });
   const current = marks.filter((v) => v.scene && v.level >= SEEN && v.role !== "caption");
+  // The scenes whose stage cut the composition declares between the previous frame and this one.
+  const declared = [...film.declaredCuts()]
+    .filter(([, at]) => [...at].some((c) => c > t - dt + 1e-9 && c <= t + 1e-9))
+    .map(([scene]) => scene);
   viewer.frame(
     t,
     current.filter((v) => v.level >= VIEWER.VISIBLE),
+    i === Math.round(from * fps) ? [] : declared,
   );
   const seen = new Map();
   // Two marks drawn on one geometry in the same frame are a layered crossfade (a dashed place filling, a colour

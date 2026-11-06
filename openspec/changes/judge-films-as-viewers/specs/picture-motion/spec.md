@@ -25,7 +25,7 @@ The motion audit SHALL follow each mark a scene draws at ink level 25 or more fr
 
 ### Requirement: The picture gate refuses motion a viewer sees as not smooth
 
-`check-picture` SHALL refuse, outside a stage cut, `motion_halts`, a mark falling from 60 px/s or more to under 1.5 px/s within one frame, unless that step is under half the one before it; `motion_starts`, the reverse, for a mark followed two frames or more; `motion_races`, a mark at 900 px/s or more; and `motion_pops`, a mark at ink 60 or more, 12 px or more across, appearing or vanishing within one frame. Each SHALL name its time, scene, kind, words and drawing line.
+`check-picture` SHALL refuse, outside a stage cut, `motion_halts`, a mark falling from 60 px/s or more to under 1.5 px/s within one frame, unless that step is under half its last; `motion_starts`, the reverse, for a mark followed two frames or more; `motion_races`, a mark at 900 px/s or more; and `motion_pops`, a mark at ink 60 or more appearing or vanishing within one frame with pieces 12 px or more across that no like mark holds. Each SHALL name its time, scene, kind, words and drawing line.
 
 #### Scenario: A flow that halts dead at the end of a thought
 
@@ -47,14 +47,24 @@ The motion audit SHALL follow each mark a scene draws at ink level 25 or more fr
 - **WHEN** a name appears at full ink within one frame while the rest of its scene stands
 - **THEN** `check-picture` refuses a pop that names the text
 
+#### Scenario: A slab that joins its stack
+
+- **WHEN** a slab eases down onto a stack of like slabs and is then drawn as part of the stack
+- **THEN** `check-picture` refuses no pop for it
+
 ### Requirement: A stage cut is the one place where marks may change at once
 
-A frame SHALL be a stage cut for a scene when at least 35% of the scene's marks at ink level 60 or more, counted or weighed by their ink, vanish or appear within it. The audit SHALL NOT follow a mark across a stage cut, and SHALL report no pop in it or as the scene enters or leaves the picture.
+A frame SHALL be a stage cut for a scene when at least 35% of the scene's marks at ink level 60 or more, counted or weighed by their ink, vanish or appear within it, or when the composition declares a cut of the scene in it. The audit SHALL NOT follow a mark across a stage cut, and SHALL report no pop in it or as the scene enters or leaves the picture.
 
 #### Scenario: A stage handed to the next on a word
 
 - **WHEN** 36 of a scene's 41 firm marks vanish within one frame while a large frame of the scene stays
 - **THEN** the audit reports no pop for them
+
+#### Scenario: A cut the composition declares
+
+- **WHEN** one name gives way to another on the word where the composition declares a stage cut of its scene
+- **THEN** the audit reports no pop for either
 
 #### Scenario: A mark beside a standing picture
 

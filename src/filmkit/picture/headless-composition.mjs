@@ -293,8 +293,9 @@ export function canvasStandIn(deliver, faces = null) {
  * Returns `palette`, the film's colours; `render(t, onPaint)`, which renders the frame at t, hands each of its paints
  * to `onPaint` and returns the layout film.js publishes; `framed`, whether film.js defines a camera `cameraOf`;
  * `camera(segment, t)`, that camera of a segment at t; `origin()`, called while a paint is handed over, the line of
- * film.js that drew it, as `film.js:<line>`, or null; and `module(origin)`, the module of the bundle that holds such a
- * line, or null.
+ * film.js that drew it, as `film.js:<line>`, or null; `module(origin)`, the module of the bundle that holds such a
+ * line, or null; and `declaredCuts()`, the stage cuts film.js has declared for each scene so far, in its own
+ * `stageCuts` map of scene to the times of its cuts, as a Map of sets, empty for a composition that keeps none.
  *
  * The origin is the innermost line of a scene's own code on the call stack, rather than a helper that scenes share:
  * a line in a scene's body, `scenes["NN"] = function`, or in a module the bundle places in a folder below `scenes/`,
@@ -382,6 +383,14 @@ export function openComposition(timeline, { faces = null } = {}) {
     module(origin) {
       const line = Number(/^film\.js:(\d+)$/.exec(origin ?? "")?.[1]);
       return (line && moduleOfLine[line - 1]) || null;
+    },
+    declaredCuts() {
+      // The map lives in the composition's realm, so it is read by its entries, not by its class.
+      const cuts = vm.runInContext(
+        'typeof stageCuts !== "undefined" && stageCuts && typeof stageCuts.entries === "function" ? stageCuts : null',
+        context,
+      );
+      return new Map(cuts ? [...cuts.entries()].map(([scene, at]) => [scene, new Set(at)]) : []);
     },
   };
 }

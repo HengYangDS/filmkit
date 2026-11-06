@@ -259,6 +259,37 @@ test("a paint is traced to the scene's own line that called a shared helper, wit
     ]);
     assert.equal(composition.module(lineOf("  ctx.stroke();")), "picture/film/drawing/rings.js");
     assert.equal(composition.module(null), null);
+    // A composition that keeps no stageCuts declares none.
+    assert.deepEqual([...composition.declaredCuts()], []);
+  } finally {
+    process.chdir(SAMPLE);
+  }
+});
+
+test("the stage cuts a composition declares are read from its own stageCuts map", async () => {
+  const root = await scratchFolder();
+  await mkdir(join(root, "picture"));
+  await writeFile(
+    join(root, "picture/film.js"),
+    [
+      "var ctx = document.getElementById('picture').getContext('2d');",
+      "var P = {};",
+      "var stageCuts = new Map();",
+      "window.renderFrame = (t) => {",
+      "  if (t >= 1) stageCuts.set('02', new Set([...(stageCuts.get('02') ?? []), 1.25]));",
+      "};",
+      "",
+    ].join("\n"),
+  );
+  process.chdir(root);
+  try {
+    const composition = openComposition({});
+    assert.deepEqual([...composition.declaredCuts()], []);
+    composition.render(2);
+    assert.deepEqual(
+      [...composition.declaredCuts()].map(([scene, at]) => [scene, [...at]]),
+      [["02", [1.25]]],
+    );
   } finally {
     process.chdir(SAMPLE);
   }

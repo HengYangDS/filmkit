@@ -10,12 +10,15 @@
  * and nearly the same size with each axis's two edges shifting together, or when it grew, shrank or was redrawn, in
  * place or while it moved: once the shift both edges of each axis share is taken out the boxes overlap by half the
  * smaller box. Its motion is the centre's shift, or that shared shift, which moves within reach; a stroke drawn on may
- * grow at any pace. A followed mark
- * changes its velocity within one frame by no more than the turn or its own speed, a mark too small to be seen grows
- * into or shrinks from only a mark small across, and a text whose words change continues a text that moved whole.
+ * grow at any pace, and a pair that holds one end of one of its drawn pieces exactly where it stood grows or turns from
+ * that end and does not travel, however its box changes. A followed mark changes its velocity within one frame by no
+ * more than the turn or its own speed, a mark too small to be seen grows into or shrinks from only a mark small across,
+ * and a text whose words change continues a text that moved whole.
  *
  * A frame is a stage cut for a scene when a CUT share of the scene's firm marks, counted or weighed by their ink, vanish
- * or appear in it; no mark is followed across a cut, and a scene's first and last frames are cuts. */
+ * or appear in it, or when the composition declares a cut of the scene in it; no mark is followed across a cut, and a
+ * scene's first and last frames are cuts. A mark that appears or vanishes pops only by the pieces it brings or takes:
+ * those that no like mark of the other frame holds in place, together at least POP across. */
 import { leastCostAssignment } from "./assignment.mjs";
 
 /** The viewer's thresholds: ink levels, pixels per second at 1080p, shares and pixels across. */
@@ -78,6 +81,16 @@ function wholeMove(p, c) {
   return together(0) && together(1) ? d : null;
 }
 
+/* Whether two marks hold one end of one of their drawn pieces exactly where it stood: a mark drawn on, or turned, from
+ * that end. Pieces are compared in their order, as a composition draws them. */
+const anchored = (p, c) =>
+  p.ends.some((ends, i) =>
+    ends.some((a, k) => {
+      const b = c.ends[i]?.[k];
+      return b !== undefined && Math.abs(a[0] - b[0]) <= 0.01 && Math.abs(a[1] - b[1]) <= 0.01;
+    }),
+  );
+
 /* A growth: a mark that grows, shrinks or is redrawn, in place or while it moves. Once the shift both edges of each axis
  * share is taken out the boxes overlap by half the smaller box. Its motion is that shared shift. */
 function growth(p, c) {
@@ -90,10 +103,12 @@ function growth(p, c) {
   return overlap(moved, c.screen) >= 0.5 * Math.min(area(moved), area(c.screen)) - 4 ? s : null;
 }
 
-/** A follower of the marks of successive frames, dt seconds apart. `frame(t, marks)` takes each frame's marks, each
- * {scene, kind, text, width, level, screen}, in order; `finish()` returns what it found: the halts, starts, races and
- * pops, each with its time, mark and speeds, and for each scene the fastest glide (a text, or a mark more than DOT
- * across) and flow (a smaller mark) with their times. */
+/** A follower of the marks of successive frames, dt seconds apart. `frame(t, marks, declared)` takes each frame's
+ * marks, each {scene, kind, text, width, level, screen, pieces}, in order, `pieces` the boxes and `ends` the first and
+ * last points of the drawn subpaths of a stroke or fill, and the scenes whose stage cut the composition declares in
+ * that frame; `finish()` returns what it found: the halts, starts, races and pops, each with its time, mark and speeds,
+ * and for each scene the fastest glide (a text, or a mark more than DOT across) and flow (a smaller mark) with their
+ * times. */
 export function follower(dt, v = VIEWER) {
   const reach = v.REACH * dt,
     unfollowed = 4 * v.TURN * dt;
@@ -118,8 +133,11 @@ export function follower(dt, v = VIEWER) {
   function candidate(p, c, motion) {
     const [small, large] = across(p.screen) < across(c.screen) ? [p, c] : [c, p];
     if (across(small.screen) < v.SEEN && Math.min(...dims(large.screen)) > 2 * v.SEEN) return null;
-    const d = motion(p, c);
-    if (!d || Math.hypot(...d) > reach) return null;
+    const shift = motion(p, c);
+    if (!shift || Math.hypot(...shift) > reach) return null;
+    // A pair that holds one end of a drawn piece where it stood turns or grows from it: its box may flip as a piece
+    // turns through that end, which is no motion of the mark.
+    const d = anchored(p, c) ? [0, 0] : shift;
     if (p.d && Math.hypot(d[0] - p.d[0], d[1] - p.d[1]) > Math.max(v.TURN * dt, Math.hypot(...p.d)))
       return null;
     const edges = p.edges ?? [0, 0, 0, 0];
@@ -262,11 +280,13 @@ export function follower(dt, v = VIEWER) {
     if (speed >= v.REST) record(c.scene, t, speed, c);
   }
 
-  function frame(t, raw) {
+  function frame(t, raw, declared = []) {
     const marks = raw.map((m) => ({
       ...m,
       text: m.text ?? "",
       width2: Math.round((m.width ?? 0) * 2),
+      pieces: m.pieces ?? [m.screen],
+      ends: m.ends ?? [],
     }));
     if (previous === null) {
       marks.forEach(begin);
@@ -276,6 +296,7 @@ export function follower(dt, v = VIEWER) {
     const { pairs, matched, used } = match(marks);
     const cut = cuts(marks, matched, used),
       next = new Map();
+    for (const scene of declared) cut.add(scene);
     for (const [c, p, d] of pairs)
       if (cut.has(c.scene)) begin(c);
       else judge(t, c, p, d, next);
@@ -284,15 +305,23 @@ export function follower(dt, v = VIEWER) {
     waiting = next;
     const before = new Set(previous.map((p) => p.scene)),
       after = new Set(marks.map((c) => c.scene));
-    const pops = (list, kept, way, present) => {
+    // The pieces of a mark that no like mark of the other frame holds in place, to 2 px: what it brings or takes.
+    const near = (a, b) => a.every((x, k) => Math.abs(x - b[k]) <= 2);
+    const brought = (m, others) => {
+      const like = likeOf(m),
+        standing = others.filter((o) => likeOf(o) === like && o.width2 === m.width2);
+      return m.pieces.filter((a) => !standing.some((o) => o.pieces.some((b) => near(a, b))));
+    };
+    const pops = (list, kept, way, present, others) => {
       for (const m of list) {
-        if (kept.has(m) || m.level < v.FIRM || across(m.screen) < v.POP) continue;
+        if (kept.has(m) || m.level < v.FIRM) continue;
         if (cut.has(m.scene) || !present.has(m.scene)) continue;
+        if (brought(m, others).reduce((n, b) => n + across(b), 0) < v.POP) continue;
         found.pops.push(row(t, m, { way, level: m.level }));
       }
     };
-    pops(marks, matched, "in", before);
-    pops(previous, used, "out", after);
+    pops(marks, matched, "in", before, previous);
+    pops(previous, used, "out", after, marks);
     for (const c of marks) if (!matched.has(c)) begin(c);
     previous = marks;
   }

@@ -35,6 +35,7 @@ A mark is any paint a scene draws at ink level 25 or more, captions apart, with 
    - **a growth:** a mark that grows, shrinks or redraws in place or while it moves. Once the shift both edges of each axis share is taken out, the boxes overlap by half the smaller box. Its motion is that shared shift, which, like every motion, stays within 4,500 px/s; its edges may grow faster, as a stroke drawn on does.
 4. **Limits.** A followed mark changes its velocity within one frame by no more than 1,200 px/s or its own speed, whichever is larger. A mark under 6 px across grows into, or shrinks from, only a mark that is under 12 px across its narrower side.
 5. **Words that change.** A text whose words change continues a text of its scene by a whole move, as a counter does.
+6. **A fixed end.** A pair that holds one end of one of its drawn subpaths exactly (to 0.01 px) where it stood grows or turns from that end and does not travel, however its box changes: a bracket's moving end sliding through its fixed end flips the box, which is no motion of the mark.
 
 The probe's nearest-centre rule produced four kinds of event that the films do not show, found by checking each kind at its frame on the three films:
 
@@ -43,6 +44,12 @@ The probe's nearest-centre rule produced four kinds of event that the films do n
 - **Jumps between like marks.** A dot that vanished was paired with a like dot appearing 73 px away, as a start and a race. A mark at rest that is predicted to stay cannot reach a mark that far within the turn limit.
 - **Swapped identities.** A list of rules halting in step was rotated, the top rule paired with the middle one, so a halt was reported where none happened. Matching by the least total miss keeps each mark with itself.
 
+The repaired essentials composition, whose motion follows these rules by design, showed three more patterns that the gate reported and a viewer does not see, each checked at its frame:
+
+- **Pieces that join or leave a like mark.** A slab that eases down and joins its stack, a bracket's second end entering by size and a line drawn on from a point change a mark's box or make a new mark of its pieces, which read as pops. A pop is judged by the pieces it brings or takes, its drawn subpaths that no like mark of the other frame holds in place within 2 px, together 12 px or more across.
+- **A turn through a fixed end.** A bracket shrinking through its fixed end, as the late start's bracket does when it moves earlier, flips its box from one side of the end to the other, which read as a halt and a start. The fixed end rule above keeps it still.
+- **Declared stage cuts.** Marks that give way to others on a word, where the composition declares a stage cut, were pops when the change kept most of the scene's ink. The gate reads the composition's own `stageCuts` map (below).
+
 The alternatives were:
 
 - **Greedy matching by the predicted position.** A halting list, or two series drawn on one above the other, then traded identities, which the optimal assignment does not do.
@@ -50,7 +57,7 @@ The alternatives were:
 
 ### A stage cut counts marks as well as ink, arriving as well as leaving
 
-A frame is a stage cut for a scene when at least 35% of the scene's firm marks, at ink level 60 or more, vanish or appear in it, counted or weighed by their ink (box area times ink level). The 35% is the brief's. Counting only the ink that vanished, as the probe does, misses most of the films' designed cuts on a word:
+A frame is a stage cut for a scene when at least 35% of the scene's firm marks, at ink level 60 or more, vanish or appear in it, counted or weighed by their ink (box area times ink level), or when the composition declares a cut of the scene in it. The 35% is the brief's. The three films keep a global `stageCuts` map of each scene to the times of the cuts it declares on its words as it renders, which the headless composition reads; a composition without one is judged by the shares alone. Counting only the ink that vanished, as the probe does, misses most of the films' designed cuts on a word:
 
 - **Handoffs.** A stage hands over to the next while a large frame stays. In ETHOS 06, 36 of 41 firm marks leave at once, which is 19% of the ink. In DDWG 01, 13 of 32 leave, which is 14%.
 - **Arrivals.** A stage arrives whole, as at ETHOS 02 with 51% of the ink after the cut.
@@ -65,9 +72,9 @@ Each limit below was measured by running the gate's follower without it on the s
 - **The eased end.** A halt whose last step is under half the step before it, or a start whose next step is more than twice its own, is the end of an eased move sampled at 30 fps: the mark slows or gathers speed over frames, and the frame step alone crosses the bounds. Without this rule the gate also refuses 2–11 halts and 1–133 starts per edition (46 starts on ETHOS Chinese, 65 and 133 on DDWG), all of them eased.
 - **The turn limit.** A followed mark changes its velocity within one frame by at most 1,200 px/s, or its own speed when that is larger. The followed marks change their velocity by at most 69–306 px/s at the 99th percentile and 297–745 px/s at the 99.9th. The few larger changes, up to 3,202 px/s, belong to a ticker that sweeps its values and to marks at speed, which the larger own speed admits. Without the limit a mark jumps to a like mark that appears elsewhere: 2–13 more halts and 2–13 more starts per edition. The limit also leaves 9–12 pops per edition, where a mark is redrawn elsewhere at once, as a highlight bar that jumps to its next row, which a viewer sees as a pop.
 - **The 6 px size.** A move is judged only on marks 6 px or more across. The dots entering and leaving by size are under 3 px across when they wrap, and the films' flow dots that a viewer follows are 8–10 px. Without the size the gate reports the wrapping: 18–19 more races on the essentials film, 4 and 3 more halts on ETHOS, and 27 more halts and 25–26 more starts on DDWG.
-- **The stage cut.** Without the cut, every designed stage change is a pop: 1,240–4,839 pops per edition in place of 53–274.
+- **The stage cut.** Without the cut, every designed stage change is a pop: 1,240–4,839 pops per edition in place of 18–228.
 - **The reach.** 4,500 px/s, the probe's, bounds a mark's shift; its edges may grow faster, as a stroke drawn on does.
-- **What the films show.** The 69 halts and 69 starts on the committed compositions fall from or rise to 63–1,088 px/s, 28 and 29 of them under 300 px/s, the pace of a flow. The ETHOS round-9 composition, which the owner watched, holds 27 halts and 29 starts of flow dots in English, every halt within 0.25 s of a word's end. After the voice clock eases to rest, 6 and 5 remain. The races peak at 903–3,951 px/s, 583 of the 607 under 2,000 px/s.
+- **What the films show.** The 58 halts and 59 starts on the committed compositions fall from or rise to 64–1,088 px/s, 20 of each under 300 px/s, the pace of a flow. The ETHOS round-9 composition, which the owner watched, holds 27 halts and 29 starts of flow dots in English, every halt within 0.25 s of a word's end. After the voice clock eases to rest, 6 and 5 remain. The races peak at 903–3,951 px/s, 582 of the 606 under 2,000 px/s. The essentials film's repaired composition, whose flows move at 160 px/s and whose glides ease in voice time, holds no finding.
 - **Calibration evidence.** The per-film counts are in tasks.md 1.4's evidence and in the Changelog.
 
 ### A finding names the scene line that drew it
