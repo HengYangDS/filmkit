@@ -32,7 +32,7 @@ A mark is any paint a scene draws at ink level 25 or more, captions apart, with 
 2. **Like marks.** The other marks of each group of like marks (scene, kind and words) are matched by the assignment of least total miss. A mark's miss is the distance, summed over the four edges, between its box and where the previous mark's own edge velocities put it. Leaving a mark unfollowed costs four times the turn limit.
 3. **A pair qualifies** when it is one of these:
    - **a whole move:** the same line width and nearly the same size (2 px or 5%), each axis's two edges shifting together within 2 px or a fifth of the axis's shift; its motion is its centre's shift;
-   - **a growth:** a mark that grows, shrinks or redraws in place or while it moves. No edge moves more than 4,500 px/s, and once the shift both edges of each axis share is taken out, the boxes overlap by half the smaller box. Its motion is that shared shift.
+   - **a growth:** a mark that grows, shrinks or redraws in place or while it moves. Once the shift both edges of each axis share is taken out, the boxes overlap by half the smaller box. Its motion is that shared shift, which, like every motion, stays within 4,500 px/s; its edges may grow faster, as a stroke drawn on does.
 4. **Limits.** A followed mark changes its velocity within one frame by no more than 1,200 px/s or its own speed, whichever is larger. A mark under 6 px across grows into, or shrinks from, only a mark that is under 12 px across its narrower side.
 5. **Words that change.** A text whose words change continues a text of its scene by a whole move, as a counter does.
 

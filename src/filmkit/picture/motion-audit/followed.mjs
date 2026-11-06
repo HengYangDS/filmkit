@@ -4,10 +4,10 @@
 import { round } from "./report.mjs";
 
 const KINDS = { halts: "halt", starts: "start", races: "race", pops: "pop" };
-const centre = (b) => [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
 
 /* Trace each event to the line that drew its mark: render its frame again and take the origin of the paint of its
- * scene, kind and words nearest its box. A pop-out's mark stands in the frame before it. */
+ * scene, kind and words whose box stands nearest the event's, edge by edge, so a mark is told from another of its kind
+ * around the same centre. A pop-out's mark stands in the frame before it. */
 function traceAll(film, markOf, dt, found) {
   const frames = new Map();
   for (const [list, kind] of Object.entries(KINDS))
@@ -22,12 +22,10 @@ function traceAll(film, markOf, dt, found) {
     film.render(t, (paint) => {
       const mark = markOf(paint);
       if (!mark?.scene) return;
-      const [x, y] = centre(mark.screen);
       let traced;
       events.forEach((e, i) => {
         if (e.scene !== mark.scene || e.kind !== mark.kind || e.text !== (mark.text ?? "")) return;
-        const [ex, ey] = centre(e.box),
-          distance = Math.hypot(x - ex, y - ey);
+        const distance = mark.screen.reduce((n, v, k) => n + Math.abs(v - e.box[k]), 0);
         if (distance >= best[i]) return;
         best[i] = distance;
         traced ??= film.origin();

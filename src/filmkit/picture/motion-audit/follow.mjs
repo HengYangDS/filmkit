@@ -8,8 +8,9 @@
  * mark's miss being how far its four edges stand from where the previous mark's own edge velocities put them, and
  * leaving a mark unfollowed costing four times the turn. A pair is one mark when it moved whole, at the same line width
  * and nearly the same size with each axis's two edges shifting together, or when it grew, shrank or was redrawn, in
- * place or while it moved: no edge moves beyond reach, and once the shift both edges of each axis share is taken out
- * the boxes overlap by half the smaller box. Its motion is the centre's shift, or that shared shift. A followed mark
+ * place or while it moved: once the shift both edges of each axis share is taken out the boxes overlap by half the
+ * smaller box. Its motion is the centre's shift, or that shared shift, which moves within reach; a stroke drawn on may
+ * grow at any pace. A followed mark
  * changes its velocity within one frame by no more than the turn or its own speed, a mark too small to be seen grows
  * into or shrinks from only a mark small across, and a text whose words change continues a text that moved whole.
  *
@@ -77,12 +78,10 @@ function wholeMove(p, c) {
   return together(0) && together(1) ? d : null;
 }
 
-/* A growth: a mark that grows, shrinks or is redrawn, in place or while it moves. No edge moves beyond reach, and once
- * the shift both edges of each axis share is taken out the boxes overlap by half the smaller box. Its motion is that
- * shared shift. */
-function growth(p, c, reach) {
+/* A growth: a mark that grows, shrinks or is redrawn, in place or while it moves. Once the shift both edges of each axis
+ * share is taken out the boxes overlap by half the smaller box. Its motion is that shared shift. */
+function growth(p, c) {
   const d = [0, 1, 2, 3].map((k) => c.screen[k] - p.screen[k]);
-  if (Math.max(...d.map(Math.abs)) > reach) return null;
   const shared = (a, b) =>
     Math.sign(a) === Math.sign(b) ? Math.sign(a) * Math.min(Math.abs(a), Math.abs(b)) : 0;
   const s = [shared(d[0], d[2]), shared(d[1], d[3])];
@@ -187,8 +186,7 @@ export function follower(dt, v = VIEWER) {
         pairs.push([c, p, [0, 0]]);
       }
     }
-    const motion = (p, c) =>
-      (p.width2 === c.width2 ? wholeMove(p, c) : null) ?? growth(p, c, reach);
+    const motion = (p, c) => (p.width2 === c.width2 ? wholeMove(p, c) : null) ?? growth(p, c);
     for (const [key, cur] of now) pairUp(cur, before.get(key) ?? [], motion, pairs, matched, used);
     // A text whose words change continues a text of its scene that moved whole, as a counter does.
     const texts = (list, set) =>

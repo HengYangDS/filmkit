@@ -16,8 +16,9 @@ const AUDIT_MOTION = fileURLToPath(
 /* Scene 01 runs to 6 s and scene 02 from then on; every motion is set by the frame's number at 30 fps, n. A dot flows
  * along a link at 300 px/s, entering and leaving by size; a dot moves at 240 px/s, halts dead and sets off again; a
  * name eases 440 px across 0.8 s; a name races 600 px in 0.4 s; a counter changes its words in place; a name pops in
- * and out; a card glides while a link draws on from it. Scene 02 hands five names to five others below them in one
- * frame. */
+ * and out; a card glides while a link draws on from it; a rule is drawn on in place, 1,200 px in eight frames, its end
+ * at up to 225 px a frame; a larger dot around a standing dot vanishes at frame 120. Scene 02 hands five names to five
+ * others below them in one frame. */
 const MOTIONS = [
   'var P = { ground: "#0F1519", ink: "#ECE8DF" };',
   'var ctx = document.getElementById("picture").getContext("2d");',
@@ -68,6 +69,9 @@ const MOTIONS = [
   "  ctx.closePath();",
   "  ctx.fill();",
   "  if (n > 75) rule(x + 120, 345, x + 120, 345 + 200 * Math.min(1, (n - 75) / 30));",
+  "  if (n >= 170) rule(300, 1000, 304 + 1200 * ease((n - 170) / 8), 1000);",
+  "  dot(1700, 900, 8);",
+  "  if (n < 120) dot(1700, 900, 14);",
   "};",
   'scenes["02"] = function (t) {',
   "  const n = Math.round(t * 30);",
@@ -132,11 +136,14 @@ test("the motion audit follows every mark and finds each motion a viewer sees as
   assert.ok(followed.races.length > 0);
   assert.ok(followed.races.every((v) => v.text === "Race" && v.t > 4 && v.t < 4.4));
   assert.ok(followed.races.every((v) => v.speed >= 900 && v.origin === lineOf('"Race"')));
-  // The name pops in at frame 150 and out at frame 165; the scene's other marks, the flowing dot, the counter and the
-  // link drawn on from the gliding card follow on, and scene 02's handover is a stage cut.
+  // The larger dot vanishes at frame 120, named by its own line though the dot it stood around shares its centre, and
+  // the name pops in at frame 150 and out at frame 165; the scene's other marks, the flowing dot, the counter, the
+  // link drawn on from the gliding card and the rule drawn on in place follow on, and scene 02's handover is a stage
+  // cut.
   assert.deepEqual(
     followed.pops.map((v) => [at(v.t), v.way, v.kind, v.text, v.origin]),
     [
+      [4, "out", "fill", "", lineOf("dot(1700, 900, 14)")],
       [5, "in", "text", "Pop", lineOf('"Pop"')],
       [5.5, "out", "text", "Pop", lineOf('"Pop"')],
     ],
@@ -147,12 +154,13 @@ test("the motion audit follows every mark and finds each motion a viewer sees as
     [
       ["halt", "01", 2.07, lineOf("dot(1000")],
       ["start", "01", 3.07, lineOf("dot(1000")],
+      ["pop", "01", 4, lineOf("dot(1700, 900, 14)")],
       ["race", "01", 4.07, lineOf('"Race"')],
       ["pop", "01", 5, lineOf('"Pop"')],
       ["pop", "01", 5.5, lineOf('"Pop"')],
     ],
   );
-  const race = followed.findings[2];
+  const race = followed.findings[3];
   assert.equal(race.speed, Math.max(...followed.races.map((v) => v.speed)));
   assert.ok(race.speed > 2000 && race.frames === followed.races.length);
   assert.deepEqual([race.paints, race.texts], [["text"], ["Race"]]);
@@ -164,7 +172,7 @@ test("the motion audit follows every mark and finds each motion a viewer sees as
     halts: 1,
     starts: 1,
     races: followed.races.length,
-    pops: 2,
+    pops: 3,
   });
 });
 
