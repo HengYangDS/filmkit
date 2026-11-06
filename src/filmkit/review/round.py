@@ -37,6 +37,7 @@ from typing import NamedTuple
 
 import filmkit.repository as repository
 import filmkit.review.prompts as round_prompts
+import filmkit.review.record as review_record
 import filmkit.review.set_aside as set_aside
 from filmkit.delivery.packaging import BOUND_FILM
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
@@ -112,6 +113,9 @@ def review_records(round_dir: Path) -> list[ProductionReview]:
     exact reviewed media, script and composition hashes, the declared scores and their
     mean, every finding and the human-listening state. Both reviews must cover the
     current delivered films, score exactly the declared dimensions and report their mean.
+    For a film that declares review levels, the record carries each level's verdict and each
+    sentence's, and a review whose levels do not pass or that leaves a sentence unjudged is
+    refused (`filmkit.review.record`).
     """
     records = []
     for code in CODES:
@@ -131,6 +135,19 @@ def review_records(round_dir: Path) -> list[ProductionReview]:
             msg = f"{code}: reviewed media differ from the current delivered films"
             raise ReviewError(msg)
         scores = reviewed_scores(code, entry)
+        problems = review_record.level_problems(entry, scores, entry["findings"])
+        if problems:
+            msg = f"{code}: the review's levels do not pass: " + "; ".join(problems)
+            raise ReviewError(msg)
+        problems = review_record.sentence_problems(entry, entry["findings"], edition)
+        if problems:
+            msg = f"{code}: the review does not judge every sentence: " + "; ".join(problems)
+            raise ReviewError(msg)
+        judged = (
+            {}
+            if review_record.LEVELS is None
+            else {"levels": entry["levels"], "sentences": entry["sentences"]}
+        )
         target = edition.production_review
         record = {
             "schema_version": SCHEMA_VERSION,
@@ -143,6 +160,7 @@ def review_records(round_dir: Path) -> list[ProductionReview]:
             "scores": scores,
             "overall": overall(scores),
             "findings": entry["findings"],
+            **judged,
             "human_listening": {
                 "state": "not_performed",
                 "basis": HUMAN_LISTENING,

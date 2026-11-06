@@ -61,6 +61,7 @@ def test_bind_names_the_language_entry_and_each_packaged_member(root, put):
         review_round.bind(root / "binding.json")
 
 
+@pytest.mark.usefixtures("unleveled")
 def test_record_writes_reviews_that_verify_film_accepts(root, review, put, capsys):
     for code in CODES:
         put(root / Edition(code).script, f"{code} script")

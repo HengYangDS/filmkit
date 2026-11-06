@@ -179,6 +179,7 @@ def release(tmp_path, monkeypatch, films) -> Release:
     return published
 
 
+@pytest.mark.usefixtures("unleveled")
 def test_a_faithful_rebuild_passes_and_reports_every_layer(release):
     report = release.compare()
     assert report["verdict"] == "pass"
@@ -201,6 +202,7 @@ def test_a_faithful_rebuild_passes_and_reports_every_layer(release):
     assert uhd["verdict"] == "pass"
 
 
+@pytest.mark.usefixtures("unleveled")
 def test_the_report_is_written_unless_read_only(release, capsys):
     reproduction.main([])
     written = json.loads((release.root / reproduction.REPORT).read_text())
@@ -211,6 +213,7 @@ def test_the_report_is_written_unless_read_only(release, capsys):
     assert "pass" in capsys.readouterr().out
 
 
+@pytest.mark.usefixtures("unleveled")
 def test_without_a_floor_the_comparison_reports_the_lowest_frames_and_does_not_pass(release):
     shutil.copyfile(release.films["picture"], production.Edition("zh").film("uhd"))
     release.record(floors=None)

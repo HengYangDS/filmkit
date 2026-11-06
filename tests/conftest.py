@@ -132,6 +132,20 @@ def pytest_terminal_summary(terminalreporter) -> None:
             terminalreporter.write_line(f"skipped: {test}")
 
 
+@pytest.fixture
+def unleveled(monkeypatch) -> None:
+    """The sample film without its review levels, as a film that declares none reads: its
+    prompts, records and verification keep the overall and dimension floors alone."""
+    import filmkit.review.prompts as review_prompts
+    import filmkit.review.record as review_record
+
+    review = review_prompts.FILM.review.model_copy(update={"levels": None})
+    monkeypatch.setattr(review_record, "LEVELS", None)
+    monkeypatch.setattr(
+        review_prompts, "FILM", review_prompts.FILM.model_copy(update={"review": review})
+    )
+
+
 def write_pcm(path, pcm, rate) -> None:
     """Write mono 16-bit PCM as a WAV file, as the narration receipts record it."""
     with wave.open(str(path), "wb") as audio:

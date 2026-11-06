@@ -293,7 +293,9 @@ def verify_review(
     """Accept only a current review of both delivered formats above threshold.
 
     The record is the edition's own unless a published one is named. A review covers each
-    film by its name and bytes, and its report lies beside it under the same name.
+    film by its name and bytes, and its report lies beside it under the same name. For a film
+    that declares review levels, every level passes and every sentence of the current timeline
+    is judged (`filmkit.review.record`).
     """
     path = record or edition.production_review
     review = repository.read(path)
@@ -324,6 +326,14 @@ def verify_review(
     if any(finding["severity"] == "material" for finding in review["findings"]):
         msg = "Review records an unresolved material finding"
         raise VerificationError(msg)
+    problems = review_record.level_problems(review, scores, review["findings"])
+    if problems:
+        msg = "Review levels do not pass: " + "; ".join(problems)
+        raise VerificationError(msg)
+    problems = review_record.sentence_problems(review, review["findings"], edition)
+    if problems:
+        msg = "Review does not judge every sentence: " + "; ".join(problems)
+        raise VerificationError(msg)
     # The report lies beside its record wherever the record was placed.
     report = path.with_suffix(".md")
     if not report.is_file() or repository.sha(report) != review["report"]["sha256"]:
@@ -334,6 +344,11 @@ def verify_review(
         "reviewer": review["reviewer"],
         "overall": review["overall"],
         "minimum_dimension": min(scores.values()),
+        **(
+            {}
+            if review_record.LEVELS is None
+            else {"levels": {name: v["verdict"] for name, v in review["levels"].items()}}
+        ),
         "human_listening": review["human_listening"],
     }
 

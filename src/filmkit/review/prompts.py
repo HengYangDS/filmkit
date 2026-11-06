@@ -12,6 +12,12 @@ be verified, or, for a film's first production review, that no earlier productio
 it cites no previous review then. A template may instead cite `{previous}` and `{findings}`
 itself, and is then filled only from a previous round.
 
+A film that declares review levels gets prompts only when its template cites `{levels}`, which
+states each level with what it asks and, under it, each of its dimensions with what that asks,
+and `{sentences}`, which names the file of the edition's sentences (`filmkit.review.sentences`)
+that the prompts write into the round's directory as sentences-<code>.json, each with its id,
+text and timeline times, for a verdict on every one. A film without levels fills neither.
+
 A round after the first gives each finding of the previous round's reviews one disposition in a
 dispositions file: fixed, with the evidence that its reverification holds; declared, with the
 design that keeps it; or deferred, with its owner and reason (`DISPOSITIONS`). `{dispositions}`
@@ -34,6 +40,7 @@ from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
 from filmkit.review.files import cited, edition_review, present, round_findings, round_number
 from filmkit.review.record import DIMENSIONS
+from filmkit.review.sentences import sentences
 
 # The round's own inputs that each reviewer prompt names.
 ROUND_INPUTS = (
@@ -49,6 +56,8 @@ NOT_DECLARED = "none declared"
 # and the reading occurrence plans.
 CONCEPT_DIMENSION = "concept_fidelity"
 CONTRACT_FIELDS = ("concepts", "readings")
+# The prompt fields that a film with review levels cites: the levels and the sentences file.
+LEVEL_FIELDS = ("levels", "sentences")
 # The fields that cite the previous round's review itself, which a first round cannot fill.
 PREVIOUS_FIELDS = ("previous", "findings")
 FIRST_ROUND = (
@@ -92,6 +101,44 @@ def contract_gaps(template: str, dimensions: dict[str, str]) -> list[str]:
     if CONCEPT_DIMENSION not in dimensions:
         gaps.append(f"review.dimensions has no {CONCEPT_DIMENSION}")
     return gaps
+
+
+def level_gaps(template: str) -> list[str]:
+    """The level fields a film with review levels leaves out of its template; none without."""
+    if FILM.review.levels is None:
+        return []
+    fields = template_fields(template)
+    return [
+        f"{FILM.review.prompt} never cites {{{name}}}"
+        for name in LEVEL_FIELDS
+        if name not in fields
+    ]
+
+
+def levels_text() -> str:
+    """`{levels}`: each level with what it asks, and under it each of its dimensions with what
+    that dimension asks, or "none declared"."""
+    if FILM.review.levels is None:
+        return NOT_DECLARED
+    lines = []
+    for name, level in FILM.review.levels.items():
+        lines.append(f"- {name}: {level.asks}")
+        lines += [f"  - {dimension}: {DIMENSIONS[dimension]}" for dimension in level.dimensions]
+    return "\n".join(lines)
+
+
+def write_sentences(out_dir: Path) -> dict[str, str]:
+    """Write each edition's sentences into the round's directory, and each edition's
+    `{sentences}`: the file as the prompts cite it, or "none declared" without levels."""
+    if FILM.review.levels is None:
+        return dict.fromkeys(CODES, NOT_DECLARED)
+    found = {}
+    for code in CODES:
+        path = out_dir / f"sentences-{code}.json"
+        rows = sentences(repository.read(Edition(code).timeline), code)
+        repository.write(path, {"edition": code, "sentences": rows})
+        found[code] = cited(path)
+    return found
 
 
 def declared_seconds(policy: dict, key: str) -> str:
@@ -198,6 +245,7 @@ def prompt_context(out_dir: Path, previous: Path | None, changes: Path | None) -
         "dimensions": "\n".join(
             f"{index}. {name}: {text}" for index, (name, text) in enumerate(DIMENSIONS.items(), 1)
         ),
+        "levels": levels_text(),
     }
 
 
@@ -353,11 +401,17 @@ def prompts(
     never a score to inherit. Nothing is written unless both editions' films, the previous
     reviews when a previous round is named and the round's inputs exist, a first round's
     template cites no previous review, a later round disposes of every previous finding, and the
-    review configuration keeps the concept contract the film declares (`contract_gaps`).
+    review configuration keeps the concept contract the film declares (`contract_gaps`) and the
+    levels it declares (`level_gaps`). For a film with levels, each edition's sentences are
+    written beside the prompts (`write_sentences`).
     """
     gaps = contract_gaps(TEMPLATE, DIMENSIONS)
     if gaps:
         msg = "the review omits the concept contract the film declares: " + "; ".join(gaps)
+        raise ReviewError(msg)
+    gaps = level_gaps(TEMPLATE)
+    if gaps:
+        msg = "the review omits the levels the film declares: " + "; ".join(gaps)
         raise ReviewError(msg)
     unfilled = sorted(template_fields(TEMPLATE).intersection(PREVIOUS_FIELDS))
     if previous is None and unfilled:
@@ -370,6 +424,7 @@ def prompts(
     stated = stated_dispositions(previous, dispositions)
     present([out_dir / name for name in ROUND_INPUTS])
     context = prompt_context(out_dir, previous, changes)
+    listed = write_sentences(out_dir)
     texts = {}
     for code in CODES:
         edition = Edition(code)
@@ -381,6 +436,7 @@ def prompts(
             **context,
             **previous_context(previous, code),
             dispositions=stated[code],
+            sentences=listed[code],
             language=edition.language,
             code=code,
             other=other,

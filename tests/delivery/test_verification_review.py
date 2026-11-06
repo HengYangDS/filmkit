@@ -54,6 +54,7 @@ def current_review(tmp_path, monkeypatch):
     return check, record, files
 
 
+@pytest.mark.usefixtures("unleveled")
 def test_a_published_review_is_read_beside_its_report_wherever_it_lies(current_review, tmp_path):
     _, record, files = current_review
     # A release names each edition's record and report after the edition's file prefix.
@@ -73,6 +74,7 @@ def test_a_published_review_is_read_beside_its_report_wherever_it_lies(current_r
         delivery_verification.verify_review(edition, films, record=published)
 
 
+@pytest.mark.usefixtures("unleveled")
 def test_review_accepts_only_current_media_above_thresholds(current_review):
     check, record, files = current_review
     accepted = check()

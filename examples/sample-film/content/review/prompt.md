@@ -20,7 +20,14 @@ Each edition: exactly {duration} s, 16:9 pure 2D, {fps} fps, UHD master and a ca
 Audio is evaluated automatically: score narration from the soundtrack, your measurements of it, recognition and word timings. Score each dimension 0-100:
 {dimensions}
 
-The overall score is the mean of the dimensions, rounded to one decimal. Every point below 100 is accounted for by a cited finding with its location, observation, impact, repair, reverification and severity (material / minor / note).
+The overall score is the mean of the dimensions, rounded to one decimal. Every point below 100 is accounted for by a cited finding with its location, observation, impact, repair, reverification, severity (material / minor / note) and level.
+
+## Levels
+Judge the film as a first-time viewer by three levels, each as a whole; a strong score in one never makes up for a fault in another. A level passes only when every dimension it holds scores at least the floor and no material finding remains in it:
+{levels}
+
+## Every sentence
+{sentences} lists every sentence of this edition with its id and its start and end in the timeline. Hear each one as speech, at the pace of the narration, and judge it at each level: is it true to the source, understood the first time it is heard, and what a fluent speaker would say? Give every sentence a verdict: "ok", or the ids of the findings that concern it.
 
 ## Output
-Write {out}/{code}-review.md and {out}/review-{code}.json with: {{"reviewer", "editions": {{"{code}": {{"media": [{{"path","sha256"}}], "scores": {{...}}, "overall", "findings": [{{"id","severity","segment","start","end","observation","impact","repair","reverification"}}], "human_listening_checklist": [...]}}}}}}. Put working files under {out}/{code}/.
+Write {out}/{code}-review.md and {out}/review-{code}.json with: {{"reviewer", "editions": {{"{code}": {{"media": [{{"path","sha256"}}], "scores": {{...}}, "overall", "levels": {{"信": {{"verdict": "pass" | "fail", "findings": [ids]}}, "达": {{...}}, "雅": {{...}}}}, "findings": [{{"id","severity","level","segment","start","end","observation","impact","repair","reverification"}}], "sentences": {{"<id>": "ok" | [finding ids]}}, "human_listening_checklist": [...]}}}}}}. Put working files under {out}/{code}/.

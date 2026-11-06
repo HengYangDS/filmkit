@@ -20,6 +20,7 @@ from pydantic import (
     StringConstraints,
     ValidationError,
     field_validator,
+    model_validator,
 )
 
 import filmkit.repository as repository
@@ -171,12 +172,27 @@ class Picture(Declared):
         return fonts
 
 
+class Level(Declared):
+    """One level of a film's review: what it asks of the whole film and the dimensions it holds."""
+
+    asks: Stated
+    dimensions: tuple[Stated, ...] = Field(min_length=1)
+
+
+# The levels a film's review may declare, in the order a viewer meets them: faithful, conveyed,
+# graceful.
+LEVELS = ("信", "达", "雅")
+LevelName = Literal["信", "达", "雅"]
+
+
 class Review(Declared):
     """The reviewer prompt, the verifier's floors, the scored dimensions and the plan readings.
 
     The dimensions keep their record order. The readings file holds the listening plan's
     analyst readings; without one the plan adds none. The clarity floors, one for each edition,
     are what the review's measurement records each voice's clarity against (`review.clarity`).
+    The levels, 信, 达 and 雅 when the film declares them, each hold some of the dimensions,
+    every dimension in exactly one; a review then passes level by level (`review.record`).
     """
 
     prompt: str
@@ -185,6 +201,28 @@ class Review(Declared):
     dimensions: dict[str, str] = Field(min_length=1)
     readings: str | None = None
     clarity_minimum_db: ClarityFloors | None = None
+    levels: dict[LevelName, Level] | None = None
+
+    @model_validator(mode="after")
+    def every_dimension_in_one_level(self) -> Review:
+        """Refuse levels that are not all three, or that miss, repeat or invent a dimension."""
+        if self.levels is None:
+            return self
+        if tuple(self.levels) != LEVELS:
+            message = f"review.levels declares {', '.join(LEVELS)} in this order"
+            raise ValueError(message)
+        held = [name for level in self.levels.values() for name in level.dimensions]
+        problems = [f"{name} stands in no level" for name in self.dimensions if name not in held]
+        problems += [
+            f"{name} stands in two levels" for name in dict.fromkeys(held) if held.count(name) > 1
+        ]
+        problems += [
+            f"{name} is no declared dimension" for name in held if name not in self.dimensions
+        ]
+        if problems:
+            message = "review.levels: " + "; ".join(problems)
+            raise ValueError(message)
+        return self
 
 
 # The longest heard pause a word boundary without a mark may hold, in seconds.

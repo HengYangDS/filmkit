@@ -14,6 +14,7 @@ from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
 
 
+@pytest.mark.usefixtures("unleveled")
 def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
     root, review, put, monkeypatch
 ):
@@ -249,6 +250,7 @@ def round_inputs(root, put, monkeypatch):
     return out
 
 
+@pytest.mark.usefixtures("unleveled")
 def test_a_first_round_states_that_no_earlier_review_exists(root, put, monkeypatch):
     out = round_inputs(root, put, monkeypatch)
     review_round.main(["prompts", "--round", "1"])
@@ -269,6 +271,7 @@ def test_a_first_round_states_that_no_earlier_review_exists(root, put, monkeypat
     assert "floors the film declares: none declared." in (out / "prompt-zh.md").read_text()
 
 
+@pytest.mark.usefixtures("unleveled")
 def test_a_template_that_cites_the_previous_review_needs_a_previous_round(
     root, review, put, monkeypatch
 ):
@@ -299,6 +302,7 @@ def test_a_template_that_cites_the_previous_review_needs_a_previous_round(
     assert "(no findings).\n" in (out / "prompt-en.md").read_text()
 
 
+@pytest.mark.usefixtures("unleveled")
 def test_the_previous_review_field_cites_the_previous_round(root, review, put, monkeypatch):
     out = round_inputs(root, put, monkeypatch)
     previous = root / "build/evidence/reviews/round-0"
@@ -411,6 +415,7 @@ def test_the_dispositions_answer_each_previous_finding_once(root, review, put, m
     assert not list(out.glob("prompt-*.md"))
 
 
+@pytest.mark.usefixtures("unleveled")
 def test_each_edition_s_prompt_states_its_dispositions_in_three_groups(
     root, review, put, monkeypatch
 ):

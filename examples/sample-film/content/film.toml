@@ -80,3 +80,24 @@ picture_and_sync = """\
 deliverable_craft = """\
   cover, credits and metadata name the film and its author; subtitles and transcript match the \
   speech; chapters and player work."""
+
+# The review's three levels, which a first-time viewer judges the whole film by: each asks one
+# thing of the film and holds some of the dimensions, every dimension in one level. A review passes
+# only when each level does, with every dimension it holds at the floor and no material finding.
+[review.levels."信"]
+asks = """\
+  faithful: every statement says what the cited README says, in its order, and each concept keeps \
+  its one rendering and its meaning in both editions."""
+dimensions = ["subject_and_faithfulness", "concept_fidelity"]
+
+[review.levels."达"]
+asks = """\
+  conveyed: a newcomer understands each sentence on first hearing and the picture shows what is \
+  said as it is said."""
+dimensions = ["narration_and_language", "picture_and_sync"]
+
+[review.levels."雅"]
+asks = """\
+  graceful: the words are what a fluent speaker would say, and the cover, credits, files and \
+  player are finished."""
+dimensions = ["deliverable_craft"]
