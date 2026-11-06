@@ -6,7 +6,7 @@ Follow every mark of an edition's picture as a viewer sees it move, refuse the m
 
 ### Requirement: The motion audit follows every mark as a viewer sees it move
 
-The motion audit SHALL follow each mark a scene draws at ink level 25 or more from frame to frame: by moving whole at nearly the same size, or by growing, shrinking or redrawing in place or while it moves, as the like mark of its scene, kind and words that its own motion predicts best. A text whose words change in place SHALL continue. Speeds SHALL be measured in 1080p pixels per second.
+The motion audit SHALL follow each mark a scene draws at ink level 25 or more from frame to frame: by moving whole at nearly the same size, or by growing, shrinking or redrawing in place or while it moves, as the like mark of its scene, kind and words that its own motion predicts best. A text whose words change in place SHALL continue. A mark SHALL rest only where its box and its drawn pieces both stand. Speeds SHALL be measured in 1080p pixels per second.
 
 #### Scenario: A mark drawn at new coordinates in every frame
 
@@ -22,6 +22,26 @@ The motion audit SHALL follow each mark a scene draws at ink level 25 or more fr
 
 - **WHEN** a flow's dot shrinks to nothing at the end of its link as another grows from nothing at its start
 - **THEN** the audit reports no race between them
+
+#### Scenario: A link drawn on from a start that glides
+
+- **WHEN** a link draws on from a start that glides and its tip turns a corner, so its box stops shifting while its start goes on
+- **THEN** the audit reports no halt and no start for it
+
+#### Scenario: A row that grows a piece at its end
+
+- **WHEN** a row of squares glides while a square grows in at its end every ten frames
+- **THEN** the audit reports no halt and no start for the row
+
+#### Scenario: A link that turns a corner as its start rises through it
+
+- **WHEN** a link drawn on from a rising start turns from a vertical stub into a horizontal line within one frame
+- **THEN** the audit follows it as one mark and reports no pop for it
+
+#### Scenario: Outlines that crossfade on a gliding box
+
+- **WHEN** a box's dashed outline gives way to a solid one while the box glides
+- **THEN** the audit reports no pop for either outline
 
 ### Requirement: The picture gate refuses motion a viewer sees as not smooth
 
