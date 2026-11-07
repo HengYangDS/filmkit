@@ -2,10 +2,16 @@
 paths = [
   "src/filmkit/picture/geometry-check.mjs",
   "src/filmkit/delivery/player-check.mjs",
+  "src/filmkit/delivery/player-frames.mjs",
   "src/filmkit/delivery/player-read.mjs",
 ]
 globals = ["browser"]
 reason = "page.evaluate, page.evaluateOnNewDocument and page.waitForFunction run these callbacks in the rendered page, where window, document and CanvasRenderingContext2D are browser globals"
+
+[[environment]]
+paths = ["src/filmkit/delivery/player-page.js"]
+globals = ["browser"]
+reason = "the player page's script runs in each edition's page, where document, location and requestAnimationFrame are browser globals"
 
 [[environment]]
 paths = ["examples/sample-film/picture/film.js"]

@@ -7,7 +7,8 @@
  * its size and duration and decodes at three seek points. The pictures draw the captions, so a player's one track of
  * the edition's cues stays hidden: it embeds the delivered WebVTT, its cues equal the SRT's, it is hidden on every
  * film, and neither the page's controls nor the browser's own can show it. On each version a cue active at its time
- * marks the transcript paragraph that holds it. A chapter button and a transcript time play from their time; the
+ * marks the transcript paragraph that holds it. No switch paints the cover or one flat colour where the film should
+ * be (player-frames.mjs). A chapter button and a transcript time play from their time; the
  * language links lead to the other edition's player and to the entry page; each file the list names carries the size
  * of the member it leads to; no link opens raw text in a tab, and each text file is a download that saves the
  * delivered bytes and leaves the page where it is. */
@@ -16,14 +17,18 @@ import { isDeepStrictEqual } from "node:util";
 
 /* Each edition's page language. */
 export const LANGUAGES = { zh: "zh-CN", en: "en" };
-/* A version or captions switch keeps the time within half a second; a time button has played from its time within
- * two. */
-export const KEPT = 0.5;
+/* A switch of a paused film keeps its time within 0.02 s, as the page sets it exactly; a playing film plays on from
+ * no earlier than SLACK before the time at the click and no later than that time plus the seconds that passed and
+ * SLACK. A time button has played from its time within two seconds. */
+export const KEPT = 0.02,
+  SLACK = 0.05;
 /* The films and controls a player holds: a file listed for each delivered film and cover and each text download. */
 const LISTED = 11;
 const PLAYED = 2;
 /* A delivered file a browser would show as raw text, however a link names it. */
 const RAW_TEXT = /\.(md|json|ffmeta|srt|vtt)(#.*)?$/i;
+/* What the dot before a listed file's size follows: a space, or a closing full-width bracket, which holds its own. */
+const SIZED = [" ", "）"];
 /* The browser's own control for a film's captions, in the video's user-agent shadow tree. */
 const CAPTION_CONTROL = "-webkit-media-controls-toggle-closed-captions-button";
 
@@ -129,9 +134,13 @@ export function fileProblems(pagePath, entries, sizes) {
   const problems = [];
   for (const { target: name, text } of entries) {
     const target = resolved(pagePath, name);
-    if (!sizes.has(target)) problems.push(`${text} leads to ${target}, which was not read`);
-    else if (!text.endsWith(` · ${sizeLabel(sizes.get(target))}`))
-      problems.push(`${text} names another size than ${target}'s ${sizeLabel(sizes.get(target))}`);
+    if (!sizes.has(target)) {
+      problems.push(`${text} leads to ${target}, which was not read`);
+      continue;
+    }
+    const size = sizeLabel(sizes.get(target));
+    if (!SIZED.some((before) => text.endsWith(`${before}· ${size}`)))
+      problems.push(`${text} names another size than ${target}'s ${size}`);
   }
   return problems;
 }
@@ -174,8 +183,21 @@ export function playbackProblems(state, duration) {
   return problems;
 }
 
+/** Why a switch's watched frames, as player-frames.mjs judged them, show it painting other than the film: frames that
+ * were not read, or frames of the cover or of one flat colour, with their times after the click. */
+export function paintProblems(by, painted) {
+  if (!painted || painted.unread) return [`${by} was not watched: no frames were read around it`];
+  const named = (times, what) =>
+    `${by} painted ${what} in ${times.length} frames, ${times[0]}-${times.at(-1)} ms after the click`;
+  return [
+    ...(painted.cover.length ? [named(painted.cover, "the cover")] : []),
+    ...(painted.flat.length ? [named(painted.flat, "one flat colour")] : []),
+  ];
+}
+
 /** Why a version, as the player switched to it from a known time, differs from what it must be: the same time, the
- * caption track hidden, an active cue marking the transcript paragraph that holds it, and its playback. */
+ * film on the screen throughout, the caption track hidden, an active cue marking the transcript paragraph that holds
+ * it, and its playback. */
 export function versionProblems(state, duration) {
   const { file } = state,
     [from, time] = state.kept_time,
@@ -185,6 +207,7 @@ export function versionProblems(state, duration) {
     Math.abs(time - from) < KEPT,
     `switching to ${file} moved the time from ${from} s to ${time} s`,
   );
+  problems.push(...paintProblems(`switching to ${file}`, state.painted));
   expect(
     state.track_mode === "hidden",
     `the caption track is ${state.track_mode} on ${file}, not hidden`,
@@ -200,8 +223,9 @@ export function versionProblems(state, duration) {
 
 /** Why a switch by the captions control or by a version button with the captions off, as the player made it from a
  * known time, playing or paused, differs from what it must be: the film of the other captions state or of the other
- * version, the same time, the film playing or paused as before, the captions control pressed as the captions show,
- * the track hidden and, where the read played the film, its playback. */
+ * version, the same time when paused and a time that played on when playing, the film on the screen throughout, the
+ * film playing or paused as before, the captions control pressed as the captions show, the track hidden and, where the
+ * read played the film, its playback. */
 export function switchProblems(step, duration) {
   const { control, file, from } = step,
     problems = [],
@@ -209,9 +233,12 @@ export function switchProblems(step, duration) {
   const by = control === "captions" ? "the captions control" : "a version button";
   expect(step.src?.endsWith(file), `${by} switched to ${step.src}, not the film ending ${file}`);
   expect(
-    Math.abs(step.time - from) < KEPT,
+    step.playing
+      ? step.time >= from - SLACK && step.time <= from + step.elapsed + SLACK
+      : Math.abs(step.time - from) < KEPT,
     `${by} moved the time from ${from} s to ${step.time} s`,
   );
+  problems.push(...paintProblems(by, step.painted));
   expect(
     step.paused === !step.playing,
     `${by} left the film ${step.paused ? "paused" : "playing"}, not ${step.playing ? "playing" : "paused"}`,

@@ -11,18 +11,21 @@ from the edition's script, timeline and delivered files:
   whose picture draws the captions and one without them. The captions control, a button pressed
   while the captions show, switches the film to the other one of the same version, and a version
   button to the film of its version with the captions as they are; both keep the time and
-  whether the film plays. The page shows the captions no other way: its one track of the
-  edition's WebVTT cues is a metadata track, which stays hidden and which no browser's own
-  controls offer, so the captions are never doubled. The page embeds the cues as a data URL,
-  since Chrome refuses a page opened from disk the caption file beside it;
+  whether the film plays, and a frame of the film on the screen: the page's script
+  (`player-page.js`) makes the chosen film ready in a second video in the same grid cell and
+  shows it only once it holds its frame. The page shows the captions no other way: its one
+  track of the edition's WebVTT cues is a metadata track, which stays hidden and which no
+  browser's own controls offer, so the captions are never doubled. The page embeds the cues as
+  a data URL, since Chrome refuses a page opened from disk the caption file beside it;
 - a button for each version and the captions control, and a button for each chapter, which seeks
   to the chapter's start and plays;
 - the summary, then the transcript (`filmkit.captions.documents.transcript_parts`): each chapter
   and scene headed by its time in a button that seeks there and plays, and each thought a
   paragraph, which the track's cues mark as the current one while the film plays;
 - the files list: each delivered file by kind, version, format and size, in decimal units, and
-  for each film whether its picture draws the captions. A browser shows the films and covers as
-  a viewer expects, so they are links. It would show every other file as raw text, so the Markdown
+  for each film whether its picture draws the captions; the dot before a size follows a closing
+  full-width bracket without a space. A browser shows the films and covers as a viewer expects,
+  so they are links. It would show every other file as raw text, so the Markdown
   transcript, the chapter files and the SRT and WebVTT captions are downloads, labelled by kind
   and purpose, as data URLs of their bytes, since a browser ignores `download` on a file beside
   a page opened from disk. The transcript in the page stays the place to read.
@@ -38,6 +41,7 @@ import json
 import math
 import re
 from html import escape
+from pathlib import Path
 from string import Template
 from typing import TYPE_CHECKING
 
@@ -54,6 +58,8 @@ if TYPE_CHECKING:
 
 # What a thought's words and its cues' are compared without: all but letters and digits.
 UNSPOKEN = re.compile(r"[\W_]+")
+# The closing full-width brackets, which hold their own space before what follows them.
+CLOSING = ("）", "」", "』", "】", "〕", "〉", "》")
 # Each edition's cover as delivered, PNG and JPEG; the PNG is the video's poster.
 COVER_PNG = f"{FILM.slug}-cover.png"
 COVER_JPEG = f"{FILM.slug}-cover.jpg"
@@ -122,7 +128,7 @@ WORDS = {
         "entry": "Choose a language",
         "play_from": "Play from {}",
         "unplayable": "This browser cannot play this encoding; open the film from the files "
-        "below in your system's player.",
+        "below in your system’s player.",
     },
 }
 # The page's style, in the declared colours.
@@ -134,6 +140,7 @@ STYLE = Template(
     "header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;"
     "gap:12px 24px;margin-bottom:24px}h1{font-size:23px;font-weight:600;margin:0}"
     "header p{font-size:13px;color:$muted;margin:6px 0 0}"
+    ".screen{display:grid}.screen>video{grid-area:1/1}"
     "video{display:block;width:100%;aspect-ratio:16/9;background:$background;"
     "border:1px solid $line}nav{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}"
     "header nav{margin:0}button,a{display:inline-block;background:transparent;color:$text;"
@@ -158,58 +165,8 @@ STYLE = Template(
     "@media(max-width:700px){body{padding:20px 16px}h1{font-size:19px}"
     "button,a{font-size:13px}}"
 )
-# What the page does: a version and the captions control switch films and keep the time and
-# whether the film plays, a time plays from there, and the hidden track's active cue marks the
-# thought it belongs to as the current paragraph.
-SCRIPT = """
-const film = document.getElementById("film");
-const track = film.textTracks[0];
-const status = document.getElementById("playback-status");
-const versions = [...document.querySelectorAll("[data-captioned]")];
-const captions = document.getElementById("captions");
-const state = captions.querySelector("span");
-const thoughts = [...document.querySelectorAll("#transcript p[data-from]")];
-let version = versions.find((button) => button.getAttribute("aria-pressed") === "true");
-const shown = () => captions.getAttribute("aria-pressed") === "true";
-function show() {
-  const time = film.currentTime, paused = film.paused;
-  film.src = shown() ? version.dataset.captioned : version.dataset.uncaptioned;
-  film.load();
-  film.addEventListener("loadedmetadata", () => {
-    film.currentTime = Math.min(time, film.duration);
-    if (!paused) film.play().catch(() => {});
-  }, { once: true });
-  status.textContent = `${version.textContent} · ${captions.textContent}`;
-}
-for (const button of versions)
-  button.addEventListener("click", () => {
-    version = button;
-    for (const other of versions) other.setAttribute("aria-pressed", String(other === button));
-    show();
-  });
-captions.addEventListener("click", () => {
-  captions.setAttribute("aria-pressed", String(!shown()));
-  state.textContent = shown() ? captions.dataset.on : captions.dataset.off;
-  show();
-});
-track.addEventListener("cuechange", () => {
-  const cue = track.activeCues[0];
-  if (!cue) return;
-  const current = thoughts.findLast((p) => Number(p.dataset.from) <= cue.startTime + 0.002);
-  for (const p of thoughts) p.toggleAttribute("aria-current", false);
-  current?.setAttribute("aria-current", "true");
-});
-for (const button of document.querySelectorAll("[data-time]"))
-  button.addEventListener("click", () => {
-    film.currentTime = Number(button.dataset.time);
-    film.play().catch(() => {});
-  });
-const transcript = document.querySelector("#transcript details");
-for (const link of document.querySelectorAll('a[href="#transcript"]'))
-  link.addEventListener("click", () => { transcript.open = true; });
-if (location.hash === "#transcript") transcript.open = true;
-film.addEventListener("error", () => { status.textContent = status.dataset.unplayable; });
-"""
+# What the page does (`player-page.js`, beside this module), inlined into the page.
+SCRIPT = Path(__file__).with_name("player-page.js").read_text(encoding="utf-8")
 
 
 def runtime_label() -> str:
@@ -276,9 +233,16 @@ def file_size(edition: Edition, name: str) -> int | None:
 
 
 def sized(label: str, size: int | None) -> str:
-    """A files list entry's words: its label, then its size, which never wraps from its unit."""
+    """A files list entry's words: its label, then its size, which never wraps from its unit.
+
+    The dot before the size follows a space, or directly a closing full-width bracket, which
+    holds its own space: 讲稿（Markdown，供下载）· 9 KB.
+    """
     shown = escape(label)
-    return shown if size is None else f'{shown}<span class="size"> · {size_label(size)}</span>'
+    if size is None:
+        return shown
+    space = "" if label.endswith(CLOSING) else " "
+    return f'{shown}<span class="size">{space}· {size_label(size)}</span>'
 
 
 def file_link(edition: Edition, name: str, label: str) -> str:
@@ -433,10 +397,10 @@ def player_page(edition: Edition) -> str:
 <body>
 <header><div><h1>{title}</h1><p>{byline}</p></div>{languages}</header>
 <main>
-<video id="film" controls playsinline preload="metadata" poster="{COVER_PNG}">
+<div class="screen"><video id="film" controls playsinline preload="metadata" poster="{COVER_PNG}">
 <source src="{edition.film("1080p-captioned").name}" type="video/mp4">
 <track kind="metadata" srclang="{code}" label="{words["track"]}" default src="{track}">
-</video>
+</video></div>
 {controls(edition, parts, words)}
 <section id="summary"><p>{escape(FILM.editions[code].summary)}</p><p id="playback-status" \
 role="status" data-unplayable="{escape(words["unplayable"])}">\

@@ -1,7 +1,7 @@
 /** Exercise how the delivered players' readback judges what it reads: where a page's links lead, the cues of a caption
  * file, the track a page embeds, the browser's own captions control, the page's captions control and the films it
- * switches between, the sizes its files list names and each page's verdict; and that a read which stops fails only its
- * page. */
+ * switches between, what each switch paints and how it keeps the time, the sizes its files list names and each page's
+ * verdict; and that a read which stops fails only its page. */
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -13,6 +13,7 @@ import {
   entryProblems,
   fileProblems,
   linkProblems,
+  paintProblems,
   parseCues,
   playbackProblems,
   playerProblems,
@@ -153,6 +154,15 @@ test("each file the list names carries the size of the delivered member it leads
     "影片 · 4K UHD · MP4 · 251 MB names another size than zh/sample-reel-zh-uhd.mp4's 263 MB",
     "字幕 · SRT · 13 KB leads to zh/sample-reel-zh.srt, which was not read",
   ]);
+  // A Chinese size follows a closing full-width bracket without a space, as the bracket holds its own.
+  const download = [
+    { target: "sample-reel-zh.vtt", text: "字幕（WebVTT，下载后供其他播放器使用）· 13 KB" },
+  ];
+  assert.deepEqual(fileProblems("zh/index.html", download, sizes), []);
+  const glued = [{ target: "sample-reel-zh.vtt", text: "字幕（WebVTT）13 KB" }];
+  assert.deepEqual(fileProblems("zh/index.html", glued, sizes), [
+    "字幕（WebVTT）13 KB names another size than zh/sample-reel-zh.vtt's 13 KB",
+  ]);
 });
 
 test("a page passes when none of its checks found a problem", () => {
@@ -191,6 +201,8 @@ const EXPECTED = {
   vtt: VTT,
   srt_cues: CUES,
 };
+/* What a switch that keeps the film on the screen paints, as player-frames.mjs reads it. */
+const CLEAN = { frames: 30, cover: [], flat: [] };
 /* The films a version plays, as the read collects them where it played them. */
 const played = (file, dimensions) => ({
   file,
@@ -203,11 +215,12 @@ const played = (file, dimensions) => ({
 });
 const version = (file, dimensions) => ({
   ...played(file, dimensions),
-  kept_time: [20, 20.02],
+  kept_time: [20, 20],
   track_mode: "hidden",
   cue_at: 12.5,
   active_cue: "“先核对，",
   current_paragraph: "先核对，再放行。",
+  painted: CLEAN,
 });
 /* The read's three switches: the captions off on the paused viewing film, the UHD version with them off, and the
  * captions on while the UHD film plays. */
@@ -222,6 +235,8 @@ const switched = (file, { control, captions, playing }) => ({
   paused: !playing,
   track_mode: "hidden",
   pressed: String(captions),
+  elapsed: 0.4,
+  painted: CLEAN,
 });
 const CAPTIONS = [
   {
@@ -405,6 +420,50 @@ test("the captions control and a version switch must reach the other film from t
     "-1080p-uncaptioned.mp4 decodes nothing at 2 s",
   ]);
   assert.deepEqual(playbackProblems(played("-uhd.mp4", [3840, 2160]), 60), []);
+});
+
+test("a switch that paints the cover or one flat colour, or was not watched, fails its page", () => {
+  const flash = { frames: 31, cover: [17, 34, 51], flat: [] };
+  assert.deepEqual(paintProblems("a version button", flash), [
+    "a version button painted the cover in 3 frames, 17-51 ms after the click",
+  ]);
+  assert.deepEqual(paintProblems("a version button", { frames: 31, cover: [], flat: [68, 85] }), [
+    "a version button painted one flat colour in 2 frames, 68-85 ms after the click",
+  ]);
+  const unwatched = "a version button was not watched: no frames were read around it";
+  assert.deepEqual(
+    paintProblems("a version button", { frames: 1, cover: [], flat: [], unread: true }),
+    [unwatched],
+  );
+  assert.deepEqual(paintProblems("a version button", undefined), [unwatched]);
+  assert.deepEqual(versionProblems({ ...version("-uhd.mp4", [3840, 2160]), painted: flash }, 60), [
+    "switching to -uhd.mp4 painted the cover in 3 frames, 17-51 ms after the click",
+  ]);
+  assert.deepEqual(switchProblems({ ...CAPTIONS[2], painted: flash }, 60), [
+    "the captions control painted the cover in 3 frames, 17-51 ms after the click",
+  ]);
+});
+
+test("a paused switch keeps the time to 0.02 s and a playing one plays on from the click", () => {
+  const paused = CAPTIONS[0];
+  assert.deepEqual(switchProblems({ ...paused, time: 20.019 }, 60), []);
+  assert.deepEqual(switchProblems({ ...paused, time: 20.021 }, 60), [
+    "the captions control moved the time from 20 s to 20.021 s",
+  ]);
+  assert.deepEqual(
+    versionProblems({ ...version("-uhd.mp4", [3840, 2160]), kept_time: [20, 20.021] }, 60),
+    ["switching to -uhd.mp4 moved the time from 20 s to 20.021 s"],
+  );
+  // A playing film takes over no earlier than the click and no later than the time that has passed since.
+  const playing = CAPTIONS[2];
+  assert.deepEqual(switchProblems({ ...playing, time: 20.42 }, 60), []);
+  assert.deepEqual(switchProblems({ ...playing, time: 19.96 }, 60), []);
+  assert.deepEqual(switchProblems({ ...playing, time: 19.7 }, 60), [
+    "the captions control moved the time from 20 s to 19.7 s",
+  ]);
+  assert.deepEqual(switchProblems({ ...playing, time: 20.6 }, 60), [
+    "the captions control moved the time from 20 s to 20.6 s",
+  ]);
 });
 
 test("the entry page leads to both players and nowhere outside the delivery", () => {

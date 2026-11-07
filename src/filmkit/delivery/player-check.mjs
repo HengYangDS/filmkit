@@ -23,13 +23,13 @@ import { readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
-import { inflateSync } from "node:zlib";
 
 import { launchBrowser } from "../picture/headless-browser.mjs";
+import { decodePng } from "./player-frames.mjs";
 import { digestFile, readDelivery, seekPoints } from "./player-read.mjs";
 import { LANGUAGES } from "./player-verdict.mjs";
 
-export { digestFile, seekPoints };
+export { decodePng, digestFile, seekPoints };
 
 const USAGE =
   "Usage: python -m filmkit.tools player-check players <binding.json> <receipt.json>\n" +
@@ -101,73 +101,6 @@ export async function changedMembers(binding) {
     if (value !== member.sha256) changed.push(member.path);
   }
   return changed;
-}
-
-const paeth = (a, b, c) => {
-  const p = a + b - c,
-    pa = Math.abs(p - a),
-    pb = Math.abs(p - b),
-    pc = Math.abs(p - c);
-  return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
-};
-
-/** Decode a PNG buffer, 8-bit and non-interlaced RGB or RGBA, into RGBA pixels; RGB pixels are opaque. */
-export function decodePng(bytes) {
-  if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))
-    throw Error("Not a PNG");
-  let width = 0,
-    height = 0,
-    channels = 0;
-  const data = [];
-  for (let at = 8; at + 8 <= bytes.length;) {
-    const length = bytes.readUInt32BE(at),
-      type = bytes.toString("latin1", at + 4, at + 8),
-      body = bytes.subarray(at + 8, at + 8 + length);
-    if (type === "IHDR") {
-      [width, height] = [body.readUInt32BE(0), body.readUInt32BE(4)];
-      channels = { 2: 3, 6: 4 }[body[9]] ?? 0;
-      if (body[8] !== 8 || !channels || body[12] !== 0)
-        throw Error("Only 8-bit non-interlaced RGB or RGBA PNG is decoded");
-    } else if (type === "IDAT") data.push(body);
-    else if (type === "IEND") break;
-    at += 12 + length;
-  }
-  const raw = inflateSync(Buffer.concat(data)),
-    stride = width * channels;
-  if (!channels || raw.length !== (stride + 1) * height)
-    throw Error("PNG pixel data does not match its header");
-  const pixels = new Uint8Array(width * height * 4);
-  let line = new Uint8Array(stride),
-    above = new Uint8Array(stride);
-  for (let y = 0; y < height; y++) {
-    const start = y * (stride + 1),
-      filter = raw[start];
-    if (filter > 4) throw Error(`Unknown PNG filter ${filter}`);
-    for (let x = 0; x < stride; x++) {
-      const a = x < channels ? 0 : line[x - channels],
-        b = above[x],
-        c = x < channels ? 0 : above[x - channels];
-      const predicted =
-        filter === 0
-          ? 0
-          : filter === 1
-            ? a
-            : filter === 2
-              ? b
-              : filter === 3
-                ? (a + b) >> 1
-                : paeth(a, b, c);
-      line[x] = (raw[start + 1 + x] + predicted) & 255;
-    }
-    for (let x = 0, i = 0, o = y * width * 4; x < width; x++, i += channels, o += 4) {
-      pixels[o] = line[i];
-      pixels[o + 1] = line[i + 1];
-      pixels[o + 2] = line[i + 2];
-      pixels[o + 3] = channels === 4 ? line[i + 3] : 255;
-    }
-    [line, above] = [above, line];
-  }
-  return { width, height, data: pixels };
 }
 
 /** Compare two decoded images: how many pixels differ and the largest channel difference. Images of different

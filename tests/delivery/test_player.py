@@ -6,6 +6,7 @@ import json
 import re
 import shutil
 from html.parser import HTMLParser
+from pathlib import Path
 
 import pytest
 
@@ -182,6 +183,20 @@ def test_the_player_shows_the_film_its_versions_and_chapters_over_a_hidden_track
     assert chapters == [("Ay", "0"), ("Bee", f"{40 + specification.CHAPTER_CARD_SHOWN:g}")]
 
 
+def test_the_page_runs_its_script_over_a_screen_that_can_hold_two_films(delivered):
+    html = delivery_player.player_page(production.Edition("zh"))
+    page = Page(html)
+    # The page's script is the engine's player-page.js, inlined whole.
+    script = (Path(delivery_player.__file__).parent / "player-page.js").read_text()
+    assert f"<script>{script}</script>" in html
+    assert delivery_player.SCRIPT == script
+    # The film stands in a grid cell that a second film can share while a switch makes it ready.
+    screen = page.all("div", class_="screen")
+    assert len(screen) == 1
+    assert page.elements[page.elements.index(screen[0]) + 1]["id"] == "film"
+    assert ".screen{display:grid}.screen>video{grid-area:1/1}" in html
+
+
 def test_the_transcript_heads_each_chapter_and_scene_with_its_time_and_gives_each_thought(
     delivered,
 ):
@@ -235,13 +250,14 @@ def test_the_files_list_names_each_delivered_file_and_the_language_links_lead_to
     ]
     # Every text file it would only show raw is a real download, labelled by kind and purpose: a
     # page opened from disk can save what it holds, where a browser ignores `download` on a file
-    # beside it.
+    # beside it. A size after a closing full-width bracket follows it without a space, since the
+    # bracket holds its own.
     assert [(a["download"], a["text"]) for a in files[6:]] == [
-        ("sample-reel-zh-transcript.md", "讲稿（Markdown，供下载） · 9 KB"),
-        ("chapters.json", "章节（JSON，供下载） · 404 B"),
-        ("chapters.ffmeta", "章节（FFmetadata，供下载） · 469 B"),
-        ("sample-reel-zh.vtt", f"字幕（WebVTT，下载后供其他播放器使用） · {vtt} B"),
-        ("sample-reel-zh.srt", f"字幕（SRT，下载后供其他播放器使用） · {srt} B"),
+        ("sample-reel-zh-transcript.md", "讲稿（Markdown，供下载）· 9 KB"),
+        ("chapters.json", "章节（JSON，供下载）· 404 B"),
+        ("chapters.ffmeta", "章节（FFmetadata，供下载）· 469 B"),
+        ("sample-reel-zh.vtt", f"字幕（WebVTT，下载后供其他播放器使用）· {vtt} B"),
+        ("sample-reel-zh.srt", f"字幕（SRT，下载后供其他播放器使用）· {srt} B"),
     ]
     for link in files[6:]:
         assert link["href"].startswith("data:")
@@ -254,7 +270,8 @@ def test_the_files_list_names_each_delivered_file_and_the_language_links_lead_to
     ]
     # A size stays whole on its line.
     assert ".size{white-space:nowrap}" in html
-    assert html.count('<span class="size"> · ') == 11
+    assert html.count('<span class="size"> · ') == 6
+    assert html.count('）<span class="size">· ') == 5
     # Nothing promises a download of a film or a cover, which a browser opening a file from disk
     # would not make.
     assert not any("download" in a or "下载" in a["text"] for a in files[:6])
@@ -297,8 +314,11 @@ def test_the_english_player_speaks_english_and_names_chinese_in_chinese(delivere
         ("../zh/index.html", "zh-CN", "中文"),
         ("../index.html", None, "Choose a language"),
     ]
-    # The only Chinese text names the Chinese edition.
+    # The only Chinese text names the Chinese edition, and an apostrophe is a typographic one.
     assert re.findall(r"[\u3000-\u303f\u3400-\u9fff\uff00-\uffef]+", html) == ["中文"]
+    status = page.all("p", id="playback-status")[0]["data-unplayable"]
+    assert "your system’s player" in status
+    assert "'" not in status
 
 
 def test_an_absent_film_is_listed_without_a_size_and_the_binding_names_what_the_page_shows(
