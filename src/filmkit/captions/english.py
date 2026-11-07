@@ -263,10 +263,8 @@ PREDICATE_STARTS = frozenset(
         "did",
     }
 )
-# A term that reads as one name stays on one line, as do a verb and the object
-# pronoun or noun phrase it takes, and a modifier and the noun it qualifies; the film
-# declares the terms its English script needs.
-FIXED_TERMS = tuple(tuple(term.split()) for term in FILM.editions["en"].caption_terms)
+# A verb stays with the object pronoun or noun phrase it takes, and a modifier with the noun
+# it qualifies.
 OBJECT_PRONOUNS = frozenset({"it", "them", "him", "her", "us", "me"})
 MODIFIER_ENDINGS = ("ible", "able", "ive", "ous", "ful", "ical", "ed")
 DETERMINERS = frozenset(
@@ -367,6 +365,17 @@ def _possessive(word: str) -> bool:
 def _word(token: str) -> str:
     """A token's word: lowercased, without the punctuation around it."""
     return re.sub(r"^[^\w]+|[^\w]+$", "", token.strip()).lower()
+
+
+def caption_term_words(terms: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
+    """Each declared caption term as the words a caption line compares with its own: each of
+    its words as `_word` reads a caption's, so a term binds whatever case it is declared in."""
+    return tuple(tuple(_word(word) for word in term.split()) for term in terms)
+
+
+# A term that reads as one name stays on one line; the film declares the terms its English
+# script needs, as it writes them.
+FIXED_TERMS = caption_term_words(FILM.editions["en"].caption_terms)
 
 
 def _break_strength(words: list[str], last: int, tail_end: str) -> int:

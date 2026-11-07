@@ -37,8 +37,30 @@ SCRIPT_TERMS = (
 @pytest.fixture
 def script_terms(monkeypatch):
     """Phrase captions with the fixed terms of the script the cases come from."""
-    terms = tuple(tuple(term.split()) for term in SCRIPT_TERMS)
+    terms = captions_english.caption_term_words(SCRIPT_TERMS)
     monkeypatch.setattr(captions_english, "FIXED_TERMS", terms)
+
+
+def test_a_caption_term_declared_with_capitals_stays_on_one_line(monkeypatch):
+    # The captions compare their words in lowercase, so a term binds whatever the case the film
+    # declares it in; the declaration keeps the term as written.
+    text = (
+        "An agent that writes to the repository first opens a Work Lane and then writes only "
+        "the paths it was admitted."
+    )
+    monkeypatch.setattr(captions_english, "FIXED_TERMS", ())
+    assert captions_english.english_caption_phrases(text)[0].endswith("opens a Work ")
+    phrased = {}
+    for declared in ("Work Lane", "work lane"):
+        terms = captions_english.caption_term_words((declared,))
+        monkeypatch.setattr(captions_english, "FIXED_TERMS", terms)
+        phrased[declared] = captions_english.english_caption_phrases(text)
+    assert not any(line.rstrip().endswith("Work") for line in phrased["Work Lane"])
+    assert phrased["Work Lane"] == phrased["work lane"]
+    assert captions_english.caption_term_words(("Work Lane", "Agent’s Work")) == (
+        ("work", "lane"),
+        ("agent’s", "work"),
+    )
 
 
 def test_english_caption_cues_preserve_connected_text_and_punctuation():
