@@ -4,6 +4,22 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- `check-picture` refuses each stroked clockwise `arc()` that sweeps a whole turn or more, less 1e-5 rad, from a start that is not a whole number of turns, naming its scene, its first and last frame, its start and the line of `picture/film.js` that drew it (`vanishing_arcs` in the frame audit's report), with the remedy `ellipse(x, y, r, r, start, 0, 2 * Math.PI)`. Chrome Headless Shell 152.0.7977.30, the renderer's browser, computes such an arc in single precision and painted no ink for 64 of 4000 starts through one turn and 13 of 1000 through any longer sweep, with Metal and with SwiftShader alike, while the headless stand-in, drawing arcs as the HTML specification does, painted them all; starts at whole turns, anticlockwise arcs and ellipses from any start all drew. This is breaking for a composition that strokes such an arc: `check-picture` refuses it until it draws the ellipse.
+- The player check watches every switch it makes with a screencast of the page, from before its click until it settles, and fails a page whose switch paints the cover or a frame of one flat colour where the film should be, naming the switch and each frame's time after the click; a switch whose frames were not read fails too.
+
+### Changed
+
+- A version or captions switch in the player keeps the film on the screen. The page makes the chosen film ready in a second video, hidden in the same place, and shows it only once it holds its frame at the time it takes over: a paused film's time, or the time a playing film has reached, which plays on meanwhile. The 0.13.0 page loaded the chosen film into the video it showed, which painted the cover in each of the 32 switches measured on the essentials films in Chrome from disk and over the media server, for 2 to 24 frames from 36 ms after the click; this page painted none. The page's script moves into `delivery/player-page.js`, which the engine inlines. Each edition's player page changes; a film's films, pictures and records do not.
+- The player check holds a paused switch to the time within 0.02 s, as the page sets it, and lets a playing one play on from no earlier than 0.05 s before the click to no later than the time that has passed since; it finds the page's film by its id, `film`.
+
+### Fixed
+
+- A caption term declared with capitals stays on one caption line: the English phrasing compares each declared term's words with a caption's words in lowercase, as it reads them. The declaration and the concept check keep each term as written.
+- `produce compare-pictures` refuses a frame under 45 dB PSNR outside the caption band, not 50 dB: the 50 dB floor refused the ETHOS film's Chinese pictures at one keyframe whose encoder noise spread thinly over the frame (49.76 dB, largest tile 1.847 levels). The tile limit of 4 levels still refuses a missing label, and the floor a uniform shift of 2 levels (42.1 dB).
+- The Chinese player's size after a closing full-width bracket follows it without a space, as in `讲稿（Markdown，供下载）· 9 KB`, since the bracket holds its own; the English message for a film the browser cannot play sets `system’s` with a typographic apostrophe.
+
 ## [0.13.0] - 2026-11-07
 
 ### Added
