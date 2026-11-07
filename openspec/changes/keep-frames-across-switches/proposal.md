@@ -1,0 +1,32 @@
+# Proposal
+
+## Why
+
+The committee's essentials review found that every press of the player's captions control and every version switch paints the cover, the title card, for about four to five frames, and likely drops the voice, because the page reloads its one video element (M8-01, minor, which holds acceptance of every film). It also found two typographic slips on the engine's page (M8-08). Two engine defects that film rounds met belong in the same release: a caption term declared with a capital never binds, since the captions compare lowercased words, and the renderer's browser can draw no ink for a clockwise arc that sweeps a whole turn from a start that is not a whole number of turns, which the headless audits, drawing arcs as the HTML specification does, never see.
+
+## What Changes
+
+- **A switch keeps the picture.** A version or captions switch makes the chosen film ready beside the shown one and shows it only once it holds its frame at the time it takes over. A paused film is shown again at its time; a playing film plays on until the chosen one takes over at the time it has reached. No switch paints the cover or a bare frame.
+- **The readback watches each switch.** The real-browser player check records every frame the page paints from each switch's click until the switch settles, and fails a switch that paints the cover or a frame of one flat colour, a paused switch that moves the time by 0.02 s or more, and a playing one that jumps back before the click or ahead of the time that passed.
+- **Player typography.** A Chinese size that follows a closing full-width bracket follows it without a space, and the English message for a film the browser cannot play sets a typographic apostrophe.
+- **Caption terms ignore case.** The English caption phrasing compares a declared term's words with a caption's words in lowercase, so a term declared with capitals stays on one line; the declaration and the concept check keep each term as written.
+- **A gated finding for an arc that can vanish.** `check-picture` refuses a stroked clockwise arc that sweeps a whole turn or more from a start that is not a whole number of turns, naming the scene, the times, the start and the line of `picture/film.js` that drew it, and the remedy: `ellipse(x, y, r, r, start, 0, 2 * Math.PI)`.
+- **Output bytes.** Every film's pictures, soundtrack, captions and films stay byte for byte unless its declaration capitalises a caption term or its composition strokes such an arc; each edition's player page changes.
+- **Out of scope.** Moving a film to this release or changing its composition, which each film does in its own lane; measuring the voice across a switch, since the readback reads the picture and the media times.
+
+## Capabilities
+
+### New Capabilities
+
+None.
+
+### Modified Capabilities
+
+- `film-package`: a switch keeps a frame of the film on the screen, the readback watches what each switch paints and how it keeps the time, and the player's words follow its edition's typography.
+- `caption-text`: a declared caption term stays on one line whatever the case of its words.
+- `picture-gates`: `check-picture` refuses a stroked clockwise arc that sweeps a whole turn from a start that is not a whole number of turns.
+
+## Impact
+
+- **Code.** `delivery/player.py` and the page's script, which moves to `delivery/player-page.js`; `delivery/player-read.mjs`, `delivery/player-verdict.mjs`, `delivery/player-check.mjs` and a new `delivery/player-frames.mjs`; `captions/english.py`; `picture/headless-composition.mjs`, `picture/frame-audit.mjs`, `picture/frame-audit/report.mjs` and `picture/gates.py`.
+- **Films.** A film adopts the release by packaging its metadata again and reading its delivery back; its films and records stay. A film whose English edition declares a caption term with capitals sees that term kept on one line, which can move its caption lines, and a composition that strokes such an arc is refused until it draws the ellipse; the three films' current compositions are scanned for one before the release.
