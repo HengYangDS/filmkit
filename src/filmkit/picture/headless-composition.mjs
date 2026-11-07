@@ -6,9 +6,10 @@
  * twice over. `subs` is the path as screen subpaths, sampled the way the real-browser check samples them
  * (geometry-check.mjs); a text stands at its anchor. `points` are the drawing points in the painter's own coordinates,
  * as the motion audit identifies a mark across frames: an arc gives the corners of its circle, a text the corners of
- * its box, and `toScreen` maps them to the screen. The stand-in measures a text's width by the advances of the film's
- * declared faces when it is given them (readTextMetrics), and otherwise by an estimate; geometry-check.mjs measures
- * real metrics. */
+ * its box, and `toScreen` maps them to the screen. A stroke whose path holds a whole turn the renderer's browser may
+ * paint without ink (wholeTurnAtRisk) carries each such arc in `turns`, with the line of film.js that drew it. The
+ * stand-in measures a text's width by the advances of the film's declared faces when it is given them
+ * (readTextMetrics), and otherwise by an estimate; geometry-check.mjs measures real metrics. */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import vm from "node:vm";
@@ -98,9 +99,6 @@ const STATE = {
   letterSpacing: "0px",
 };
 
-/** The 2D context film.js draws on: exactly the members it uses, each refusing any other. `deliver` receives each
- * stroke, fill and text as a paint, called directly by the method painting it, so a paint can be traced into film.js.
- * fillRect lays the ground under each frame, which no audit counts as a mark, so it paints nothing. */
 /** The signed angle a canvas arc sweeps from a0 toward a1: clockwise unless anticlockwise, a whole turn once the
  * angles span one, and otherwise the difference brought into one turn, as the HTML canvas specification draws it. */
 export function canvasSweep(a0, a1, anticlockwise = false) {
@@ -110,15 +108,36 @@ export function canvasSweep(a0, a1, anticlockwise = false) {
   return anticlockwise ? -sweep : sweep;
 }
 
-export function canvasStandIn(deliver, faces = null) {
+/* A sweep counts as a whole turn from TURN_SHORT radians short of one, and a start as a whole number of turns within
+ * TURN_START radians of one. */
+const TURN_SHORT = 1e-5,
+  TURN_START = 1e-6;
+
+/** Whether the renderer's browser may paint no ink for arc(x, y, r, a0, a1, anticlockwise). Chrome Headless Shell
+ * 152 computes a clockwise arc's end angle in single precision; through a whole turn or more from a start that is not
+ * a whole number of turns, 64 of 4000 starts drew no ink for a whole turn and 13 of 1000 for every longer sweep, with
+ * Metal and with SwiftShader alike. Starts at whole turns, anticlockwise arcs and ellipses from any start all drew. */
+export function wholeTurnAtRisk(a0, a1, anticlockwise = false) {
+  const turn = 2 * Math.PI,
+    off = ((a0 % turn) + turn) % turn;
+  return !anticlockwise && a1 - a0 >= turn - TURN_SHORT && Math.min(off, turn - off) > TURN_START;
+}
+
+/** The 2D context film.js draws on: exactly the members it uses, each refusing any other. `deliver` receives each
+ * stroke, fill and text as a paint, called directly by the method painting it, so a paint can be traced into film.js.
+ * fillRect lays the ground under each frame, which no audit counts as a mark, so it paints nothing. `turned()`, called
+ * as an arc at risk (wholeTurnAtRisk) is drawn, names the line that drew it. */
+export function canvasStandIn(deliver, faces = null, turned = () => null) {
   let m = [1, 0, 0, 1, 0, 0],
     state = { ...STATE, dash: [] };
   const stack = [];
-  // The current path twice over: screen subpaths as sampled, and the drawing points in the painter's coordinates.
+  // The current path twice over: screen subpaths as sampled, and the drawing points in the painter's coordinates; and
+  // its whole turns at risk.
   let subs = [],
     sub = null,
     last = [0, 0],
-    points = [];
+    points = [],
+    turns = [];
   const tx = (x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
   const begin = (pts) => {
     sub = pts;
@@ -197,6 +216,7 @@ export function canvasStandIn(deliver, faces = null) {
       subs = [];
       sub = null;
       points = [];
+      turns = [];
     },
     moveTo(x, y) {
       begin([tx(x, y)]);
@@ -212,6 +232,8 @@ export function canvasStandIn(deliver, faces = null) {
       if (sub?.length) sub.push(sub[0]);
     },
     arc(x, y, r, a0, a1, anticlockwise = false) {
+      if (wholeTurnAtRisk(a0, a1, anticlockwise))
+        turns.push({ start: a0, sweep: a1 - a0, origin: turned() });
       extend(sampled(x, y, r, r, 0, a0, a1, anticlockwise));
       last = [x + r * Math.cos(a1), y + r * Math.sin(a1)];
       points.push([x - r, y - r], [x + r, y + r]);
@@ -250,7 +272,8 @@ export function canvasStandIn(deliver, faces = null) {
       points.push([x, y], [x + w, y + h]);
     },
     stroke() {
-      deliver(paintOf("stroke", state.strokeStyle, path()));
+      const atRisk = turns.length ? { turns: turns.map((turn) => ({ ...turn })) } : {};
+      deliver(paintOf("stroke", state.strokeStyle, { ...path(), ...atRisk }));
     },
     fill() {
       deliver(paintOf("fill", state.fillStyle, path()));
@@ -326,8 +349,18 @@ export function openComposition(timeline, { faces = null } = {}) {
     paint.scene = window.__sceneId ?? null;
     onPaint(paint);
   }
+  // The line that drew an arc at risk: the innermost line of film.js below the stand-in's arc.
+  function turned() {
+    const limit = Error.stackTraceLimit,
+      trace = {};
+    Error.stackTraceLimit = Infinity;
+    Error.captureStackTrace(trace, turned);
+    Error.stackTraceLimit = limit;
+    const line = /film\.js:(\d+):\d+/.exec(trace.stack)?.[1];
+    return line ? `film.js:${line}` : null;
+  }
   // The document holds the picture's canvas and the film element whose width sets the resolution, nothing else.
-  const ctx = canvasStandIn(deliver, faces);
+  const ctx = canvasStandIn(deliver, faces, turned);
   const elements = {
     picture: {
       getContext(type) {

@@ -74,6 +74,7 @@ export function frameReport({
   underfilled,
   textLayout,
   wrappedLabels,
+  vanishingArcs,
 }) {
   const listsLeft = Object.groupBy(lists.findings(), (v) =>
     v.kind === "list_leaving_early" ? "early" : "dimmed",
@@ -295,6 +296,16 @@ export function frameReport({
      * was first seen and first at rest, and at rest its lines' sizes, the share of the widest line of its size that
      * each spans and the rules its lines break. filmkit.picture.gates gates each break a film does not declare. */
     wrapped_labels: wrappedLabels,
+    /* Every stroked clockwise arc through a whole turn from a start that is not a whole number of turns, which the
+     * renderer's browser may paint without ink, by scene and the line that drew it, with its module, its first and
+     * last frame, its first start and sweep in radians and the frames that drew it. filmkit.picture.gates gates each. */
+    vanishing_arcs: vanishingArcs.map((v) => ({
+      ...v,
+      from: +v.from.toFixed(2),
+      to: +v.to.toFixed(2),
+      start: +v.start.toFixed(4),
+      sweep: +v.sweep.toFixed(4),
+    })),
   };
 }
 

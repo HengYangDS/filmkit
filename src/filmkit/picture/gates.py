@@ -15,9 +15,12 @@ hold the previous picture and the cues mostly drawn as labels are recorded. The 
 judges every wrapped label at rest by the film's `[picture.wrapping]` rules, which it reads from
 the file `FILMKIT_WRAPPING` names: each label that breaks one is gated unless one of the
 edition's declared exceptions names its lines, which records it with the exception's reason,
-and an exception whose lines no frame of the edition paints is gated as stale. A gated finding
-refuses with `PictureError`, after the record is written, and so does an audit that fails or a
-composition or timeline that changes while it is checked.
+and an exception whose lines no frame of the edition paints is gated as stale. Every stroked
+clockwise arc through a whole turn from a start that is not a whole number of turns is gated by
+its scene, times and the line that drew it, since the renderer's browser computes such an arc in
+single precision and can paint no ink for it; the finding names the ellipse from 0 that it paints.
+A gated finding refuses with `PictureError`, after the record is written, and so does an audit
+that fails or a composition or timeline that changes while it is checked.
 The motion audit follows every mark as a viewer sees it move, and each of its findings, a halt,
 start, race or pop outside a stage cut, is gated by its time, scene, marks and the line that drew
 it, unless one of the edition's `[[picture.motion.exceptions]]` names its scene, its line or
@@ -240,6 +243,25 @@ MOTION_WORDS = {
 }
 
 
+# The remedy for a whole turn the renderer's browser may paint without ink: the same ring as an
+# ellipse from 0, its start the rotation.
+WHOLE_TURN = "ellipse(x, y, r, r, start, 0, 2 * Math.PI)"
+
+
+def arc_findings(frame: dict) -> list[str]:
+    """Each stroked whole turn the renderer's browser may paint without ink, as the gate names it:
+    its scene, its first and last frame, its start, the line that drew it and the remedy."""
+    found = []
+    for arc in frame.get("vanishing_arcs", []):
+        drawn = arc["origin"] + (f" ({arc['module']})" if arc["module"] else "")
+        found.append(
+            f"frame vanishing_arcs {arc['scene']} {arc['from']:.2f}-{arc['to']:.2f} s: a clockwise"
+            f" arc through a whole turn from {arc['start']:.4f} rad, drawn at {drawn}, may paint no"
+            f" ink in the renderer's browser; draw it as {WHOLE_TURN}"
+        )
+    return found
+
+
 def motion_finding(finding: dict) -> str:
     """A motion finding as the record names it: its kind, scene, time, marks and drawing line."""
     start, end = finding["start"], finding["end"]
@@ -345,7 +367,8 @@ def check_picture(edition: Edition) -> dict:
     frame, motion = repository.read(frame_path), repository.read(motion_path)
     wrapped, declared = wrapping_findings(frame, wrapping, edition.code)
     moved, kept = motion_findings(motion, FILM.picture.motion, edition.code)
-    findings = gated_findings(frame, sync, motion) + text_findings(texts) + wrapped + moved
+    findings = gated_findings(frame, sync, motion) + arc_findings(frame) + text_findings(texts)
+    findings += wrapped + moved
     record = {
         **bound,
         "frames_checked": frame["frames_checked"],

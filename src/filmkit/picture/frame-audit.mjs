@@ -88,6 +88,30 @@ const contrast = readingLoad(film.palette),
   lists = listTracker(),
   faintSeen = faintLabels();
 
+/* Each stroked whole turn the renderer's browser may paint without ink (headless-composition.mjs wholeTurnAtRisk), by
+ * its scene and the line that drew its arc, with its first and last frame and its first start. */
+const vanishing = new Map();
+function turnsAtRisk(paint, t) {
+  for (const { start, sweep, origin } of paint.turns ?? []) {
+    const key = `${paint.scene}|${origin}`,
+      module = film.module(origin);
+    if (!vanishing.has(key))
+      vanishing.set(key, {
+        scene: paint.scene,
+        origin,
+        module,
+        from: t,
+        to: t,
+        start,
+        sweep,
+        frames: 0,
+      });
+    const seen = vanishing.get(key);
+    seen.to = t;
+    seen.frames++;
+  }
+}
+
 /* Painted paths are recorded so labels crossing strokes or partly covered by fills are reported, and what the scene
  * itself paints outside the head band is counted, so speech over an empty picture is reported. Every paint is kept
  * for the frame's text layout. */
@@ -96,6 +120,7 @@ function onPaint(paint) {
   const points = paint.subs.flat(),
     seq = ++paints.seq;
   paints.all.push(paint);
+  if (paint.alpha > INK) turnsAtRisk(paint, paints.t);
   if (paint.kind === "text") paints.texts.push(seq);
   if (paint.scene && !inHead(points)) {
     paints.level = Math.max(paints.level, levelOf(paint.color, paint.alpha));
@@ -145,7 +170,7 @@ const thoughts = timeline.segments.flatMap((seg) => {
 /* Render the frame at t and gather what the measures read: its layout and graphics, what its scene painted, where it
  * falls in the timeline and its scene words. */
 function renderedFrame(t) {
-  paints = { all: [], graphics: [], texts: [], seq: 0, ink: 0, strong: 0, level: 0 };
+  paints = { all: [], graphics: [], texts: [], seq: 0, ink: 0, strong: 0, level: 0, t };
   const layout = film.render(t, onPaint);
   const segments = timeline.segments,
     at = segments.findLastIndex((v) => v.start <= t),
@@ -440,6 +465,7 @@ const report = frameReport({
   underfilled: composition.underfilled,
   textLayout: typography.finish(),
   wrappedLabels: wrapping.finish(),
+  vanishingArcs: [...vanishing.values()],
 });
 writeRequestedFiles({
   trace,

@@ -44,6 +44,8 @@ test("the frame audit reports a stretch of the film, its traces, its marks and i
     ),
   );
   assert.deepEqual(report.errors, []);
+  // The sample film strokes no whole turn its browser may paint without ink.
+  assert.deepEqual(report.vanishing_arcs, []);
   assert.ok(report.frames_checked > 0);
   // Thoughts whose picture stands off the content centre at a reviewers' instant, with the instant and both offsets.
   assert.ok(report.off_centre && typeof report.off_centre === "object");
@@ -416,4 +418,71 @@ test("the frame audit reports each wrapped label with when it first rests and th
     labels(audit({ FILMKIT_WRAPPING: "" })).map((v) => v.breaks),
     [['line 1 ends on the lead word "in"'], []],
   );
+});
+
+/* A composition whose scene 01 strokes a ring turning with time through a whole turn from its start, which the
+ * renderer's browser may paint without ink, and beside it the same ring drawn as an ellipse from 0, which it paints. */
+const TURNING = [
+  '"use strict";',
+  'const ctx = document.getElementById("picture").getContext("2d");',
+  'const P = { ground: "#0F1519", ink: "#ECE8DF" };',
+  "const ring = (x, a, ellipse) => {",
+  "  ctx.beginPath();",
+  "  if (ellipse) ctx.ellipse(x, 540, 24, 24, a, 0, 2 * Math.PI);",
+  "  else ctx.arc(x, 540, 24, a, a + 2 * Math.PI);",
+  "  ctx.stroke();",
+  "};",
+  "window.renderFrame = (t) => {",
+  "  ctx.strokeStyle = P.ink;",
+  "  ctx.globalAlpha = 1;",
+  '  window.__sceneId = "01";',
+  "  ring(860, 0.5 + t, false);",
+  "  ring(1060, 0.5 + t, true);",
+  "  window.__sceneId = null;",
+  "  window.__filmLayout = { time: t, texts: [] };",
+  "};",
+  "",
+].join("\n");
+
+test("the frame audit reports each stroked whole turn the browser may not paint, by scene and line", async () => {
+  const root = await scratchFolder(),
+    path = join(root, "timeline.json");
+  await mkdir(join(root, "picture"));
+  await writeFile(join(root, "picture/film.js"), TURNING);
+  const segment = {
+    id: "01",
+    chapter: "sample",
+    start: 0,
+    end: 3,
+    voice_start: 0.5,
+    voice_end: 2.5,
+    utterance_groups: ["A ring"],
+    words: [
+      { text: "A", start: 0.5, end: 1 },
+      { text: "ring", start: 1.2, end: 2.5 },
+    ],
+  };
+  await writeFile(
+    path,
+    JSON.stringify({ language: "English", duration: 3, segments: [segment], captions: [] }),
+  );
+  const report = JSON.parse(
+    execFileSync(process.execPath, [AUDIT_FRAMES, path, "0.0333333"], {
+      cwd: root,
+      encoding: "utf8",
+    }),
+  );
+  assert.deepEqual(report.errors, []);
+  assert.deepEqual(report.vanishing_arcs, [
+    {
+      scene: "01",
+      origin: "film.js:7",
+      module: null,
+      from: 0,
+      to: 3,
+      start: 0.5,
+      sweep: 6.2832,
+      frames: report.frames_checked,
+    },
+  ]);
 });

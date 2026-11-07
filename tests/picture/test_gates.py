@@ -1,6 +1,7 @@
 """The picture's gate before a render: the gated findings of the audits and the record they bind."""
 
 import json
+import re
 import shutil
 from importlib.metadata import version
 from pathlib import Path
@@ -166,10 +167,29 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
     assert table["fonts_sha256"] == record["fonts_sha256"]
 
 
+# A ring the frame audit reports as a whole turn the renderer's browser may paint without ink.
+VANISHING_ARC = {
+    "scene": "05",
+    "origin": "film.js:1234",
+    "module": "picture/film/drawing/marks.js",
+    "from": 12.4,
+    "to": 30.1,
+    "start": 1.9112,
+    "sweep": 6.2832,
+    "frames": 532,
+}
+
+
 @pytest.mark.parametrize(
     ("reports", "named"),
     [
         ({**CLEAN, "frame": {**CLEAN["frame"], "overlaps": [{"pair": "04:a|b"}]}}, "overlaps"),
+        (
+            {**CLEAN, "frame": {**CLEAN["frame"], "vanishing_arcs": [VANISHING_ARC]}},
+            "frame vanishing_arcs 05 12.40-30.10 s: a clockwise arc through a whole turn from "
+            "1.9112 rad, drawn at film.js:1234 (picture/film/drawing/marks.js), may paint no ink "
+            "in the renderer's browser; draw it as ellipse(x, y, r, r, start, 0, 2 * Math.PI)",
+        ),
         (
             {**CLEAN, "frame": {**CLEAN["frame"], "off_centre_runs": {"04": ["1.00-3.50 13.0%"]}}},
             "off_centre_runs",
@@ -267,7 +287,7 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
 def test_a_gated_finding_writes_a_refused_record_and_refuses(film, monkeypatch, reports, named):
     edition = Edition("zh")
     audits(monkeypatch, reports)
-    with pytest.raises(PictureError, match=f"1 gated findings: .*{named}"):
+    with pytest.raises(PictureError, match=f"1 gated findings: .*{re.escape(named)}"):
         gates.check_picture(edition)
     record = repository.read(edition.picture_gates)
     assert record["verdict"] == "refuse"
