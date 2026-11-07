@@ -10,7 +10,7 @@ See proposal.md for why. The player page (`filmkit.delivery.player`) holds one `
 
 - No switch paints the cover or a flat frame, in Chrome from disk and over the engine's media server, with the time exact when paused and continuous when playing.
 - The readback fails a page that paints either during a switch, so delivery refuses it for every film.
-- A declared term binds whatever its case, and an arc the renderer may not paint is refused before a render.
+- A declared term binds whatever its case, and an arc the renderer paints without ink is refused before a render.
 
 **Non-Goals:**
 
@@ -39,9 +39,13 @@ The times follow the switch's state: a paused switch keeps the time within 0.02 
 
 `FIXED_TERMS` normalises each declared term's words with the function that normalises each caption word, lowercase without outer punctuation, so the comparison has one owner. The declaration and the concept check, which already matches English case-insensitively, keep the term as written.
 
-### The stand-in records each clockwise whole turn that does not start at one
+### The renderer's browser judges each clockwise whole turn that does not start at one
 
-The stand-in records each `arc()` drawn clockwise through 2π or more, less 1e-5 rad, from a start that is not within 1e-6 rad of a whole number of turns, with the innermost line of `film.js` on the call stack, the `arc()` call, and its module. A stroke carries its path's records; the frame audit reports each by scene and line with its first and last time and start, as `vanishing_arcs`, and `check-picture` gates it with the remedy. Measured in Chrome Headless Shell 152 with Metal and with SwiftShader alike (`build/evidence/keep-frames-across-switches/arcs.json`): 64 of 4000 starts drew no ink for a whole turn and 13 of 1000 for every longer clockwise sweep, since Chrome then sets the end to the start plus a single-precision turn; 28 of 1000 for a sweep 1e-6 short and none 3e-6 short; none for starts at whole turns from −6 to 6, none anticlockwise and none for `ellipse()` from any start. The gate therefore leaves anticlockwise arcs and ellipses alone and names the ellipse from 0 as the remedy, which draws the same dashes from the same start.
+The stand-in records each `arc()` drawn clockwise through 2π or more, less 1e-5 rad, from a start that is not within 1e-6 rad of a whole number of turns, with its exact start and end, the innermost line of `film.js` on the call stack, the `arc()` call, and its module. A stroke carries its path's records; the frame audit reports each scene's line once as `whole_turns`, with its first and last time, first start and number of distinct starts, and writes every distinct start and end of it with its own frames to its `TURNS` file. When that file holds any, `check-picture` runs the `whole-turns` tool, which draws each distinct start and end once, alone in a cell of a scratch canvas in the renderer's browser, and measures its ink against a circle from 0 on the same canvas; a turn paints at 0.6 of that ink. A line is refused when one of its starts paints no ink, naming those starts' frames, the first of them and how many of its starts fail, and is recorded otherwise; both name the ellipse from 0 as the remedy, which draws the same dashes from the same start whatever the start.
+
+Measured in Chrome Headless Shell 152 with Metal and with SwiftShader alike (`build/evidence/keep-frames-across-switches/arcs.json`): 64 of 4000 starts drew no ink for a whole turn and 13 of 1000 for every longer clockwise sweep, since Chrome then sets the end to the start plus a single-precision turn; 28 of 1000 for a sweep 1e-6 short and none 3e-6 short; none for starts at whole turns from −6 to 6, none anticlockwise and none for `ellipse()` from any start. Which start fails follows from single-precision rounding no simpler rule reproduces, so the browser itself judges each start, and the tool's own draws found the same 13 of 1000. A fixed start costs one draw; a ring that turns costs one draw for each start it reaches, and the starts are drawn 1023 to a canvas read back once.
+
+Alternatives considered: refusing every such arc refused ethos-film's and ddwg-film's rings, whose fixed starts π, 3π/2 and −π/2 Chrome 152 paints in full, and would have forced a picture to be rendered again for a gate no frame fails; emulating Chrome's single-precision path in the stand-in would reproduce a browser's internals that change between builds. The tool draws in the renderer's own browser build, the one the render uses.
 
 ### The PSNR floor lies below the encoders' noise at a keyframe
 
@@ -53,8 +57,9 @@ The encoded-level comparison keeps both measures and lowers only the floor, from
 - [A playing switch answers after the lead, 0.25 s of film, or longer after a cold seek] → The shown film plays on meanwhile; a miss doubles the lead rather than show the chosen film early.
 - [Other browsers are not measured] → The hand-over uses only standard media events and keeps the shown film on the screen until the chosen one shows its frame, so a browser that is slow to paint the clone shows the shown film's frame, not the cover.
 - [The screencast classifier was calibrated on one film] → Its thresholds compare each frame with the film's own frames around the switch, and a capture that fails is reported.
-- [The arc gate refuses arcs a film draws correctly today] → ethos-film's and ddwg-film's `ring()` stroke such whole turns from fixed starts (π and 3π/2, and −π/2) that Chrome Headless Shell 152 paints in full, so their films are whole today, yet the gate refuses them until each `ring()` draws the ellipse, as ddwg-essentials-film's already does (`build/evidence/keep-frames-across-switches/film-arcs.json`). A fixed start that paints in one browser build may not in another, and a start that moves passes through the starts that do not; the remedy draws the same ring and costs one line in each helper.
+- [A whole turn the browser paints today may not paint in another browser build] → Each recorded finding names the line and the remedy, and the gate judges again with the browser build the renderer pins; ethos-film's and ddwg-film's rings are recorded (`build/evidence/keep-frames-across-switches/film-arcs.json`), and a film moves them to the ellipse when its picture is next rendered.
+- [The gate now starts the renderer's browser] → Only when the frame audit found such a whole turn, for one page, and the record binds its draws as the `whole_turns` report; a picture without one starts none.
 
 ## Migration Plan
 
-A film adopts the release by locking it, running `package-metadata` for each edition and reading its delivery back. Its films, pictures, captions and soundtrack are unchanged unless its declaration capitalises a caption term or its composition strokes such an arc, which it repairs before its next render.
+A film adopts the release by locking it, running `package-metadata` for each edition and reading its delivery back. Its films, pictures, captions and soundtrack are unchanged unless its declaration capitalises a caption term or its composition strokes a whole turn the browser paints without ink, which it repairs before its next render.

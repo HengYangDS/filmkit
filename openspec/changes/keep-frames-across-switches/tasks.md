@@ -18,9 +18,9 @@
 
 ## 4. Arcs that may vanish
 
-- [x] 4.1 Record in the headless stand-in each stroked clockwise `arc()` through a whole turn from a start that is not a whole number of turns, with the line that drew it. Done when `tests/picture/whole-turns.test.mjs`, red before the change, finds such an arc with its line and none for an ellipse from 0, `arc(0, 2π)` or an anticlockwise arc.
-- [x] 4.2 Report them in the frame audit as `vanishing_arcs` and gate them in `check-picture` with the remedy, and document the finding in `README.md` and the Changelog. Done when `tests/picture/frame-audit.test.mjs` and `tests/picture/test_gates.py` refuse such an arc, naming its scene, times, start, line and the ellipse form, and the sample film's audit reports none.
-- [x] 4.3 Record the browser measurement behind the rule and scan each film's current composition for such arcs. Done when `build/evidence/keep-frames-across-switches/arcs.json` holds the measured empty draws and `film-arcs.json` the arcs, or none, of ddwg-film, ethos-film and ddwg-essentials-film.
+- [x] 4.1 Record in the headless stand-in each stroked clockwise `arc()` through a whole turn from a start that is not a whole number of turns, with its exact start and end and the line that drew it. Done when `tests/picture/whole-turns.test.mjs`, red before the change, finds such an arc with its line and none for an ellipse from 0, `arc(0, 2π)` or an anticlockwise arc.
+- [x] 4.2 Report them in the frame audit as `whole_turns`, with each distinct start and end in its `TURNS` file, draw each start once in the renderer's browser with the `whole-turns` tool, and in `check-picture` refuse a line whose arc paints no ink from one of its starts and record every other with the remedy; document the finding in `README.md` and the Changelog. Done when `tests/picture/frame-audit.test.mjs`, `tests/picture/whole-turns.test.mjs` and `tests/picture/test_gates.py`, red before the change, refuse a start of 1.9335 rad that the browser paints without ink and record π, 3π/2 and −π/2, and the sample film's audit reports none.
+- [x] 4.3 Record the browser measurement behind the rule, draw the measured starts with the tool in Chrome Headless Shell 152, and rescan each film's current composition. Done when `build/evidence/keep-frames-across-switches/arcs.json` holds the measured empty draws and the tool's draws of them, and `film-arcs.json` what each of ddwg-film, ethos-film and ddwg-essentials-film gets: refused or recorded, with counts.
 
 ## 5. The PSNR floor
 
