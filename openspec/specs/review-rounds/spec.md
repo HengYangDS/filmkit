@@ -28,7 +28,7 @@ Prepare each independent review round of a film's two editions: set the packages
 
 ### Requirement: An unreviewed build is set aside by its consumer's copies
 
-`set-aside --unreviewed --consumer <dir>` SHALL move each edition's films, package record and rendered picture into `build/artifacts/film/superseded/<label>/<code>/` with the manifest, move and readback of a reviewed round, labelled `round-<n>` or by `--label`. Before anything moves it SHALL refuse unless `<dir>/<code>/` holds both films byte-identical, and it SHALL record that folder as their consumer.
+`set-aside --unreviewed --consumer <dir>` SHALL move each edition's films, package record and rendered pictures into `build/artifacts/film/superseded/<label>/<code>/` with the manifest, move and readback of a reviewed round, labelled `round-<n>` or by `--label`. Before anything moves it SHALL refuse unless `<dir>/<code>/` holds each of the edition's films byte-identical, and it SHALL record that folder as their consumer.
 
 #### Scenario: A preview the owner watched
 
@@ -155,3 +155,12 @@ For a film that declares levels, each review SHALL give every sentence id of its
 
 - **WHEN** a review gives verdicts for all but sentence 05.2.1
 - **THEN** `review.round record` refuses and names 05.2.1
+
+### Requirement: A set-aside moves the films its build made
+
+A set-aside, reviewed or not, SHALL move each edition's films with captions, its films without captions and its uncaptioned picture when they are in place, its package record and, unless kept, its pictures, so a build packaged before the films without captions existed is set aside by its two films and its captioned picture, bound by the review or the consumer copies of those films.
+
+#### Scenario: A round reviewed before 0.13.0
+
+- **WHEN** a round whose reviews bind each edition's two films with captions is set aside
+- **THEN** each edition's two films, package record and captioned picture move, and the set-aside names no missing film

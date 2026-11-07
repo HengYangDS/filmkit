@@ -8,7 +8,7 @@ Report, before an expensive render, every input of the render and of the packagi
 
 ### Requirement: A pre-render check names every stale or missing input
 
-`produce preflight` SHALL report at once, and refuse while any remains: a stage that is not the current UHD picture; a tracked cover other than the cover the current stage paints; an earlier film package record of the edition; a draft still scan that is missing, finds a still picture over its limit or binds another timeline or composition; a failing concept check; and a picture gate record that has not passed on the current inputs.
+`produce preflight` SHALL report at once, and refuse while any remains: a stage of the captioned or the uncaptioned picture that is not its current UHD picture; a tracked cover other than the cover the current stage paints; an earlier film package record of the edition; a draft still scan that is missing, finds a still picture over its limit or binds another timeline or composition; a failing concept check; and a picture gate record that has not passed on the current inputs.
 
 #### Scenario: Every input current
 
