@@ -123,13 +123,44 @@ def test_the_measures_name_tiles_that_differ_and_the_psnr_of_the_rest():
     measured = equivalence.frame_measures(ground, changed, size, rows)
     assert measured["largest_sample"] == 100
     assert measured["largest_tile"] == pytest.approx(100 * 4 / 4)
-    shifted = equivalence.frame_measures(ground, ground + 1, size, (0, 0))
-    assert shifted["psnr_db"] == pytest.approx(48.13, abs=0.01)
-    # A whole frame a level lighter is under the PSNR floor, though no tile reaches its limit.
-    assert shifted["largest_tile"] == 1.0
+    # A whole frame two levels lighter is under the PSNR floor, though no tile reaches its limit;
+    # one level lighter lies within the encoders' noise.
+    shifted = equivalence.frame_measures(ground, ground + 2, size, (0, 0))
+    assert shifted["psnr_db"] == pytest.approx(42.11, abs=0.01)
+    assert shifted["largest_tile"] == 2.0
     assert equivalence.differs(shifted)
+    lighter = equivalence.frame_measures(ground, ground + 1, size, (0, 0))
+    assert lighter["psnr_db"] == pytest.approx(48.13, abs=0.01)
+    assert not equivalence.differs(lighter)
     # A tile at the edge holds the pixels that are left.
     assert equivalence.largest_tile(np.ones((5, 7)), 4) == 1.0
+
+
+def test_keyframe_noise_passes_while_a_shift_or_a_missing_label_fails():
+    # At 1080p, outside a caption band of rows 880-1000, as the films compare their pictures.
+    size, rows = (1920, 1080), (880, 1000)
+    samples = size[0] * size[1] * 3 // 2
+    ground = np.full(samples, 30, dtype=np.uint8)
+    # A keyframe's noise spreads thinly over the frame: 7.5% of the samples 3 levels off and a few
+    # 47 off, as the ETHOS film's frame 50580 measured 49.76 dB with its largest tile 1.847.
+    rng = np.random.default_rng(50580)
+    noise = np.where(rng.random(samples) < 0.075, rng.choice([-3, 3], size=samples), 0)
+    noise[rng.choice(samples, 40, replace=False)] = 47
+    keyframe = (ground + noise).clip(0, 255).astype(np.uint8)
+    measured = equivalence.frame_measures(ground, keyframe, size, rows)
+    assert 49.5 < measured["psnr_db"] < 50.0
+    assert measured["largest_tile"] < 2 and measured["largest_sample"] == 47
+    assert not equivalence.differs(measured)
+    # A uniform shift of two levels fails on the PSNR floor alone.
+    shifted = equivalence.frame_measures(ground, ground + 2, size, rows)
+    assert shifted["psnr_db"] == pytest.approx(42.11, abs=0.01)
+    assert shifted["largest_tile"] < equivalence.TILE_LIMIT and equivalence.differs(shifted)
+    # A label missing outside the captions fails on its tile, whatever the PSNR of the frame.
+    missing = ground.copy()
+    missing[: size[0] * size[1]].reshape(size[1], size[0])[200:212, 400:424] = 90
+    label = equivalence.frame_measures(ground, missing, size, rows)
+    assert label["largest_tile"] > equivalence.TILE_LIMIT
+    assert label["psnr_db"] > equivalence.PSNR_FLOOR_DB and equivalence.differs(label)
 
 
 @pytest.mark.ffmpeg

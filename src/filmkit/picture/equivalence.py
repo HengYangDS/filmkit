@@ -16,7 +16,9 @@ record (`require_equivalence`). It compares the pictures at two levels:
   `BAND_MARGIN` rows of the 1080-row frame on each side and out to the encoder's 16-pixel blocks.
   In each frame the mean absolute difference of every `TILE`-row square of the luma and chroma
   planes must stay within `TILE_LIMIT`, and the PSNR of all compared samples at or above
-  `PSNR_FLOOR_DB`: the encoder's noise, as the sample film measures it, lies well inside both.
+  `PSNR_FLOOR_DB`. The tile limit is the structural guard, which a missing label exceeds in its
+  tile; the floor only has to catch a difference spread thinly across the whole frame, and lies
+  below the encoders' noise at a keyframe of the films' denser pictures.
 
 The record, build/evidence/editions/<code>/caption-equivalence.json, binds the composition, the
 timeline, the engine version and both pictures' stage documents, files and receipts, and holds
@@ -64,10 +66,18 @@ BLOCK = 16
 # The side of a compared tile in rows of the 1080-row frame, the largest mean absolute difference
 # in 8-bit levels a tile may show, and the lowest PSNR in dB of a frame's compared samples. On the
 # sample film the encoder's noise between the two pictures reached 1.51 levels and 60.2 dB at
-# worst, and a picture missing one label outside the captions 17.2 and 24.8 levels.
+# worst, and a picture missing one label outside the captions 17.2 and 24.8 levels in its tile.
+# The sample's frames are sparse: the essentials film's pairs reached 53.69 and 54.78 dB, and the
+# ETHOS film's Chinese pair fell to 49.76 dB at one of its 2,495 compared frames, frame 50580, a
+# keyframe of both encodes (an I-frame every 12 frames), where the difference spread thinly over
+# the whole content box, its largest tile 1.847 levels and its largest sample 47, while the frames
+# around it measured about 72 and 62 dB and the composition-level comparison found no differing
+# paint. The tile limit catches a missing label; the floor catches a diffuse difference across the
+# frame, such as a uniform shift of 2 levels, which measures 42.1 dB, and passes that keyframe
+# noise with a margin of 4.8 dB.
 TILE = 32
 TILE_LIMIT = 4.0
-PSNR_FLOOR_DB = 50.0
+PSNR_FLOOR_DB = 45.0
 # How many of the frames that differ most the record lists.
 WORST = 10
 # Seconds a picture's decode may take.
