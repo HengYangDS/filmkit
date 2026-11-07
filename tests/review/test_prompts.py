@@ -137,7 +137,8 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
         # The delivery format is the specification's, at the soundtracks' program level.
         (
             f"Each edition: exactly {specification.DURATION} s, 16:9 pure 2D, "
-            f"{specification.FPS} fps, UHD master and a captioned 1080p viewing edition, "
+            f"{specification.FPS} fps, UHD master and a 1080p viewing edition, each with its "
+            "captions drawn in the picture and again without captions, "
             f"{specification.RATE // 1000} kHz stereo narration at -16.5 LUFS integrated, "
             "no music."
         ),

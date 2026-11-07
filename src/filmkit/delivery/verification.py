@@ -1,7 +1,8 @@
 """Verify delivered film editions against their current authored inputs.
 
-The checks cover the pinned canonical sources, narration custody, the rendered picture,
-package bindings, complete media decoding and the recorded review thresholds.
+The checks cover the pinned canonical sources, narration custody, both rendered pictures and
+the record that they differ only by their captions, package bindings, complete media decoding
+of all four films and the recorded review thresholds.
 Aesthetic judgment belongs to the review record; human listening stays separate.
 The verifier reads and decodes; it writes nothing and prints each edition's report.
 
@@ -23,6 +24,7 @@ import filmkit.media as media
 import filmkit.narration.selection as narration_selection
 import filmkit.narration.spoken_units as narration_spoken_units
 import filmkit.narration.thought_groups as narration_thought_groups
+import filmkit.picture.equivalence as picture_equivalence
 import filmkit.picture.rendering as picture_rendering
 import filmkit.production as production
 import filmkit.repository as repository
@@ -45,11 +47,11 @@ CREDITS_DURATION, DURATION, FPS, RATE = (
 
 
 def bilingual_inputs(files: list[Path]) -> dict[str, list[Path]]:
-    """Require both edition pairs under their current language-owned roots."""
+    """Require both editions' films under their current language-owned roots."""
     groups = {code: production.Edition(code).films for code in production.CODES}
-    expected = {path for pair in groups.values() for path in pair}
+    expected = {path for films in groups.values() for path in films}
     if len(files) != len(expected) or set(files) != expected:
-        msg = "Bilingual acceptance requires both current edition pairs"
+        msg = "Bilingual acceptance requires both editions' current films"
         raise VerificationError(msg)
     return groups
 
@@ -139,9 +141,12 @@ def verify_narration(edition: production.Edition) -> dict:
 
 
 def verify_picture(edition: production.Edition) -> dict:
-    """Bind the native render and its whole-film geometry to the staged picture."""
+    """Bind both native renders and the captioned picture's whole-film geometry to their staged
+    pictures, and require the passing record that the two differ only by their captions."""
     render = repository.read(edition.render_receipt)
     picture_rendering.validate_picture_binding(edition, render)
+    uncaptioned = repository.read(edition.rendered(captions=False).receipt)
+    picture_rendering.validate_picture_binding(edition, uncaptioned, captions=False)
     geometry = repository.read(edition.picture_geometry)
     step = geometry.get("step_frames")
     if not (
@@ -164,8 +169,14 @@ def verify_picture(edition: production.Edition) -> dict:
     ):
         msg = "Shot plan differs from the current picture inputs"
         raise VerificationError(msg)
+    equivalence = picture_equivalence.require_equivalence(edition)
     return {
         "picture_sha256": render["output_sha256"],
+        "uncaptioned_picture_sha256": uncaptioned["output_sha256"],
+        "caption_equivalence": {
+            "composition_instants": equivalence["composition"]["instants"],
+            "encoded_frames": equivalence["encoded"]["frames"],
+        },
         "geometry_frames": geometry["checked"],
         "browser": geometry["browser"],
     }
@@ -183,20 +194,21 @@ def language_index() -> dict:
 
 
 def verify_package(edition: production.Edition) -> dict:
-    """Bind both delivered formats and the viewing package to their inputs."""
+    """Bind every delivered film, the picture each carries and the viewing package to their
+    inputs."""
     output = edition.artifacts
     films = repository.read(edition.film_package)
-    render = repository.read(edition.render_receipt)
     names = sorted(film.name for film in edition.films)
+    pictures = {
+        edition.film(kind).name: edition.rendered(rendition.captions).name
+        for kind, rendition in production.RENDITIONS.items()
+    }
     if (
-        films["script_sha256"] != repository.sha(repository.ROOT / edition.script)
-        or films["soundtrack_sha256"] != repository.sha(edition.soundtrack)
-        or films["picture_sha256"] != render["output_sha256"]
-        or films["cover_sha256"] != repository.sha(output / packaging.COVER_JPEG)
-        or films["chapters_sha256"] != repository.sha(output / "chapters.ffmeta")
+        packaging.stale_bindings(edition, films)
         or sorted(member["path"] for member in films["editions"]) != names
         or any(
             member["sha256"] != repository.sha(output / member["path"])
+            or member.get("picture") != pictures[member["path"]]
             for member in films["editions"]
         )
     ):
@@ -229,8 +241,9 @@ def verify_package(edition: production.Edition) -> dict:
     return {"films": names, "viewing_members": len(viewing["members"])}
 
 
-def verify_media(edition: production.Edition, path: Path, size: tuple[int, int]) -> dict:
-    """Decode one complete delivered movie and check its declared contract."""
+def verify_media(edition: production.Edition, path: Path, rendition: production.Rendition) -> dict:
+    """Decode one complete delivered movie and check its rendition's declared contract."""
+    size = (rendition.width, rendition.height)
     data = media.probe(path)
     try:
         video = media.require_video(
@@ -242,7 +255,6 @@ def verify_media(edition: production.Edition, path: Path, size: tuple[int, int])
     audio = next((s for s in data["streams"] if s["codec_type"] == "audio"), None)
     tags = data["format"]["tags"]
     language = specification.ISO_LANGUAGES[edition.code]
-    rendition = next(r for r in production.RENDITIONS.values() if (r.width, r.height) == size)
     release, names = packaging.delivered_tags(edition, rendition), packaging.track_names(edition)
     tolerance = media.DURATION_TOLERANCE
     if not (
@@ -290,7 +302,7 @@ def verify_media(edition: production.Edition, path: Path, size: tuple[int, int])
 def verify_review(
     edition: production.Edition, files: list[Path], record: Path | None = None
 ) -> dict:
-    """Accept only a current review of both delivered formats above threshold.
+    """Accept only a current review of every delivered film above threshold.
 
     The record is the edition's own unless a published one is named. A review covers each
     film by its name and bytes, and its report lies beside it under the same name. For a film
@@ -356,15 +368,14 @@ def verify_review(
 def qualify(
     edition: production.Edition, files: list[Path], *, technical_only: bool = False
 ) -> dict:
-    """Verify one edition's two delivered formats and their bound inputs."""
-    sizes = {
-        edition.film(kind).name: (rendition.width, rendition.height)
-        for kind, rendition in production.RENDITIONS.items()
+    """Verify one edition's four delivered films and their bound inputs."""
+    renditions = {
+        edition.film(kind).name: rendition for kind, rendition in production.RENDITIONS.items()
     }
-    if sorted(path.name for path in files) != sorted(sizes) or any(
+    if sorted(path.name for path in files) != sorted(renditions) or any(
         path.parent != edition.artifacts for path in files
     ):
-        msg = "An edition is verified as its two current delivered formats"
+        msg = "An edition is verified as its four current delivered films"
         raise VerificationError(msg)
     report = {
         "verdict": "pass",
@@ -374,7 +385,7 @@ def qualify(
         "narration": verify_narration(edition),
         "picture": verify_picture(edition),
         "package": verify_package(edition),
-        "media": [verify_media(edition, path, sizes[path.name]) for path in sorted(files)],
+        "media": [verify_media(edition, path, renditions[path.name]) for path in sorted(files)],
     }
     report["review"] = (
         {"verdict": "not_reviewed"} if technical_only else verify_review(edition, sorted(files))

@@ -17,7 +17,9 @@ def qualified(tmp_path, monkeypatch):
     for name in ("sources", "narration", "picture", "package"):
         monkeypatch.setattr(delivery_verification, f"verify_{name}", lambda *_, n=name: n)
     monkeypatch.setattr(
-        delivery_verification, "verify_media", lambda _edition, path, size: (path.name, size)
+        delivery_verification,
+        "verify_media",
+        lambda _edition, path, rendition: (path.name, (rendition.width, rendition.height)),
     )
     monkeypatch.setattr(
         delivery_verification,
@@ -27,7 +29,7 @@ def qualified(tmp_path, monkeypatch):
 
 
 @pytest.mark.usefixtures("qualified")
-def test_an_edition_is_qualified_as_its_two_current_films():
+def test_an_edition_is_qualified_as_its_four_current_films():
     edition = production.Edition("en")
     films = list(reversed(edition.films))
     report = delivery_verification.qualify(edition, films)
@@ -46,6 +48,8 @@ def test_an_edition_is_qualified_as_its_two_current_films():
     assert (report["verdict"], report["scope"], report["language"]) == ("pass", "acceptance", "en")
     assert report["media"] == [
         ("sample-reel-en-1080p-captioned.mp4", (1920, 1080)),
+        ("sample-reel-en-1080p-uncaptioned.mp4", (1920, 1080)),
+        ("sample-reel-en-uhd-uncaptioned.mp4", (3840, 2160)),
         ("sample-reel-en-uhd.mp4", (3840, 2160)),
     ]
     assert report["review"] == ("en", sorted(film.name for film in films))
@@ -57,7 +61,7 @@ def test_an_edition_is_qualified_as_its_two_current_films():
         [edition.artifacts.parent / "zh" / film.name for film in films],
         production.Edition("zh").films,
     ):
-        with pytest.raises(VerificationError, match="two current delivered formats"):
+        with pytest.raises(VerificationError, match="four current delivered films"):
             delivery_verification.qualify(edition, files)
 
 
@@ -70,7 +74,7 @@ def test_the_command_prints_each_editions_report_and_writes_nothing(tmp_path, ca
         ("zh", "technical"),
         ("en", "technical"),
     ]
-    delivery_verification.main(["--language", "en", *films[2:]])
+    delivery_verification.main(["--language", "en", *films[4:]])
     (report,) = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     assert (report["language"], report["scope"]) == ("en", "acceptance")
     assert list(tmp_path.rglob("*")) == []
@@ -82,7 +86,7 @@ def test_the_command_prints_each_editions_report_and_writes_nothing(tmp_path, ca
     (report,) = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     english = sorted(film.name for film in production.Edition("en").films)
     assert [name for name, _size in report["media"]] == english
-    with pytest.raises(VerificationError, match="both current edition pairs"):
+    with pytest.raises(VerificationError, match="both editions' current films"):
         delivery_verification.main(["--language", "all", *films[1:]])
     with pytest.raises(SystemExit):
         delivery_verification.main(["--language", "fr", *films])

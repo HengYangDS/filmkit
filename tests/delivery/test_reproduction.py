@@ -89,14 +89,21 @@ class Release:
         shutil.copyfile(source, self.folder / name)
 
     def record(self, floors: float | None = 30.0) -> None:
-        """Write the release manifest of the published folder, with each film's floor."""
+        """Write the release manifest of the published folder, with each published film's floor;
+        a release that publishes the films without captions records their stage too."""
         editions = {}
         for code in production.CODES:
             edition = production.Edition(code)
-            films = [film.name for film in edition.films]
+            films = [film.name for film in edition.films if (self.folder / film.name).is_file()]
+            uncaptioned = edition.rendered(captions=False).stage / "index.html"
             editions[code] = {
                 "soundtrack_sha256": repository.sha(edition.soundtrack),
                 "stage_sha256": repository.sha(edition.picture_stage / "index.html"),
+                **(
+                    {"uncaptioned_stage_sha256": repository.sha(uncaptioned)}
+                    if len(films) == len(edition.films)
+                    else {}
+                ),
                 "picture_floor_db": {} if floors is None else dict.fromkeys(films, floors),
             }
         sources = [
@@ -143,8 +150,10 @@ def release(tmp_path, monkeypatch, films) -> Release:
         script.parent.mkdir(parents=True, exist_ok=True)
         script.write_text(json.dumps({"edition": code}))
         edition.artifacts.mkdir(parents=True)
-        edition.picture_stage.mkdir(parents=True)
-        (edition.picture_stage / "index.html").write_text(f"<html>{code}</html>")
+        for captions in (True, False):
+            stage = edition.rendered(captions).stage
+            stage.mkdir(parents=True)
+            (stage / "index.html").write_text(f"<html>{code} {captions}</html>")
         edition.soundtrack.write_bytes(f"soundtrack {code}".encode())
         for film in edition.films:
             shutil.copyfile(films["same"], film)
@@ -258,6 +267,12 @@ def test_different_decoded_audio_fails(release):
             "stage",
         ),
         (
+            lambda edition: (edition.rendered(captions=False).stage / "index.html").write_text(
+                "<html></html>"
+            ),
+            "uncaptioned_stage",
+        ),
+        (
             lambda edition: (edition.artifacts / "sample-reel-zh.vtt").write_text("WEBVTT\n"),
             "documents",
         ),
@@ -269,6 +284,48 @@ def test_a_rebuilt_byte_that_differs_fails_naming_the_edition_and_layer(release,
     assert report["verdict"] == "fail"
     with pytest.raises(SystemExit, match=f"zh: .*{layer}"):
         reproduction.main(["--read-only"])
+
+
+@pytest.mark.usefixtures("unleveled")
+def test_a_release_without_the_films_without_captions_compares_the_films_it_published(release):
+    # A release published before the films without captions existed holds each edition's two
+    # films with captions, and its reviews bind those.
+    for code in production.CODES:
+        edition = production.Edition(code)
+        for kind in ("uhd-uncaptioned", "1080p-uncaptioned"):
+            (release.folder / edition.film(kind).name).unlink()
+        path = release.folder / f"{edition.prefix}-production-review.json"
+        review = json.loads(path.read_text())
+        review["media"] = [item for item in review["media"] if "uncaptioned" not in item["path"]]
+        path.write_text(json.dumps(review))
+    release.record()
+    report = release.compare()
+    assert report["verdict"] == "pass"
+    zh = report["editions"]["zh"]
+    assert [film["asset"] for film in zh["films"]] == [
+        "sample-reel-zh-uhd.mp4",
+        "sample-reel-zh-1080p-captioned.mp4",
+    ]
+    assert zh["unpublished"] == [
+        "sample-reel-zh-uhd-uncaptioned.mp4",
+        "sample-reel-zh-1080p-uncaptioned.mp4",
+    ]
+    assert "uncaptioned_stage" not in zh
+    assert zh["review"]["verdict"] == "pass"
+
+
+def test_a_release_publishes_every_edition_s_films_without_captions_or_none(release):
+    path = release.root / reproduction.MANIFEST
+    manifest = json.loads(path.read_text())
+    manifest["editions"]["en"].pop("uncaptioned_stage_sha256")
+    path.write_text(json.dumps(manifest))
+    with pytest.raises(ReproductionError, match="uncaptioned picture's stage exactly when"):
+        reproduction.load()
+    # One edition's films without captions, and not the other's, name no complete release.
+    (release.folder / "sample-reel-en-uhd-uncaptioned.mp4").unlink()
+    release.record()
+    with pytest.raises(ReproductionError, match="does not name every published asset"):
+        reproduction.load()
 
 
 def test_a_review_that_does_not_bind_the_published_films_fails(release):

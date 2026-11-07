@@ -1,21 +1,26 @@
 /** Judge what a delivery's pages show and do, as the real-browser read collects it (player-read.mjs), a page at a time.
  *
  * Every link of a page must lead to a delivery member, a sibling page or a place in the page. The language entry page
- * leads to both players. Every version's picture draws its captions, so a player's one track of the edition's cues
- * stays hidden: it embeds the delivered WebVTT, its cues equal the SRT's, it is hidden on every version, and neither
- * the page's controls nor the browser's own can show it. On each version a cue active at its time marks the transcript
- * paragraph that holds it. Switching versions keeps the time; each version plays at its size and duration and decodes
- * at three seek points; a chapter button and a transcript time play from their time; the language links lead to the
- * other edition's player and to the entry page; each file the list names carries the size of the member it leads to;
- * no link opens raw text in a tab, and each text file is a download that saves the delivered bytes and leaves the page
- * where it is. */
+ * leads to both players. A player opens on the viewing film with its captions drawn and its captions control pressed.
+ * The control switches to the other film of the same version, with or without captions, and a version button to its
+ * version's film with the captions as they are, each keeping the time and whether the film plays; every film plays at
+ * its size and duration and decodes at three seek points. The pictures draw the captions, so a player's one track of
+ * the edition's cues stays hidden: it embeds the delivered WebVTT, its cues equal the SRT's, it is hidden on every
+ * film, and neither the page's controls nor the browser's own can show it. On each version a cue active at its time
+ * marks the transcript paragraph that holds it. A chapter button and a transcript time play from their time; the
+ * language links lead to the other edition's player and to the entry page; each file the list names carries the size
+ * of the member it leads to; no link opens raw text in a tab, and each text file is a download that saves the
+ * delivered bytes and leaves the page where it is. */
 import { posix } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
 /* Each edition's page language. */
 export const LANGUAGES = { zh: "zh-CN", en: "en" };
-/* A version switch keeps the time within half a second; a time button has played from its time within two. */
+/* A version or captions switch keeps the time within half a second; a time button has played from its time within
+ * two. */
 export const KEPT = 0.5;
+/* The films and controls a player holds: a file listed for each delivered film and cover and each text download. */
+const LISTED = 11;
 const PLAYED = 2;
 /* A delivered file a browser would show as raw text, however a link names it. */
 const RAW_TEXT = /\.(md|json|ffmeta|srt|vtt)(#.*)?$/i;
@@ -149,9 +154,28 @@ export function entryProblems(read, members) {
   return problems;
 }
 
+/** Why a film, as the player shows it, does not play as delivered: its duration, its size, a media error, or nothing
+ * decoded at a seek point. */
+export function playbackProblems(state, duration) {
+  const { file } = state,
+    problems = [],
+    expect = (ok, problem) => ok || problems.push(problem);
+  expect(state.duration === duration, `${file} lasts ${state.duration} s, not ${duration} s`);
+  expect(
+    isDeepStrictEqual([state.width, state.height], state.dimensions),
+    `${file} is ${state.width}x${state.height}, not ${state.dimensions.join("x")}`,
+  );
+  expect(state.error === null, `${file} reports media error ${state.error}`);
+  for (const check of state.seek_checks)
+    expect(
+      check.error === null && check.decoded_frames > 0,
+      `${file} decodes nothing at ${check.target} s`,
+    );
+  return problems;
+}
+
 /** Why a version, as the player switched to it from a known time, differs from what it must be: the same time, the
- * caption track hidden, an active cue marking the transcript paragraph that holds it, the film's duration and size,
- * and decoding at each seek point. */
+ * caption track hidden, an active cue marking the transcript paragraph that holds it, and its playback. */
 export function versionProblems(state, duration) {
   const { file } = state,
     [from, time] = state.kept_time,
@@ -171,18 +195,33 @@ export function versionProblems(state, duration) {
       bare(state.current_paragraph ?? "").includes(bare(state.active_cue)),
       `the transcript's current paragraph at ${state.cue_at} s on ${file} does not hold the active cue`,
     );
-  expect(state.duration === duration, `${file} lasts ${state.duration} s, not ${duration} s`);
+  return [...problems, ...playbackProblems(state, duration)];
+}
+
+/** Why a switch by the captions control or by a version button with the captions off, as the player made it from a
+ * known time, playing or paused, differs from what it must be: the film of the other captions state or of the other
+ * version, the same time, the film playing or paused as before, the captions control pressed as the captions show,
+ * the track hidden and, where the read played the film, its playback. */
+export function switchProblems(step, duration) {
+  const { control, file, from } = step,
+    problems = [],
+    expect = (ok, problem) => ok || problems.push(problem);
+  const by = control === "captions" ? "the captions control" : "a version button";
+  expect(step.src?.endsWith(file), `${by} switched to ${step.src}, not the film ending ${file}`);
   expect(
-    isDeepStrictEqual([state.width, state.height], state.dimensions),
-    `${file} is ${state.width}x${state.height}, not ${state.dimensions.join("x")}`,
+    Math.abs(step.time - from) < KEPT,
+    `${by} moved the time from ${from} s to ${step.time} s`,
   );
-  expect(state.error === null, `${file} reports media error ${state.error}`);
-  for (const check of state.seek_checks)
-    expect(
-      check.error === null && check.decoded_frames > 0,
-      `${file} decodes nothing at ${check.target} s`,
-    );
-  return problems;
+  expect(
+    step.paused === !step.playing,
+    `${by} left the film ${step.paused ? "paused" : "playing"}, not ${step.playing ? "playing" : "paused"}`,
+  );
+  expect(
+    step.pressed === String(step.captions),
+    `the captions control is pressed ${step.pressed} with the captions ${step.captions ? "on" : "off"}`,
+  );
+  expect(step.track_mode === "hidden", `the caption track is ${step.track_mode} on ${step.src}`);
+  return step.seek_checks ? [...problems, ...playbackProblems(step, duration)] : problems;
 }
 
 /** Why a player's read, `read`, differs from what the delivery holds, `expected`: its language, chapters, links,
@@ -220,7 +259,10 @@ export function playerProblems(read, expected) {
     );
   if (has("files")) {
     problems.push(...fileProblems(path, read.files, sizes));
-    expect(read.files.length === 9, `the files list names ${read.files.length} files, not 9`);
+    expect(
+      read.files.length === LISTED,
+      `the files list names ${read.files.length} files, not ${LISTED}`,
+    );
   }
   for (const href of read.plain_downloads ?? [])
     problems.push(`${href} asks for a download, which a browser ignores on a file beside the page`);
@@ -251,10 +293,11 @@ export function playerProblems(read, expected) {
     expect(text === vtt, "the track does not carry the delivered WebVTT");
   }
   if (has("opening")) {
-    const { src, tracks, mode } = read.opening;
+    const { src, tracks, mode, captions } = read.opening;
     expect(src === `${slug}-${code}-1080p-captioned.mp4`, `the page opens on ${src}`);
     expect(tracks === 1, `the film has ${tracks} text tracks, not one`);
     expect(mode === "hidden", `the caption track is ${mode} on the viewing film, not hidden`);
+    expect(captions === "true", `the page opens with its captions control pressed ${captions}`);
   }
   if (has("cues")) problems.push(...cueProblems(read.cues, srt_cues));
   if (has("native_caption_controls"))
@@ -268,6 +311,13 @@ export function playerProblems(read, expected) {
       `a control shows the track: ${read.control_sweep.shown.join(", ")}`,
     );
   for (const state of read.editions ?? []) problems.push(...versionProblems(state, duration));
+  if (has("captions")) {
+    expect(
+      read.captions.length === 3,
+      `the captions control was read ${read.captions.length} times, not 3`,
+    );
+    for (const step of read.captions) problems.push(...switchProblems(step, duration));
+  }
   if (has("chapter_jump"))
     expect(
       read.chapter_jump >= chapters[1].start && read.chapter_jump < duration,

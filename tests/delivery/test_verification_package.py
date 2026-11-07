@@ -1,4 +1,4 @@
-"""The verifier's binding of both films and the viewing package to their inputs."""
+"""The verifier's binding of the four films and the viewing package to their inputs."""
 
 import json
 
@@ -11,7 +11,12 @@ from filmkit.delivery.verification import VerificationError
 
 def test_the_current_packages_pass(inputs):
     assert delivery_verification.verify_package(inputs.edition) == {
-        "films": ["sample-reel-zh-1080p-captioned.mp4", "sample-reel-zh-uhd.mp4"],
+        "films": [
+            "sample-reel-zh-1080p-captioned.mp4",
+            "sample-reel-zh-1080p-uncaptioned.mp4",
+            "sample-reel-zh-uhd-uncaptioned.mp4",
+            "sample-reel-zh-uhd.mp4",
+        ],
         "viewing_members": 8,
     }
 
@@ -56,6 +61,11 @@ def viewing(*keys, value):
         (films("script_sha256", value="0"), "Film package differs"),
         (films("soundtrack_sha256", value="0"), "Film package differs"),
         (films("picture_sha256", value="0"), "Film package differs"),
+        (films("uncaptioned_picture_sha256", value="0"), "Film package differs"),
+        (films("caption_equivalence_sha256", value="0"), "Film package differs"),
+        (films("caption_owner", value="Already drawn"), "Film package differs"),
+        (films("editions", "2", "picture", value="captioned"), "Film package differs"),
+        (films("editions", "0", "picture", value=None), "Film package differs"),
         (films("cover_sha256", value="0"), "Film package differs"),
         (films("chapters_sha256", value="0"), "Film package differs"),
         (films("editions", "1", "path", value="sample-reel-zh-1080p.mp4"), "Film package differs"),

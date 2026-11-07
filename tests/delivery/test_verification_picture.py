@@ -1,19 +1,49 @@
-"""The verifier's binding of the rendered picture, its geometry and its shot plan."""
+"""The verifier's binding of both rendered pictures, their equivalence, the captioned picture's
+geometry and its shot plan."""
 
 import pytest
 
 import filmkit.delivery.verification as delivery_verification
+import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 from filmkit.delivery.verification import VerificationError
+from filmkit.picture.rendering import PictureError
 
 
-def test_the_current_picture_passes(inputs):
+def test_the_current_picture_passes(inputs, monkeypatch):
     edition = inputs.edition
+    bound = []
+    monkeypatch.setattr(
+        picture_rendering,
+        "validate_picture_binding",
+        lambda _edition, receipt, captions=True: bound.append((receipt["picture"], captions)),
+    )
     assert delivery_verification.verify_picture(edition) == {
         "picture_sha256": repository.sha(edition.picture),
+        "uncaptioned_picture_sha256": repository.sha(edition.rendered(captions=False).file),
+        "caption_equivalence": {"composition_instants": 5, "encoded_frames": 4},
         "geometry_frames": 60,
         "browser": "Chromium",
     }
+    # Each receipt is bound to its own picture.
+    assert bound == [("captioned", True), ("uncaptioned", False)]
+
+
+@pytest.mark.parametrize(
+    ("change", "reason"),
+    [
+        ("verdict", "did not pass"),
+        ("timeline_sha256", "binds another timeline_sha256"),
+        ("pictures", "binds another pictures"),
+    ],
+)
+def test_pictures_without_their_current_passing_equivalence_are_refused(inputs, change, reason):
+    inputs.change(inputs.edition.caption_equivalence, change, value="refuse")
+    with pytest.raises(PictureError, match=reason):
+        delivery_verification.verify_picture(inputs.edition)
+    inputs.edition.caption_equivalence.unlink()
+    with pytest.raises(PictureError, match="no equivalence record; run compare-pictures"):
+        delivery_verification.verify_picture(inputs.edition)
 
 
 # The short films last two seconds at 60 fps, so geometry of every second frame checks 60.

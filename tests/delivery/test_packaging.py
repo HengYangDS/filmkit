@@ -13,6 +13,7 @@ import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.specification as specification
 from filmkit.delivery.packaging import PackagingError
+from filmkit.picture.rendering import PictureError
 
 
 def test_the_runtime_and_viewing_members_follow_the_edition():
@@ -133,10 +134,13 @@ def packaging_root(tmp_path, monkeypatch):
     edition.artifacts.mkdir(parents=True)
     for path, body in (
         (edition.picture, "picture"),
+        (edition.rendered(captions=False).file, "uncaptioned picture"),
+        (edition.caption_equivalence, "{}"),
         (edition.soundtrack, "soundtrack"),
         (edition.artifacts / "chapters.ffmeta", ";FFMETADATA1\n"),
         (edition.artifacts / delivery_packaging.COVER_JPEG, "cover"),
     ):
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(body)
     calls = []
 
@@ -155,7 +159,8 @@ def packaging_root(tmp_path, monkeypatch):
         return subprocess.CompletedProcess(command, 0, b"", b"")
 
     monkeypatch.setattr(delivery_packaging, "run", run)
-    monkeypatch.setattr(delivery_packaging, "validate_picture", lambda _edition: {})
+    monkeypatch.setattr(delivery_packaging, "validate_picture", lambda _edition, captions: {})
+    monkeypatch.setattr(delivery_packaging, "require_equivalence", lambda _edition: {})
     # The chapter track's language is written into each finished film after its keys.
     monkeypatch.setattr(
         delivery_packaging,
@@ -169,7 +174,8 @@ def packaging_root(tmp_path, monkeypatch):
 
 def kind_of(path) -> str:
     """The rendition kind a film's name declares."""
-    return next(kind for kind in production.RENDITIONS if Path(path).stem.endswith(kind))
+    stem = Path(path).stem
+    return next(kind for kind in production.RENDITIONS if stem.endswith(f"-{kind}"))
 
 
 def test_each_film_is_encoded_finished_and_checked_in_work_before_it_is_linked_into_place(
@@ -180,6 +186,8 @@ def test_each_film_is_encoded_finished_and_checked_in_work_before_it_is_linked_i
     package = json.loads(edition.film_package.read_text())
     assert list(package) == [
         "picture_sha256",
+        "uncaptioned_picture_sha256",
+        "caption_equivalence_sha256",
         "soundtrack_sha256",
         "cover_sha256",
         "script_sha256",
@@ -187,9 +195,16 @@ def test_each_film_is_encoded_finished_and_checked_in_work_before_it_is_linked_i
         "editions",
         "caption_owner",
     ]
-    assert [member["path"] for member in package["editions"]] == [
-        "sample-reel-zh-uhd.mp4",
-        "sample-reel-zh-1080p-captioned.mp4",
+    assert package["uncaptioned_picture_sha256"] == repository.sha(
+        edition.rendered(captions=False).file
+    )
+    assert package["caption_equivalence_sha256"] == repository.sha(edition.caption_equivalence)
+    # Each film names the picture it carries.
+    assert [(member["path"], member["picture"]) for member in package["editions"]] == [
+        ("sample-reel-zh-uhd.mp4", "captioned"),
+        ("sample-reel-zh-1080p-captioned.mp4", "captioned"),
+        ("sample-reel-zh-uhd-uncaptioned.mp4", "uncaptioned"),
+        ("sample-reel-zh-1080p-uncaptioned.mp4", "uncaptioned"),
     ]
     work = root / "build/runtime/work/final-film-packaging/zh"
     for member, film in zip(package["editions"], edition.films, strict=True):
@@ -205,6 +220,31 @@ def test_each_film_is_encoded_finished_and_checked_in_work_before_it_is_linked_i
     assert not (edition.evidence / "packaging-failure.json").exists()
 
 
+def test_packaging_waits_for_both_valid_pictures_and_their_equivalence(packaging_root, monkeypatch):
+    _, edition, calls = packaging_root
+    checked = []
+    monkeypatch.setattr(
+        delivery_packaging,
+        "validate_picture",
+        lambda _edition, captions: checked.append(("picture", captions)),
+    )
+
+    def refuse(_edition):
+        checked.append(("equivalence",))
+        msg = "The zh equivalence record did not pass; run compare-pictures"
+        raise PictureError(msg)
+
+    monkeypatch.setattr(delivery_packaging, "require_equivalence", refuse)
+    with pytest.raises(PictureError, match="did not pass; run compare-pictures"):
+        delivery_packaging.package_film(edition)
+    assert checked == [("picture", True), ("picture", False), ("equivalence",)]
+    assert calls == []
+    assert not edition.film_package.exists()
+    edition.rendered(captions=False).file.unlink()
+    with pytest.raises(PackagingError, match="No rendered picture at .*-uncaptioned.mp4"):
+        delivery_packaging.package_film(edition)
+
+
 def test_the_viewing_package_is_derived_again_once_the_films_are_in_place(
     packaging_root, monkeypatch
 ):
@@ -218,7 +258,7 @@ def test_the_viewing_package_is_derived_again_once_the_films_are_in_place(
     delivery_packaging.package_film(edition)
     # Before the films, for the cover and chapters they carry; after them, for the sizes the
     # player names.
-    assert seen == [[False, False], [True, True]]
+    assert seen == [[False] * 4, [True] * 4]
 
 
 def test_the_commands_carry_the_release_metadata(packaging_root):
@@ -230,9 +270,7 @@ def test_the_commands_carry_the_release_metadata(packaging_root):
         f"{root}/build/runtime/work/final-film-packaging/zh",
     )
     created = next(argument for argument in calls[0][0] if argument.startswith("creation_time="))
-    inputs = [
-        "-i",
-        f"{artifacts}/sample-reel-final-picture.mp4",
+    rest = [
         "-i",
         f"{artifacts}/sample-reel-zh-narration.wav",
         "-f",
@@ -302,17 +340,34 @@ def test_the_commands_carry_the_release_metadata(packaging_root):
         "-Keys:CreationDate=" + created.removeprefix("creation_time="),
     ]
     expected = []
-    for name, decoding, video, level, marks, deadline in (
-        ("sample-reel-zh-uhd.mp4", [], ["-c:v:0", "copy"], "5.2", [], 600),
+    viewing = max(delivery_packaging.DEADLINE_FLOOR, 2 * specification.DURATION)
+    captioned, uncaptioned = (
+        "sample-reel-final-picture.mp4",
+        "sample-reel-final-picture-uncaptioned.mp4",
+    )
+    for name, picture, decoding, video, level, marks, deadline in (
+        ("sample-reel-zh-uhd.mp4", captioned, [], ["-c:v:0", "copy"], "5.2", [], 600),
         (
             "sample-reel-zh-1080p-captioned.mp4",
+            captioned,
             hardware,
             scaled,
             "4.2",
             ["hd_video=2"],
-            max(delivery_packaging.DEADLINE_FLOOR, 2 * specification.DURATION),
+            viewing,
+        ),
+        ("sample-reel-zh-uhd-uncaptioned.mp4", uncaptioned, [], ["-c:v:0", "copy"], "5.2", [], 600),
+        (
+            "sample-reel-zh-1080p-uncaptioned.mp4",
+            uncaptioned,
+            hardware,
+            scaled,
+            "4.2",
+            ["hd_video=2"],
+            viewing,
         ),
     ):
+        inputs = ["-i", f"{artifacts}/{picture}", *rest]
         intermediate, finished = f"{work}/{name}", f"{work}/finished/{name}"
         cover = ["-i", intermediate, "-i", f"{artifacts}/sample-reel-cover.jpg", *attach]
         metadata = [arg for tag in [*tags, *marks, created] for arg in ("-metadata", tag)]

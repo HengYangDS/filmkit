@@ -1,8 +1,9 @@
 /** Read a delivery's pages back in a real browser, each page with a verdict of its own.
  *
  * This part only collects what each page shows and does: it opens the entry page and each player, switches versions,
- * clicks every control of the page, reads the browser's own captions control, plays from a chapter and a transcript
- * time and saves each download. player-verdict.mjs judges what it collects. */
+ * turns the captions off and on, paused and playing, and switches a version with them off, clicks every control of the
+ * page, reads the browser's own captions control, plays from a chapter and a transcript time and saves each download.
+ * player-verdict.mjs judges what it collects. */
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
@@ -21,14 +22,17 @@ import {
   visibleCaptionControls,
 } from "./player-verdict.mjs";
 
-/* Each delivered film's name ending and size. */
-const EDITIONS = [
-  ["-uhd.mp4", [3840, 2160]],
-  ["-1080p-captioned.mp4", [1920, 1080]],
+/* Each version's films, with and without captions, by name ending, and their size, in the order the read switches to
+ * them: the UHD version, then the viewing film the page opens on. */
+const VERSIONS = [
+  ["-uhd.mp4", "-uhd-uncaptioned.mp4", [3840, 2160]],
+  ["-1080p-captioned.mp4", "-1080p-uncaptioned.mp4", [1920, 1080]],
 ];
-/* A saved download has this long to end, and a page this long to show it left, in milliseconds. */
+/* A saved download has this long to end, a page this long to show it left, and a switched film this long to show,
+ * in milliseconds. */
 const SAVING = 10000,
-  SETTLING = 150;
+  SETTLING = 150,
+  SWITCHING = 10000;
 
 /** A file's SHA-256, streamed so that a film need not fit in memory. */
 export async function digestFile(path) {
@@ -40,15 +44,17 @@ export async function digestFile(path) {
 /** Two seconds in, the middle, and four seconds before the end. */
 export const seekPoints = (duration) => [2, duration / 2, duration - 4];
 
-/* The page's video and its caption track as the browser holds them. */
+/* The page's video, its caption track and its captions control as the browser holds them. */
 const videoState = (page) =>
   page.$eval("video", (video) => {
     const track = video.textTracks[0];
     return {
       src: video.currentSrc.split("/").pop(),
       time: video.currentTime,
+      paused: video.paused,
       tracks: video.textTracks.length,
       mode: track?.mode ?? null,
+      captions: document.getElementById("captions")?.getAttribute("aria-pressed") ?? null,
     };
   });
 
@@ -73,11 +79,46 @@ async function standAt(page, time) {
   );
 }
 
+/* Play the film the page shows from each seek point; returns its duration, size and error and what each point
+ * decoded. */
+async function playback(page, file, dimensions, duration) {
+  const state = await page.$eval("video", (video) => ({
+    duration: video.duration,
+    width: video.videoWidth,
+    height: video.videoHeight,
+    src: video.currentSrc,
+    error: video.error?.code ?? null,
+  }));
+  Object.assign(state, { file, dimensions, seek_checks: [] });
+  for (const target of seekPoints(duration)) {
+    await standAt(page, target);
+    await page.$eval("video", (video) => video.play());
+    await page.waitForFunction(
+      (at) => document.querySelector("video").currentTime > at + 0.35,
+      {},
+      target,
+    );
+    const decoded = await page.$eval("video", (video) => {
+      video.pause();
+      const q = video.getVideoPlaybackQuality();
+      return {
+        time: video.currentTime,
+        ready_state: video.readyState,
+        error: video.error?.code ?? null,
+        decoded_frames: q.totalVideoFrames,
+        dropped_frames: q.droppedVideoFrames,
+      };
+    });
+    state.seek_checks.push({ target, ...decoded });
+  }
+  return state;
+}
+
 /* Switch to a version from a known time, then play it from each seek point; returns what the browser showed. */
 async function switchVersion(page, file, dimensions, duration) {
   const from = duration / 3;
   await standAt(page, from);
-  await page.click(`[data-file$="${file}"]`);
+  await page.click(`[data-captioned$="${file}"]`);
   await page.waitForFunction(
     (suffix) =>
       document.querySelector("video").currentSrc.endsWith(suffix) &&
@@ -94,13 +135,6 @@ async function switchVersion(page, file, dimensions, duration) {
       KEPT,
     )
     .catch(() => {});
-  const state = await page.$eval("video", (video) => ({
-    duration: video.duration,
-    width: video.videoWidth,
-    height: video.videoHeight,
-    src: video.currentSrc,
-    error: video.error?.code ?? null,
-  }));
   const { time, mode } = await videoState(page);
   // The middle of the middle cue: the hidden track holds it active there, and it marks its paragraph.
   const cueAt = await page.$eval("video", (video) => {
@@ -125,37 +159,71 @@ async function switchVersion(page, file, dimensions, duration) {
     current_paragraph:
       document.querySelector('#transcript p[aria-current="true"]')?.textContent ?? null,
   }));
-  Object.assign(state, {
-    file,
-    dimensions,
+  return {
+    ...(await playback(page, file, dimensions, duration)),
     kept_time: [from, time],
     track_mode: mode,
     cue_at: cueAt,
     ...marked,
-    seek_checks: [],
-  });
-  for (const target of seekPoints(duration)) {
-    await standAt(page, target);
+  };
+}
+
+/* Click a control from a known time, the film paused or playing, and wait until the film whose name ends `file` shows
+ * from that time, paused or playing as before; returns what the browser showed. A page that does not switch, keep the
+ * time or play on is judged, not waited for. */
+async function switchBy(page, selector, file, at, playing) {
+  await standAt(page, at);
+  if (playing) {
     await page.$eval("video", (video) => video.play());
     await page.waitForFunction(
-      (at) => document.querySelector("video").currentTime > at + 0.35,
+      (start) => document.querySelector("video").currentTime > start + 0.1,
       {},
-      target,
+      at,
     );
-    const decoded = await page.$eval("video", (video) => {
-      video.pause();
-      const q = video.getVideoPlaybackQuality();
-      return {
-        time: video.currentTime,
-        ready_state: video.readyState,
-        error: video.error?.code ?? null,
-        decoded_frames: q.totalVideoFrames,
-        dropped_frames: q.droppedVideoFrames,
-      };
-    });
-    state.seek_checks.push({ target, ...decoded });
   }
-  return state;
+  const from = await page.$eval("video", (video) => video.currentTime);
+  await page.click(selector);
+  await page
+    .waitForFunction(
+      (suffix) =>
+        document.querySelector("video").currentSrc.endsWith(suffix) &&
+        document.querySelector("video").readyState >= 1,
+      { timeout: SWITCHING },
+      file,
+    )
+    .catch(() => {});
+  // While a film plays on, its time moves past the time it was switched at.
+  await page
+    .waitForFunction(
+      (target, kept, play) => {
+        const video = document.querySelector("video");
+        return Math.abs(video.currentTime - target) < kept && video.paused === !play;
+      },
+      { timeout: SWITCHING },
+      from,
+      playing ? KEPT / 2 : KEPT,
+      playing,
+    )
+    .catch(() => {});
+  const { src, time, paused, mode, captions } = await videoState(page);
+  await page.$eval("video", (video) => video.pause());
+  return { file, from, playing, src, time, paused, track_mode: mode, pressed: captions };
+}
+
+/* Turn the captions off on the viewing film while it is paused, and play it; switch to the UHD version with them off,
+ * and play it; then turn them on while the UHD film plays. Returns each switch as the browser showed it. */
+async function switchCaptions(page, duration) {
+  const [uhd, viewing] = VERSIONS;
+  const off = await switchBy(page, "#captions", viewing[1], duration / 3, false);
+  const offPlayed = await playback(page, viewing[1], viewing[2], duration);
+  const moved = await switchBy(page, `[data-captioned$="${uhd[0]}"]`, uhd[1], duration / 3, false);
+  const movedPlayed = await playback(page, uhd[1], uhd[2], duration);
+  const on = await switchBy(page, "#captions", uhd[0], duration / 2, true);
+  return [
+    { control: "captions", captions: false, ...offPlayed, ...off },
+    { control: "version", captions: false, ...movedPlayed, ...moved },
+    { control: "captions", captions: true, ...on },
+  ];
 }
 
 /* Click a button that names a time and wait until the film plays from there. */
@@ -329,8 +397,9 @@ export async function readPlayer(page, root, code, binding, screenshot) {
     );
     read.native_caption_controls = await nativeCaptionControls(page);
     read.saved = await saveDownloads(page, root, code, read.files);
-    for (const [file, dimensions] of EDITIONS)
+    for (const [file, , dimensions] of VERSIONS)
       read.editions.push(await switchVersion(page, file, dimensions, binding.film.duration));
+    read.captions = await switchCaptions(page, binding.film.duration);
     read.chapter_jump = (await playFrom(page, "#chapters button:nth-child(2)")).played;
     await page.screenshot({ path: screenshot, fullPage: true });
     read.transcript_chapters = await page.$$eval("#transcript h2", (hs) => hs.length);

@@ -56,22 +56,49 @@ def test_the_actions_are_the_documented_ones_in_order():
         "render-picture",
         "package-metadata",
         "validate-picture",
+        "compare-pictures",
         "package-film",
     ]
 
 
 def test_an_edition_action_passes_its_options_to_its_owner(monkeypatch, tmp_path):
     calls = []
-    monkeypatch.setattr(produce, "stage_picture", lambda *arguments: calls.append(arguments))
-    monkeypatch.setattr(produce, "render_picture", lambda *arguments: calls.append(arguments))
+
+    def owner(*arguments, **options):
+        calls.append((*arguments, options))
+
+    for name in ("stage_picture", "render_picture", "validate_picture", "compare_pictures"):
+        monkeypatch.setattr(produce, name, owner)
     output = tmp_path / "stage"
     stage = ["--output", str(output), "--duration", "60", "--width", "1920", "--height", "1080"]
     produce.main(["stage-picture", "--language", "zh", *stage, "--start", "12.5"])
     produce.main(["render-picture", "--language", "en", "--deadline", "600"])
+    # The uncaptioned picture is staged, rendered and validated by the same owners.
+    produce.main(["stage-picture", "--language", "en", "--uncaptioned"])
+    produce.main(["render-picture", "--language", "zh", "--uncaptioned", "--deadline", "600"])
+    produce.main(["validate-picture", "--language", "zh", "--uncaptioned"])
+    produce.main(["compare-pictures", "--language", "en"])
+    zh, en = production.Edition("zh"), production.Edition("en")
     assert calls == [
-        (production.Edition("zh"), output, 60, 1920, 1080, 12.5),
-        (production.Edition("en"), 600),
+        (zh, output, 60, 1920, 1080, 12.5, {"captions": True}),
+        (en, 600, {"captions": True}),
+        (en, None, produce.DURATION, 3840, 2160, 0, {"captions": False}),
+        (zh, 600, {"captions": False}),
+        (zh, {"captions": False}),
+        (en, {}),
     ]
+
+
+@pytest.mark.parametrize("action", ["check-picture", "compare-pictures", "package-film"])
+def test_only_the_picture_actions_take_the_uncaptioned_picture(monkeypatch, capsys, action):
+    monkeypatch.setattr(produce, "package_film", lambda _edition: pytest.fail("ran"))
+    with pytest.raises(SystemExit) as stopped:
+        produce.main([action, "--language", "zh", "--uncaptioned"])
+    assert stopped.value.code == 2
+    assert (
+        "--uncaptioned applies only to stage-picture, render-picture, validate-picture"
+        in capsys.readouterr().err
+    )
 
 
 @pytest.mark.parametrize(
@@ -91,7 +118,7 @@ def test_an_action_refuses_without_its_required_inputs(monkeypatch, capsys, argu
 
 
 def test_a_refusal_ends_the_command_with_the_action_and_its_reason(monkeypatch):
-    def refuse(_edition):
+    def refuse(_edition, **_options):
         msg = "The render receipt does not bind the staged picture"
         raise PictureError(msg)
 

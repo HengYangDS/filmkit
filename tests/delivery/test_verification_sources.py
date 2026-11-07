@@ -8,7 +8,7 @@ import filmkit.repository as repository
 from filmkit.delivery.verification import VerificationError
 
 
-def test_bilingual_acceptance_needs_exactly_both_current_edition_pairs(tmp_path, monkeypatch):
+def test_bilingual_acceptance_needs_exactly_both_editions_current_films(tmp_path, monkeypatch):
     monkeypatch.setattr(repository, "ROOT", tmp_path)
     films = [film for code in production.CODES for film in production.Edition(code).films]
     groups = delivery_verification.bilingual_inputs(list(reversed(films)))
@@ -19,5 +19,5 @@ def test_bilingual_acceptance_needs_exactly_both_current_edition_pairs(tmp_path,
         [*films[1:], films[1]],
         [tmp_path / "elsewhere" / film.name for film in films],
     ):
-        with pytest.raises(VerificationError, match="both current edition pairs"):
+        with pytest.raises(VerificationError, match="both editions' current films"):
             delivery_verification.bilingual_inputs(files)

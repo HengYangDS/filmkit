@@ -1,8 +1,9 @@
 """Deliver both editions to the film's Documents folder with rsync, then read them back with shasum.
 
-The destination holds exactly the 21 delivery members: the language entry page and, per
-edition, the UHD and captioned 1080p films, the cover as PNG and JPEG, SRT and VTT subtitles,
-the transcript, chapters as JSON and FFmetadata, and the player. They lie below
+The destination holds exactly the 25 delivery members: the language entry page and, per
+edition, its four films, the UHD and the 1080p film each with the captions drawn and without
+them, the cover as PNG and JPEG, SRT and VTT subtitles, the transcript, chapters as JSON and
+FFmetadata, and the player. They lie below
 build/artifacts/film as they lie below the destination. rsync copies each member whose bytes
 differ and removes every other entry except Finder's .DS_Store files and the app-managed
 .claude folder; each entry it replaces or removes moves into
@@ -14,9 +15,10 @@ build/evidence/delivery/delivery-readback.json.
 
 Before rsync changes anything, the player check (`filmkit.tools player-check players`) reads
 the entry page and both players back in a real browser from build/artifacts/film, which holds
-the members as the destination will, and delivery refuses a page that fails, naming the page
-and its problems; its receipt is build/evidence/delivery/player-check.json, which the readback
-names with its SHA-256. A dry run reads no player.
+the members as the destination will, turning each player's captions off and on and playing all
+four of its films, and delivery refuses a page that fails, naming the page and its problems;
+its receipt is build/evidence/delivery/player-check.json, which the readback names with its
+SHA-256. A dry run reads no player.
 
 The film verifier binds every member to its package records; the delivery task runs it first.
 A refusal before rsync leaves the destination unchanged and exits with status 1.

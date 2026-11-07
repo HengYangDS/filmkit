@@ -13,7 +13,7 @@ before anything moves or is written, and --dry-run stops after the plan. A refus
 A reviewed round's packages are set aside by the round's reviews; an unreviewed build's, such as
 a preview the owner watched, with --unreviewed by the consumer folder that holds its films, under
 the round's label or one given with --label. --language limits a set-aside to one edition, and
---without-picture leaves the rendered picture in place, for the editions it names or for both.
+--without-picture leaves the rendered pictures in place, for the editions it names or for both.
 
 Usage: python -m filmkit.review.round set-aside --round <n> --purpose <text>
            [--review-dir <dir>] [--language zh|en] [--without-picture [zh|en ...]] [--dry-run]
@@ -66,7 +66,7 @@ class ProductionReview(NamedTuple):
 def bind(out: Path) -> dict:
     """Bind the packaged delivery members for the real-browser player check.
 
-    The members are the neutral language entry and, for each edition, its two films and
+    The members are the neutral language entry and, for each edition, its four films and
     the viewing package its package record names. Writes the destination, the film's file
     prefix and duration, and each member's path and SHA-256, the shape the player check reads.
     """
@@ -275,7 +275,7 @@ def set_aside_options(aside: argparse.ArgumentParser) -> None:
         "--consumer",
         type=Path,
         metavar="DIR",
-        help="the folder whose <edition>/ holds each edition's two films byte-identical",
+        help="the folder whose <edition>/ holds each edition's films byte-identical",
     )
     aside.add_argument("--language", choices=CODES, help="set aside this edition only")
     aside.add_argument(
@@ -283,7 +283,7 @@ def set_aside_options(aside: argparse.ArgumentParser) -> None:
         nargs="*",
         choices=CODES,
         metavar="CODE",
-        help="leave the rendered picture in place, for the editions named or for every edition",
+        help="leave the rendered pictures in place, for the editions named or for every edition",
     )
     aside.add_argument("--dry-run", action="store_true", help="plan without moving anything")
     aside.set_defaults(run=run_set_aside)

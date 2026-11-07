@@ -35,7 +35,7 @@ def test_bind_names_the_language_entry_and_each_packaged_member(root, put):
             {"members": [{"path": name, "sha256": "recorded"} for name in names]},
         )
     assert review_round.bind(root / "binding.json") == {
-        "members": 11,
+        "members": 15,
         "binding": "binding.json",
     }
     binding = json.loads((root / "binding.json").read_text())
@@ -48,6 +48,8 @@ def test_bind_names_the_language_entry_and_each_packaged_member(root, put):
             for name in (
                 f"sample-reel-{code}-uhd.mp4",
                 f"sample-reel-{code}-1080p-captioned.mp4",
+                f"sample-reel-{code}-uhd-uncaptioned.mp4",
+                f"sample-reel-{code}-1080p-uncaptioned.mp4",
                 "sample-reel-cover.png",
                 f"sample-reel-{code}.srt",
                 "index.html",
@@ -113,7 +115,7 @@ def test_record_writes_reviews_that_verify_film_accepts(root, review, put, capsy
     films = Edition("zh").films
     assert record["media"] == [
         {"path": str(film.relative_to(root)), "sha256": repository.sha(film)}
-        for film in films[::-1]
+        for film in sorted(films)
     ]
     assert record["human_listening"]["checklist"] == ["Listen to 24.3 in its clause."]
     assert record["source_review"] == {

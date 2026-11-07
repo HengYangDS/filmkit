@@ -1,16 +1,18 @@
 """Set an edition's packaged films aside before its next render and package.
 
 package-film refuses to extend a package bound to changed inputs, and the next render would
-overwrite the picture in place. Setting aside renames each edition's two films and package
-record, and its rendered picture unless that edition keeps it (when the successor's render has
-already replaced it, or when the next build does not replace it), within the volume into
+overwrite the pictures in place. Setting aside renames each edition's films and package record,
+and its rendered pictures unless that edition keeps them (when the successor's render has
+already replaced them, or when the next build does not replace them), within the volume into
 build/artifacts/film/superseded/<label>/<code>/, and records them in manifest.json with their
 hashes, the consumer that still holds their bytes and the exit condition. Each member is read
-back by its hash after it moves.
+back by its hash after it moves. A build's films are its films with captions and those without
+that it made (`built_films`): a build packaged before the films without captions existed holds
+only the first, and has only the captioned picture.
 
-A reviewed round's packages are bound by the round's review, which must name both film hashes;
+A reviewed round's packages are bound by the round's review, which must name every film hash;
 their label is round-<n>. An unreviewed build, such as a preview the owner watched, is bound by
-a consumer folder that holds both films byte-identical in <consumer>/<code>/, and is labelled
+a consumer folder that holds its films byte-identical in <consumer>/<code>/, and is labelled
 round-<n> or by a name of its own. Every planned edition is checked before anything moves.
 
 Assembling an edition's soundtrack or refreshing its captions rewrites the inputs of its
@@ -27,7 +29,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import filmkit.repository as repository
-from filmkit.production import CODES, Edition
+from filmkit.production import CODES, RENDITIONS, Edition
 from filmkit.review import ReviewError
 from filmkit.review.files import REVIEWS, edition_review, present, round_number
 
@@ -55,6 +57,24 @@ def round_label(number: int) -> str:
     return f"round-{number}"
 
 
+def built_films(edition: Edition) -> list[Path]:
+    """The films of the edition's build, in `RENDITIONS` order: every film with captions, and
+    each film without them that is in place, since a build packaged before those films existed
+    holds none of them."""
+    return [
+        edition.film(kind)
+        for kind, rendition in RENDITIONS.items()
+        if rendition.captions or edition.film(kind).is_file()
+    ]
+
+
+def built_pictures(edition: Edition) -> list[Path]:
+    """The edition's rendered pictures: the captioned one, and the uncaptioned one when it is in
+    place."""
+    uncaptioned = edition.rendered(captions=False).file
+    return [edition.picture, *([uncaptioned] if uncaptioned.is_file() else [])]
+
+
 def edition_members(label: str, code: str, *, picture: bool) -> tuple[Path, list[Path]]:
     """An edition's target folder and the members to move there.
 
@@ -69,7 +89,11 @@ def edition_members(label: str, code: str, *, picture: bool) -> tuple[Path, list
     if target.exists():
         msg = f"{repository.relative(target)} exists; inspect it before setting aside again"
         raise ReviewError(msg)
-    sources = [*edition.films, edition.film_package, *([edition.picture] if picture else [])]
+    sources = [
+        *built_films(edition),
+        edition.film_package,
+        *(built_pictures(edition) if picture else []),
+    ]
     present(sources)
     volume = next(parent for parent in target.parents if parent.exists()).stat().st_dev
     if any(path.stat().st_dev != volume for path in sources):
@@ -113,7 +137,7 @@ def plan_set_aside(
 ) -> list[SetAside]:
     """Plan moving a reviewed round's packages aside, each edition's picture among `pictures`.
 
-    Refused unless, for every edition, its members can move and the round's review binds both
+    Refused unless, for every edition, its members can move and the round's review binds each
     of its film hashes.
     """
     plans = []
@@ -122,11 +146,11 @@ def plan_set_aside(
         review = review_dir / f"review-{code}.json"
         bound = {item["sha256"] for item in edition_review(review, code)[1].get("media", [])}
         hashes = hashed(sources)
-        if not all(hashes[film] in bound for film in Edition(code).films):
+        if not all(hashes[film] in bound for film in built_films(Edition(code))):
             msg = f"{code}: the packaged films are not the ones round {number} reviewed"
             raise ReviewError(msg)
         what = f"{code} package and picture reviewed in round {number}: {purpose}"
-        binding = f"{repository.relative(review)} binds the two film hashes"
+        binding = f"{repository.relative(review)} binds the film hashes"
         plans.append(planned(code, target, hashes, what, binding))
     return plans
 
@@ -142,14 +166,14 @@ def plan_unreviewed(
     """Plan moving an unreviewed build's packages aside, each edition's picture among `pictures`.
 
     Refused unless, for every edition, its members can move and the consumer folder holds
-    copies of both of its films byte-identical in <consumer>/<code>/, other than the films.
+    copies of each of its films byte-identical in <consumer>/<code>/, other than the films.
     """
     plans = []
     for code in codes:
         target, sources = edition_members(label, code, picture=code in pictures)
         hashes = hashed(sources)
         copies = consumer / code
-        for film in Edition(code).films:
+        for film in built_films(Edition(code)):
             copy = copies / film.name
             if copy.resolve() == film.resolve():
                 msg = f"{code}: {copy} is the film itself, not a consumer's copy"
@@ -158,7 +182,7 @@ def plan_unreviewed(
                 msg = f"{code}: {copy} does not hold the bytes of {repository.relative(film)}"
                 raise ReviewError(msg)
         what = f"{code} package of an unreviewed build: {purpose}"
-        binding = f"{repository.relative(copies)} holds the two films' bytes"
+        binding = f"{repository.relative(copies)} holds the films' bytes"
         plans.append(planned(code, target, hashes, what, binding))
     return plans
 
@@ -201,17 +225,19 @@ def binding_rounds(edition: Edition) -> list[int]:
     """The review rounds whose prompts name each of the edition's current films by its hash.
 
     A round's prompt for the edition is prompt-<code>.md in its directory round-<n> below
-    `REVIEWS`. An edition whose films are not all in place is bound by none, and the films are
-    hashed only when a round holds such a prompt.
+    `REVIEWS`. The films are the build's (`built_films`); an edition whose films with captions
+    are not all in place is bound by none, and the films are hashed only when a round holds
+    such a prompt.
     """
     prompts = sorted(
         (number, path)
         for path in (repository.ROOT / REVIEWS).glob(f"round-*/prompt-{edition.code}.md")
         if (number := round_number(path.parent)) is not None
     )
-    if not prompts or not all(film.is_file() for film in edition.films):
+    films = built_films(edition)
+    if not prompts or not all(film.is_file() for film in films):
         return []
-    hashes = [repository.sha(film) for film in edition.films]
+    hashes = [repository.sha(film) for film in films]
     bound = []
     for number, path in prompts:
         text = path.read_text(encoding="utf-8")

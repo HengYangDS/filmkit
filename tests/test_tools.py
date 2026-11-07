@@ -105,12 +105,13 @@ def test_the_headless_audits_measure_text_by_the_films_faces(film, tmp_path, mon
     package = tmp_path / "package"
     (package / "picture").mkdir(parents=True)
     probe = f"console.log(JSON.stringify({{table: process.env.{VARIABLE} ?? null}}));"
-    for tool in ("frame-audit", "motion-audit", "geometry-check"):
+    for tool in ("frame-audit", "motion-audit", "caption-equivalence", "geometry-check"):
         (package / tools.TOOLS[tool]).write_text(probe)
     monkeypatch.setattr(tools, "PACKAGE", package)
     monkeypatch.delenv(VARIABLE, raising=False)
-    # Both audits that run the composition are given the table of the film's declared faces.
-    for tool in ("frame-audit", "motion-audit"):
+    # Each tool that runs the composition headlessly is given the table of the film's declared
+    # faces.
+    for tool in ("frame-audit", "motion-audit", "caption-equivalence"):
         assert tools.run(tool, []) == 0
         assert json.loads(capfd.readouterr().out) == {"table": str(film / TABLE)}
     assert sorted(repository.read(film / TABLE)["faces"]) == [
@@ -154,6 +155,12 @@ def test_the_command_names_each_tool_and_refuses_another(capsys):
         tools.main(["render"])
     assert refused.value.code == 2
     assert "invalid choice: 'render'" in capsys.readouterr().err
-    assert sorted(tools.TOOLS) == ["frame-audit", "geometry-check", "motion-audit", "player-check"]
+    assert sorted(tools.TOOLS) == [
+        "caption-equivalence",
+        "frame-audit",
+        "geometry-check",
+        "motion-audit",
+        "player-check",
+    ]
     for path in tools.TOOLS.values():
         assert (tools.PACKAGE / path).is_file()

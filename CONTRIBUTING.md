@@ -54,7 +54,7 @@ mise run sample:supply
 mise run sample:build
 ```
 
-A change to narration, sound or picture rebuilds the sample film and compares it with its previous output. Packaging refuses to extend films bound to other inputs, so first delete each edition's two films and its `film-package.json`, as the README describes.
+A change to narration, sound or picture rebuilds the sample film and compares it with its previous output. Packaging refuses to extend films bound to other inputs, so first delete each edition's four films and its `film-package.json`, as the README describes.
 
 ## Commit
 

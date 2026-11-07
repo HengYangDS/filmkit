@@ -12,6 +12,12 @@ from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
 
 PURPOSE = "superseded by its repairs"
+PICTURES = ("sample-reel-final-picture.mp4", "sample-reel-final-picture-uncaptioned.mp4")
+
+
+def films(code: str) -> list[str]:
+    """An edition's four films by name, as a build holds them."""
+    return [film.name for film in Edition(code).films]
 
 
 def test_set_aside_refuses_before_moving_then_reads_back_each_member(root, review):
@@ -33,8 +39,7 @@ def test_set_aside_refuses_before_moving_then_reads_back_each_member(root, revie
     assert not (root / "build/artifacts/film/superseded").exists()
     sources = {
         code: [
-            f"build/artifacts/film/{code}/sample-reel-{code}-uhd.mp4",
-            f"build/artifacts/film/{code}/sample-reel-{code}-1080p-captioned.mp4",
+            *(f"build/artifacts/film/{code}/{name}" for name in films(code)),
             f"build/evidence/editions/{code}/film-package.json",
         ]
         for code in CODES
@@ -47,7 +52,7 @@ def test_set_aside_refuses_before_moving_then_reads_back_each_member(root, revie
         assert list(manifest) == ["purpose", "consumer", "exit_condition", "moved_at", "members"]
         assert manifest["purpose"] == f"{code} package and picture reviewed in round 3: {PURPOSE}"
         consumer = f"build/evidence/reviews/round-3/review-{code}.json"
-        assert manifest["consumer"] == f"{consumer} binds the two film hashes"
+        assert manifest["consumer"] == f"{consumer} binds the film hashes"
         assert manifest["exit_condition"] == "Retire after the successor delivery is accepted"
         assert manifest["moved_at"]
         assert [member["source"] for member in manifest["members"]] == sources[code]
@@ -86,12 +91,8 @@ def test_set_aside_records_its_members_before_the_first_move(root, review, monke
     assert manifest["moved_at"] is None
     assert [member["path"] for member in manifest["members"]] == [
         f"build/artifacts/film/superseded/round-3/zh/{name}"
-        for name in (
-            "sample-reel-zh-uhd.mp4",
-            "sample-reel-zh-1080p-captioned.mp4",
-            "film-package.json",
-        )
-    ] + ["build/artifacts/film/superseded/round-3/zh/sample-reel-final-picture.mp4"]
+        for name in (*films("zh"), "film-package.json", *PICTURES)
+    ]
 
 
 def test_cli_defaults_the_round_directory_and_reports_refusals(root, review, capsys):
@@ -107,12 +108,7 @@ def test_cli_defaults_the_round_directory_and_reports_refusals(root, review, cap
                 "target": f"build/artifacts/film/superseded/round-3/{code}",
                 "members": [
                     f"build/artifacts/film/superseded/round-3/{code}/{name}"
-                    for name in (
-                        f"sample-reel-{code}-uhd.mp4",
-                        f"sample-reel-{code}-1080p-captioned.mp4",
-                        "film-package.json",
-                        "sample-reel-final-picture.mp4",
-                    )
+                    for name in (*films(code), "film-package.json", *PICTURES)
                 ],
             }
             for code in CODES
@@ -127,7 +123,7 @@ def test_cli_defaults_the_round_directory_and_reports_refusals(root, review, cap
 
 
 def preview_copies(folder, codes=CODES):
-    """Copy each edition's two films byte-identical into <folder>/<code>/, as a preview delivery."""
+    """Copy each edition's films byte-identical into <folder>/<code>/, as a preview delivery."""
     for code in codes:
         for film in Edition(code).films:
             copy = folder / code / film.name
@@ -162,15 +158,14 @@ def test_an_unreviewed_build_is_set_aside_by_the_copies_its_consumer_holds(root,
         assert manifest["purpose"] == f"{code} package of an unreviewed build: {PURPOSE}"
         # The consumer is named below the root when it lies there, as every member is.
         assert manifest["consumer"] == (
-            f"Documents/sample-reel-preview/{code} holds the two films' bytes"
+            f"Documents/sample-reel-preview/{code} holds the films' bytes"
         )
         assert manifest["exit_condition"] == "Retire after the successor delivery is accepted"
         assert manifest["moved_at"]
         assert [member["source"] for member in manifest["members"]] == [
-            f"build/artifacts/film/{code}/sample-reel-{code}-uhd.mp4",
-            f"build/artifacts/film/{code}/sample-reel-{code}-1080p-captioned.mp4",
+            *(f"build/artifacts/film/{code}/{name}" for name in films(code)),
             f"build/evidence/editions/{code}/film-package.json",
-            f"build/artifacts/film/{code}/sample-reel-final-picture.mp4",
+            *(f"build/artifacts/film/{code}/{name}" for name in PICTURES),
         ]
         for film in Edition(code).films:
             assert not film.exists()
@@ -203,11 +198,7 @@ def test_the_command_sets_aside_one_edition_of_an_unreviewed_build_and_keeps_its
                 "target": "build/artifacts/film/superseded/round-5/en",
                 "members": [
                     f"build/artifacts/film/superseded/round-5/en/{name}"
-                    for name in (
-                        "sample-reel-en-uhd.mp4",
-                        "sample-reel-en-1080p-captioned.mp4",
-                        "film-package.json",
-                    )
+                    for name in (*films("en"), "film-package.json")
                 ],
             }
         ],
@@ -224,16 +215,43 @@ def test_a_reviewed_set_aside_keeps_the_pictures_it_is_told_to(root, review, cap
     review(reviews, "en")
     plans = review_set_aside.plan_set_aside(3, PURPOSE, reviews, pictures=("zh",))
     moved = {plan.code: [path.name for path in plan.sources] for plan in plans}
-    assert moved["zh"][-1] == "sample-reel-final-picture.mp4"
-    assert "sample-reel-final-picture.mp4" not in moved["en"]
+    assert moved["zh"][-2:] == list(PICTURES)
+    assert not set(PICTURES) & set(moved["en"])
     # Named without an edition, --without-picture keeps every edition's picture.
     review_round.main(
         ["set-aside", "--round", "3", "--purpose", PURPOSE, "--without-picture", "--dry-run"]
     )
     printed = json.loads(capsys.readouterr().out)["editions"]
-    assert [len(edition["members"]) for edition in printed] == [3, 3]
+    assert [len(edition["members"]) for edition in printed] == [5, 5]
     assert not any("final-picture" in path for edition in printed for path in edition["members"])
     assert not (root / "build/artifacts/film/superseded").exists()
+
+
+def test_a_build_packaged_before_the_films_without_captions_is_set_aside_with_its_own(root, review):
+    # A build that a release before the films without captions packaged holds each edition's
+    # two films with captions and its captioned picture, and its round's reviews bind those.
+    for code in CODES:
+        edition = Edition(code)
+        for path in (*edition.films[2:], edition.rendered(captions=False).file):
+            path.unlink()
+    reviews = root / "build/evidence/reviews/round-2"
+    for code in CODES:
+        review(
+            reviews,
+            code,
+            media=[
+                {"path": str(film), "sha256": repository.sha(film)}
+                for film in Edition(code).films[:2]
+            ],
+        )
+    plans = review_set_aside.plan_set_aside(2, PURPOSE, reviews)
+    assert [path.name for path in plans[0].sources] == [
+        *films("zh")[:2],
+        "film-package.json",
+        PICTURES[0],
+    ]
+    review_set_aside.move_aside(plans)
+    assert not any(film.exists() for code in CODES for film in Edition(code).films)
 
 
 def test_the_rounds_whose_prompts_bind_an_edition_s_films_hold_them_until_set_aside(

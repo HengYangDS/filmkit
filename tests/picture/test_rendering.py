@@ -36,6 +36,7 @@ PLACEHOLDERS = (
     'width="1920" height="1080"',
 )
 RECEIPT_KEYS = [
+    "picture",
     "command",
     "exit",
     "timed_out",

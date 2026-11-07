@@ -30,6 +30,8 @@ def test_the_delivery_members_are_the_entry_page_then_each_editions_films_and_vi
             for name in (
                 f"sample-reel-{code}-uhd.mp4",
                 f"sample-reel-{code}-1080p-captioned.mp4",
+                f"sample-reel-{code}-uhd-uncaptioned.mp4",
+                f"sample-reel-{code}-1080p-uncaptioned.mp4",
                 "sample-reel-cover.png",
                 "sample-reel-cover.jpg",
                 f"sample-reel-{code}.srt",
@@ -50,7 +52,7 @@ def test_the_delivery_members_are_the_entry_page_then_each_editions_films_and_vi
 def test_a_first_delivery_places_and_reads_back_every_member(film):
     root, destination = film
     report = delivery_documents_folder.deliver(root, destination)
-    assert len(report["members"]) == 21
+    assert len(report["members"]) == 25
     assert report["members"][1] == {
         "path": "zh/sample-reel-zh-uhd.mp4",
         "sha256": sha("current zh/sample-reel-zh-uhd.mp4\n"),
@@ -157,7 +159,7 @@ def test_the_command_reports_the_readback_summary(film, monkeypatch, capsys):
     monkeypatch.setattr(repository, "ROOT", film.root)
     delivery_documents_folder.main(["--destination", str(film.destination)])
     assert json.loads(capsys.readouterr().out) == {
-        "members": 21,
+        "members": 25,
         "all_match": True,
         "predecessors": None,
     }

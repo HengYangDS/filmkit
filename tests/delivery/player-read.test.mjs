@@ -1,6 +1,7 @@
 /** Exercise how the delivered players' readback judges what it reads: where a page's links lead, the cues of a caption
- * file, the track a page embeds, the browser's own captions control, the sizes its files list names and each page's
- * verdict; and that a read which stops fails only its page. */
+ * file, the track a page embeds, the browser's own captions control, the page's captions control and the films it
+ * switches between, the sizes its files list names and each page's verdict; and that a read which stops fails only its
+ * page. */
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -13,8 +14,10 @@ import {
   fileProblems,
   linkProblems,
   parseCues,
+  playbackProblems,
   playerProblems,
   sizeLabel,
+  switchProblems,
   verdict,
   versionProblems,
   visibleCaptionControls,
@@ -188,21 +191,50 @@ const EXPECTED = {
   vtt: VTT,
   srt_cues: CUES,
 };
-const version = (file, dimensions) => ({
+/* The films a version plays, as the read collects them where it played them. */
+const played = (file, dimensions) => ({
   file,
   dimensions,
   duration: 60,
   width: dimensions[0],
   height: dimensions[1],
   error: null,
+  seek_checks: [2, 30, 56].map((target) => ({ target, error: null, decoded_frames: 31 })),
+});
+const version = (file, dimensions) => ({
+  ...played(file, dimensions),
   kept_time: [20, 20.02],
   track_mode: "hidden",
   cue_at: 12.5,
   active_cue: "“先核对，",
   current_paragraph: "先核对，再放行。",
-  seek_checks: [2, 30, 56].map((target) => ({ target, error: null, decoded_frames: 31 })),
 });
-const SHOWN = Array.from({ length: 4 }, () => ({
+/* The read's three switches: the captions off on the paused viewing film, the UHD version with them off, and the
+ * captions on while the UHD film plays. */
+const switched = (file, { control, captions, playing }) => ({
+  control,
+  captions,
+  file,
+  from: 20,
+  playing,
+  src: `sample-reel-zh${file}`,
+  time: playing ? 20.1 : 20,
+  paused: !playing,
+  track_mode: "hidden",
+  pressed: String(captions),
+});
+const CAPTIONS = [
+  {
+    ...played("-1080p-uncaptioned.mp4", [1920, 1080]),
+    ...switched("-1080p-uncaptioned.mp4", { control: "captions", captions: false, playing: false }),
+  },
+  {
+    ...played("-uhd-uncaptioned.mp4", [3840, 2160]),
+    ...switched("-uhd-uncaptioned.mp4", { control: "version", captions: false, playing: false }),
+  },
+  switched("-uhd.mp4", { control: "captions", captions: true, playing: true }),
+];
+const SHOWN = Array.from({ length: 6 }, () => ({
   target: "sample-reel-zh-uhd.mp4",
   text: "影片 · 超高清 4K · 画面内含字幕 · MP4 · 263 MB",
   embedded: false,
@@ -227,11 +259,17 @@ const READ = {
   files: FILES,
   saved: DOWNLOADS.map((name) => ({ name, state: "completed", same: true, navigated: false })),
   track: { kind: "metadata", srclang: "zh", label: "中文字幕", text: VTT },
-  opening: { src: "sample-reel-zh-1080p-captioned.mp4", tracks: 1, mode: "hidden" },
+  opening: {
+    src: "sample-reel-zh-1080p-captioned.mp4",
+    tracks: 1,
+    mode: "hidden",
+    captions: "true",
+  },
   cues: CUES,
   native_caption_controls: 0,
-  control_sweep: { controls: 14, shown: [] },
+  control_sweep: { controls: 15, shown: [] },
   editions: [version("-uhd.mp4", [3840, 2160]), version("-1080p-captioned.mp4", [1920, 1080])],
+  captions: CAPTIONS,
   chapter_jump: 20.25,
   transcript_chapters: 2,
   transcript_open: true,
@@ -252,17 +290,18 @@ test("a player that misses what the delivery holds names each problem", () => {
     links: ["sample-reel-zh.srt.bak"],
     language_links: [],
     plain_downloads: ["sample-reel-zh-uhd.mp4"],
-    files: FILES.slice(0, 7),
+    files: FILES.slice(0, 9),
     saved: [
       { name: "sample-reel-zh-transcript.md", state: "canceled", same: false, navigated: false },
       { name: "chapters.json", state: "completed", same: true, navigated: true },
     ],
     track: { kind: "captions", srclang: "zh", label: "", text: "WEBVTT\n" },
-    opening: { src: "sample-reel-zh-uhd.mp4", tracks: 0, mode: "showing" },
+    opening: { src: "sample-reel-zh-uhd.mp4", tracks: 0, mode: "showing", captions: null },
     cues: [],
     native_caption_controls: 1,
-    control_sweep: { controls: 14, shown: ["字幕"] },
+    control_sweep: { controls: 15, shown: ["字幕"] },
     editions: [],
+    captions: CAPTIONS.slice(0, 2),
     chapter_jump: 3,
     transcript_chapters: 1,
     transcript_open: false,
@@ -273,7 +312,7 @@ test("a player that misses what the delivery holds names each problem", () => {
     "the chapter buttons differ from chapters.json",
     "sample-reel-zh.srt.bak resolves to zh/sample-reel-zh.srt.bak, which is no delivery member",
     "the language links do not lead to the other edition's player and the entry page",
-    "the files list names 7 files, not 9",
+    "the files list names 9 files, not 11",
     "sample-reel-zh-uhd.mp4 asks for a download, which a browser ignores on a file beside the page",
     "sample-reel-zh.vtt is no download the page holds",
     "sample-reel-zh.srt is no download the page holds",
@@ -287,9 +326,11 @@ test("a player that misses what the delivery holds names each problem", () => {
     "the page opens on sample-reel-zh-uhd.mp4",
     "the film has 0 text tracks, not one",
     "the caption track is showing on the viewing film, not hidden",
+    "the page opens with its captions control pressed null",
     "the track holds 0 cues, the SRT 1",
     "the browser's own controls offer the track, so a viewer could double the captions",
     "a control shows the track: 字幕",
+    "the captions control was read 2 times, not 3",
     "the second chapter does not play from its start",
     "the transcript does not head every chapter",
     "the transcript link does not open the transcript",
@@ -326,6 +367,44 @@ test("a version must keep the time, keep the track hidden, mark its paragraph an
   ]);
   // A cue and its paragraph are compared by their letters and digits.
   assert.equal(bare("“先核对，” A-1"), "先核对A1");
+});
+
+test("the captions control and a version switch must reach the other film from the same time and playback", () => {
+  for (const step of CAPTIONS) assert.deepEqual(switchProblems(step, 60), []);
+  // A control that does not switch leaves the film it showed, and so does a version button that drops the state.
+  const stayed = { ...CAPTIONS[0], src: "sample-reel-zh-1080p-captioned.mp4" };
+  assert.deepEqual(switchProblems(stayed, 60), [
+    "the captions control switched to sample-reel-zh-1080p-captioned.mp4, not the film ending -1080p-uncaptioned.mp4",
+  ]);
+  const dropped = { ...CAPTIONS[1], src: "sample-reel-zh-uhd.mp4" };
+  assert.deepEqual(switchProblems(dropped, 60), [
+    "a version button switched to sample-reel-zh-uhd.mp4, not the film ending -uhd-uncaptioned.mp4",
+  ]);
+  // The switch keeps the time and whether the film plays, and the control's state follows the captions.
+  const careless = {
+    ...CAPTIONS[2],
+    time: 0,
+    paused: true,
+    pressed: "false",
+    track_mode: "showing",
+  };
+  assert.deepEqual(switchProblems(careless, 60), [
+    "the captions control moved the time from 20 s to 0 s",
+    "the captions control left the film paused, not playing",
+    "the captions control is pressed false with the captions on",
+    "the caption track is showing on sample-reel-zh-uhd.mp4",
+  ]);
+  // A film the read played must play as delivered.
+  const broken = {
+    ...CAPTIONS[0],
+    width: 1280,
+    seek_checks: [{ target: 2, error: 4, decoded_frames: 0 }],
+  };
+  assert.deepEqual(switchProblems(broken, 60), [
+    "-1080p-uncaptioned.mp4 is 1280x1080, not 1920x1080",
+    "-1080p-uncaptioned.mp4 decodes nothing at 2 s",
+  ]);
+  assert.deepEqual(playbackProblems(played("-uhd.mp4", [3840, 2160]), 60), []);
 });
 
 test("the entry page leads to both players and nowhere outside the delivery", () => {

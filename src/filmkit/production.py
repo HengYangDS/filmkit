@@ -5,7 +5,7 @@ Every action takes the edition it produces as an argument; nothing holds a curre
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 import filmkit.repository as repository
@@ -21,11 +21,13 @@ CODES = ("zh", "en")
 
 @dataclass(frozen=True)
 class Rendition:
-    """A delivered film's frame size, whether it re-encodes the rendered picture, and how.
+    """A delivered film: its frame size, whether and how it re-encodes its picture, and which
+    picture it carries.
 
     `decoding` holds the FFmpeg options before the picture input and `video` those of the video
     stream. Packaging allows the encode `deadline_ratio` seconds per second of film, and never
-    less than its own floor.
+    less than its own floor. `captions` names the picture: the one that draws the captions, or
+    the uncaptioned one.
     """
 
     width: int
@@ -34,29 +36,48 @@ class Rendition:
     decoding: tuple[str, ...] = ()
     video: tuple[str, ...] = ("-c:v:0", "copy")
     deadline_ratio: int = 0
+    captions: bool = True
 
 
-# Each edition's delivered films by kind: the UHD master copies the rendered picture stream
-# and the 1080p viewing film re-encodes it, decoded and scaled through VideoToolbox. Both show
-# the captions the picture draws.
+# The two sizes a film is delivered at: the UHD master and the 1080p viewing film.
+UHD = Rendition(3840, 2160, reencoded=False)
+VIEWING = Rendition(
+    1920,
+    1080,
+    reencoded=True,
+    decoding=("-hwaccel", "videotoolbox", "-hwaccel_output_format", "videotoolbox_vld"),
+    video=("-filter:v:0", "scale_vt=w=1920:h=1080", "-c:v:0", "h264_videotoolbox", "-b:v:0", "10M"),
+    deadline_ratio=2,
+)
+# Each edition's delivered films by kind: at each size, one with the captions the picture draws
+# and one without them. The UHD films copy their rendered picture's stream and the 1080p viewing
+# films re-encode it, decoded and scaled through VideoToolbox; the two films of a size are made
+# alike from their own pictures.
 RENDITIONS = {
-    "uhd": Rendition(3840, 2160, reencoded=False),
-    "1080p-captioned": Rendition(
-        1920,
-        1080,
-        reencoded=True,
-        decoding=("-hwaccel", "videotoolbox", "-hwaccel_output_format", "videotoolbox_vld"),
-        video=(
-            "-filter:v:0",
-            "scale_vt=w=1920:h=1080",
-            "-c:v:0",
-            "h264_videotoolbox",
-            "-b:v:0",
-            "10M",
-        ),
-        deadline_ratio=2,
-    ),
+    "uhd": UHD,
+    "1080p-captioned": VIEWING,
+    "uhd-uncaptioned": replace(UHD, captions=False),
+    "1080p-uncaptioned": replace(VIEWING, captions=False),
 }
+
+
+@dataclass(frozen=True)
+class Rendered:
+    """One of an edition's two pictures and its places: its stage, its file and its receipt.
+
+    The captioned picture draws the timeline's captions; the uncaptioned one is staged from the
+    same composition and timeline with no captions, and is otherwise the same picture.
+    """
+
+    captions: bool
+    stage: Path
+    file: Path
+    receipt: Path
+
+    @property
+    def name(self) -> str:
+        """The picture as its stage record, receipt and package name it."""
+        return "captioned" if self.captions else "uncaptioned"
 
 
 @dataclass(frozen=True)
@@ -109,9 +130,20 @@ class Edition:
     def evidence(self) -> Path:
         return repository.ROOT / "build/evidence/editions" / self.code
 
+    def rendered(self, captions: bool = True) -> Rendered:
+        """The captioned picture's places, or with `captions` False the uncaptioned one's."""
+        suffix = "" if captions else "-uncaptioned"
+        return Rendered(
+            captions,
+            repository.ROOT / "build/runtime/work" / f"final-delivery-{self.code}-uhd{suffix}",
+            self.artifacts / f"{FILM.slug}-final-picture{suffix}.mp4",
+            self.evidence / f"render/receipt{suffix}.json",
+        )
+
     @property
     def picture_stage(self) -> Path:
-        return repository.ROOT / "build/runtime/work" / f"final-delivery-{self.code}-uhd"
+        """The captioned picture's stage."""
+        return self.rendered().stage
 
     @property
     def prefix(self) -> str:
@@ -129,8 +161,8 @@ class Edition:
 
     @property
     def picture(self) -> Path:
-        """The rendered picture, before the soundtrack, cover and metadata join it."""
-        return self.artifacts / f"{FILM.slug}-final-picture.mp4"
+        """The rendered captioned picture, before the soundtrack, cover and metadata join it."""
+        return self.rendered().file
 
     def film(self, kind: str) -> Path:
         """A delivered film by its kind in `RENDITIONS`."""
@@ -138,7 +170,8 @@ class Edition:
 
     @property
     def films(self) -> list[Path]:
-        """The delivered films in `RENDITIONS` order: the UHD master, then the viewing film."""
+        """The delivered films in `RENDITIONS` order: the UHD master and the viewing film, each
+        with its captions drawn, then the same two without captions."""
         return [self.film(kind) for kind in RENDITIONS]
 
     @property
@@ -160,7 +193,14 @@ class Edition:
 
     @property
     def render_receipt(self) -> Path:
-        return self.evidence / "render/receipt.json"
+        """The captioned picture's render receipt."""
+        return self.rendered().receipt
+
+    @property
+    def caption_equivalence(self) -> Path:
+        """The record that the uncaptioned picture differs from the captioned one only by its
+        captions (`filmkit.picture.equivalence`)."""
+        return self.evidence / "caption-equivalence.json"
 
     @property
     def picture_geometry(self) -> Path:

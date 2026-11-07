@@ -85,7 +85,8 @@ def decoded(tmp_path, monkeypatch):
 
     def check(changes=None):
         monkeypatch.setattr(media, "probe", lambda _path: probe(changes or {}))
-        return delivery_verification.verify_media(production.Edition("zh"), film, (3840, 2160))
+        uhd = production.RENDITIONS["uhd"]
+        return delivery_verification.verify_media(production.Edition("zh"), film, uhd)
 
     return film, check
 

@@ -1,15 +1,17 @@
 /** Read the delivered players back in a real browser, and paint the cover from a staged document.
  *
- * players: a binding names the destination, the film's file prefix and duration, and the SHA-256 of each of the 21
+ * players: a binding names the destination, the film's file prefix and duration, and the SHA-256 of each of the 25
  * delivery members (the delivery readback, or a review round's artifacts binding). The member bytes are checked before and after the browser read.
  * The read (player-read.mjs, judged by player-verdict.mjs) opens the language entry page and each language's player, and records each page with a
  * verdict of its own in the receipt's `pages`: every link leads to a member or a sibling page; the captioned viewing
- * edition plays first; the one track, which embeds the delivered WebVTT and whose cues equal the SRT's, stays hidden on
- * every version since every picture draws its captions, and no control of the page or the browser can show it; a cue
- * marks its transcript paragraph; a version switch keeps the time; both editions' duration and dimensions with
- * decoding at three seek points; a chapter jump and a transcript time that play from their time; the language links;
- * the sizes the files list names, no link that opens raw text, and the bytes each download saves without leaving the
- * page. Requests outside the destination are refused and recorded; screenshots are written beside the receipt.
+ * edition plays first with its captions control pressed; the control turns the captions off and on, paused and
+ * playing, onto the other film of the version, and a version button keeps them off, each keeping the time and whether
+ * the film plays; the one track, which embeds the delivered WebVTT and whose cues equal the SRT's, stays hidden on
+ * every film since the pictures draw the captions, and no control of the page or the browser can show it; a cue marks
+ * its transcript paragraph; a version switch keeps the time; all four films' duration and dimensions with decoding at
+ * three seek points; a chapter jump and a transcript time that play from their time; the language links; the sizes the
+ * files list names, no link that opens raw text, and the bytes each download saves without leaving the page. Requests
+ * outside the destination are refused and recorded; screenshots are written beside the receipt.
  * cover: paints window.renderCover() from a staged UHD document and compares its pixels with the tracked cover; a
  * painting with no tracked cover yet is written, reported uncompared and fails, so the painting can become the cover.
  * No human hearing or complete-film playback is claimed.
@@ -38,8 +40,9 @@ const DEADLINE = 300000;
 
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
-/** A film's 21 delivery members: the language entry page, then per language both movies, the cover as PNG and JPEG,
- * SRT and VTT subtitles, the transcript, chapters as JSON and FFmetadata, and the player. */
+/** A film's 25 delivery members: the language entry page, then per language its four films, the UHD and the 1080p film
+ * with captions and the same two without, the cover as PNG and JPEG, SRT and VTT subtitles, the transcript, chapters as
+ * JSON and FFmetadata, and the player. */
 export function deliveryMembers(slug) {
   return [
     "index.html",
@@ -47,6 +50,8 @@ export function deliveryMembers(slug) {
       [
         `${slug}-${code}-uhd.mp4`,
         `${slug}-${code}-1080p-captioned.mp4`,
+        `${slug}-${code}-uhd-uncaptioned.mp4`,
+        `${slug}-${code}-1080p-uncaptioned.mp4`,
         `${slug}-cover.png`,
         `${slug}-cover.jpg`,
         `${slug}-${code}.srt`,
@@ -246,7 +251,7 @@ export async function checkPlayers(bindingPath, receiptPath) {
     destination: binding.destination,
     binding_sha256: await digestFile(bindingPath),
     scope:
-      "Real-browser links, the hidden caption track and every control that could show it, version switching, decode at seek points, chapter and transcript seeking, the files list and its downloads, with a verdict per page; no human hearing or complete-film playback",
+      "Real-browser links, the captions control, the hidden caption track and every control that could show it, version switching, decode at seek points, chapter and transcript seeking, the files list and its downloads, with a verdict per page; no human hearing or complete-film playback",
     pages: [],
     console_errors: [],
     console_warnings: [],

@@ -4,6 +4,22 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.13.0] - UNRELEASED
+
+### Added
+
+- Each edition renders a second picture without its captions. `stage-picture --uncaptioned` stages the same composition and timeline with `captions` set to `[]` in `final-delivery-<edition>-uhd-uncaptioned/`, and `render-picture --uncaptioned` renders it with the same HyperFrames settings to `<slug>-final-picture-uncaptioned.mp4` and `render/receipt-uncaptioned.json`; `validate-picture --uncaptioned` binds it. Each stage record and receipt names its `picture`, `captioned` or `uncaptioned`; one written before 0.13.0 names none and stays the captioned picture's, so no captioned picture is rendered again for it.
+- `produce compare-pictures` proves that the uncaptioned picture differs from the captioned one only by its captions and records it in `build/evidence/editions/<edition>/caption-equivalence.json`, which packaging requires. At the composition, `filmkit.tools caption-equivalence` runs the composition headlessly with and without the captions at every caption's start, middle and end and every 0.5 s, and refuses any paint that changes, goes or comes besides the caption paints: texts outside every scene that carry the display text of the cue that started last or of the next one, and that the frame's layout names as captions. In the encoded pictures, both are decoded at every 0.5 s and every caption's start, middle and end frame and compared outside the caption band, widened by 24 rows of 1080 and out to 16-pixel blocks: no tile of 64 luma or 32 chroma pixels may differ by more than 4 levels on average, and the compared samples must keep 50 dB PSNR. On the sample film the encoder's noise between the two pictures reached 1.51 and 1.24 levels and 60.2 and 61.1 dB at worst in the Chinese and English editions; a picture missing one muted note outside the captions differed by 24.8 and 17.2 levels in 31 and 29 of the 152 and 154 sampled frames, and the Chinese picture one frame off by 11.0 levels and 47.8 dB, while the English one frame off, slow at every sampled frame, stayed within both limits at 3.7 levels and 52.2 dB.
+- Each edition delivers four films: `uhd` and `1080p-captioned` as before, and `uhd-uncaptioned`, the uncaptioned picture's copied stream, and `1080p-uncaptioned`, its 1080p encode, with the same soundtrack, chapters, metadata and cover. The film package binds both pictures and the equivalence record, and each member names the picture it carries.
+- The player has a captions control: a button with `aria-pressed`, pressed while the captions show, reading `字幕：开` or `字幕：关` and `Captions: on` or `Captions: off`, with `字幕` or `Captions` as its name. It switches to the other film of the same version, and the version buttons keep its state; both keep the time and whether the film plays. The files list says of each film whether its picture draws the captions (`画面内含字幕` or `无字幕`, `captions in the picture` or `no captions`).
+- `player-check players` turns the captions off on the paused viewing film, switches to the UHD version with them off and turns them on again while the UHD film plays, and fails a page whose control or version button does not reach the other film from the same time, does not keep the film paused or playing, or leaves the control pressed against the captions; all four films are played at three seek points.
+
+### Changed
+
+- **Breaking:** the delivery holds 25 members, each edition's four films among them; the verifier, the review rounds, the set-aside and the release manifest take every film of an edition. A build packaged before 0.13.0 is set aside with its two films and its captioned picture. A release manifest names either every edition's four films with its `uncaptioned_stage_sha256` or, for a release published before 0.13.0, only the two films with captions; the comparison then lists the rebuilt films without captions as unpublished.
+- The preflight reports the uncaptioned picture's stage beside the captioned one's.
+- The sample film's tasks stage, render and validate both pictures and compare them, and its review prompt describes the four films.
+
 ## [0.12.0] - 2026-11-07
 
 ### Added

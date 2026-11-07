@@ -1,4 +1,4 @@
-"""Stage, render and validate the picture against its recorded inputs.
+"""Stage, render and validate an edition's two pictures against their recorded inputs.
 
 A stage is one ignored workspace holding the renderer document, which inlines the edition's
 timeline and the composition's script and style into the composition's template, beside the
@@ -8,6 +8,12 @@ update checks and self-installs off, and records a receipt; validation binds the
 picture to that receipt, the stage and the current inputs. A stage, render or receipt that
 differs from this contract raises `PictureError`, as does a film whose installed renderer is not
 the version the engine renders with.
+
+Each edition has two pictures (`production.Edition.rendered`): the captioned one, which draws
+the timeline's captions, and the uncaptioned one, whose document inlines the same timeline with
+no captions and which renders with the same settings to its own stage, file and receipt. Each
+stage record and receipt names its picture; one written before the uncaptioned picture existed
+names none, and its places bind it to the captioned picture.
 """
 
 from __future__ import annotations
@@ -33,7 +39,7 @@ from filmkit.repository import content_sha, read, sha, write
 from filmkit.specification import DURATION, FPS
 
 if TYPE_CHECKING:
-    from filmkit.production import Edition
+    from filmkit.production import Edition, Rendered
 
 # The composition that draws the picture, as a path below the repository root.
 COMPOSITION = Path("picture")
@@ -146,15 +152,19 @@ def picture_html(
     start: float,
     *,
     timeline: dict | None = None,
+    captions: bool = True,
 ) -> str:
     """Derive the exact native renderer document from current authored inputs.
 
     The template's language, duration and frame are set before the timeline, style and
-    script are inlined, so no substitution reaches inlined text.
+    script are inlined, so no substitution reaches inlined text. The uncaptioned picture's
+    document, with `captions` False, inlines the timeline with no captions.
     """
     data = dict(timeline) if timeline is not None else read(edition.timeline)
     data["render_offset"] = start
     data["edition"] = edition.code
+    if not captions:
+        data["captions"] = []
     style = (repository.ROOT / STYLE).read_text(encoding="utf-8")
     script = (repository.ROOT / COMPOSITION_SCRIPT).read_text(encoding="utf-8")
     html = (repository.ROOT / TEMPLATE).read_text(encoding="utf-8")
@@ -229,8 +239,11 @@ def stage_picture(
     width: int,
     height: int,
     start: float = 0,
+    *,
+    captions: bool = True,
 ) -> None:
-    """Materialize the authored picture in one ignored native render workspace."""
+    """Materialize the authored picture, or with `captions` False the uncaptioned one, in one
+    ignored native render workspace: its own stage unless `output` names another."""
     require_renderer()
     if (
         not 1 <= duration <= DURATION
@@ -239,12 +252,15 @@ def stage_picture(
     ):
         msg = "Picture must use the admitted frame and duration contract"
         raise PictureError(msg)
-    target = (output or edition.picture_stage).resolve()
+    rendered = edition.rendered(captions)
+    target = (output or rendered.stage).resolve()
     if not target.is_relative_to(repository.ROOT / "build"):
         msg = "Derived renderer inputs belong to this repository's build owner"
         raise PictureError(msg)
     inputs, timeline = candidate_picture_inputs(edition)
-    document = picture_html(edition, duration, width, height, start, timeline=timeline)
+    document = picture_html(
+        edition, duration, width, height, start, timeline=timeline, captions=captions
+    )
     target.mkdir(parents=True, exist_ok=True)
     (target / "index.html").write_text(document, encoding="utf-8")
     members = [copy_member(target, path, source) for path, source in staged_members()]
@@ -257,6 +273,7 @@ def stage_picture(
             "width": width,
             "height": height,
             "edition": edition.code,
+            "picture": rendered.name,
             "script_sha256": inputs["script"]["sha256"],
             "template_sha256": sha(TEMPLATE),
             "timeline_sha256": inputs["timeline"]["sha256"],
@@ -264,7 +281,8 @@ def stage_picture(
             "members": members,
         },
     )
-    print(json.dumps({"stage": str(target), "members": len(members)}), flush=True)
+    staged = {"stage": str(target), "picture": rendered.name, "members": len(members)}
+    print(json.dumps(staged), flush=True)
 
 
 def require_staged_members(members: object, stage: Path) -> None:
@@ -285,12 +303,13 @@ def require_staged_members(members: object, stage: Path) -> None:
             raise PictureError(msg)
 
 
-def require_current_stage(edition: Edition, stage: Path) -> dict:
+def require_current_stage(edition: Edition, stage: Path, *, captions: bool = True) -> dict:
     """The stage's record, refused unless the stage holds the complete current UHD picture.
 
-    The record must bind the current inputs, template and edition over the whole duration at
-    the UHD frame; the staged document must be the one those sources derive now, and every
-    copied member must match its record and its source.
+    The record must bind the current inputs, template, edition and picture, captioned or with
+    `captions` False uncaptioned, over the whole duration at the UHD frame; the staged document
+    must be the one those sources derive now, and every copied member must match its record and
+    its source.
     """
     record, document = stage / "stage.json", stage / "index.html"
     if not record.is_file() or not document.is_file():
@@ -311,15 +330,24 @@ def require_current_stage(edition: Edition, stage: Path) -> dict:
         "inputs": inputs,
     }
     differing = [key for key, value in expected.items() if binding.get(key) != value]
+    if recorded_picture(binding) != edition.rendered(captions).name:
+        differing.append("picture")
     if differing:
         msg = f"The stage is not the complete current UHD picture: {', '.join(differing)} differ"
         raise PictureError(msg)
-    derived = picture_html(edition, DURATION, *PICTURE_SIZE, 0, timeline=timeline)
+    derived = picture_html(
+        edition, DURATION, *PICTURE_SIZE, 0, timeline=timeline, captions=captions
+    )
     if document.read_bytes() != derived.encode("utf-8"):
         msg = "The staged document differs from the one the current sources derive"
         raise PictureError(msg)
     require_staged_members(binding.get("members"), stage)
     return binding
+
+
+def recorded_picture(record: dict) -> str:
+    """The picture a stage record or receipt names; one that names none is the captioned one."""
+    return record.get("picture", "captioned")
 
 
 def require_completed_receipt(receipt: dict, stage: Path) -> None:
@@ -470,19 +498,21 @@ def require_passing_gates(edition: Edition) -> None:
         raise PictureError(msg)
 
 
-def render_picture(edition: Edition, deadline: int) -> None:
+def render_picture(edition: Edition, deadline: int, *, captions: bool = True) -> None:
     """Run the locked renderer on the complete current stage and record its receipt.
 
-    The edition's picture must have passed check-picture as it stands. At the deadline the
-    renderer's process group is sent SIGTERM and, after `STOP_GRACE_SECONDS`, SIGKILL. A
-    render that does not exit 0 within its deadline, or whose stage changed meanwhile, raises
-    `PictureError` after its receipt is written.
+    With `captions` False it renders the uncaptioned picture, from its own stage to its own file
+    and receipt, with the same settings. The edition's picture must have passed check-picture as
+    it stands. At the deadline the renderer's process group is sent SIGTERM and, after
+    `STOP_GRACE_SECONDS`, SIGKILL. A render that does not exit 0 within its deadline, or whose
+    stage changed meanwhile, raises `PictureError` after its receipt is written.
     """
     require_renderer()
     require_passing_gates(edition)
-    stage = edition.picture_stage
-    require_current_stage(edition, stage)
-    picture = edition.picture
+    rendered = edition.rendered(captions)
+    stage = rendered.stage
+    require_current_stage(edition, stage, captions=captions)
+    picture = rendered.file
     command = [
         str(repository.node_modules() / RENDERER),
         "render",
@@ -507,6 +537,7 @@ def render_picture(edition: Edition, deadline: int) -> None:
     started = datetime.now(UTC)
     exit_code, timed_out = run_renderer(command, deadline)
     receipt = {
+        "picture": rendered.name,
         "command": command,
         "exit": exit_code,
         "timed_out": timed_out,
@@ -517,7 +548,7 @@ def render_picture(edition: Edition, deadline: int) -> None:
         "output_path": str(picture),
         "output_sha256": sha(picture) if picture.is_file() else None,
     }
-    write(edition.render_receipt, receipt)
+    write(rendered.receipt, receipt)
     print(json.dumps({key: receipt[key] for key in ("exit", "timed_out", "elapsed_seconds")}))
     if exit_code != 0 or timed_out or source != sha(stage / "index.html"):
         msg = "Native picture render did not complete from the current stage"
@@ -534,21 +565,32 @@ def recorded_at(recorded: str, current: Path, root: Path) -> bool:
     return Path(recorded).parts[-len(place) :] == place
 
 
-def validate_picture_binding(edition: Edition, receipt: dict) -> None:
-    """Bind one complete native render to the exact staged current inputs."""
-    stage = edition.picture_stage
-    require_completed_receipt(receipt, stage)
-    require_current_stage(edition, stage)
-    require_receipt_places(receipt, stage, edition.picture)
+def require_receipt_picture(receipt: dict, rendered: Rendered) -> None:
+    """Refuse a receipt that names another picture than the one it is read for."""
+    if recorded_picture(receipt) != rendered.name:
+        held = recorded_picture(receipt)
+        msg = f"The render receipt holds the {held} picture, not the {rendered.name}"
+        raise PictureError(msg)
 
 
-def validate_picture(edition: Edition) -> dict:
-    """Bind the complete native capture to its current authored input."""
-    picture, frames = edition.picture, DURATION * FPS
-    receipt = read(edition.render_receipt)
-    validate_picture_binding(edition, receipt)
+def validate_picture_binding(edition: Edition, receipt: dict, *, captions: bool = True) -> None:
+    """Bind one complete native render, of the captioned picture or with `captions` False of the
+    uncaptioned one, to the exact staged current inputs."""
+    rendered = edition.rendered(captions)
+    require_receipt_picture(receipt, rendered)
+    require_completed_receipt(receipt, rendered.stage)
+    require_current_stage(edition, rendered.stage, captions=captions)
+    require_receipt_places(receipt, rendered.stage, rendered.file)
+
+
+def validate_picture(edition: Edition, *, captions: bool = True) -> dict:
+    """Bind the complete native capture, captioned or with `captions` False uncaptioned, to its
+    current authored input."""
+    rendered, frames = edition.rendered(captions), DURATION * FPS
+    receipt = read(rendered.receipt)
+    validate_picture_binding(edition, receipt, captions=captions)
     media.require_video(
-        media.probe(picture), frames=frames, fps=FPS, size=PICTURE_SIZE, duration=DURATION
+        media.probe(rendered.file), frames=frames, fps=FPS, size=PICTURE_SIZE, duration=DURATION
     )
-    media.video_cadence(picture, frames, FPS)
+    media.video_cadence(rendered.file, frames, FPS)
     return receipt

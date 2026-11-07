@@ -80,11 +80,13 @@ const opaque = (rgb) =>
     i % 4 === 3 ? 255 : rgb[(i >> 2) * 3 + (i % 4)],
   );
 
-test("the delivery has the entry page and ten members per language", () => {
+test("the delivery has the entry page and twelve members per language", () => {
   const edition = (code) =>
     [
       `sample-reel-${code}-uhd.mp4`,
       `sample-reel-${code}-1080p-captioned.mp4`,
+      `sample-reel-${code}-uhd-uncaptioned.mp4`,
+      `sample-reel-${code}-1080p-uncaptioned.mp4`,
       "sample-reel-cover.png",
       "sample-reel-cover.jpg",
       `sample-reel-${code}.srt`,
@@ -95,7 +97,7 @@ test("the delivery has the entry page and ten members per language", () => {
       "index.html",
     ].map((name) => `${code}/${name}`);
   assert.deepEqual(deliveryMembers(FILM.slug), ["index.html", ...edition("zh"), ...edition("en")]);
-  assert.equal(new Set(deliveryMembers(FILM.slug)).size, 21);
+  assert.equal(new Set(deliveryMembers(FILM.slug)).size, 25);
 });
 
 test("a binding names an absolute destination, the film and exactly its delivery members", () => {

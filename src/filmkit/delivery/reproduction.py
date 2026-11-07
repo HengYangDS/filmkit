@@ -4,12 +4,18 @@ The published assets lie in build/artifacts/release under the names that the rel
 content/release.json records with each asset's size and SHA-256; an asset that differs from
 the manifest, or a film-bound source that differs from the bytes the manifest records, refuses
 the comparison before any layer is compared. Each edition's soundtrack and staged picture
-document must hold the bytes the manifest records, its captions, transcript and cover the
+documents must hold the bytes the manifest records, its captions, transcript and cover the
 published bytes, and its published review must bind the published films and the current
-script and composition. Each rebuilt film must have its published film's frame count, decoded
-audio, streams, chapters and tags, and every decoded frame's PSNR against it at or above the
-floor that the manifest records. Without a floor the comparison reports the lowest frames, so
-that they can be inspected and the floor recorded, and does not pass.
+script and composition. Each rebuilt film that the release publishes must have its published
+film's frame count, decoded audio, streams, chapters and tags, and every decoded frame's PSNR
+against it at or above the floor that the manifest records. Without a floor the comparison
+reports the lowest frames, so that they can be inspected and the floor recorded, and does not
+pass.
+
+A release publishes either all four films of each edition, with the uncaptioned picture's stage
+document recorded beside the captioned one's, or, published before the films without captions
+existed, only each edition's two films with captions; the comparison then lists the rebuilt
+uncaptioned films as unpublished and compares the rest.
 
 The report goes to build/evidence/reproduction/report.json unless --read-only is given; a
 comparison that does not pass exits with "<edition>: <asset>: <layer>" for each failing layer.
@@ -71,6 +77,7 @@ class EditionRecord(Declared):
 
     soundtrack_sha256: Digest
     stage_sha256: Digest
+    uncaptioned_stage_sha256: Digest | None = None
     picture_floor_db: dict[AssetName, PositiveFloat] = Field(default_factory=dict)
 
 
@@ -85,11 +92,22 @@ class Release(Declared):
     assets: tuple[Asset, ...] = Field(min_length=1)
 
 
-def members(edition: production.Edition) -> dict[str, tuple[str, Path]]:
-    """Each asset an edition publishes, by its release name: its layer and the build file."""
+def members(
+    edition: production.Edition, *, uncaptioned: bool = True
+) -> dict[str, tuple[str, Path]]:
+    """Each asset an edition publishes, by its release name: its layer and the build file.
+
+    With `uncaptioned` False they are those of a release published before the films without
+    captions existed, which holds only the films with captions.
+    """
     prefix, review = edition.prefix, edition.production_review
+    films = [
+        edition.film(kind)
+        for kind, rendition in production.RENDITIONS.items()
+        if uncaptioned or rendition.captions
+    ]
     return {
-        **{film.name: ("film", film) for film in edition.films},
+        **{film.name: ("film", film) for film in films},
         **{
             f"{prefix}{suffix}": ("document", edition.artifacts / f"{prefix}{suffix}")
             for suffix in (".srt", ".vtt", "-transcript.md")
@@ -116,13 +134,31 @@ def load() -> Release:
     if set(release.editions) != set(production.CODES):
         msg = f"{MANIFEST} records the editions {sorted(release.editions)}"
         raise ReproductionError(msg)
-    published = [name for code in production.CODES for name in members(production.Edition(code))]
     names = [asset.name for asset in release.assets]
-    if len(set(names)) != len(names) or sorted(names) != sorted([*published, CHECKSUMS]):
+    choices = {
+        uncaptioned: [
+            name
+            for code in production.CODES
+            for name in members(production.Edition(code), uncaptioned=uncaptioned)
+        ]
+        for uncaptioned in (True, False)
+    }
+    held = [
+        u for u, published in choices.items() if sorted(names) == sorted([*published, CHECKSUMS])
+    ]
+    if len(set(names)) != len(names) or not held:
         msg = f"{MANIFEST} does not name every published asset of the editions, each once"
         raise ReproductionError(msg)
+    if any(
+        (record.uncaptioned_stage_sha256 is None) == held[0] for record in release.editions.values()
+    ):
+        msg = (
+            f"{MANIFEST} records the uncaptioned picture's stage exactly when it publishes the "
+            "films without captions"
+        )
+        raise ReproductionError(msg)
     for code, record in release.editions.items():
-        films = {film.name for film in production.Edition(code).films}
+        films = {film.name for film in production.Edition(code).films} & set(names)
         if not set(record.picture_floor_db) <= films:
             msg = f"{MANIFEST} records a floor for an asset that is not a film of {code}"
             raise ReproductionError(msg)
@@ -176,7 +212,7 @@ def identical(name: str, rebuilt: Path, published: Path) -> dict:
 
 def review(edition: production.Edition, assets: dict[str, Path]) -> dict:
     """The edition's published review, which must bind its published films and sources."""
-    films = [assets[film.name] for film in edition.films]
+    films = [assets[film.name] for film in edition.films if film.name in assets]
     record = assets[f"{edition.prefix}-production-review.json"]
     try:
         accepted = verification.verify_review(edition, films, record=record)
@@ -301,9 +337,15 @@ def film(name: str, rebuilt: Path, published: Path, floor: float | None) -> dict
 def compare_edition(edition: production.Edition, record: EditionRecord, assets: dict) -> dict:
     """One edition's every layer against its published assets and its manifest record."""
     layers = members(edition)
+    uncaptioned = edition.rendered(captions=False).stage / "index.html"
     return {
         "soundtrack": recorded(edition.soundtrack, record.soundtrack_sha256),
         "stage": recorded(edition.picture_stage / "index.html", record.stage_sha256),
+        **(
+            {}
+            if record.uncaptioned_stage_sha256 is None
+            else {"uncaptioned_stage": recorded(uncaptioned, record.uncaptioned_stage_sha256)}
+        ),
         "review": review(edition, assets),
         "documents": [
             identical(name, source, assets[name])
@@ -313,7 +355,10 @@ def compare_edition(edition: production.Edition, record: EditionRecord, assets: 
         "films": [
             film(name, source, assets[name], record.picture_floor_db.get(name))
             for name, (layer, source) in layers.items()
-            if layer == "film"
+            if layer == "film" and name in assets
+        ],
+        "unpublished": [
+            name for name, (layer, _) in layers.items() if layer == "film" and name not in assets
         ],
     }
 
@@ -324,8 +369,8 @@ def failures(report: dict) -> list[str]:
     for code, edition in report["editions"].items():
         found += [
             f"{code}: {layer}"
-            for layer in ("soundtrack", "stage", "review")
-            if edition[layer]["verdict"] == "fail"
+            for layer in ("soundtrack", "stage", "uncaptioned_stage", "review")
+            if layer in edition and edition[layer]["verdict"] == "fail"
         ]
         found += [
             f"{code}: {document['asset']}: documents"

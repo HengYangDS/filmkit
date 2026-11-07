@@ -42,8 +42,8 @@ def painted(identical=True, cover_sha256="0" * 64, differing=0):
 
 @pytest.fixture
 def edition(tmp_path, monkeypatch):
-    """The Chinese edition with every input of its render current: a stage of its current
-    picture, a passing gate record, a passing draft scan and no earlier package."""
+    """The Chinese edition with every input of its render current: a stage of each of its current
+    pictures, a passing gate record, a passing draft scan and no earlier package."""
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
     supported = {"name": "hyperframes", "version": picture_rendering.RENDERER_VERSION}
@@ -65,6 +65,7 @@ def edition(tmp_path, monkeypatch):
     }
     put(edition.audio_assembly, assembly)
     picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160)
+    picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160, captions=False)
     composition = repository.sha(root / picture_rendering.COMPOSITION_SCRIPT)
     put(
         edition.picture_gates,
@@ -94,7 +95,16 @@ def test_an_edition_whose_inputs_are_current_passes(edition, monkeypatch, capsys
     monkeypatch.setattr(preflight.tools, "run", run)
     report = preflight.preflight(edition)
     assert report == dict.fromkeys(
-        ["stage", "picture_gate", "draft_stills", "concepts", "film_package", "cover"], "current"
+        [
+            "stage",
+            "uncaptioned_stage",
+            "picture_gate",
+            "draft_stills",
+            "concepts",
+            "film_package",
+            "cover",
+        ],
+        "current",
     )
     assert json.loads(capsys.readouterr().out) == {"language": "zh", "inputs": report}
     # The cover is painted from the stage with the edition's tracked cover beside it.
@@ -122,17 +132,19 @@ def test_every_stale_input_is_named_at_once_and_refuses(edition, monkeypatch, ca
     with pytest.raises(SystemExit) as refusal:
         produce.main(["preflight", "--language", "zh"])
     message = str(refusal.value)
-    assert message.startswith("preflight: 6 stale or missing inputs before the zh render: stage: ")
+    assert message.startswith("preflight: 7 stale or missing inputs before the zh render: stage: ")
     for named in (
         "stage: The staged document differs from the one the current sources derive; run "
-        "stage-picture",
+        "stage-picture |",
+        "uncaptioned_stage: The staged document differs from the one the current sources derive; "
+        "run stage-picture --uncaptioned",
         "picture_gate: The zh picture gate record binds another composition_sha256",
         "draft_stills: build/evidence/editions/zh/draft-stills.json does not bind the current "
         "composition; scan a new draft",
         "concepts: 01: 复刻 is a counterexample of rebuild; 02: says no rendering of offline",
         "film_package: build/evidence/editions/zh/film-package.json binds other picture_sha256, "
-        "soundtrack_sha256, cover_sha256, script_sha256, chapters_sha256, caption_owner; set its "
-        "films aside first",
+        "uncaptioned_picture_sha256, caption_equivalence_sha256, soundtrack_sha256, cover_sha256, "
+        "script_sha256, chapters_sha256, caption_owner; set its films aside first",
         "cover: not compared: the stage is not current",
     ):
         assert named in message
@@ -146,8 +158,10 @@ def test_a_package_of_the_current_inputs_is_named_for_the_picture_the_render_rep
     edition, monkeypatch
 ):
     monkeypatch.setattr(preflight.tools, "run", painted()[0])
-    for path in (edition.picture, edition.artifacts / "sample-reel-cover.jpg"):
+    uncaptioned = edition.rendered(captions=False).file
+    for path in (edition.picture, uncaptioned, edition.caption_equivalence):
         put(path, f"{path.name} bytes")
+    put(edition.artifacts / "sample-reel-cover.jpg", "cover bytes")
     put(edition.artifacts / "chapters.ffmeta", ";FFMETADATA1\n")
     record = {**preflight.packaging.film_bindings(edition), "editions": []}
     put(edition.film_package, {**record, "caption_owner": preflight.packaging.CAPTION_OWNER})

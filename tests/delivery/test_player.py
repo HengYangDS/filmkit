@@ -68,7 +68,9 @@ def sizes(edition: production.Edition) -> dict[str, int]:
     """The delivered files beside the player and their sizes in bytes, the captions left out."""
     return {
         f"{edition.prefix}-1080p-captioned.mp4": 203_312_000,
+        f"{edition.prefix}-1080p-uncaptioned.mp4": 198_700_000,
         f"{edition.prefix}-uhd.mp4": 262_800_000,
+        f"{edition.prefix}-uhd-uncaptioned.mp4": 241_400_000,
         f"{edition.prefix}-transcript.md": 8_702,
         "chapters.json": 404,
         "chapters.ffmeta": 469,
@@ -135,8 +137,8 @@ def test_the_player_shows_the_film_its_versions_and_chapters_over_a_hidden_track
     # The film's colours, and its summary under the film.
     assert all(colour in html for colour in FILM.player.model_dump().values())
     assert FILM.editions["zh"].summary in page.all("section", id="summary")[0]["text"]
-    # The viewing film plays first. Every version's picture draws its captions, so the track of
-    # the edition's WebVTT cues is one no browser shows or offers: a metadata track, kept hidden.
+    # The viewing film plays first, with its captions. The pictures draw the captions, so the track
+    # of the edition's WebVTT cues is one no browser shows or offers: a metadata track, kept hidden.
     assert page.all("video", id="film")[0]["poster"] == "sample-reel-cover.png"
     assert [s["src"] for s in page.all("source")] == ["sample-reel-zh-1080p-captioned.mp4"]
     [track] = page.all("track")
@@ -146,13 +148,34 @@ def test_the_player_shows_the_film_its_versions_and_chapters_over_a_hidden_track
     vtt = (edition.artifacts / "sample-reel-zh.vtt").read_bytes()
     assert base64.b64decode(track["src"].removeprefix(embedded)) == vtt
     assert track["src"].startswith(embedded)
-    buttons = [b for b in page.all("button") if "data-file" in b]
-    assert [(b["data-file"], b["text"], b["aria-pressed"]) for b in buttons] == [
-        ("sample-reel-zh-1080p-captioned.mp4", "观看版 · 1080p", "true"),
-        ("sample-reel-zh-uhd.mp4", "超高清 4K · 2160p", "false"),
+    # Each version names its film with captions and its film without them.
+    buttons = [b for b in page.all("button") if "data-captioned" in b]
+    assert [
+        (b["data-captioned"], b["data-uncaptioned"], b["text"], b["aria-pressed"]) for b in buttons
+    ] == [
+        (
+            "sample-reel-zh-1080p-captioned.mp4",
+            "sample-reel-zh-1080p-uncaptioned.mp4",
+            "观看版 · 1080p",
+            "true",
+        ),
+        (
+            "sample-reel-zh-uhd.mp4",
+            "sample-reel-zh-uhd-uncaptioned.mp4",
+            "超高清 4K · 2160p",
+            "false",
+        ),
     ]
-    # Showing the track would double the drawn captions, so nothing in the page can.
-    assert page.all("button", id="captions") == []
+    # One captions control, pressed while the captions show: its words say so, and a screen reader
+    # reads its name with the pressed state.
+    [control] = page.all("button", id="captions")
+    assert (control["aria-pressed"], control["text"]) == ("true", "字幕：开")
+    assert (control["data-on"], control["data-off"]) == ("：开", "：关")
+    [state] = [e for e in page.all("span") if e.get("aria-hidden") == "true"]
+    assert state["text"] == "：开"
+    assert page.all("p", id="playback-status")[0]["text"] == "观看版 · 1080p · 字幕：开"
+    # The control switches films; showing the track would double the drawn captions, so nothing in
+    # the page can.
     assert "showing" not in html and "::cue" not in html
     # Each chapter's button seeks to its start, as chapters.json gives it.
     chapters = [(b["text"], b["data-time"]) for b in page.all("button", class_="chapter")]
@@ -199,26 +222,28 @@ def test_the_files_list_names_each_delivered_file_and_the_language_links_lead_to
     vtt = (edition.artifacts / "sample-reel-zh.vtt").stat().st_size
     srt = (edition.artifacts / "sample-reel-zh.srt").stat().st_size
     files = page.all("a", class_="file")
-    # A browser shows the films and covers as a viewer expects, and both films say their captions
-    # are in the picture.
-    drawn = "画面内含字幕 · MP4"
-    assert [(a["href"], a["text"]) for a in files[:4]] == [
+    # A browser shows the films and covers as a viewer expects, and each film says whether its
+    # picture draws the captions.
+    drawn, undrawn = "画面内含字幕 · MP4", "无字幕 · MP4"
+    assert [(a["href"], a["text"]) for a in files[:6]] == [
         ("sample-reel-zh-1080p-captioned.mp4", f"影片 · 观看版 1080p · {drawn} · 203 MB"),
+        ("sample-reel-zh-1080p-uncaptioned.mp4", f"影片 · 观看版 1080p · {undrawn} · 199 MB"),
         ("sample-reel-zh-uhd.mp4", f"影片 · 超高清 4K · {drawn} · 263 MB"),
+        ("sample-reel-zh-uhd-uncaptioned.mp4", f"影片 · 超高清 4K · {undrawn} · 241 MB"),
         ("sample-reel-cover.png", "封面 · PNG · 260 KB"),
         ("sample-reel-cover.jpg", "封面 · JPEG · 252 KB"),
     ]
     # Every text file it would only show raw is a real download, labelled by kind and purpose: a
     # page opened from disk can save what it holds, where a browser ignores `download` on a file
     # beside it.
-    assert [(a["download"], a["text"]) for a in files[4:]] == [
+    assert [(a["download"], a["text"]) for a in files[6:]] == [
         ("sample-reel-zh-transcript.md", "讲稿（Markdown，供下载） · 9 KB"),
         ("chapters.json", "章节（JSON，供下载） · 404 B"),
         ("chapters.ffmeta", "章节（FFmetadata，供下载） · 469 B"),
         ("sample-reel-zh.vtt", f"字幕（WebVTT，下载后供其他播放器使用） · {vtt} B"),
         ("sample-reel-zh.srt", f"字幕（SRT，下载后供其他播放器使用） · {srt} B"),
     ]
-    for link in files[4:]:
+    for link in files[6:]:
         assert link["href"].startswith("data:")
         held = base64.b64decode(link["href"].split(",", 1)[1])
         assert held == (edition.artifacts / link["download"]).read_bytes()
@@ -229,10 +254,10 @@ def test_the_files_list_names_each_delivered_file_and_the_language_links_lead_to
     ]
     # A size stays whole on its line.
     assert ".size{white-space:nowrap}" in html
-    assert html.count('<span class="size"> · ') == 9
+    assert html.count('<span class="size"> · ') == 11
     # Nothing promises a download of a film or a cover, which a browser opening a file from disk
     # would not make.
-    assert not any("download" in a or "下载" in a["text"] for a in files[:4])
+    assert not any("download" in a or "下载" in a["text"] for a in files[:6])
 
 
 def test_the_english_player_speaks_english_and_names_chinese_in_chinese(delivered):
@@ -245,14 +270,22 @@ def test_the_english_player_speaks_english_and_names_chinese_in_chinese(delivere
         "en",
         "English captions",
     )
-    assert [a["text"] for a in page.all("a", class_="file")][:2] == [
+    assert [a["text"] for a in page.all("a", class_="file")][:4] == [
         "Film · Viewing edition 1080p · captions in the picture · MP4 · 203 MB",
+        "Film · Viewing edition 1080p · no captions · MP4 · 199 MB",
         "Film · 4K UHD · captions in the picture · MP4 · 263 MB",
+        "Film · 4K UHD · no captions · MP4 · 241 MB",
     ]
+    [control] = page.all("button", id="captions")
+    assert (control["text"], control["data-on"], control["data-off"]) == (
+        "Captions: on",
+        ": on",
+        ": off",
+    )
     edition = production.Edition("en")
     vtt = (edition.artifacts / "sample-reel-en.vtt").stat().st_size
     srt = (edition.artifacts / "sample-reel-en.srt").stat().st_size
-    assert [a["text"] for a in page.all("a", class_="file")][4:] == [
+    assert [a["text"] for a in page.all("a", class_="file")][6:] == [
         "Transcript (Markdown, download) · 9 KB",
         "Chapters (JSON, download) · 404 B",
         "Chapters (FFmetadata, download) · 469 B",
@@ -275,16 +308,18 @@ def test_an_absent_film_is_listed_without_a_size_and_the_binding_names_what_the_
     edition.film("uhd").unlink()
     page = Page(delivery_player.player_page(edition))
     assert [a["text"] for a in page.all("a", class_="file")][
-        1
+        2
     ] == "影片 · 超高清 4K · 画面内含字幕 · MP4"
     binding = delivery_player.player_binding(edition)
     declared = {"summary": FILM.editions["zh"].summary, "player": FILM.player.model_dump()}
     assert binding["declaration_sha256"] == repository.content_sha(
         json.dumps(declared, ensure_ascii=False, sort_keys=True)
     )
-    assert binding["files"][:2] == [
+    assert binding["files"][:4] == [
         {"path": "sample-reel-zh-1080p-captioned.mp4", "bytes": 203_312_000},
+        {"path": "sample-reel-zh-1080p-uncaptioned.mp4", "bytes": 198_700_000},
         {"path": "sample-reel-zh-uhd.mp4", "bytes": None},
+        {"path": "sample-reel-zh-uhd-uncaptioned.mp4", "bytes": 241_400_000},
     ]
     vtt = (edition.artifacts / "sample-reel-zh.vtt").stat().st_size
     assert {"path": "sample-reel-zh.vtt", "bytes": vtt} in binding["files"]

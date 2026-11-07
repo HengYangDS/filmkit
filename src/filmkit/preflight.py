@@ -3,8 +3,8 @@
 `preflight` reports at once every stale or missing input of an edition, each by the owner that
 would refuse it later, and refuses with `PreflightError` while any remains:
 
-- the stage: the complete current UHD picture that `render-picture` renders
-  (`filmkit.picture.rendering.require_current_stage`);
+- the stages: the complete current UHD pictures that `render-picture` renders, the captioned one
+  and the uncaptioned one (`filmkit.picture.rendering.require_current_stage`);
 - the cover: the edition's tracked cover identical to the cover the staged composition paints,
   as `filmkit.tools player-check cover` compares them, the painting written below
   build/runtime/work/preflight/<code>/;
@@ -51,11 +51,13 @@ def missing(error: FileNotFoundError) -> str:
     return f"missing {repository.relative(Path(error.filename))}"
 
 
-def stage(edition: Edition) -> str | None:
+def stage(edition: Edition, *, captions: bool = True) -> str | None:
+    """Whether the stage of the captioned picture, or of the uncaptioned one, is current."""
+    rendered = edition.rendered(captions)
     try:
-        rendering.require_current_stage(edition, edition.picture_stage)
+        rendering.require_current_stage(edition, rendered.stage, captions=captions)
     except rendering.PictureError as error:
-        return f"{error}; run stage-picture"
+        return f"{error}; run stage-picture" + ("" if captions else " --uncaptioned")
     except FileNotFoundError as error:
         return missing(error)
     return None
@@ -148,6 +150,7 @@ def preflight(edition: Edition) -> dict:
     staged = stage(edition)
     found = {
         "stage": staged,
+        "uncaptioned_stage": stage(edition, captions=False),
         "picture_gate": gates(edition),
         "draft_stills": draft(edition),
         "concepts": concept_check(),

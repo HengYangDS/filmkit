@@ -4,11 +4,15 @@
 transcript and chapters, the edition's player, which the engine renders from the declared
 words and colours (`filmkit.delivery.player`), and the language entry page, each recorded with
 its SHA-256 in the edition's viewing package beside what the player shows. It refuses an
-edition whose declared cover has not been painted yet. `package_film` muxes the rendered
-picture with the soundtrack and chapters into every rendition in `production.RENDITIONS`,
-attaches the cover and the QuickTime keys in the packaging work folder, checks the finished
-film and only then links it into place, recording its SHA-256 and commands in the edition's
-film package; it then derives the viewing package again, so the player names the films' sizes.
+edition whose declared cover has not been painted yet. `package_film` requires both of the
+edition's pictures valid and a passing equivalence record that binds them
+(`filmkit.picture.equivalence`). It muxes each rendition's picture, the captioned one or the
+uncaptioned one, with the soundtrack and chapters into every rendition in
+`production.RENDITIONS`, attaches the cover and the QuickTime keys in the packaging work folder,
+checks the finished film and only then links it into place, recording its SHA-256, its picture
+and its commands in the edition's film package; it then derives the viewing package again, so
+the player names the films' sizes. All four films carry the same soundtrack, chapters, release
+metadata and cover.
 
 A film's release metadata comes from its script's "release": FFmpeg writes it as the iTunes
 item list (title, artist, collection, genre, year, comments, synopsis, copyright and media
@@ -42,6 +46,7 @@ from filmkit.delivery.player import (
 )
 from filmkit.delivery.track_language import set_chapter_language
 from filmkit.film import FILM, copied_players
+from filmkit.picture.equivalence import require_equivalence
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, validate_picture
 from filmkit.production import CODES, RENDITIONS
 from filmkit.repository import read, run, sha, write
@@ -71,7 +76,10 @@ LANGUAGE_INDEX = Path("build/artifacts/film/index.html")
 WORK = Path("build/runtime/work/final-film-packaging")
 # What a failed or timed-out encode was bound to, in the edition's evidence folder.
 FAILURE_RECEIPT = "packaging-failure.json"
-CAPTION_OWNER = "Already drawn in source picture; no duplicate burn-in"
+CAPTION_OWNER = (
+    "The captioned films' picture draws the captions and the uncaptioned films' picture none;"
+    " packaging burns in no captions"
+)
 # No encode's deadline is shorter, in seconds.
 DEADLINE_FLOOR = 600
 # The film that a delivery binding names for the real-browser player check.
@@ -215,9 +223,12 @@ def package_metadata(edition: Edition) -> None:
 
 
 def film_inputs(edition: Edition) -> dict[str, Path]:
-    """The production inputs of both delivered films, by the record field of each SHA-256."""
+    """The production inputs of the delivered films, by the record field of each SHA-256: both
+    pictures and the record of their equivalence among them."""
     return {
         "picture_sha256": edition.picture,
+        "uncaptioned_picture_sha256": edition.rendered(captions=False).file,
+        "caption_equivalence_sha256": edition.caption_equivalence,
         "soundtrack_sha256": edition.soundtrack,
         "cover_sha256": edition.artifacts / COVER_JPEG,
         "script_sha256": repository.ROOT / edition.script,
@@ -226,7 +237,7 @@ def film_inputs(edition: Edition) -> dict[str, Path]:
 
 
 def film_bindings(edition: Edition) -> dict:
-    """The production inputs of both delivered films, by SHA-256, in record order."""
+    """The production inputs of the delivered films, by SHA-256, in record order."""
     return {key: sha(path) for key, path in film_inputs(edition).items()}
 
 
@@ -326,7 +337,8 @@ def delivered_tags(edition: Edition, rendition: Rendition) -> dict[str, str]:
 def encode_command(
     edition: Edition, rendition: Rendition, intermediate: Path, created_at: str
 ) -> list[str]:
-    """The FFmpeg command that muxes the picture, soundtrack and chapters into one rendition."""
+    """The FFmpeg command that muxes the rendition's picture, the soundtrack and the chapters
+    into one film."""
     language, names = ISO_LANGUAGES[edition.code], track_names(edition)
     tags = [
         *(f"{key}={value}" for key, value in release_tags(edition, rendition)),
@@ -339,7 +351,7 @@ def encode_command(
         "-nostdin",
         *rendition.decoding,
         "-i",
-        str(edition.picture),
+        str(edition.rendered(rendition.captions).file),
         "-i",
         str(edition.soundtrack),
         "-f",
@@ -488,8 +500,8 @@ def package_rendition(
 ) -> dict:
     """Encode, finish and check one film in the work folder, then link it into place.
 
-    Returns the film's package member. A film or work file already in place is preserved
-    for inspection, as is the work of a failed step.
+    Returns the film's package member, which names the picture it carries. A film or work file
+    already in place is preserved for inspection, as is the work of a failed step.
     """
     if target.exists():
         msg = f"Preserve existing film output: {target}"
@@ -508,23 +520,28 @@ def package_rendition(
     set_chapter_language(finished, ISO_LANGUAGES[edition.code])
     check_delivered_film(finished, edition, rendition)
     target.hardlink_to(finished)
-    member = {"path": target.name, "sha256": sha(target), "commands": commands}
+    picture = edition.rendered(rendition.captions).name
+    member = {"path": target.name, "sha256": sha(target), "picture": picture, "commands": commands}
     finished.unlink()
     intermediate.unlink()
     return member
 
 
 def package_film(edition: Edition) -> None:
-    """Write both delivered films with the exact soundtrack and media metadata.
+    """Write every delivered film with the exact soundtrack and media metadata.
 
-    A film recorded by a package bound to the current inputs is reused when its bytes are the
-    recorded ones; the edition's folder never receives a film before its checks pass. The
-    finished package supersedes the failure receipt of an earlier attempt, which is retired.
+    Both pictures must be valid and their equivalence record must pass and bind them. A film
+    recorded by a package bound to the current inputs is reused when its bytes are the recorded
+    ones; the edition's folder never receives a film before its checks pass. The finished
+    package supersedes the failure receipt of an earlier attempt, which is retired.
     """
-    if not edition.picture.is_file():
-        msg = f"No rendered picture at {edition.picture}"
-        raise PackagingError(msg)
-    validate_picture(edition)
+    for captions in (True, False):
+        picture = edition.rendered(captions).file
+        if not picture.is_file():
+            msg = f"No rendered picture at {picture}"
+            raise PackagingError(msg)
+        validate_picture(edition, captions=captions)
+    require_equivalence(edition)
     package_metadata(edition)
     package = resume_package(edition)
     created_at = datetime.now(UTC).isoformat()

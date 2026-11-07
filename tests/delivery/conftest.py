@@ -18,6 +18,7 @@ import filmkit.delivery.player as delivery_player
 import filmkit.delivery.verification as delivery_verification
 import filmkit.narration.selection as narration_selection
 import filmkit.narration.thought_groups as narration_thought_groups
+import filmkit.picture.equivalence as picture_equivalence
 import filmkit.picture.rendering as picture_rendering
 import filmkit.production as production
 import filmkit.repository as repository
@@ -190,12 +191,24 @@ def narration(inputs: Inputs, texts: dict[str, str]) -> None:
 
 
 def picture(inputs: Inputs) -> None:
-    """The staged and rendered picture, its render receipt, geometry and shot plan."""
+    """Both staged and rendered pictures, their render receipts and equivalence record, and the
+    captioned picture's geometry and shot plan."""
     root, edition, sha = inputs.root, inputs.edition, repository.sha
     write_input(root / picture_rendering.COMPOSITION_SCRIPT, "/* film */")
-    write_input(edition.picture_stage / "index.html", "<html></html>")
-    write_input(edition.picture, "picture")
-    write_input(edition.render_receipt, {"output_sha256": sha(edition.picture)})
+    for captions in (True, False):
+        rendered = edition.rendered(captions)
+        write_input(rendered.stage / "index.html", f"<html>{rendered.name}</html>")
+        write_input(rendered.file, f"{rendered.name} picture")
+        receipt = {"picture": rendered.name, "output_sha256": sha(rendered.file)}
+        write_input(rendered.receipt, receipt)
+    equivalence = {
+        **picture_equivalence.current_bindings(edition),
+        "composition": {"instants": 5, "differing_instants": 0},
+        "encoded": {"frames": 4, "failing_frames": 0},
+        "findings": [],
+        "verdict": "pass",
+    }
+    write_input(edition.caption_equivalence, equivalence)
     write_input(
         edition.picture_geometry,
         {
@@ -224,7 +237,7 @@ def picture(inputs: Inputs) -> None:
 
 
 def packages(inputs: Inputs) -> None:
-    """Both films, the viewing members, the entry page and both package records."""
+    """The four films, the viewing members, the entry page and both package records."""
     root, edition, sha = inputs.root, inputs.edition, repository.sha
     output = edition.artifacts
     write_input(root / edition.cover, b"cover png")
@@ -234,15 +247,16 @@ def packages(inputs: Inputs) -> None:
         )
     for film in edition.films:
         write_input(film, f"{film.name}\n")
+    members = [
+        {"path": edition.film(kind).name, "picture": edition.rendered(rendition.captions).name}
+        for kind, rendition in production.RENDITIONS.items()
+    ]
     write_input(
         edition.film_package,
         {
-            "picture_sha256": sha(edition.picture),
-            "soundtrack_sha256": sha(edition.soundtrack),
-            "cover_sha256": sha(output / delivery_packaging.COVER_JPEG),
-            "script_sha256": sha(root / edition.script),
-            "chapters_sha256": sha(output / "chapters.ffmeta"),
-            "editions": [{"path": film.name, "sha256": sha(film)} for film in edition.films],
+            **delivery_packaging.film_bindings(edition),
+            "editions": [{**m, "sha256": sha(output / m["path"])} for m in members],
+            "caption_owner": delivery_packaging.CAPTION_OWNER,
         },
     )
     for path, body in (
@@ -293,7 +307,7 @@ def inputs(tmp_path, monkeypatch) -> Inputs:
         "validate_voice_record",
         lambda record, cast: current.checked.append(("voice", record["id"], cast)),
     )
-    monkeypatch.setattr(picture_rendering, "validate_picture_binding", lambda *_: None)
+    monkeypatch.setattr(picture_rendering, "validate_picture_binding", lambda *_, **__: None)
     narration(current, {"01": "数据先行。", "02": "交付在后。"})
     picture(current)
     packages(current)

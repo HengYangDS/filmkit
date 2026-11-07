@@ -29,12 +29,14 @@ def put():
 
 @pytest.fixture
 def root(tmp_path, monkeypatch):
-    """A repository root holding both packaged editions as tiny stand-in files."""
+    """A repository root holding both packaged editions as tiny stand-in files: each edition's
+    four films, its package record and both pictures."""
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
     for code in CODES:
         edition = Edition(code)
-        for path in (*edition.films, edition.picture, edition.film_package):
+        pictures = (edition.picture, edition.rendered(captions=False).file)
+        for path in (*edition.films, edition.film_package, *pictures):
             write_fixture(path, f"{code} {path.name}")
     return root
 

@@ -7,19 +7,22 @@ from the edition's script, timeline and delivered files:
 
 - the header: the title, then the author, the language, the running time and the frame rate,
   and links to the other edition's player and to the entry page;
-- the video, which opens on the viewing film. Every version's picture draws its captions, so the
-  page shows them no other way and offers no control for them: its one track of the edition's
-  WebVTT cues is a metadata track, which stays hidden and which no browser's own controls offer.
-  The page embeds the cues as a data URL, since Chrome refuses a page opened from disk the
-  caption file beside it;
-- a button for each version, which keeps the time, and one for each chapter, which seeks to the
-  chapter's start and plays;
+- the video, which opens on the viewing film with its captions. Each version has two films: one
+  whose picture draws the captions and one without them. The captions control, a button pressed
+  while the captions show, switches the film to the other one of the same version, and a version
+  button to the film of its version with the captions as they are; both keep the time and
+  whether the film plays. The page shows the captions no other way: its one track of the
+  edition's WebVTT cues is a metadata track, which stays hidden and which no browser's own
+  controls offer, so the captions are never doubled. The page embeds the cues as a data URL,
+  since Chrome refuses a page opened from disk the caption file beside it;
+- a button for each version and the captions control, and a button for each chapter, which seeks
+  to the chapter's start and plays;
 - the summary, then the transcript (`filmkit.captions.documents.transcript_parts`): each chapter
   and scene headed by its time in a button that seeks there and plays, and each thought a
   paragraph, which the track's cues mark as the current one while the film plays;
 - the files list: each delivered file by kind, version, format and size, in decimal units, and
-  for each film that its captions are in the picture. A browser shows the films and covers as a
-  viewer expects, so they are links. It would show every other file as raw text, so the Markdown
+  for each film whether its picture draws the captions. A browser shows the films and covers as
+  a viewer expects, so they are links. It would show every other file as raw text, so the Markdown
   transcript, the chapter files and the SRT and WebVTT captions are downloads, labelled by kind
   and purpose, as data URLs of their bytes, since a browser ignores `download` on a file beside
   a page opened from disk. The transcript in the page stays the place to read.
@@ -54,8 +57,12 @@ UNSPOKEN = re.compile(r"[\W_]+")
 # Each edition's cover as delivered, PNG and JPEG; the PNG is the video's poster.
 COVER_PNG = f"{FILM.slug}-cover.png"
 COVER_JPEG = f"{FILM.slug}-cover.jpg"
-# Each version's film, whether the page opens on it, and the word of its button.
-VERSIONS = (("1080p-captioned", "true", "viewing"), ("uhd", "false", "uhd"))
+# Each version's films with and without captions, whether the page opens on it, and the word of
+# its button.
+VERSIONS = (
+    ("1080p-captioned", "1080p-uncaptioned", "true", "viewing"),
+    ("uhd", "uhd-uncaptioned", "false", "uhd"),
+)
 # The words of each edition's page.
 WORDS = {
     "zh": {
@@ -65,6 +72,8 @@ WORDS = {
         "viewing": "观看版 · 1080p",
         "uhd": "超高清 4K · 2160p",
         "captions": "字幕",
+        "captions_on": "：开",
+        "captions_off": "：关",
         "track": "中文字幕",
         "chapters": "章节",
         "transcript": "完整讲稿",
@@ -73,6 +82,7 @@ WORDS = {
         "viewing_film": "观看版 1080p",
         "uhd_film": "超高清 4K",
         "drawn": "画面内含字幕",
+        "undrawn": "无字幕",
         "downloads": "下载",
         "labelled": "{kind}（{form}，{purpose}）",
         "to_download": "供下载",
@@ -91,6 +101,8 @@ WORDS = {
         "viewing": "Viewing edition · 1080p",
         "uhd": "4K UHD · 2160p",
         "captions": "Captions",
+        "captions_on": ": on",
+        "captions_off": ": off",
         "track": "English captions",
         "chapters": "Chapters",
         "transcript": "Transcript",
@@ -99,6 +111,7 @@ WORDS = {
         "viewing_film": "Viewing edition 1080p",
         "uhd_film": "4K UHD",
         "drawn": "captions in the picture",
+        "undrawn": "no captions",
         "downloads": "Downloads",
         "labelled": "{kind} ({form}, {purpose})",
         "to_download": "download",
@@ -145,26 +158,40 @@ STYLE = Template(
     "@media(max-width:700px){body{padding:20px 16px}h1{font-size:19px}"
     "button,a{font-size:13px}}"
 )
-# What the page does: a version keeps the time, a time plays from there, and the hidden track's
-# active cue marks the thought it belongs to as the current paragraph.
+# What the page does: a version and the captions control switch films and keep the time and
+# whether the film plays, a time plays from there, and the hidden track's active cue marks the
+# thought it belongs to as the current paragraph.
 SCRIPT = """
 const film = document.getElementById("film");
 const track = film.textTracks[0];
 const status = document.getElementById("playback-status");
-const versions = [...document.querySelectorAll("[data-file]")];
+const versions = [...document.querySelectorAll("[data-captioned]")];
+const captions = document.getElementById("captions");
+const state = captions.querySelector("span");
 const thoughts = [...document.querySelectorAll("#transcript p[data-from]")];
+let version = versions.find((button) => button.getAttribute("aria-pressed") === "true");
+const shown = () => captions.getAttribute("aria-pressed") === "true";
+function show() {
+  const time = film.currentTime, paused = film.paused;
+  film.src = shown() ? version.dataset.captioned : version.dataset.uncaptioned;
+  film.load();
+  film.addEventListener("loadedmetadata", () => {
+    film.currentTime = Math.min(time, film.duration);
+    if (!paused) film.play().catch(() => {});
+  }, { once: true });
+  status.textContent = `${version.textContent} · ${captions.textContent}`;
+}
 for (const button of versions)
   button.addEventListener("click", () => {
-    const time = film.currentTime, paused = film.paused;
-    film.src = button.dataset.file;
-    film.load();
-    film.addEventListener("loadedmetadata", () => {
-      film.currentTime = Math.min(time, film.duration);
-      if (!paused) film.play().catch(() => {});
-    }, { once: true });
+    version = button;
     for (const other of versions) other.setAttribute("aria-pressed", String(other === button));
-    status.textContent = button.textContent;
+    show();
   });
+captions.addEventListener("click", () => {
+  captions.setAttribute("aria-pressed", String(!shown()));
+  state.textContent = shown() ? captions.dataset.on : captions.dataset.off;
+  show();
+});
 track.addEventListener("cuechange", () => {
   const cue = track.activeCues[0];
   if (!cue) return;
@@ -207,13 +234,19 @@ def size_label(size: int) -> str:
 
 def listed_files(edition: Edition) -> list[tuple[str, str]]:
     """Each delivered file a browser shows as a viewer expects, in list order, by name, with its
-    kind, version and format in the edition's language."""
+    kind, version, captions and format in the edition's language: each version's film with its
+    captions drawn and without them, then the covers."""
     words = WORDS[edition.code]
     film, cover = words["film"], words["cover"]
-    drawn = f"{words['drawn']} · MP4"
     return [
-        (edition.film("1080p-captioned").name, f"{film} · {words['viewing_film']} · {drawn}"),
-        (edition.film("uhd").name, f"{film} · {words['uhd_film']} · {drawn}"),
+        *(
+            (edition.film(kind).name, f"{film} · {words[version]} · {words[captions]} · MP4")
+            for version, kinds in (
+                ("viewing_film", ("1080p-captioned", "1080p-uncaptioned")),
+                ("uhd_film", ("uhd", "uhd-uncaptioned")),
+            )
+            for kind, captions in zip(kinds, ("drawn", "undrawn"), strict=True)
+        ),
         (COVER_PNG, f"{cover} · PNG"),
         (COVER_JPEG, f"{cover} · JPEG"),
     ]
@@ -339,11 +372,22 @@ def transcript_html(parts: list[Part], captions: list[dict], words: dict[str, st
 
 
 def controls(edition: Edition, parts: list[Part], words: dict[str, str]) -> str:
-    """The version buttons, then a button for each chapter."""
+    """The version buttons and the captions control, then a button for each chapter.
+
+    A version button names its films with and without captions. The captions control is pressed
+    while the captions show; its words say whether they do, and its name, the part a screen
+    reader reads beside the pressed state, is the word for captions alone.
+    """
     versions = "".join(
-        f'<button type="button" data-file="{edition.film(kind).name}" '
+        f'<button type="button" data-captioned="{edition.film(captioned).name}" '
+        f'data-uncaptioned="{edition.film(uncaptioned).name}" '
         f'aria-pressed="{pressed}">{words[name]}</button>'
-        for kind, pressed, name in VERSIONS
+        for captioned, uncaptioned, pressed, name in VERSIONS
+    )
+    on, off = escape(words["captions_on"]), escape(words["captions_off"])
+    versions += (
+        f'<button type="button" id="captions" aria-pressed="true" data-on="{on}" '
+        f'data-off="{off}">{words["captions"]}<span aria-hidden="true">{on}</span></button>'
     )
     chapters = "".join(
         f'<button type="button" class="chapter" data-time="{seek_time(part.start)}">'
@@ -395,7 +439,8 @@ def player_page(edition: Edition) -> str:
 </video>
 {controls(edition, parts, words)}
 <section id="summary"><p>{escape(FILM.editions[code].summary)}</p><p id="playback-status" \
-role="status" data-unplayable="{escape(words["unplayable"])}">{words["viewing"]}</p></section>
+role="status" data-unplayable="{escape(words["unplayable"])}">\
+{words["viewing"]} · {words["captions"]}{words["captions_on"]}</p></section>
 <section id="transcript"><details><summary>{words["transcript"]}</summary>\
 {transcript_html(parts, timeline["captions"], words)}</details></section>
 <footer><h2>{words["files"]}</h2><ul>{files}</ul><h3>{words["downloads"]}</h3>\

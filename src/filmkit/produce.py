@@ -2,13 +2,16 @@
 
 Each action belongs to its owning module, which derives its media and receipts from the
 current production contract; the command parses the options and calls that owner. Every
-action needs --language.
+action needs --language. `--uncaptioned` makes stage-picture, render-picture and
+validate-picture act on the edition's uncaptioned picture instead of its captioned one, and
+every other action refuses it; compare-pictures proves that the two pictures differ only by the
+captions (`filmkit.picture.equivalence`).
 A refusal by an action's owner exits with status 1 and "<action>: <reason>" on standard
 error. Assembling a soundtrack and refreshing captions first refuse while a review round binds
 the edition's films and has not set them aside (`filmkit.review.set_aside.require_set_aside`).
 The command owns no goal, approval, repository lifecycle, service or task state.
 
-Usage: python -m filmkit.produce <edition action> --language zh|en [options]
+Usage: python -m filmkit.produce <edition action> --language zh|en [--uncaptioned] [options]
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ from filmkit.media import MediaError
 from filmkit.narration.selection import SelectionError, select
 from filmkit.narration.spoken_units import AlignmentError
 from filmkit.narration.thought_groups import RetainedUtteranceError
+from filmkit.picture.equivalence import compare_pictures
 from filmkit.picture.gates import check_picture
 from filmkit.picture.rendering import (
     PictureError,
@@ -63,15 +67,28 @@ EDITION_ACTIONS: dict[str, Callable[[Edition, argparse.Namespace], object]] = {
     "assemble": lambda edition, _: after_set_aside(edition, assemble),
     "refresh-captions": lambda edition, _: after_set_aside(edition, refresh_captions),
     "stage-picture": lambda edition, options: stage_picture(
-        edition, options.output, options.duration, options.width, options.height, options.start
+        edition,
+        options.output,
+        options.duration,
+        options.width,
+        options.height,
+        options.start,
+        captions=not options.uncaptioned,
     ),
     "check-picture": lambda edition, _: check_picture(edition),
     "preflight": lambda edition, _: preflight(edition),
-    "render-picture": lambda edition, options: render_picture(edition, options.deadline),
+    "render-picture": lambda edition, options: render_picture(
+        edition, options.deadline, captions=not options.uncaptioned
+    ),
     "package-metadata": lambda edition, _: package_metadata(edition),
-    "validate-picture": lambda edition, _: validate_picture(edition),
+    "validate-picture": lambda edition, options: validate_picture(
+        edition, captions=not options.uncaptioned
+    ),
+    "compare-pictures": lambda edition, _: compare_pictures(edition),
     "package-film": lambda edition, _: package_film(edition),
 }
+# The actions that take either of the edition's two pictures.
+PICTURE_ACTIONS = ("stage-picture", "render-picture", "validate-picture")
 # The refusals of the actions' owners, which end the command with the action's name and the
 # reason; any other exception keeps its traceback.
 REFUSALS = (
@@ -102,6 +119,11 @@ def arguments() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--language", choices=CODES, help="the edition of an edition action")
     parser.add_argument("--deadline", type=int, default=10800)
+    parser.add_argument(
+        "--uncaptioned",
+        action="store_true",
+        help="act on the uncaptioned picture: " + ", ".join(PICTURE_ACTIONS),
+    )
     return parser
 
 
@@ -110,6 +132,8 @@ def main(argv: list[str] | None = None) -> None:
     options = parser.parse_args(argv)
     if options.language is None:
         parser.error("the following arguments are required: --language")
+    if options.uncaptioned and options.action not in PICTURE_ACTIONS:
+        parser.error(f"--uncaptioned applies only to {', '.join(PICTURE_ACTIONS)}")
     try:
         EDITION_ACTIONS[options.action](Edition(options.language), options)
     except REFUSALS as error:
