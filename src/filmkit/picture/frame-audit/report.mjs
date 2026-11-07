@@ -74,7 +74,7 @@ export function frameReport({
   underfilled,
   textLayout,
   wrappedLabels,
-  vanishingArcs,
+  wholeTurns,
 }) {
   const listsLeft = Object.groupBy(lists.findings(), (v) =>
     v.kind === "list_leaving_early" ? "early" : "dimmed",
@@ -298,8 +298,9 @@ export function frameReport({
     wrapped_labels: wrappedLabels,
     /* Every stroked clockwise arc through a whole turn from a start that is not a whole number of turns, which the
      * renderer's browser may paint without ink, by scene and the line that drew it, with its module, its first and
-     * last frame, its first start and sweep in radians and the frames that drew it. filmkit.picture.gates gates each. */
-    vanishing_arcs: vanishingArcs.map((v) => ({
+     * last frame, its first start and sweep in radians, the frames that drew it and its distinct starts.
+     * filmkit.picture.gates has each start drawn in that browser and refuses a line whose turn it paints no ink for. */
+    whole_turns: wholeTurns.map((v) => ({
       ...v,
       from: +v.from.toFixed(2),
       to: +v.to.toFixed(2),
@@ -309,8 +310,9 @@ export function frameReport({
   };
 }
 
-export function writeRequestedFiles({ trace, texts, thoughts, marks, extents, drawn }) {
+export function writeRequestedFiles({ trace, texts, turns, thoughts, marks, extents, drawn }) {
   if (process.env.TRACE) writeFileSync(process.env.TRACE, trace.join("\n") + "\n");
+  if (process.env.TURNS) writeFileSync(process.env.TURNS, JSON.stringify({ draws: turns }) + "\n");
   if (process.env.TEXTS) writeFileSync(process.env.TEXTS, texts.join("\n") + "\n");
   if (process.env.BALANCE)
     writeFileSync(

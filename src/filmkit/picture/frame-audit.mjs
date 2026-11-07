@@ -6,7 +6,9 @@
  * every text of every frame, whatever its role, which filmkit.picture.text_trace reads; MARKS=<file> writes the
  * firm marks and repeated members of each voiced frame, with whether a legible name stands at each, for its seat
  * check (src/filmkit/picture/seat-marks.mjs); BOUNDS=<file> writes each scene's drawn extent; BALANCE=<file> writes
- * each thought's lit offsets and band cover at the reviewers' two instants. FILMKIT_TEXT_METRICS=<file> names the
+ * each thought's lit offsets and band cover at the reviewers' two instants; TURNS=<file> writes each start and end of
+ * the stroked whole turns the renderer's browser may paint without ink, for whole-turns.mjs to draw there.
+ * FILMKIT_TEXT_METRICS=<file> names the
  * advance widths of the film's declared faces (filmkit.picture.metrics), by which the headless canvas measures text;
  * without it the canvas estimates text metrics (headless-composition.mjs). FILMKIT_WRAPPING=<file> names the film's
  * rules for wrapped labels (filmkit.picture.gates); without it the defaults of frame-audit/typography/breaks.mjs
@@ -89,14 +91,17 @@ const contrast = readingLoad(film.palette),
   faintSeen = faintLabels();
 
 /* Each stroked whole turn the renderer's browser may paint without ink (headless-composition.mjs wholeTurnAtRisk), by
- * its scene and the line that drew its arc, with its first and last frame and its first start. */
-const vanishing = new Map();
+ * its scene and the line that drew its arc, with its first and last frame and its first start, and each distinct start
+ * and end of it with its own frames, which the TURNS file holds for whole-turns.mjs to draw in that browser. */
+const wholeTurns = new Map(),
+  turnDraws = new Map();
 function turnsAtRisk(paint, t) {
-  for (const { start, sweep, origin } of paint.turns ?? []) {
+  for (const { start, end, sweep, origin } of paint.turns ?? []) {
     const key = `${paint.scene}|${origin}`,
-      module = film.module(origin);
-    if (!vanishing.has(key))
-      vanishing.set(key, {
+      module = film.module(origin),
+      drawn = `${key}|${start}|${end}`;
+    if (!wholeTurns.has(key))
+      wholeTurns.set(key, {
         scene: paint.scene,
         origin,
         module,
@@ -105,10 +110,25 @@ function turnsAtRisk(paint, t) {
         start,
         sweep,
         frames: 0,
+        starts: 0,
       });
-    const seen = vanishing.get(key);
-    seen.to = t;
-    seen.frames++;
+    if (!turnDraws.has(drawn)) {
+      turnDraws.set(drawn, {
+        scene: paint.scene,
+        origin,
+        module,
+        start,
+        end,
+        from: t,
+        to: t,
+        frames: 0,
+      });
+      wholeTurns.get(key).starts++;
+    }
+    for (const seen of [wholeTurns.get(key), turnDraws.get(drawn)]) {
+      seen.to = t;
+      seen.frames++;
+    }
   }
 }
 
@@ -465,11 +485,12 @@ const report = frameReport({
   underfilled: composition.underfilled,
   textLayout: typography.finish(),
   wrappedLabels: wrapping.finish(),
-  vanishingArcs: [...vanishing.values()],
+  wholeTurns: [...wholeTurns.values()],
 });
 writeRequestedFiles({
   trace,
   texts,
+  turns: [...turnDraws.values()],
   thoughts,
   marks: composition.marks,
   extents: composition.extents,

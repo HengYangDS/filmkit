@@ -15,12 +15,15 @@ hold the previous picture and the cues mostly drawn as labels are recorded. The 
 judges every wrapped label at rest by the film's `[picture.wrapping]` rules, which it reads from
 the file `FILMKIT_WRAPPING` names: each label that breaks one is gated unless one of the
 edition's declared exceptions names its lines, which records it with the exception's reason,
-and an exception whose lines no frame of the edition paints is gated as stale. Every stroked
-clockwise arc through a whole turn from a start that is not a whole number of turns is gated by
-its scene, times and the line that drew it, since the renderer's browser computes such an arc in
-single precision and can paint no ink for it; the finding names the ellipse from 0 that it paints.
-A gated finding refuses with `PictureError`, after the record is written, and so does an audit
-that fails or a composition or timeline that changes while it is checked.
+and an exception whose lines no frame of the edition paints is gated as stale. The renderer's
+browser computes a clockwise arc through a whole turn in single precision and can paint no ink
+for one that starts off a whole number of turns: the frame audit lists each such stroked arc, by
+its scene, line and each distinct start and end, and the `whole-turns` tool draws each start and
+end once on a scratch canvas in that browser. A line whose turn paints no ink from one of its
+starts is gated, and every other is recorded; each finding names the ellipse from 0 that paints
+the turn from any start. A gated finding refuses with `PictureError`, after the record is
+written, and so does an audit that fails or a composition or timeline that changes while it is
+checked.
 The motion audit follows every mark as a viewer sees it move, and each of its findings, a halt,
 start, race or pop outside a stage cut, is gated by its time, scene, marks and the line that drew
 it, unless one of the edition's `[[picture.motion.exceptions]]` names its scene, its line or
@@ -248,18 +251,48 @@ MOTION_WORDS = {
 WHOLE_TURN = "ellipse(x, y, r, r, start, 0, 2 * Math.PI)"
 
 
-def arc_findings(frame: dict) -> list[str]:
-    """Each stroked whole turn the renderer's browser may paint without ink, as the gate names it:
-    its scene, its first and last frame, its start, the line that drew it and the remedy."""
-    found = []
-    for arc in frame.get("vanishing_arcs", []):
-        drawn = arc["origin"] + (f" ({arc['module']})" if arc["module"] else "")
-        found.append(
-            f"frame vanishing_arcs {arc['scene']} {arc['from']:.2f}-{arc['to']:.2f} s: a clockwise"
-            f" arc through a whole turn from {arc['start']:.4f} rad, drawn at {drawn}, may paint no"
-            f" ink in the renderer's browser; draw it as {WHOLE_TURN}"
+def turn_findings(draws: list[dict], painted: dict) -> tuple[list[str], list[str]]:
+    """The gated and the recorded findings of the stroked whole turns the frame audit found, by
+    the renderer's browser's draws of each of their distinct starts and ends.
+
+    A line, a scene's line of film.js, is gated when the browser paints no ink for its turn from
+    one of its starts, naming the frames of those starts, the first of them and how many fail, and
+    when one of its starts was not drawn. Every other line is recorded with all its frames and its
+    first start. Each finding names the ellipse that paints the turn from any start.
+    """
+    verdicts = {(turn["start"], turn["end"]): turn["paints"] for turn in painted["turns"]}
+    lines: dict[tuple[str, str], list[dict]] = {}
+    for drawn in draws:
+        lines.setdefault((drawn["scene"], drawn["origin"]), []).append(drawn)
+    gated, recorded = [], []
+    for (scene, origin), drawn in lines.items():
+        where = origin + (f" ({drawn[0]['module']})" if drawn[0]["module"] else "")
+        undrawn = [d for d in drawn if (d["start"], d["end"]) not in verdicts]
+        if undrawn:
+            gated.append(
+                f"frame vanishing_arcs {scene}: {len(undrawn)} starts of the whole turn drawn at"
+                f" {where} were not drawn in the renderer's browser"
+            )
+            continue
+        failing = [d for d in drawn if not verdicts[(d["start"], d["end"])]]
+        shown = failing or drawn
+        span = f"{min(d['from'] for d in shown):.2f}-{max(d['to'] for d in shown):.2f} s"
+        start = min(shown, key=lambda d: d["from"])["start"]
+        named = (
+            f"{scene} {span}: a clockwise arc through a whole turn from {start:.4f} rad, drawn at"
+            f" {where}, paints"
         )
-    return found
+        if failing:
+            gated.append(
+                f"frame vanishing_arcs {named} no ink in the renderer's browser from"
+                f" {len(failing)} of its {len(drawn)} starts; draw it as {WHOLE_TURN}"
+            )
+        else:
+            recorded.append(
+                f"frame whole_turns {named} in the renderer's browser from each of its"
+                f" {len(drawn)} starts; the ellipse draws it from any start: {WHOLE_TURN}"
+            )
+    return gated, recorded
 
 
 def motion_finding(finding: dict) -> str:
@@ -339,17 +372,24 @@ def check_picture(edition: Edition) -> dict:
     frame_path, trace, marks = work / "frame.json", work / "trace.tsv", work / "marks.tsv"
     sync_path, motion_path = work / "sync.json", work / "motion.json"
     texts_trace, texts_path = work / "texts.tsv", work / "texts.json"
+    turns_path, painted_path = work / "turns.json", work / "whole-turns.json"
     faces = {metrics.VARIABLE: str(metrics.current_table())}
     wrapping = FILM.picture.wrapping
     rules = work / "wrapping.json"
     repository.write(rules, wrapping_rules(wrapping))
     traces = {"TRACE": str(trace), "TEXTS": str(texts_trace), "MARKS": str(marks)}
+    traces["TURNS"] = str(turns_path)
     run_audit(
         "frame-audit",
         [timeline, f"{FRAME_STEP:.7f}"],
         frame_path,
         {**traces, WRAPPING_VARIABLE: str(rules), **faces},
     )
+    # The browser draws each start and end of the whole turns once; a picture without one starts
+    # no browser.
+    draws = repository.read(turns_path)["draws"]
+    if draws:
+        run_audit("whole-turns", [str(turns_path)], painted_path)
     run_audit(
         "motion-audit",
         [timeline, str(MOTION_FPS), "--out", str(motion_path)],
@@ -367,22 +407,25 @@ def check_picture(edition: Edition) -> dict:
     frame, motion = repository.read(frame_path), repository.read(motion_path)
     wrapped, declared = wrapping_findings(frame, wrapping, edition.code)
     moved, kept = motion_findings(motion, FILM.picture.motion, edition.code)
-    findings = gated_findings(frame, sync, motion) + arc_findings(frame) + text_findings(texts)
+    turned, painting = turn_findings(draws, repository.read(painted_path)) if draws else ([], [])
+    findings = gated_findings(frame, sync, motion) + turned + text_findings(texts)
     findings += wrapped + moved
+    reports = [
+        ("frame", frame_path),
+        ("sync", sync_path),
+        ("texts", texts_path),
+        ("motion", motion_path),
+    ]
+    reports += [("whole_turns", painted_path)] if draws else []
     record = {
         **bound,
         "frames_checked": frame["frames_checked"],
         "reports": {
             name: {"path": repository.relative(path), "sha256": repository.sha(path)}
-            for name, path in (
-                ("frame", frame_path),
-                ("sync", sync_path),
-                ("texts", texts_path),
-                ("motion", motion_path),
-            )
+            for name, path in reports
         },
         "gated_findings": findings,
-        "recorded_findings": recorded_findings(frame, sync) + declared + kept,
+        "recorded_findings": recorded_findings(frame, sync) + painting + declared + kept,
         "verdict": "refuse" if findings else "pass",
     }
     repository.write(edition.picture_gates, record)

@@ -42,6 +42,7 @@ TOOLS = {
     "motion-audit": "picture/motion-audit.mjs",
     "caption-equivalence": "picture/caption-equivalence.mjs",
     "player-check": "delivery/player-check.mjs",
+    "whole-turns": "picture/whole-turns.mjs",
 }
 # The copies, below the film's root, in a folder for each engine version.
 CACHE = picture_rendering.TOOL_CACHE / "filmkit"

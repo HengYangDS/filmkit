@@ -1,6 +1,7 @@
 """The picture's gate before a render: the gated findings of the audits and the record they bind."""
 
 import json
+import math
 import re
 import shutil
 from importlib.metadata import version
@@ -112,8 +113,9 @@ def film(tmp_path, monkeypatch):
 
 
 def audits(monkeypatch, reports, *, change=None):
-    """Stand in for the three audits: each writes its report from `reports`; `change` edits a
-    file while the frame audit runs."""
+    """Stand in for the audits: each writes its report from `reports`, the frame audit its whole
+    turns from `reports["turns"]` and the browser's draws of them from `reports["painted"]`;
+    `change` edits a file while the frame audit runs."""
     calls = []
 
     def run(tool, arguments, *, environment=None, stdout=None):
@@ -121,8 +123,12 @@ def audits(monkeypatch, reports, *, change=None):
         if tool == "frame-audit":
             put(stdout, reports["frame"])
             put(Path(environment["TEXTS"]), reports["texts"])
+            put(Path(environment["TURNS"]), {"draws": reports.get("turns", [])})
             if change is not None:
                 change()
+        elif tool == "whole-turns":
+            assert repository.read(Path(arguments[0])) == {"draws": reports["turns"]}
+            put(stdout, reports["painted"])
         else:
             put(stdout, {"summary": True})
             put(Path(arguments[arguments.index("--out") + 1]), reports["motion"])
@@ -156,7 +162,8 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
     # 30 frames per second, both on the edition's timeline.
     (frame_tool, frame_args, frame_env), (motion_tool, motion_args, motion_env) = calls
     assert (frame_tool, frame_args) == ("frame-audit", [str(edition.timeline), "0.0333333"])
-    assert sorted(frame_env) == [VARIABLE, gates.WRAPPING_VARIABLE, "MARKS", "TEXTS", "TRACE"]
+    traces = {"MARKS", "TEXTS", "TRACE", "TURNS"}
+    assert set(frame_env) == {VARIABLE, gates.WRAPPING_VARIABLE, *traces}
     # The frame audit judges wrapped labels by the declared shares and lead words.
     rules = repository.read(Path(frame_env[gates.WRAPPING_VARIABLE]))
     assert rules == {"line_share": 0.8, "last_share": 0.6, "lead_words": []}
@@ -167,29 +174,10 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
     assert table["fonts_sha256"] == record["fonts_sha256"]
 
 
-# A ring the frame audit reports as a whole turn the renderer's browser may paint without ink.
-VANISHING_ARC = {
-    "scene": "05",
-    "origin": "film.js:1234",
-    "module": "picture/film/drawing/marks.js",
-    "from": 12.4,
-    "to": 30.1,
-    "start": 1.9112,
-    "sweep": 6.2832,
-    "frames": 532,
-}
-
-
 @pytest.mark.parametrize(
     ("reports", "named"),
     [
         ({**CLEAN, "frame": {**CLEAN["frame"], "overlaps": [{"pair": "04:a|b"}]}}, "overlaps"),
-        (
-            {**CLEAN, "frame": {**CLEAN["frame"], "vanishing_arcs": [VANISHING_ARC]}},
-            "frame vanishing_arcs 05 12.40-30.10 s: a clockwise arc through a whole turn from "
-            "1.9112 rad, drawn at film.js:1234 (picture/film/drawing/marks.js), may paint no ink "
-            "in the renderer's browser; draw it as ellipse(x, y, r, r, start, 0, 2 * Math.PI)",
-        ),
         (
             {**CLEAN, "frame": {**CLEAN["frame"], "off_centre_runs": {"04": ["1.00-3.50 13.0%"]}}},
             "off_centre_runs",
@@ -512,3 +500,23 @@ def test_a_declared_motion_finding_is_recorded_and_a_stale_exception_refuses(fil
         HALT_FINDING,
         "motion exception start 02 film.js:120 is stale: no finding of the edition matches it",
     ]
+
+
+def test_the_browser_draws_each_whole_turn_once_and_a_start_without_ink_refuses(film, monkeypatch):
+    # 1.9335 rad is a start whose whole turn Chrome Headless Shell 152 paints without ink.
+    turn, failing = 2 * math.pi, 1.9335
+    ring = {"scene": "05", "origin": "film.js:1234", "module": "picture/film/marks.js"}
+    ring |= {"start": failing, "end": failing + turn, "from": 12.4, "to": 30.1, "frames": 532}
+    shares = [{"start": failing, "end": failing + turn, "share": 0.0, "paints": False}]
+    painted = {"browser": "HeadlessChrome/152.0.7977.30", "turns": shares}
+    calls = audits(monkeypatch, {**CLEAN, "turns": [ring], "painted": painted})
+    with pytest.raises(PictureError, match="1 gated findings"):
+        gates.check_picture(Edition("zh"))
+    record = repository.read(Edition("zh").picture_gates)
+    assert record["gated_findings"] == [
+        "frame vanishing_arcs 05 12.40-30.10 s: a clockwise arc through a whole turn from 1.9335"
+        " rad, drawn at film.js:1234 (picture/film/marks.js), paints no ink in the renderer's"
+        " browser from 1 of its 1 starts; draw it as ellipse(x, y, r, r, start, 0, 2 * Math.PI)"
+    ]
+    assert [call[0] for call in calls] == ["frame-audit", "whole-turns", "motion-audit"]
+    assert sorted(record["reports"]) == ["frame", "motion", "sync", "texts", "whole_turns"]

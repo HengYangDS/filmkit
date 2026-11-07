@@ -7,7 +7,8 @@
  * (geometry-check.mjs); a text stands at its anchor. `points` are the drawing points in the painter's own coordinates,
  * as the motion audit identifies a mark across frames: an arc gives the corners of its circle, a text the corners of
  * its box, and `toScreen` maps them to the screen. A stroke whose path holds a whole turn the renderer's browser may
- * paint without ink (wholeTurnAtRisk) carries each such arc in `turns`, with the line of film.js that drew it. The
+ * paint without ink (wholeTurnAtRisk) carries each such arc in `turns`, its exact start and end angles and the line of
+ * film.js that drew it, which whole-turns.mjs draws in that browser. The
  * stand-in measures a text's width by the advances of the film's declared faces when it is given them
  * (readTextMetrics), and otherwise by an estimate; geometry-check.mjs measures real metrics. */
 import { readFileSync } from "node:fs";
@@ -116,7 +117,8 @@ const TURN_SHORT = 1e-5,
 /** Whether the renderer's browser may paint no ink for arc(x, y, r, a0, a1, anticlockwise). Chrome Headless Shell
  * 152 computes a clockwise arc's end angle in single precision; through a whole turn or more from a start that is not
  * a whole number of turns, 64 of 4000 starts drew no ink for a whole turn and 13 of 1000 for every longer sweep, with
- * Metal and with SwiftShader alike. Starts at whole turns, anticlockwise arcs and ellipses from any start all drew. */
+ * Metal and with SwiftShader alike. Starts at whole turns, anticlockwise arcs and ellipses from any start all drew.
+ * Whether a given start and end paints only that browser tells, so whole-turns.mjs draws each one there. */
 export function wholeTurnAtRisk(a0, a1, anticlockwise = false) {
   const turn = 2 * Math.PI,
     off = ((a0 % turn) + turn) % turn;
@@ -233,7 +235,7 @@ export function canvasStandIn(deliver, faces = null, turned = () => null) {
     },
     arc(x, y, r, a0, a1, anticlockwise = false) {
       if (wholeTurnAtRisk(a0, a1, anticlockwise))
-        turns.push({ start: a0, sweep: a1 - a0, origin: turned() });
+        turns.push({ start: a0, end: a1, sweep: a1 - a0, origin: turned() });
       extend(sampled(x, y, r, r, 0, a0, a1, anticlockwise));
       last = [x + r * Math.cos(a1), y + r * Math.sin(a1)];
       points.push([x - r, y - r], [x + r, y + r]);

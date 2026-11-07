@@ -161,6 +161,7 @@ def test_the_command_names_each_tool_and_refuses_another(capsys):
         "geometry-check",
         "motion-audit",
         "player-check",
+        "whole-turns",
     ]
     for path in tools.TOOLS.values():
         assert (tools.PACKAGE / path).is_file()

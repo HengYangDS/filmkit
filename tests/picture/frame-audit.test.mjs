@@ -44,8 +44,8 @@ test("the frame audit reports a stretch of the film, its traces, its marks and i
     ),
   );
   assert.deepEqual(report.errors, []);
-  // The sample film strokes no whole turn its browser may paint without ink.
-  assert.deepEqual(report.vanishing_arcs, []);
+  // The sample film strokes no clockwise whole turn from a start off a whole turn.
+  assert.deepEqual(report.whole_turns, []);
   assert.ok(report.frames_checked > 0);
   // Thoughts whose picture stands off the content centre at a reviewers' instant, with the instant and both offsets.
   assert.ok(report.off_centre && typeof report.off_centre === "object");
@@ -446,7 +446,8 @@ const TURNING = [
 
 test("the frame audit reports each stroked whole turn the browser may not paint, by scene and line", async () => {
   const root = await scratchFolder(),
-    path = join(root, "timeline.json");
+    path = join(root, "timeline.json"),
+    turns = join(root, "turns.json");
   await mkdir(join(root, "picture"));
   await writeFile(join(root, "picture/film.js"), TURNING);
   const segment = {
@@ -470,10 +471,12 @@ test("the frame audit reports each stroked whole turn the browser may not paint,
     execFileSync(process.execPath, [AUDIT_FRAMES, path, "0.0333333"], {
       cwd: root,
       encoding: "utf8",
+      env: { ...process.env, TURNS: turns },
     }),
   );
   assert.deepEqual(report.errors, []);
-  assert.deepEqual(report.vanishing_arcs, [
+  // The report names each line's whole turns once, with how many starts it drew them from.
+  assert.deepEqual(report.whole_turns, [
     {
       scene: "01",
       origin: "film.js:7",
@@ -483,6 +486,23 @@ test("the frame audit reports each stroked whole turn the browser may not paint,
       start: 0.5,
       sweep: 6.2832,
       frames: report.frames_checked,
+      starts: report.frames_checked,
     },
   ]);
+  // TURNS holds each start the ring turned through with its exact angles and frames, for the browser to draw.
+  const { draws } = JSON.parse(await readFile(turns, "utf8"));
+  assert.equal(draws.length, report.frames_checked);
+  const [first, second] = draws;
+  assert.deepEqual(first, {
+    scene: "01",
+    origin: "film.js:7",
+    module: null,
+    start: 0.5,
+    end: 0.5 + 2 * Math.PI,
+    from: 0,
+    to: 0,
+    frames: 1,
+  });
+  assert.equal(second.start, 0.5 + 0.0333333);
+  assert.equal(second.end, second.start + 2 * Math.PI);
 });
