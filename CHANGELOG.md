@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-08
+
 ### Fixed
 
 - A declared caption term stays on one English caption line wherever it fits. The phrasing compares layouts first by how many of their breaks fall inside a declared term and then by their cost; a split had cost 90, as much as a line that ends on a word such as "for", so the ETHOS film's expanded name split after "Trust", its one whole layout ending a line on "for" and leaving a short line. A term longer than a line takes the fewest splits. On the films' current English scripts this moves the lines of one segment of the ETHOS film and one of the DDWG film.
