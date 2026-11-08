@@ -222,7 +222,12 @@ test("a still state that a stage cut or the next scene replaces is finished, not
   const runs = reviewedRuns(1 / 30);
   for (let k = 0; k / 30 < 3 - 1e-9; k++) {
     const t = k / 30;
-    runs.frame(t, "07", t < cutAt ? offBy(70) : wider, t > cutAt - 1 / 30 + 1e-9 && t <= cutAt + 1e-9);
+    runs.frame(
+      t,
+      "07",
+      t < cutAt ? offBy(70) : wider,
+      t > cutAt - 1 / 30 + 1e-9 && t <= cutAt + 1e-9,
+    );
   }
   const replaced = runs.finish();
   assert.deepEqual(replaced.settled, []);
@@ -238,10 +243,7 @@ test("a still state that a stage cut or the next scene replaces is finished, not
     (t) => (t < 2.5 ? "07" : "08"),
     (t) => (t < 2.5 ? offBy(70) : offBy(0)),
   );
-  assert.deepEqual(
-    [next.settled.length, next.finished.map((v) => v.scene)],
-    [0, ["07"]],
-  );
+  assert.deepEqual([next.settled.length, next.finished.map((v) => v.scene)], [0, ["07"]]);
   // Without the cut the wider box grew from the state, which waited for it: no run.
   const grown = sampled(
     reviewedRuns(1 / 30),
