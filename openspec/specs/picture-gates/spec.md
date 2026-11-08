@@ -98,7 +98,7 @@ The frame audit SHALL take, in every frame it exercises, the box of every paint 
 
 ### Requirement: The frame audit measures still states off centre
 
-The frame audit SHALL report per scene each run of 2 seconds or more in which that box stands more than 50 px off while its left and right edges stay within 4 px, unless the frame that ends the run holds a wider box of the same scene that contains it, with its start, its end and its largest offset in px.
+The frame audit SHALL report per scene each run of 2 seconds or more in which that box stands more than 50 px off while its left and right edges stay within 4 px, with its start, its end and its largest offset in px. It SHALL leave out a run whose next frame, after no stage cut, holds a wider box of the same scene that contains it, and SHALL report as finished a run whose next frame shows another scene or follows a stage cut of its scene.
 
 #### Scenario: A settled composition off centre
 
@@ -115,9 +115,19 @@ The frame audit SHALL report per scene each run of 2 seconds or more in which th
 - **WHEN** the lit picture stands 70 px off for 3 seconds while its right edge grows by 40 px
 - **THEN** the audit reports no settled run and no build-up
 
+#### Scenario: A still state that a stage cut replaces
+
+- **WHEN** the lit picture stands still 70 px off for 2.5 seconds and the next frame, after a stage cut the composition declares for its scene, holds a wider box that contains it
+- **THEN** the audit reports one finished run for that scene with its offset of 70 px and no settled run
+
+#### Scenario: A still state that another scene replaces
+
+- **WHEN** the lit picture stands still 70 px off for 2.5 seconds and the next frame shows the next scene's picture
+- **THEN** the audit reports one finished run and no settled run
+
 ### Requirement: The picture gate refuses a picture off the reviewers' balance
 
-`check-picture` SHALL refuse `off_centre_builds` and SHALL record `off_centre_settled` in the gate record without refusing it.
+`check-picture` SHALL refuse `off_centre_builds` and `off_centre_finished` and SHALL record `off_centre_settled` in the gate record without refusing it.
 
 #### Scenario: An off-centre build-up refuses
 
@@ -128,6 +138,11 @@ The frame audit SHALL report per scene each run of 2 seconds or more in which th
 
 - **WHEN** the frame audit reports an off-centre settled run and no gated finding
 - **THEN** `check-picture` writes a passing record that lists the settled run
+
+#### Scenario: A finished composition off centre refuses
+
+- **WHEN** the frame audit reports an off-centre finished run
+- **THEN** `check-picture` writes a refused record that names it and exits with a refusal
 
 ### Requirement: The frame audit measures how settled text lines up
 
