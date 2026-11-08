@@ -198,6 +198,16 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
                 **CLEAN,
                 "frame": {
                     **CLEAN["frame"],
+                    "off_centre_finished": {"07": ["493.00-504.00 -63.5 px"]},
+                },
+            },
+            "frame off_centre_finished",
+        ),
+        (
+            {
+                **CLEAN,
+                "frame": {
+                    **CLEAN["frame"],
                     "uneven_pitch": {
                         "03": [
                             {

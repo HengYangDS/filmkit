@@ -75,8 +75,10 @@ FRAME_GATES = (
     "off_balance",
     "off_centre",
     "off_centre_runs",
-    # Balance as the reviews since round 29 measure it, on the full-size lit box of every frame.
+    # Balance as the reviews since round 29 measure it, on the full-size lit box of every frame:
+    # build-ups, and still states that a stage cut or the next scene replaced.
     "off_centre_builds",
+    "off_centre_finished",
     "sparse_runs",
     "thin_lit",
     "thin_runs",
@@ -93,8 +95,8 @@ FRAME_GATES = (
     "mixed_case",
 )
 # The frame audit's findings that the record lists for the reviewers and that refuse nothing: the
-# still states off centre, which are a settled composition or a build-up held while its next
-# parts are still to come, as only the stage's intent tells.
+# still states off centre that end within their stage, which are a settled composition or a
+# build-up held while its next parts are still to come, as only the stage's intent tells.
 FRAME_RECORDED = ("off_centre_settled",)
 # Seconds a still picture may hold under speech: the reviewers' limit for a held picture.
 STILL_LIMIT = 3.5

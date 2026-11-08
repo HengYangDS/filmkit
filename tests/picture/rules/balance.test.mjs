@@ -177,7 +177,7 @@ test("a settled composition off centre for 2 s or more is a reviewers' run; a gr
       return [x0, y0, x1 + (40 * t) / 3, y1];
     },
   );
-  assert.deepEqual(growing, { builds: [], settled: [] });
+  assert.deepEqual(growing, { builds: [], settled: [], finished: [] });
   // A still state that the next part grows from is a build-up held while it waits: no settled run. The same state
   // followed by another picture of its scene, or by nothing lit, is a settled composition.
   const waiting = (t) => (t < 2.5 ? offBy(70) : [offBy(70)[0], 300, offBy(70)[2] + 300, 700]);
@@ -212,5 +212,43 @@ test("a settled composition off centre for 2 s or more is a reviewers' run; a gr
     () => "09",
     () => offBy(0, 60),
   );
-  assert.deepEqual(lone, { builds: [], settled: [] });
+  assert.deepEqual(lone, { builds: [], settled: [], finished: [] });
+});
+
+test("a still state that a stage cut or the next scene replaces is finished, not grown from", () => {
+  // 70 px off for 2.5 s; at 2.5 s a stage cut of its scene brings a wider box that contains it.
+  const cutAt = 2.5,
+    wider = [offBy(70)[0], 300, offBy(70)[2] + 300, 700];
+  const runs = reviewedRuns(1 / 30);
+  for (let k = 0; k / 30 < 3 - 1e-9; k++) {
+    const t = k / 30;
+    runs.frame(t, "07", t < cutAt ? offBy(70) : wider, t > cutAt - 1 / 30 + 1e-9 && t <= cutAt + 1e-9);
+  }
+  const replaced = runs.finish();
+  assert.deepEqual(replaced.settled, []);
+  assert.deepEqual(
+    replaced.finished.map((v) => [v.scene, near(v.start, 0), near(v.worst, 70)]),
+    [["07", true, true]],
+  );
+  // The same state followed by the next scene's picture is finished too.
+  const next = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    3,
+    (t) => (t < 2.5 ? "07" : "08"),
+    (t) => (t < 2.5 ? offBy(70) : offBy(0)),
+  );
+  assert.deepEqual(
+    [next.settled.length, next.finished.map((v) => v.scene)],
+    [0, ["07"]],
+  );
+  // Without the cut the wider box grew from the state, which waited for it: no run.
+  const grown = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    3,
+    () => "07",
+    (t) => (t < cutAt ? offBy(70) : wider),
+  );
+  assert.deepEqual(grown, { builds: [], settled: [], finished: [] });
 });

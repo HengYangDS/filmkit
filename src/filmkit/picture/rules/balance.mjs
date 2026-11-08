@@ -75,21 +75,24 @@ export const REVIEWED_BAND = [120, 919],
   REVIEWED_BUILD = { px: 90, seconds: 1.5 },
   REVIEWED_SETTLED = { px: 50, seconds: 2, steady: 4 };
 
-/** Joins frames sampled every `step` seconds into the reviewers' off-centre runs. `frame(t, scene, box)` takes the
- * scene the frame falls in and the frame's lit box in the band, or null when nothing is lit; a frame of another scene,
- * a frame without a lit box and a gap in the samples each end a run, and a settled run also ends when an edge moves
- * more than 4 px from where it stood when the run began. A still run is left out when the frame that ends it holds a
- * wider box of the same scene that contains it: the picture grew from it. `finish()` returns `builds` and `settled`,
- * each run with its scene, start, end and largest offset in px, signed. */
+/** Joins frames sampled every `step` seconds into the reviewers' off-centre runs. `frame(t, scene, box, cut)` takes
+ * the scene the frame falls in, the frame's lit box in the band, or null when nothing is lit, and whether a stage cut
+ * the composition declares for that scene falls since the previous sample; a frame of another scene, a frame without
+ * a lit box and a gap in the samples each end a run, and a settled run also ends when an edge moves more than 4 px from
+ * where it stood when the run began, or at a stage cut. A still run is left out when the frame that ends it, after no
+ * stage cut, holds a wider box of the same scene that contains it: the picture grew from it. A still run that the next
+ * frame replaces, by a stage cut of its scene or by another scene's picture, is a finished composition: no part can
+ * still dock to it. `finish()` returns `builds`, `settled` and `finished`, each run with its scene, start, end and
+ * largest offset in px, signed. */
 export function reviewedRuns(step) {
-  const runs = { builds: [], settled: [] },
+  const runs = { builds: [], settled: [], finished: [] },
     open = { builds: null, settled: null },
     least = { builds: REVIEWED_BUILD.seconds, settled: REVIEWED_SETTLED.seconds },
     { steady: STEADY } = REVIEWED_SETTLED;
-  const close = (kind) => {
+  const close = (kind, into = kind) => {
     const run = open[kind];
     if (run && run.end - run.start >= least[kind] - 1e-9)
-      runs[kind].push({ scene: run.scene, start: run.start, end: run.end, worst: run.worst });
+      runs[into].push({ scene: run.scene, start: run.start, end: run.end, worst: run.worst });
     open[kind] = null;
   };
   const follows = (run, t, scene) =>
@@ -103,8 +106,11 @@ export function reviewedRuns(step) {
     box[0] <= run.left + STEADY &&
     box[2] >= run.right - STEADY &&
     box[2] - box[0] > run.right - run.left + STEADY;
+  // The next frame replaced the still run's picture: a stage cut of its scene, or another scene's lit picture.
+  const replaced = (run, t, scene, box, cut) =>
+    Math.abs(run.end - t) < step * 1.5 && box !== null && (cut || run.scene !== scene);
   return {
-    frame(t, scene, box) {
+    frame(t, scene, box, cut = false) {
       const dx = box ? (box[0] + box[2]) / 2 - 960 : 0;
       if (box && Math.abs(dx) > REVIEWED_BUILD.px) {
         const run = open.builds;
@@ -117,13 +123,19 @@ export function reviewedRuns(step) {
         }
       } else close("builds");
       const run = open.settled;
-      if (box && Math.abs(dx) > REVIEWED_SETTLED.px && follows(run, t, scene) && steady(run, box)) {
+      if (
+        !cut &&
+        box &&
+        Math.abs(dx) > REVIEWED_SETTLED.px &&
+        follows(run, t, scene) &&
+        steady(run, box)
+      ) {
         run.end = t + step;
         if (Math.abs(dx) > Math.abs(run.worst)) run.worst = dx;
         return;
       }
-      if (run && grewFrom(run, t, scene, box)) open.settled = null;
-      else close("settled");
+      if (run && !cut && grewFrom(run, t, scene, box)) open.settled = null;
+      else close("settled", run && replaced(run, t, scene, box, cut) ? "finished" : "settled");
       if (box && Math.abs(dx) > REVIEWED_SETTLED.px)
         open.settled = { scene, start: t, end: t + step, worst: dx, left: box[0], right: box[2] };
     },

@@ -168,12 +168,14 @@ export function compositionMeasures({ film, step, thoughts }) {
   }
   /* Balance as the reviews since round 29 measure it, in every frame, spoken or not: the box of every paint lit at full
    * size whose extent reaches rows 120-919, a text by its box, a stroke by its path widened by half its width and a
-   * fill by its path, joined per scene, the timeline segment the frame falls in, into off-centre build-ups and settled
-   * runs (rules/balance.mjs). */
+   * fill by its path, joined per scene, the timeline segment the frame falls in, into off-centre build-ups, settled
+   * runs and finished ones, which a stage cut the composition declares for the scene, or the next scene, replaces
+   * (rules/balance.mjs). */
   const reviewed = reviewedRuns(step),
     isLitAtFullSize = litAtFullSize(film.palette),
     offCentreBuilds = [],
-    offCentreSettled = [];
+    offCentreSettled = [],
+    offCentreFinished = [];
   function reviewedBalance(f) {
     const box = emptyBox();
     for (const p of f.paints) {
@@ -187,7 +189,10 @@ export function compositionMeasures({ film, step, thoughts }) {
       growBox(box, [x0 - half, Math.max(y0 - half, REVIEWED_BAND[0])]);
       growBox(box, [x1 + half, Math.min(y1 + half, REVIEWED_BAND[1])]);
     }
-    reviewed.frame(f.t, f.seg?.id ?? null, box[2] > box[0] ? box : null);
+    const scene = f.seg?.id ?? null,
+      cuts = scene === null ? undefined : film.declaredCuts().get(scene),
+      cut = [...(cuts ?? [])].some((at) => at > f.t - step + 1e-9 && at <= f.t + 1e-9);
+    reviewed.frame(f.t, scene, box[2] > box[0] ? box : null, cut);
   }
   /* Sparse runs, as the Chinese review measured them: the box around every mark of visible ink in the content band,
    * through each voiced frame; a run of 1.5 s or more of speech whose box covers less than 4% of the band is reported per
@@ -282,9 +287,10 @@ export function compositionMeasures({ film, step, thoughts }) {
     const { off, thin } = runs.finish();
     offCentreRuns.push(...off);
     thinRuns.push(...thin);
-    const { builds, settled } = reviewed.finish();
+    const { builds, settled, finished } = reviewed.finish();
     offCentreBuilds.push(...builds);
     offCentreSettled.push(...settled);
+    offCentreFinished.push(...finished);
   }
   return {
     seats,
@@ -302,6 +308,7 @@ export function compositionMeasures({ film, step, thoughts }) {
     offCentreRuns,
     offCentreBuilds,
     offCentreSettled,
+    offCentreFinished,
     thinRuns,
     underfilled,
   };

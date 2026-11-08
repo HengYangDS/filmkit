@@ -70,6 +70,7 @@ export function frameReport({
   offCentreRuns,
   offCentreBuilds,
   offCentreSettled,
+  offCentreFinished,
   thinRuns,
   underfilled,
   textLayout,
@@ -211,9 +212,11 @@ export function frameReport({
     off_centre_runs: runsByScene(offCentreRuns),
     /* Balance as the reviews since round 29 measure it, in every frame of a scene: runs of 1.5 s or more whose
      * full-size lit box stands more than 90 px off x 960, and settled runs of 2 s or more, the box's edges steady
-     * within 4 px, more than 50 px off, per scene, with their span and the largest offset in px. */
+     * within 4 px, more than 50 px off, per scene, with their span and the largest offset in px; a settled run that a
+     * stage cut or the next scene replaces is a finished one. */
     off_centre_builds: pxRunsByScene(offCentreBuilds),
     off_centre_settled: pxRunsByScene(offCentreSettled),
+    off_centre_finished: pxRunsByScene(offCentreFinished),
     thin_runs: runsByScene(thinRuns),
     /* Thoughts whose lit picture covers less than the reviewers' share of the band at one of their instants, with the
      * instant and the share. */
