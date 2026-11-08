@@ -4,6 +4,12 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-08
+
+### Changed
+
+- `check-picture` refuses a still state off centre that its stage leaves: a run of 2 s or more in which the picture's full-size lit box stands more than 50 px off x 960 while its edges keep still, and which a stage cut the composition declares, or the next scene, then replaces. The frame audit reports such runs as `off_centre_finished` and the other still runs, which may wait for a part that docks to them, as `off_centre_settled`, still recorded without refusing. A frame after a stage cut no longer counts as growth from the state before it: the essentials film's 07.3 stood about 63 px left of centre for 11 s and passed because the next stage cut in with a wider box, where its sixth production review found it off balance. This breaks a composition with such a stage.
+
 ## [0.15.0] - 2026-11-08
 
 ### Fixed
