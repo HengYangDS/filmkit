@@ -1,8 +1,9 @@
 """Set an English passage as caption lines that break at grammatical boundaries.
 
-Each sentence, and each long independent clause, is kept together, and its lines take the
-cheapest breaks: after a phrase mark or before a clause, phrase or predicate, never inside a
-fixed term or after a word that binds to what follows, at a comfortable line length.
+Each sentence, and each long independent clause, is kept together, as is a short quotation of
+several sentences, and its lines take the cheapest breaks: after a phrase mark or before a
+clause, phrase or predicate, never after a word that binds to what follows, at a comfortable
+line length, and never inside a declared term where the term fits on a line.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from filmkit.narration.spoken_units import (
     PHRASE_BREAKS,
     SEMICOLONS,
     SENTENCE_ENDS,
+    quotation_open,
 )
 from filmkit.specification import CAPTION_LIMITS
 
@@ -50,17 +52,38 @@ def _long_sentence_clauses(sentence: str) -> list[str]:
     return clauses
 
 
+def _join_open_quotations(text: str, sentences: list[str], limit: int) -> list[str]:
+    """Join each sentence that begins inside an open quotation to the unit before it while the two
+    fit the caption limit, so a short quotation of several sentences stays whole."""
+    joined: list[str] = []
+    position = 0
+    for sentence in sentences:
+        if (
+            joined
+            and quotation_open(text[:position])
+            and len((joined[-1] + sentence).rstrip()) <= limit
+        ):
+            joined[-1] += sentence
+        else:
+            joined.append(sentence)
+        position += len(sentence)
+    return joined
+
+
 def english_caption_sentences(text: str, limit: int = CAPTION_LIMITS["en"]) -> list[str]:
     """Keep complete sentences and long independent clauses together.
 
-    A sentence longer than the caption limit divides at its semicolons. No English caption
-    crosses the end of one of these units; they are not the narration's thought groups.
+    A sentence that ends inside an open quotation continues into the next while both fit the
+    caption limit; a sentence longer than the caption limit divides at its semicolons. No
+    English caption crosses the end of one of these units; they are not the narration's
+    thought groups.
     """
     protected = _PROTECTED_DOTS.sub(lambda match: match[0].replace(".", "\0"), text)
     sentences = [text[match.start() : match.end()] for match in _SENTENCE.finditer(protected)]
     if "".join(sentences) != text:
         msg = "English caption sentences must preserve the exact text"
         raise CaptionError(msg)
+    sentences = _join_open_quotations(text, sentences, limit)
     groups = []
     for sentence in sentences:
         groups.extend([sentence] if len(sentence) <= limit else _long_sentence_clauses(sentence))
@@ -440,6 +463,15 @@ def _open_break_penalty(words: list[str], last: int) -> int:
     return penalty
 
 
+def _splits_term(words: list[str], last: int) -> bool:
+    """Whether a line that ends before word last splits a declared caption term."""
+    return last < len(words) and any(
+        tuple(words[last - offset : last - offset + len(term)]) == term
+        for term in FIXED_TERMS
+        for offset in range(1, len(term))
+    )
+
+
 def _break_cost(tokens: list[str], words: list[str], last: int) -> int:
     """What a line that ends before token last costs for its break, wherever it starts."""
     tail_end = tokens[last - 1].rstrip()[-1]
@@ -448,12 +480,6 @@ def _break_cost(tokens: list[str], words: list[str], last: int) -> int:
         cost = _break_strength(words, last, tail_end)
         if tail_end not in _CLOSES_PHRASE:
             cost += _open_break_penalty(words, last)
-        if any(
-            tuple(words[last - offset : last - offset + len(term)]) == term
-            for term in FIXED_TERMS
-            for offset in range(1, len(term))
-        ):
-            cost += 90
         # A function word closing its own phrase ("delegate to:") stays with that phrase
         # rather than opening the next line.
         if words[last] in GLUE and tokens[last].rstrip()[-1] in _CLOSES_PHRASE:
@@ -464,14 +490,17 @@ def _break_cost(tokens: list[str], words: list[str], last: int) -> int:
     return cost
 
 
-def _cheapest_lines(tokens: list[str], costs: dict[int, int], limit: int) -> list[str]:
+def _cheapest_lines(
+    tokens: list[str], costs: dict[int, int], splits: set[int], limit: int
+) -> list[str]:
     """The cheapest lines of a sentence's tokens, each within the caption limit.
 
-    A line costs 16, the cost of its break, 90 more when it holds fewer than three tokens or
-    16 characters, and the square of its distance from 48 characters over 80. A tie keeps
-    the shortest early line.
+    Lines that split fewer declared terms win, the breaks before the tokens in `splits`
+    splitting one each; among those, a line costs 16, the cost of its break, 90 more when it
+    holds fewer than three tokens or 16 characters, and the square of its distance from 48
+    characters over 80. A tie keeps the shortest early line.
     """
-    best: dict[int, tuple[float, list[str]]] = {len(tokens): (0, [])}
+    best: dict[int, tuple[tuple[int, float], list[str]]] = {len(tokens): ((0, 0), [])}
     for first in range(len(tokens) - 1, -1, -1):
         candidates = []
         for last in range(first + 1, len(tokens) + 1):
@@ -483,8 +512,9 @@ def _cheapest_lines(tokens: list[str], costs: dict[int, int], limit: int) -> lis
             tail = cue.rstrip()
             boundary = costs[last]
             short = 90 if last - first < 3 or len(tail) < 16 else 0
-            cost = best[last][0] + 16 + boundary + short + (len(tail) - 48) ** 2 / 80
-            candidates.append((cost, [cue, *best[last][1]]))
+            split, rest = best[last][0]
+            cost = rest + 16 + boundary + short + (len(tail) - 48) ** 2 / 80
+            candidates.append(((split + (last in splits), cost), [cue, *best[last][1]]))
         if candidates:
             best[first] = min(candidates, key=lambda item: item[0])
     if 0 not in best:
@@ -503,7 +533,8 @@ def english_caption_phrases(text: str, limit: int = CAPTION_LIMITS["en"]) -> lis
             raise CaptionError(msg)
         words = [_word(token) for token in tokens]
         costs = {last: _break_cost(tokens, words, last) for last in range(1, len(tokens) + 1)}
-        phrases.extend(_cheapest_lines(tokens, costs, limit))
+        splits = {last for last in range(1, len(tokens)) if _splits_term(words, last)}
+        phrases.extend(_cheapest_lines(tokens, costs, splits, limit))
     if "".join(phrases) != text:
         msg = "English captions must retain exact narration"
         raise CaptionError(msg)

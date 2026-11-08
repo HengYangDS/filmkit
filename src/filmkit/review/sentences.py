@@ -22,8 +22,8 @@ from filmkit.review import ReviewError
 # and close a quotation, in which no mark ends a sentence.
 SENTENCE_MARKS = frozenset(spoken_units.SENTENCE_ENDS)
 CLOSING_MARKS = frozenset(spoken_units.CLOSING_MARKS)
-OPENING_QUOTES = frozenset("“‘「『")
-CLOSING_QUOTES = frozenset("”’」』")
+OPENING_QUOTES = frozenset(spoken_units.OPENING_QUOTES)
+CLOSING_QUOTES = frozenset(spoken_units.CLOSING_QUOTES)
 
 
 def split(text: str) -> list[str]:

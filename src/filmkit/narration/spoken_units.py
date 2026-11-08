@@ -24,6 +24,11 @@ LINE_ENDS = SENTENCE_ENDS + SEMICOLONS
 CLOSING_MARKS = "”’\"')]}"
 # Quotation marks, which are not pauses of their own.
 QUOTATION_MARKS = "“”‘’\"'"
+# Marks that open and close a quotation, inside which no mark ends a sentence. A straight double
+# quote opens a quotation and the next one closes it; a closing single quote outside a quotation
+# is an apostrophe.
+OPENING_QUOTES = "“‘「『"
+CLOSING_QUOTES = "”’」』"
 # Marks that end a question.
 QUESTION_MARKS = "？?"
 # Chinese marks that close a clause, where a caption line may break.
@@ -38,6 +43,19 @@ PHRASE_END_MARKS = frozenset(CLAUSE_MARKS + PHRASE_BREAKS + SENTENCE_ENDS + SEMI
 
 class AlignmentError(ValueError):
     """Aligned items or thought groups that do not fit their narration text exactly."""
+
+
+def quotation_open(text: str) -> bool:
+    """Whether a quotation that opens in `text` is still open at its end."""
+    depth, straight = 0, False
+    for character in text:
+        if character in OPENING_QUOTES:
+            depth += 1
+        elif character in CLOSING_QUOTES and depth:
+            depth -= 1
+        elif character == '"':
+            straight = not straight
+    return bool(depth) or straight
 
 
 def units(text: str) -> str:

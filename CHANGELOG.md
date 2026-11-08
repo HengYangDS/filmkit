@@ -4,6 +4,11 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Fixed
+
+- A declared caption term stays on one English caption line wherever it fits. The phrasing compares layouts first by how many of their breaks fall inside a declared term and then by their cost; a split had cost 90, as much as a line that ends on a word such as "for", so the ETHOS film's expanded name split after "Trust", its one whole layout ending a line on "for" and leaving a short line. A term longer than a line takes the fewest splits. On the films' current English scripts this moves the lines of one segment of the ETHOS film and one of the DDWG film.
+- A short English quotation of several sentences stays on one caption line: a sentence that ends inside an open quotation continues into the next while both fit the caption limit, so the ETHOS film's "Done. All tests pass." no longer spans two captions. A longer quotation divides at its sentences as before. The quotation marks, which the review's sentences read the same way, move to `filmkit.narration.spoken_units`.
+
 ## [0.14.0] - 2026-11-08
 
 ### Added

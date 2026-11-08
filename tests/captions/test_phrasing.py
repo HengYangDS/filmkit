@@ -63,6 +63,65 @@ def test_a_caption_term_declared_with_capitals_stays_on_one_line(monkeypatch):
     )
 
 
+def test_a_caption_term_stays_whole_where_its_only_break_ends_on_a_function_word(monkeypatch):
+    # The ETHOS film's round-2 review (M3-04): the one break that keeps the expanded name whole
+    # ends a line on "for" and leaves a short line, and the split inside the name won on cost.
+    name = "Evidence-grounded Trust for Human-Agent Operational Stewardship"
+    text = f"Its name stands for {name}."
+    monkeypatch.setattr(captions_english, "FIXED_TERMS", ())
+    assert captions_english.english_caption_phrases(text) == [
+        "Its name stands for Evidence-grounded Trust ",
+        "for Human-Agent Operational Stewardship.",
+    ]
+    terms = captions_english.caption_term_words((name,))
+    monkeypatch.setattr(captions_english, "FIXED_TERMS", terms)
+    assert captions_english.english_caption_phrases(text) == [
+        "Its name stands for ",
+        f"{name}.",
+    ]
+
+
+def test_a_caption_term_longer_than_a_line_is_split_once(monkeypatch):
+    term = "every request that a member raises with the department and every answer it receives"
+    text = f"The register keeps {term}."
+    terms = captions_english.caption_term_words((term,))
+    monkeypatch.setattr(captions_english, "FIXED_TERMS", terms)
+    phrases = captions_english.english_caption_phrases(text)
+    assert "".join(phrases) == text
+    assert all(len(phrase) <= 66 for phrase in phrases)
+    assert len(phrases) == 2
+
+
+@pytest.mark.parametrize(
+    ("opening", "closing"),
+    [('"', '"'), ("“", "”")],
+)
+def test_a_short_quotation_of_two_sentences_stays_on_one_caption(opening, closing):
+    # The ETHOS film's round-2 review (M3-05): the caption sentences ended at "Done." inside the
+    # quotation, so the reply spanned two captions although its sentence fits one line.
+    quoted = f"An Agent hands back one sentence: {opening}Done. All tests pass.{closing} "
+    text = quoted + "How much does that sentence actually say?"
+    assert captions_english.english_caption_sentences(text) == [
+        quoted,
+        "How much does that sentence actually say?",
+    ]
+    phrases = captions_english.english_caption_phrases(text)
+    assert phrases[0] == quoted
+    assert not any(phrase.rstrip().endswith("Done.") for phrase in phrases)
+
+
+def test_a_quotation_longer_than_a_line_divides_at_its_sentences():
+    text = (
+        'The reply read: "Every check in the suite passed. '
+        'The release can go out today, as planned." Then it stopped.'
+    )
+    assert captions_english.english_caption_sentences(text) == [
+        'The reply read: "Every check in the suite passed. ',
+        'The release can go out today, as planned." ',
+        "Then it stopped.",
+    ]
+
+
 def test_english_caption_cues_preserve_connected_text_and_punctuation():
     copy = (
         "Before temporary work enters production, verify meaning, quality, "
