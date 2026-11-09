@@ -248,7 +248,9 @@ MOTION_WORDS = {
     "start": "sets off from rest at {speed} px/s",
     "race": "moves at {speed} px/s for {frames} frames",
     "pop": "at ink {level} {appears} within one frame",
-    "jump": "jump {distance} px ({shift[0]}, {shift[1]}) beyond their motion as {marks} marks at a cut",
+    "jump": (
+        "jump {distance} px ({shift[0]}, {shift[1]}) beyond their motion as {marks} marks at a cut"
+    ),
     "dash": "turns from {gaps[0]:.0%} to {gaps[1]:.0%} gap in its dash pattern within one frame",
 }
 # What a pop adds when a declared stage cut that keeps its stage brought it.
