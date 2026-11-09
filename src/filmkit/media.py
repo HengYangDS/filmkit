@@ -31,7 +31,8 @@ def probe(path: Path) -> dict:
 def video_cadence(path: Path, expected_frames: int, fps: int) -> dict:
     """Qualify every presentation time of the first video stream, including internal splices.
 
-    Each frame must start within one tick of its place on the fps grid and last one frame.
+    Each frame must start within one tick of its place on the fps grid and last one frame. The
+    record names the frames whose packets are keyframes, in presentation order.
     """
     data = json.loads(
         repository.run(
@@ -44,7 +45,7 @@ def video_cadence(path: Path, expected_frames: int, fps: int) -> dict:
                 "-show_packets",
                 "-show_streams",
                 "-show_entries",
-                "stream=time_base:packet=pts,duration",
+                "stream=time_base:packet=pts,duration,flags",
                 "-of",
                 "json",
                 str(path),
@@ -72,6 +73,9 @@ def video_cadence(path: Path, expected_frames: int, fps: int) -> dict:
         "presentation_start": 0,
         "presentation_end": expected_frames / fps,
         "every_frame_checked": True,
+        "keyframes": [
+            frame for frame, packet in enumerate(packets) if "K" in packet.get("flags", "")
+        ],
     }
 
 

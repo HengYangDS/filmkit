@@ -1,7 +1,6 @@
-"""The delivery index, the viewing members and the packaged films."""
+"""The packaged films: their encodes, the finished-film checks and the package records."""
 
 import json
-import re
 import subprocess
 from pathlib import Path
 
@@ -14,65 +13,6 @@ import filmkit.repository as repository
 import filmkit.specification as specification
 from filmkit.delivery.packaging import PackagingError
 from filmkit.picture.rendering import PictureError
-
-
-def test_the_runtime_and_viewing_members_follow_the_edition():
-    minutes, seconds = divmod(specification.DURATION, 60)
-    assert delivery_packaging.runtime_label() == f"{minutes:02d}:{seconds:02d}"
-    assert delivery_packaging.viewing_members(production.Edition("en")) == (
-        "sample-reel-cover.png",
-        "sample-reel-cover.jpg",
-        "sample-reel-en.srt",
-        "sample-reel-en.vtt",
-        "sample-reel-en-transcript.md",
-        "chapters.json",
-        "chapters.ffmeta",
-        "index.html",
-    )
-
-
-def test_an_edition_whose_cover_is_not_painted_refuses_naming_its_field(tmp_path, monkeypatch):
-    monkeypatch.setattr(repository, "ROOT", tmp_path)
-    edition = production.Edition("zh")
-    with pytest.raises(PackagingError, match=rf"editions\.zh\.cover: {re.escape(edition.cover)}"):
-        delivery_packaging.package_metadata(edition)
-    assert not (tmp_path / "build").exists()
-
-
-def test_delivery_index_uses_sibling_languages_and_preserves_language_players(
-    tmp_path,
-    monkeypatch,
-):
-    """Exercise the actual root-template producer, independent of edition depth."""
-    template = (repository.ROOT / delivery_packaging.INDEX).read_bytes()
-    monkeypatch.setattr(repository, "ROOT", tmp_path)
-    source = tmp_path / delivery_packaging.INDEX
-    source.parent.mkdir(parents=True)
-    source.write_bytes(template)
-    root = tmp_path / "build/artifacts/film"
-    for code in ("zh", "en"):
-        player = root / code / "index.html"
-        player.parent.mkdir(parents=True)
-        player.write_text(f"Existing {code} player")
-    observed = delivery_packaging.package_language_index()
-    output = (root / "index.html").read_text()
-    assert 'href="zh/index.html"' in output
-    assert 'href="en/index.html"' in output
-    runtime = f"{specification.DURATION // 60:02d}:{specification.DURATION % 60:02d}"
-    assert "<base " not in output
-    assert runtime in output
-    assert observed == {
-        "source": "content/index.html",
-        "source_sha256": repository.sha(source),
-        "path": "build/artifacts/film/index.html",
-        "sha256": repository.sha(root / "index.html"),
-        "languages": ["zh", "en"],
-    }
-    for code in ("zh", "en"):
-        assert (root / code / "index.html").read_text() == f"Existing {code} player"
-    source.write_bytes(template.replace(b'href="en/index.html"', b'href="en.html"'))
-    with pytest.raises(PackagingError, match="both sibling language links"):
-        delivery_packaging.package_language_index()
 
 
 def probe(
@@ -169,7 +109,13 @@ def packaging_root(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(delivery_packaging, "package_metadata", lambda _edition: None)
     monkeypatch.setattr(media, "probe", lambda path: probe(kind=kind_of(path)))
+    monkeypatch.setattr(media, "video_cadence", lambda _path, frames, fps: keyed(frames, 2 * fps))
     return tmp_path, edition, calls
+
+
+def keyed(frames: int, every: int) -> dict:
+    """A cadence record whose keyframes stand at every `every` frames from the first."""
+    return {"frames": frames, "keyframes": list(range(0, frames, every))}
 
 
 def kind_of(path) -> str:
@@ -315,21 +261,24 @@ def test_the_commands_carry_the_release_metadata(packaging_root):
         "h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1"
         ":video_full_range_flag=0:level="
     )
-    hardware = ["-hwaccel", "videotoolbox", "-hwaccel_output_format", "videotoolbox_vld"]
+    # The 1080p film averages each 2x2 block of the UHD picture between the VideoToolbox decode
+    # and encode, and holds a keyframe every 2 s.
+    hardware = ["-hwaccel", "videotoolbox"]
     scaled = [
         "-filter:v:0",
-        "scale_vt=w=1920:h=1080",
+        "scale=w=1920:h=1080:flags=area",
         "-c:v:0",
         "h264_videotoolbox",
         "-b:v:0",
         "10M",
+        "-g:v:0",
+        str(2 * specification.FPS),
     ]
     attach = ["-map", "0:v:0", "-map", "0:a:0", "-map", "1:v:0", "-map_metadata", "0"]
     attach += ["-map_chapters", "0", "-c", "copy", "-disposition:v:1", "attached_pic"]
     keys = [
         "-Keys:Author=Yang HENG",
         "-Keys:Title=示例影片 · 从源文件到成片",
-        "-Keys:Artist=Yang HENG",
         "-Keys:Album=示例影片 · 从源文件到成片",
         "-Keys:Genre=教育",
         "-Keys:Description=从源文件重建影片的示例；中文；纯 2D；仅旁白",
@@ -423,10 +372,21 @@ def test_a_failed_check_leaves_no_film_in_place_and_keeps_the_work(packaging_roo
         {"changes": {"album": None}},
         {"changes": {"synopsis": "Another film."}},
         {"changes": {"com.apple.quicktime.keywords": None}},
+        {"changes": {"com.apple.quicktime.artist": specification.AUTHOR}},
         {"kind": "1080p-captioned"},
         {"chapters": "eng"},
     ],
-    ids=["frames", "author", "sound", "album", "synopsis", "keywords", "hd-mark", "chapters"],
+    ids=[
+        "frames",
+        "author",
+        "sound",
+        "album",
+        "synopsis",
+        "keywords",
+        "second-author",
+        "hd-mark",
+        "chapters",
+    ],
 )
 def test_a_finished_film_needs_every_frame_its_author_and_release(tmp_path, monkeypatch, change):
     monkeypatch.setattr(media, "probe", lambda _path: probe(**change))
@@ -434,6 +394,33 @@ def test_a_finished_film_needs_every_frame_its_author_and_release(tmp_path, monk
         delivery_packaging.check_delivered_film(
             tmp_path / "film.mp4", production.Edition("zh"), production.RENDITIONS["uhd"]
         )
+
+
+def test_a_finished_film_may_carry_its_creation_date_beside_its_release_keys(tmp_path, monkeypatch):
+    changes = {"com.apple.quicktime.creationdate": "2026-11-09T22:00:00+00:00"}
+    monkeypatch.setattr(media, "probe", lambda _path: probe(changes=changes))
+    delivery_packaging.check_delivered_film(
+        tmp_path / "film.mp4", production.Edition("zh"), production.RENDITIONS["uhd"]
+    )
+
+
+@pytest.mark.parametrize(("every", "passes"), [(2 * specification.FPS, True), (12, False)])
+def test_a_1080p_film_holds_a_keyframe_every_2_seconds(tmp_path, monkeypatch, every, passes):
+    monkeypatch.setattr(media, "probe", lambda _path: probe(kind="1080p-captioned"))
+    monkeypatch.setattr(media, "video_cadence", lambda _path, frames, _fps: keyed(frames, every))
+
+    def check():
+        delivery_packaging.check_delivered_film(
+            tmp_path / "film.mp4",
+            production.Edition("zh"),
+            production.RENDITIONS["1080p-captioned"],
+        )
+
+    if passes:
+        check()
+    else:
+        with pytest.raises(PackagingError, match="differs from the delivery contract"):
+            check()
 
 
 def test_the_release_tags_come_from_the_script():

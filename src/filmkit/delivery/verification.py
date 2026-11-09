@@ -271,6 +271,7 @@ def verify_media(edition: production.Edition, path: Path, rendition: production.
         and tags.get("artist") == specification.AUTHOR
         and tags.get("author", tags.get("com.apple.quicktime.author")) == specification.AUTHOR
         and all(tags.get(key) == release.get(key) for key in {*release, "hd_video"})
+        and packaging.only_release_keys(tags, release)
         and all(
             stream.get("tags", {}).get("language") == language
             for stream in data["streams"]
@@ -282,7 +283,10 @@ def verify_media(edition: production.Edition, path: Path, rendition: production.
     ):
         msg = f"Movie differs from the delivery contract: {path.name}"
         raise VerificationError(msg)
-    media.video_cadence(path, DURATION * FPS, FPS)
+    cadence = media.video_cadence(path, DURATION * FPS, FPS)
+    if not packaging.keyed_as_declared(rendition, cadence.get("keyframes", [])):
+        msg = f"Movie differs from the delivery contract: {path.name}: keyframes"
+        raise VerificationError(msg)
     frames = media.decoded_video_frames(path, DURATION * FPS, max(300, DURATION))
     sample_frames = media.decoded_audio_frames(path)
     # AAC encoder padding is distinct from the declared sample domain.

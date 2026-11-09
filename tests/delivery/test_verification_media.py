@@ -108,6 +108,9 @@ def test_a_delivered_film_meeting_its_contract_is_decoded_completely(decoded):
         "streams/0/field_order": "unknown",
     }
     assert check(quicktime)["video_frames"] == FRAMES
+    # The creation date that ExifTool writes beside the release keys passes.
+    created = {"format/tags/com.apple.quicktime.creationdate": "2026-11-09T22:00:00+00:00"}
+    assert check(created)["video_frames"] == FRAMES
 
 
 @pytest.mark.parametrize(
@@ -131,6 +134,8 @@ def test_a_delivered_film_meeting_its_contract_is_decoded_completely(decoded):
         {"format/tags/author": "Someone else"},
         {"format/tags/genre": None},
         {"format/tags/com.apple.quicktime.title": "Another film"},
+        # Spotlight lists every author-bearing QuickTime key, so only Author names the author.
+        {"format/tags/com.apple.quicktime.artist": specification.AUTHOR},
         {"format/tags/hd_video": "2"},
         {"streams/0/tags": {"language": "zho", "handler_name": "VideoHandler"}},
         {"streams/0/tags": {"language": "eng"}},
@@ -146,6 +151,30 @@ def test_a_delivered_film_outside_its_contract_is_refused(decoded, changes):
     film, check = decoded
     with pytest.raises(VerificationError, match=f"delivery contract: {film.name}"):
         check(changes)
+
+
+@pytest.mark.parametrize(("every", "passes"), [(2 * specification.FPS, True), (12, False)])
+def test_a_delivered_1080p_film_holds_a_keyframe_every_2_seconds(
+    decoded, monkeypatch, every, passes
+):
+    film, _ = decoded
+    viewing = {
+        "streams/0/width": 1920,
+        "streams/0/height": 1080,
+        "streams/0/level": specification.H264_LEVELS[1080],
+        "format/tags/hd_video": "2",
+    }
+    monkeypatch.setattr(media, "probe", lambda _path: probe(viewing))
+    keyframes = list(range(0, FRAMES, every))
+    monkeypatch.setattr(media, "video_cadence", lambda *_: {"keyframes": keyframes})
+    edition, rendition = production.Edition("zh"), production.RENDITIONS["1080p-captioned"]
+    if passes:
+        assert (
+            delivery_verification.verify_media(edition, film, rendition)["video_frames"] == FRAMES
+        )
+    else:
+        with pytest.raises(VerificationError, match=f"delivery contract: {film.name}"):
+            delivery_verification.verify_media(edition, film, rendition)
 
 
 def test_a_decoded_soundtrack_of_another_length_is_refused(decoded, monkeypatch):

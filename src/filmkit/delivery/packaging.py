@@ -82,6 +82,10 @@ CAPTION_OWNER = (
 )
 # No encode's deadline is shorter, in seconds.
 DEADLINE_FLOOR = 600
+# The prefix FFprobe reports ExifTool's QuickTime keys under, and the creation date's key, which
+# packaging writes beside the release's keys.
+QUICKTIME_PREFIX = "com.apple.quicktime."
+CREATION_KEY = QUICKTIME_PREFIX + "creationdate"
 # The film that a delivery binding names for the real-browser player check.
 BOUND_FILM = {"slug": FILM.slug, "duration": DURATION}
 
@@ -308,13 +312,17 @@ def track_names(edition: Edition) -> dict[str, str]:
 
 
 def quicktime_keys(edition: Edition) -> dict[str, str]:
-    """The QuickTime keys ExifTool writes, by ExifTool tag name, without the creation date."""
+    """The QuickTime keys ExifTool writes, by ExifTool tag name, without the creation date.
+
+    The author stands only under Author: Spotlight lists every author-bearing QuickTime key
+    among a film's authors, so an Artist key would list the author twice, and the item-list
+    artist tags, which the release tags carry, do not count.
+    """
     script = read(edition.script)
     release = script["release"]
     return {
         "Author": AUTHOR,
         "Title": typeset(script["title"]),
-        "Artist": AUTHOR,
         "Album": release["collection"],
         "Genre": release["genre"],
         "Description": typeset(release["description"]),
@@ -328,10 +336,30 @@ def quicktime_keys(edition: Edition) -> dict[str, str]:
 def delivered_tags(edition: Edition, rendition: Rendition) -> dict[str, str]:
     """The global tags FFprobe reads from a finished film: its item list and QuickTime keys."""
     keys = {
-        f"com.apple.quicktime.{key.lower()}": value
-        for key, value in quicktime_keys(edition).items()
+        f"{QUICKTIME_PREFIX}{key.lower()}": value for key, value in quicktime_keys(edition).items()
     }
     return {**dict(release_tags(edition, rendition)), **keys}
+
+
+def only_release_keys(tags: dict, expected: dict) -> bool:
+    """Whether every QuickTime key of a film's tags is one of its release's or its creation date."""
+    keys = {key for key in tags if key.startswith(QUICKTIME_PREFIX)}
+    return keys <= {*expected, CREATION_KEY}
+
+
+def keyed_as_declared(rendition: Rendition, keyframes: list[int]) -> bool:
+    """Whether a film's keyframes stand at every interval its rendition declares, from the first
+    frame, and nowhere else; a rendition that declares none keeps the keyframes it copies."""
+    if rendition.keyframe_seconds is None:
+        return True
+    return keyframes == list(range(0, DURATION * FPS, rendition.keyframe_seconds * FPS))
+
+
+def keyframe_options(rendition: Rendition) -> tuple[str, ...]:
+    """The encoder option that sets a rendition's declared keyframe interval, if it declares one."""
+    if rendition.keyframe_seconds is None:
+        return ()
+    return ("-g:v:0", str(rendition.keyframe_seconds * FPS))
 
 
 def encode_command(
@@ -367,6 +395,7 @@ def encode_command(
         "-map_chapters",
         "2",
         *rendition.video,
+        *keyframe_options(rendition),
         "-bsf:v:0",
         video_tags(rendition),
         "-c:a",
@@ -464,9 +493,11 @@ def attach_cover_and_keys(
 def check_delivered_film(path: Path, edition: Edition, rendition: Rendition) -> None:
     """Refuse a finished film without every frame, its duration, cover, release tags or tracks.
 
-    Its release tags must be exactly the rendition's, so only the 1080p film is marked HD, its
-    picture and narration tracks must carry their names, and every track but the attached
-    cover, the chapter track included, the edition's language.
+    Its release tags must be exactly the rendition's, so only the 1080p film is marked HD, it
+    may carry no other QuickTime key than its release's and its creation date, its picture and
+    narration tracks must carry their names, and every track but the attached cover, the
+    chapter track included, the edition's language. A rendition that declares a keyframe
+    interval must hold its keyframes exactly there.
     """
     info = media.probe(path)
     streams = info["streams"]
@@ -481,6 +512,7 @@ def check_delivered_film(path: Path, edition: Edition, rendition: Rendition) -> 
         and float(info["format"]["duration"]) == float(sounds[0]["duration"]) == DURATION
         and any(stream.get("disposition", {}).get("attached_pic") for stream in streams)
         and all(tags.get(key) == expected.get(key) for key in {*expected, "hd_video"})
+        and only_release_keys(tags, expected)
         and movie.get("tags", {}) | {"handler_name": names["picture"], "language": language}
         == movie.get("tags", {})
         and sounds[0].get("tags", {}) | {"handler_name": names["narration"], "language": language}
@@ -493,6 +525,15 @@ def check_delivered_film(path: Path, edition: Edition, rendition: Rendition) -> 
     ):
         msg = f"The finished film differs from the delivery contract: {path}"
         raise PackagingError(msg)
+    if rendition.keyframe_seconds is not None:
+        try:
+            keyframes = media.video_cadence(path, DURATION * FPS, FPS)["keyframes"]
+        except media.MediaError as error:
+            msg = f"The finished film differs from the delivery contract: {path}: {error}"
+            raise PackagingError(msg) from error
+        if not keyed_as_declared(rendition, keyframes):
+            msg = f"The finished film differs from the delivery contract: {path}: keyframes"
+            raise PackagingError(msg)
 
 
 def package_rendition(

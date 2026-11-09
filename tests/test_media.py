@@ -9,6 +9,38 @@ import filmkit.media as media
 
 
 @pytest.mark.ffmpeg
+def test_the_cadence_names_the_keyframes(tmp_path):
+    film = tmp_path / "keyed.mp4"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-nostdin",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=64x36:r=60",
+            "-frames:v",
+            "240",
+            "-c:v",
+            "libx264",
+            "-bf",
+            "0",
+            "-g",
+            "120",
+            "-sc_threshold",
+            "0",
+            str(film),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=30,
+    )
+    assert media.video_cadence(film, 240, 60)["keyframes"] == [0, 120]
+
+
+@pytest.mark.ffmpeg
 def test_mixed_time_base_splice_requires_native_cadence(tmp_path):
     first, second = tmp_path / "first.mp4", tmp_path / "second.mp4"
     for target, scale, color in [(first, 90000, "black"), (second, 15360, "white")]:

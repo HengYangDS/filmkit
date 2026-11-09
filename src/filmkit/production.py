@@ -25,9 +25,11 @@ class Rendition:
     picture it carries.
 
     `decoding` holds the FFmpeg options before the picture input and `video` those of the video
-    stream. Packaging allows the encode `deadline_ratio` seconds per second of film, and never
-    less than its own floor. `captions` names the picture: the one that draws the captions, or
-    the uncaptioned one.
+    stream. A rendition that re-encodes may declare `keyframe_seconds`: its film then holds a
+    keyframe at every that many seconds of frames from the first and at no other frame; one
+    that declares none keeps the keyframes of the stream it copies. Packaging allows the encode
+    `deadline_ratio` seconds per second of film, and never less than its own floor. `captions`
+    names the picture: the one that draws the captions, or the uncaptioned one.
     """
 
     width: int
@@ -37,6 +39,7 @@ class Rendition:
     video: tuple[str, ...] = ("-c:v:0", "copy")
     deadline_ratio: int = 0
     captions: bool = True
+    keyframe_seconds: int | None = None
 
 
 # The two sizes a film is delivered at: the UHD master and the 1080p viewing film.
@@ -45,14 +48,24 @@ VIEWING = Rendition(
     1920,
     1080,
     reencoded=True,
-    decoding=("-hwaccel", "videotoolbox", "-hwaccel_output_format", "videotoolbox_vld"),
-    video=("-filter:v:0", "scale_vt=w=1920:h=1080", "-c:v:0", "h264_videotoolbox", "-b:v:0", "10M"),
+    decoding=("-hwaccel", "videotoolbox"),
+    video=(
+        "-filter:v:0",
+        "scale=w=1920:h=1080:flags=area",
+        "-c:v:0",
+        "h264_videotoolbox",
+        "-b:v:0",
+        "10M",
+    ),
     deadline_ratio=2,
+    keyframe_seconds=2,
 )
 # Each edition's delivered films by kind: at each size, one with the captions the picture draws
-# and one without them. The UHD films copy their rendered picture's stream and the 1080p viewing
-# films re-encode it, decoded and scaled through VideoToolbox; the two films of a size are made
-# alike from their own pictures.
+# and one without them. The UHD films copy their rendered picture's stream. The 1080p viewing
+# films re-encode it: decoded through VideoToolbox, averaged over each 2x2 block of pixels, which
+# neither rings nor lifts a white as VideoToolbox's own scaler does, and encoded through
+# VideoToolbox with a keyframe every 2 s. The two films of a size are made alike from their own
+# pictures.
 RENDITIONS = {
     "uhd": UHD,
     "1080p-captioned": VIEWING,

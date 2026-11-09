@@ -4,6 +4,14 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Fixed
+
+- A delivered film names its author once. Packaging wrote the author into the QuickTime Author and Artist keys, and Spotlight lists every author-bearing QuickTime key among a file's authors, so Finder showed every film's author as "Yang HENG (2)"; the item-list artist tags it also writes do not count. The Artist key is gone, and packaging and the verifier refuse a film that carries a QuickTime key besides its release's and its creation date.
+- The 1080p films no longer ring. VideoToolbox's scaler laid a dark fringe along every stroke, 12 to 20 % of the ground pixels near ink more than 8 levels darker than the ground on the ETHOS film, and lifted the brightest ink to 255 where the master reaches 242. The films are now averaged over each 2×2 block of the UHD picture between the VideoToolbox decode and encode: on the ETHOS film's Chinese frame at 489.5 s no ground pixel near ink is darker and its brightest ink stands at 243.
+- The 1080p films hold a keyframe every 2 s, at every 120th frame, where the encoder kept FFmpeg's default of one every 12 frames; packaging and the verifier refuse a 1080p film keyed elsewhere. The UHD films keep their renderer's keyframes: HyperFrames 0.9.9 applies `--keyframe-interval` only to its software encoder.
+
+This breaks a film packaged by an earlier release: the verifier refuses its films until it packages them again, from the same pictures and soundtracks.
+
 ## [0.17.0] - 2026-11-09
 
 ### Changed
