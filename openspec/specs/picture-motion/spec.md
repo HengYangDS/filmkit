@@ -76,7 +76,7 @@ The motion audit SHALL follow each mark a scene draws at ink level 25 or more fr
 
 ### Requirement: A stage cut is the one place where marks may change at once
 
-A frame SHALL be a stage cut for a scene when at least 35% of the scene's marks at ink level 60 or more, counted or weighed by their ink, vanish or appear within it, or when the composition declares a cut of the scene in it. The audit SHALL NOT follow a mark across a stage cut, and SHALL report no pop in it or as the scene enters or leaves the picture.
+A frame SHALL be a stage cut for a scene when at least 35% of the scene's marks at ink level 60 or more, counted or weighed by their ink, vanish or appear within it, or when the composition declares a cut of the scene in it. The audit SHALL NOT follow a mark across a stage cut and SHALL report no pop as a scene enters or leaves the picture. A declared cut that changes less than that 35% SHALL excuse the marks it takes away and SHALL NOT excuse the marks it brings.
 
 #### Scenario: A stage handed to the next on a word
 
@@ -85,13 +85,18 @@ A frame SHALL be a stage cut for a scene when at least 35% of the scene's marks 
 
 #### Scenario: A cut the composition declares
 
-- **WHEN** one name gives way to another on the word where the composition declares a stage cut of its scene
-- **THEN** the audit reports no pop for either
+- **WHEN** the composition declares a stage cut on a word where 20 of the scene's 24 firm marks give way to 18 others
+- **THEN** the audit reports no pop for them
 
 #### Scenario: A mark beside a standing picture
 
 - **WHEN** one card appears within one frame among 30 standing marks
 - **THEN** the audit reports its marks as pops
+
+#### Scenario: A mark brought into a standing stage at a declared cut
+
+- **WHEN** one name gives way to another at a cut the composition declares while the scene's 30 other firm marks stand
+- **THEN** the audit reports the arriving name as a pop and no pop for the name that leaves
 
 ### Requirement: A finding names the scene line that drew it
 
@@ -104,7 +109,7 @@ Each motion finding SHALL name the line of the composition that drew its mark: t
 
 ### Requirement: A film declares the motion it keeps
 
-A film MAY declare `[[picture.motion.exceptions]]` in `content/film.toml`, each with its edition, scene, source, the composition line as `film.js:<line>` or its module, kind (`halt`, `start`, `race` or `pop`) and reason. A finding that an exception matches SHALL be recorded with the reason and SHALL NOT refuse; an exception that matches no finding of its edition SHALL be refused.
+A film MAY declare `[[picture.motion.exceptions]]` in `content/film.toml`, each with its edition, scene, source, the composition line as `film.js:<line>` or its module, kind (`halt`, `start`, `race`, `pop`, `jump` or `dash`) and reason. A finding that an exception matches SHALL be recorded with the reason and SHALL NOT refuse; an exception that matches no finding of its edition SHALL be refused.
 
 #### Scenario: A declared beat
 
@@ -127,7 +132,7 @@ The motion audit SHALL record, for each scene, the largest speed of a glide, the
 
 ### Requirement: The review's measurements report each edition's motion
 
-`review.measurement` SHALL record each edition's motion from its picture gate record: the counts of halts, starts, races and pops, the declared ones apart, the largest speeds per scene and each finding with its time. It SHALL refuse a gate record or motion report that is not bound to the current composition and timeline.
+`review.measurement` SHALL record each edition's motion from its picture gate record: the counts of halts, starts, races, pops, jumps and dash snaps, the declared ones apart, the largest speeds per scene and each finding with its time. It SHALL refuse a gate record or motion report that is not bound to the current composition and timeline.
 
 #### Scenario: A current gate record
 
@@ -138,3 +143,51 @@ The motion audit SHALL record, for each scene, the largest speed of a glide, the
 
 - **WHEN** the composition changed after `check-picture` wrote the record
 - **THEN** the measurement refuses and names the edition's gate record
+
+### Requirement: The marks a cut keeps go on as they went
+
+At a stage cut the audit SHALL report a jump for a scene when its marks at ink 60 or more that the cut keeps, matched across the frame at one size, moved whole by one shift of 8 px or more beyond the shift each moved by in the frame before, to within 2 px, and hold at least half of the scene's firm ink before the cut. `check-picture` SHALL refuse a jump as `motion_jumps`, naming its time, scene, shift and marks, unless the film declares it.
+
+#### Scenario: A field and its name moved at a cut
+
+- **WHEN** at a declared cut a square and its heading, the scene's only firm marks, both move 354 px left within one frame
+- **THEN** the audit reports one jump of 354 px for the scene and `check-picture` refuses it
+
+#### Scenario: A cut that keeps its rail in place
+
+- **WHEN** a cut replaces a scene's names while its rail stands where it stood
+- **THEN** the audit reports no jump
+
+#### Scenario: A stage gliding through a cut
+
+- **WHEN** a field and its name glide 12 px a frame before, at and after a cut the composition declares
+- **THEN** the audit reports no jump
+
+#### Scenario: A heading moved while its stage is replaced
+
+- **WHEN** at a cut a heading moves 200 px while the scene's 12 other firm marks give way to new ones
+- **THEN** the audit reports no jump, since the heading holds less than half of the scene's firm ink
+
+### Requirement: A stroke's dashes open and close over time
+
+The headless composition SHALL record each stroke's dash pattern, and the audit SHALL report a dash snap when a stroke it follows at ink 25 or more, outside a stage cut, changes the share of its pattern that is gap by 0.25 or more within one frame. `check-picture` SHALL refuse a dash snap as `motion_dash_snaps`, naming its time, scene and line, unless the film declares it.
+
+#### Scenario: A join that turns dashed at once
+
+- **WHEN** a solid link turns into dashes of 8 px on and 8 px off within one frame
+- **THEN** the audit reports a dash snap and `check-picture` refuses it
+
+#### Scenario: A join that breaks over a third of a second
+
+- **WHEN** a solid link's gaps open from 0 to 8 px of each 16 px over 0.35 s
+- **THEN** the audit reports no dash snap
+
+#### Scenario: A dashed way drawn on
+
+- **WHEN** a dashed way of one pattern draws on along its length
+- **THEN** the audit reports no dash snap
+
+#### Scenario: A dashed outline crossfading into a solid one
+
+- **WHEN** a dashed outline fades out while a solid one fades in on the same box
+- **THEN** each continues the outline of its own pattern and the audit reports no dash snap
