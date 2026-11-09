@@ -4,6 +4,15 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-09
+
+### Changed
+
+- `check-picture` refuses a jump at a stage cut (`motion_jumps`): the marks at ink level 60 or more that a cut keeps, matched at one size, which move whole by one shift of 8 px or more beyond the shift each moved by in the frame before, to within 2 px, while they hold half or more of their scene's firm ink, by box area times ink level, in the frame before the cut. The follower stops at a cut, so the 0.16.0 gate never judged the DDWG film's 04.2 field and name, which moved 354 px within one frame at a declared cut, or the English 05.2 case, which moved 224 px; its round-34 production review found both. A stage gliding through a cut keeps its motion and does not jump, while one that sets off at a cut faster than it then glides jumps by its first step: counted on the shift alone, at 30 fps every glide of 240 px/s or more through a cut would jump, as ten glides through the declared cuts of the DDWG and ETHOS films did. A finding names the jump's heaviest mark, its shift beyond the marks' motion, its distance and how many marks moved.
+- A stage cut the composition declares that changes less than 35% of its scene's firm marks, counted and by ink, excuses the marks it takes away and no longer the marks it brings: a mark it brings at ink level 60 or more pops, and its finding says it came at a declared cut that keeps its stage. The DDWG film declared a cut where 06.2's statement appeared at full ink and where 02.2's divider replaced a tie, and 0.16.0 excused both.
+- The headless canvas records each stroke's dash pattern as a canvas holds it, an odd pattern repeated and an invalid one ignored, and `check-picture` refuses a dash snap (`motion_dash_snaps`): a stroke followed at ink level 25 or more whose share of gap, the sum of its gaps over its period, changes by 0.25 or more within one frame outside a stage cut, as the DDWG film's 13.1 join did when it turned into dashes of 8 px on and 8 px off. A dashed way drawn on keeps its share, and gaps that open over a third of a second change it by a few hundredths a frame. Of two outlines crossfading on one box, each continues the outline of its own pattern.
+- A film keeps a jump or a dash snap by declaring it in `[[picture.motion.exceptions]]` with kind `jump` or `dash`, and `filmkit.review.measurement` counts jumps and dash snaps and refuses a motion report that judges neither. On the DDWG film's round-34 composition the audit finds each of the eight cases its review named; on the films' current compositions it finds a pop and a dash snap in each DDWG edition, a jump and five pops in the ETHOS film's English edition and two jumps and two pops in its Chinese one, and two pops in each edition of the essentials film. This breaks a composition that moves the marks a cut keeps, brings a mark onto a stage that stands at a declared cut, or switches a stroke's dashes within one frame.
+
 ## [0.16.0] - 2026-11-08
 
 ### Changed
