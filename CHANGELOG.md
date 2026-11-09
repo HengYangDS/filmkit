@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-10
+
 ### Fixed
 
 - A delivered film names its author once. Packaging wrote the author into the QuickTime Author and Artist keys, and Spotlight lists every author-bearing QuickTime key among a file's authors, so Finder showed every film's author as "Yang HENG (2)"; the item-list artist tags it also writes do not count. The Artist key is gone, and packaging and the verifier refuse a film that carries a QuickTime key besides its release's and its creation date.
