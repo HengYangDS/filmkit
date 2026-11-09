@@ -1,14 +1,14 @@
 /** Run the composition headlessly in Node, as the staged document runs it, for the frame and motion audits.
  *
- * film.js runs in its own vm context on a canvas stand-in. Each stroke, fill and text it paints while the caller renders
- * a frame reaches the caller as one paint: its kind, the scene drawing it (film.js publishes window.__sceneId around each
- * scene), its opacity and colour, its line width, whether its line is dashed, the scale of its transform, and its geometry
- * twice over. `subs` is the path as screen subpaths, sampled the way the real-browser check samples them
- * (geometry-check.mjs); a text stands at its anchor. `points` are the drawing points in the painter's own coordinates,
- * as the motion audit identifies a mark across frames: an arc gives the corners of its circle, a text the corners of
- * its box, and `toScreen` maps them to the screen. A stroke whose path holds a whole turn the renderer's browser may
- * paint without ink (wholeTurnAtRisk) carries each such arc in `turns`, its exact start and end angles and the line of
- * film.js that drew it, which whole-turns.mjs draws in that browser. The
+ * film.js runs in its own vm context on a canvas stand-in. Each stroke, fill and text it paints while the caller
+ * renders a frame reaches the caller as one paint: its kind, the scene drawing it (film.js publishes window.__sceneId
+ * around each scene), its opacity and colour, its line width, its dash pattern as the canvas holds it and whether it is
+ * dashed, the scale of its transform, and its geometry twice over. `subs` is the path as screen subpaths, sampled the
+ * way the real-browser check samples them (geometry-check.mjs); a text stands at its anchor. `points` are the drawing
+ * points in the painter's own coordinates, as the motion audit identifies a mark across frames: an arc gives the
+ * corners of its circle, a text the corners of its box, and `toScreen` maps them to the screen. A stroke whose path
+ * holds a whole turn the renderer's browser may paint without ink (wholeTurnAtRisk) carries each such arc in `turns`,
+ * its exact start and end angles and the line of film.js that drew it, which whole-turns.mjs draws in that browser. The
  * stand-in measures a text's width by the advances of the film's declared faces when it is given them
  * (readTextMetrics), and otherwise by an estimate; geometry-check.mjs measures real metrics. */
 import { readFileSync } from "node:fs";
@@ -185,6 +185,7 @@ export function canvasStandIn(deliver, faces = null, turned = () => null) {
       alpha: state.globalAlpha,
       color,
       lineWidth: state.lineWidth,
+      dash: state.dash.slice(),
       dashed: state.dash.some((v) => v > 0),
       scale: Math.hypot(a, b),
       toScreen: ([x, y]) => [a * x + c * y + e, b * x + d * y + f],
@@ -211,7 +212,10 @@ export function canvasStandIn(deliver, faces = null, turned = () => null) {
       if (stack.length) [m, state] = stack.pop();
     },
     setLineDash(segments) {
-      state.dash = [...segments];
+      // As on a canvas, a pattern with a negative or an infinite length is ignored and an odd one repeats.
+      const list = [...segments].map(Number);
+      if (list.some((v) => !(v >= 0 && Number.isFinite(v)))) return;
+      state.dash = list.length % 2 ? [...list, ...list] : list;
     },
     measureText: (v) => textMetrics(v, state, faces),
     beginPath() {

@@ -24,11 +24,12 @@ starts is gated, and every other is recorded; each finding names the ellipse fro
 the turn from any start. A gated finding refuses with `PictureError`, after the record is
 written, and so does an audit that fails or a composition or timeline that changes while it is
 checked.
-The motion audit follows every mark as a viewer sees it move, and each of its findings, a halt,
-start, race or pop outside a stage cut, is gated by its time, scene, marks and the line that drew
-it, unless one of the edition's `[[picture.motion.exceptions]]` names its scene, its line or
-module and its kind, which records it with the exception's reason; an exception that matches no
-finding of the edition is gated as stale.
+The motion audit follows every mark as a viewer sees it move, and each of its findings is gated
+by its time, scene, marks and the line that drew it: a halt, start, race, pop or dash snap outside
+a stage cut, a pop that a declared cut keeping its stage brings, and the jump of the marks a stage
+cut keeps but moves whole. One of the edition's `[[picture.motion.exceptions]]` that names its
+scene, its line or module and its kind records it with the exception's reason instead; an
+exception that matches no finding of the edition is gated as stale.
 `render-picture` reads the record before it starts the renderer
 (`filmkit.picture.rendering.require_passing_gates`).
 
@@ -239,13 +240,19 @@ MOTION_GATES = {
     "start": "motion_starts",
     "race": "motion_races",
     "pop": "motion_pops",
+    "jump": "motion_jumps",
+    "dash": "motion_dash_snaps",
 }
 MOTION_WORDS = {
     "halt": "falls from {speed} px/s to rest",
     "start": "sets off from rest at {speed} px/s",
     "race": "moves at {speed} px/s for {frames} frames",
     "pop": "at ink {level} {appears} within one frame",
+    "jump": "jump {distance} px ({shift[0]}, {shift[1]}) beyond their motion as {marks} marks at a cut",
+    "dash": "turns from {gaps[0]:.0%} to {gaps[1]:.0%} gap in its dash pattern within one frame",
 }
+# What a pop adds when a declared stage cut that keeps its stage brought it.
+DECLARED_CUT = " at a declared cut that keeps its stage"
 
 
 # The remedy for a whole turn the renderer's browser may paint without ink: the same ring as an
@@ -306,7 +313,7 @@ def motion_finding(finding: dict) -> str:
     way = finding.get("way")
     words = MOTION_WORDS[finding["kind"]].format(
         **finding, appears="appears" if way == "in" else "vanishes"
-    )
+    ) + (DECLARED_CUT if finding.get("declared_cut") else "")
     drawn = finding["origin"] + (f" ({finding['module']})" if finding["module"] else "")
     measure = MOTION_GATES[finding["kind"]]
     return f"{measure} {finding['scene']} {span}: {marks} {words}, drawn at {drawn}"

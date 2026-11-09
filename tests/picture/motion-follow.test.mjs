@@ -16,15 +16,16 @@ const AUDIT_MOTION = fileURLToPath(
 /* Scene 01 runs to 6 s and scene 02 from then on; every motion is set by the frame's number at 30 fps, n. A dot flows
  * along a link at 300 px/s, entering and leaving by size; a dot moves at 240 px/s, halts dead and sets off again; a
  * name eases 440 px across 0.8 s; a name races 600 px in 0.4 s; a counter changes its words in place; a name pops in
- * and out; a card glides while a link draws on from it; a rule is drawn on in place, 1,200 px in eight frames, its end
- * at up to 225 px a frame; a larger dot around a standing dot vanishes at frame 120. None of these follows and
- * nothing is found: a name gives way to another at the stage cut the composition declares at frame 102; a bracket's
- * second end enters 360 px from its first by size, from frame 40; a span's moving end slides through its fixed end at
- * frame 101; a ring is drawn on from a point, from frame 31; a slab eases down and joins its stack at frame 60; a link
- * is drawn on from a start that glides 180 px/s and turns its corner at frame 71; a row of squares glides 90 px/s
- * while a square grows in at its end every ten frames; a link drawn on from a rising start turns its corner as the
- * start rises through it at frame 165; a box's dashed outline gives way to a solid one while the box glides, from frame
- * 77. Scene 02 hands five names to five others below them in one frame. */
+ * and out; a name gives way to another at the stage cut the composition declares at frame 102, which keeps the rest of
+ * its stage, so the name it brings pops; a card glides while a link draws on from it; a rule is drawn on in place,
+ * 1,200 px in eight frames, its end at up to 225 px a frame; a larger dot around a standing dot vanishes at frame 120.
+ * None of these follows and nothing is found: the name the cut at frame 102 takes away; a bracket's second end enters
+ * 360 px from its first by size, from frame 40; a span's moving end slides through its fixed end at frame 101; a ring
+ * is drawn on from a point, from frame 31; a slab eases down and joins its stack at frame 60; a link is drawn on from a
+ * start that glides 180 px/s and turns its corner at frame 71; a row of squares glides 90 px/s while a square grows in
+ * at its end every ten frames; a link drawn on from a rising start turns its corner as the start rises through it at
+ * frame 165; a box's dashed outline gives way to a solid one while the box glides, from frame 77. Scene 02 hands five
+ * names to five others below them in one frame. */
 const MOTIONS = [
   'var P = { ground: "#0F1519", ink: "#ECE8DF" };',
   'var ctx = document.getElementById("picture").getContext("2d");',
@@ -211,13 +212,14 @@ test("the motion audit follows every mark and finds each motion a viewer sees as
   assert.ok(followed.races.length > 0);
   assert.ok(followed.races.every((v) => v.text === "Race" && v.t > 4 && v.t < 4.4));
   assert.ok(followed.races.every((v) => v.speed >= 900 && v.origin === lineOf('"Race"')));
-  // The larger dot vanishes at frame 120, named by its own line though the dot it stood around shares its centre, and
-  // the name pops in at frame 150 and out at frame 165; the scene's other marks, the flowing dot, the counter, the
-  // link drawn on from the gliding card and the rule drawn on in place follow on, and scene 02's handover is a stage
-  // cut.
+  // The declared cut at frame 102 brings its name onto a stage that stands, the larger dot vanishes at frame 120, named
+  // by its own line though the dot it stood around shares its centre, and the name pops in at frame 150 and out at
+  // frame 165; the scene's other marks, the flowing dot, the counter, the link drawn on from the gliding card and the
+  // rule drawn on in place follow on, and scene 02's handover is a stage cut.
   assert.deepEqual(
     followed.pops.map((v) => [at(v.t), v.way, v.kind, v.text, v.origin]),
     [
+      [3.4, "in", "text", "Swapped", lineOf('"Swapped"')],
       [4, "out", "fill", "", lineOf("dot(1700, 900, 14)")],
       [5, "in", "text", "Pop", lineOf('"Pop"')],
       [5.5, "out", "text", "Pop", lineOf('"Pop"')],
@@ -229,13 +231,14 @@ test("the motion audit follows every mark and finds each motion a viewer sees as
     [
       ["halt", "01", 2.07, lineOf("dot(1000")],
       ["start", "01", 3.07, lineOf("dot(1000")],
+      ["pop", "01", 3.4, lineOf('"Swapped"')],
       ["pop", "01", 4, lineOf("dot(1700, 900, 14)")],
       ["race", "01", 4.07, lineOf('"Race"')],
       ["pop", "01", 5, lineOf('"Pop"')],
       ["pop", "01", 5.5, lineOf('"Pop"')],
     ],
   );
-  const race = followed.findings[3];
+  const race = followed.findings.find((v) => v.kind === "race");
   assert.equal(race.speed, Math.max(...followed.races.map((v) => v.speed)));
   assert.ok(race.speed > 2000 && race.frames === followed.races.length);
   assert.deepEqual([race.paints, race.texts], [["text"], ["Race"]]);
@@ -247,7 +250,9 @@ test("the motion audit follows every mark and finds each motion a viewer sees as
     halts: 1,
     starts: 1,
     races: followed.races.length,
-    pops: 3,
+    pops: 4,
+    jumps: 0,
+    dash_snaps: 0,
   });
 });
 

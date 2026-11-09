@@ -126,7 +126,7 @@ class MotionException(Declared):
     edition: Literal["zh", "en"]
     scene: Stated
     source: Annotated[str, StringConstraints(pattern=r"^(film\.js:[1-9][0-9]*|[^\s:]+\.m?js)$")]
-    kind: Literal["halt", "start", "race", "pop"]
+    kind: Literal["halt", "start", "race", "pop", "jump", "dash"]
     reason: Stated
 
 

@@ -190,7 +190,7 @@ def test_motion_exceptions_default_and_are_declared(declared):
 @pytest.mark.parametrize(
     ("old", "new", "field"),
     [
-        ('kind = "pop"', 'kind = "jump"', "picture.motion.exceptions.0.kind"),
+        ('kind = "pop"', 'kind = "drift"', "picture.motion.exceptions.0.kind"),
         ('source = "picture/film/scenes/p06/beats.js"', 'source = "line 5"', "0.source"),
         ('source = "picture/film/scenes/p06/beats.js"', 'source = "film.js:0"', "0.source"),
         ('reason = "the beat ring marks each condition on its word"', 'reason = " "', "0.reason"),

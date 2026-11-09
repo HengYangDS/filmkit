@@ -1,9 +1,32 @@
-/* What the follower found (follow.mjs), as the motion report lists it: each frame's halts, starts, races and pops,
- * traced to the composition line that drew their marks; the findings they form, one for each run of frames of one kind,
- * scene and line; and each scene's fastest glide and flow. */
+/* What the follower found (follow.mjs), as the motion report lists it: each frame's halts, starts, races, pops, jumps
+ * and dash snaps, traced to the composition line that drew their marks, a jump by its heaviest mark; the findings they
+ * form, one for each run of frames of one kind, scene and line; and each scene's fastest glide and flow. */
 import { round } from "./report.mjs";
 
-const KINDS = { halts: "halt", starts: "start", races: "race", pops: "pop" };
+const KINDS = {
+  halts: "halt",
+  starts: "start",
+  races: "race",
+  pops: "pop",
+  jumps: "jump",
+  dash_snaps: "dash",
+};
+/* What a finding of each kind measures over its events: a pop its way and highest ink, and whether a declared cut that
+ * keeps its stage brought it; a jump its longest shift and the marks it moved; a dash snap the gap shares it stepped
+ * from and to; any other its highest speed. */
+const MEASURES = {
+  pop: (events) => ({
+    way: events[0].way,
+    level: Math.max(...events.map((e) => e.level)),
+    ...(events.some((e) => e.declared_cut) ? { declared_cut: true } : {}),
+  }),
+  jump: (events) => {
+    const { shift, distance, marks } = events.reduce((a, e) => (e.distance > a.distance ? e : a));
+    return { shift, distance, marks };
+  },
+  dash: (events) => ({ gaps: [events[0].gaps[0], events.at(-1).gaps[1]] }),
+};
+const speedOf = (events) => ({ speed: Math.max(...events.map((e) => e.from ?? e.to ?? e.speed)) });
 
 /* Trace each event to the line that drew its mark: render its frame again and take the origin of the paint of its
  * scene, kind and words whose box stands nearest the event's, edge by edge, so a mark is told from another of its kind
@@ -62,13 +85,10 @@ function findingsOf(list, kind, dt) {
   }
   return findings.map(({ events, ...finding }) => ({
     ...finding,
-    ...(kind === "pop"
-      ? { way: events[0].way, level: Math.max(...events.map((e) => e.level)) }
-      : {}),
-    ...(kind === "pop" ? {} : { speed: Math.max(...events.map((e) => e.from ?? e.to ?? e.speed)) }),
+    ...(MEASURES[kind] ?? speedOf)(events),
     frames: new Set(events.map((e) => e.t)).size,
-    paints: [...new Set(events.map((e) => e.kind))],
-    texts: [...new Set(events.map((e) => e.text).filter(Boolean))],
+    paints: [...new Set(events.flatMap((e) => e.paints ?? [e.kind]))],
+    texts: [...new Set(events.flatMap((e) => e.texts ?? [e.text]).filter(Boolean))],
   }));
 }
 

@@ -1,30 +1,36 @@
 /* Follow every mark of a scene across frames as a viewer sees it move, and find the motion a viewer sees as not smooth:
- * a mark that halts at speed or sets off at speed within one frame, a mark that races, and a mark that pops in or out
- * outside a stage cut. Speeds are in 1080p pixels per second, so a result does not depend on the frame rate.
+ * a mark that halts at speed or sets off at speed within one frame, a mark that races, a mark that pops in or out
+ * outside a stage cut, a stroke whose dashes snap open or shut within one frame outside a stage cut, and, at a stage
+ * cut, the marks it keeps but moves whole beyond their own motion as a jump (cuts.mjs). Speeds are in 1080p pixels per
+ * second, so a result does not depend on the frame rate.
  *
  * A mark is a paint of a scene at ink level VISIBLE or more: its scene, kind, words, line width, ink level and screen
  * box. A mark whose box and line width stand unchanged continues the mark that stood there. The other marks of each
  * group of like marks (scene, kind and words) continue the previous frame's by the assignment of least total miss, a
  * mark's miss being how far its four edges stand from where the previous mark's own edge velocities put them, and
- * leaving a mark unfollowed costing four times the turn; of marks that stand alike, a mark continues the one nearest its
- * ink. A pair is one mark when it moved whole, at the same line width and nearly the same size with each axis's two
- * edges shifting together, or when it grew, shrank or was redrawn, in place or while it moved: once the shift both
- * edges of each axis share is taken out the boxes overlap by half the smaller box, or, where they do not, each of its
- * drawn pieces, moved by the shift its pieces share, meets the piece drawn in its place. Its motion is the centre's
- * shift, or that shared shift, which moves within reach; a stroke drawn on may grow at any pace, and a pair that holds
- * one end of one of its drawn pieces exactly where it stood grows or turns from that end and does not travel, however
- * its box changes. A followed mark changes its velocity within one frame by no more than the turn or its own speed, a
- * mark too small to be seen grows into or shrinks from only a mark small across, and a text whose words change
- * continues a text that moved whole. The shift a pair's pieces share is the one more than half of its drawn pieces,
- * taken in their order, share to within 2 px or a fifth: an open piece is where it is drawn from, its first point, and
- * a closed piece is at its centre. A mark that grows while it moves, a stroke drawn on from a start that glides or a row
- * that grows a piece at its end, rests only where its box and its pieces both show it at rest.
+ * leaving a mark unfollowed costing four times the turn; of marks that stand alike, a mark continues the one nearest
+ * its ink and the share of its dash pattern that is gap (dashes.mjs), and one standing unchanged continues only a mark
+ * of its own pattern. A pair is one mark when it moved whole, at the same line width and nearly the same size with each
+ * axis's two edges shifting together, or when it grew, shrank or was redrawn, in place or while it moved: once the
+ * shift both edges of each axis share is taken out the boxes overlap by half the smaller box, or, where they do not,
+ * each of its drawn pieces, moved by the shift its pieces share, meets the piece drawn in its place. Its motion is the
+ * centre's shift, or that shared shift, which moves within reach; a stroke drawn on may grow at any pace, and a pair
+ * that holds one end of one of its drawn pieces exactly where it stood grows or turns from that end and does not
+ * travel, however its box changes. A followed mark changes its velocity within one frame by no more than the turn or
+ * its own speed, a mark too small to be seen grows into or shrinks from only a mark small across, and a text whose
+ * words change continues a text that moved whole. The shift a pair's pieces share is the one more than half of its
+ * drawn pieces, taken in their order, share to within 2 px or a fifth: an open piece is where it is drawn from, its
+ * first point, and a closed piece is at its centre. A mark that grows while it moves, a stroke drawn on from a start
+ * that glides or a row that grows a piece at its end, rests only where its box and its pieces both show it at rest.
  *
- * A frame is a stage cut for a scene when a CUT share of the scene's firm marks, counted or weighed by their ink, vanish
- * or appear in it, or when the composition declares a cut of the scene in it; no mark is followed across a cut, and a
- * scene's first and last frames are cuts. A mark that appears or vanishes pops only by the pieces it brings or takes:
- * those that no like mark of the other frame holds in place, together at least POP across. */
+ * A frame is a stage cut for a scene when a CUT share of the scene's firm marks, counted or weighed by their ink,
+ * vanish or appear in it, or when the composition declares a cut of the scene in it; no mark is followed across a cut,
+ * and a scene's first and last frames are cuts. A cut the composition declares that changes less than the CUT share
+ * excuses the marks it takes away and not the marks it brings. A mark that appears or vanishes pops only by the pieces
+ * it brings or takes: those that no like mark of the other frame holds in place, together at least POP across. */
 import { leastCostAssignment } from "./assignment.mjs";
+import { excused, jumps } from "./cuts.mjs";
+import { dashSnap, gapShare } from "./dashes.mjs";
 
 /** The viewer's thresholds: ink levels, pixels per second at 1080p, shares and pixels across. */
 export const VIEWER = Object.freeze({
@@ -47,6 +53,13 @@ export const VIEWER = Object.freeze({
   SEEN: 6,
   POP: 12,
   DOT: 16,
+  // At a stage cut, firm marks it keeps that move whole by one shift of JUMP px or more beyond their own motion, to
+  // within SHARED px, jump when they hold HALF of the scene's firm ink before the cut.
+  JUMP: 8,
+  SHARED: 2,
+  HALF: 0.5,
+  // A followed stroke's gaps may open or close by less than DASH of its dash pattern within one frame.
+  DASH: 0.25,
 });
 
 const dims = (b) => [b[2] - b[0], b[3] - b[1]];
@@ -144,15 +157,15 @@ function piecesMeet(p, c, s) {
 }
 
 /** A follower of the marks of successive frames, dt seconds apart. `frame(t, marks, declared)` takes each frame's
- * marks, each {scene, kind, text, width, level, screen, pieces}, in order, `pieces` the boxes and `ends` the first and
- * last points of the drawn subpaths of a stroke or fill, and the scenes whose stage cut the composition declares in
- * that frame; `finish()` returns what it found: the halts, starts, races and pops, each with its time, mark and speeds,
- * and for each scene the fastest glide (a text, or a mark more than DOT across) and flow (a smaller mark) with their
- * times. */
+ * marks, each {scene, kind, text, width, level, screen, pieces, ends, dash}, in order, `pieces` the boxes and `ends`
+ * the first and last points of the drawn subpaths of a stroke or fill and `dash` a stroke's dash pattern, and the
+ * scenes whose stage cut the composition declares in that frame; `finish()` returns what it found: the halts, starts,
+ * races, pops, jumps and dash snaps, each with its time, mark and speeds, shift or gap shares, and for each scene the
+ * fastest glide (a text, or a mark more than DOT across) and flow (a smaller mark) with their times. */
 export function follower(dt, v = VIEWER) {
   const reach = v.REACH * dt,
     unfollowed = 4 * v.TURN * dt;
-  const found = { halts: [], starts: [], races: [], pops: [] },
+  const found = { halts: [], starts: [], races: [], pops: [], jumps: [], dash_snaps: [] },
     speeds = {};
   // Each start waits, by its track, for the step after it, which tells a start at speed from an eased one.
   let waiting = new Map(),
@@ -199,8 +212,9 @@ export function follower(dt, v = VIEWER) {
       (n, k) => n + Math.abs(c.screen[k] - p.screen[k] - edges[k]),
       0,
     );
-    // Of marks that stand alike, as two outlines crossfading on one box, the one nearest the mark's ink continues it.
-    const ink = Math.abs(p.level - c.level) / 1000;
+    // Of marks that stand alike, as two outlines crossfading on one box, the one nearest the mark's ink and its dash
+    // pattern continues it.
+    const ink = Math.abs(p.level - c.level) / 1000 + Math.abs(p.gaps - c.gaps);
     return { d, pieces, miss: miss + (p.width2 === c.width2 ? 0 : 0.5) + ink };
   }
 
@@ -252,6 +266,7 @@ export function follower(dt, v = VIEWER) {
           (q) =>
             !used.has(q) &&
             q.width2 === c.width2 &&
+            q.gaps === c.gaps &&
             q.screen.every((x, k) => Math.abs(x - c.screen[k]) < 0.01),
         );
         if (!p) continue;
@@ -344,6 +359,7 @@ export function follower(dt, v = VIEWER) {
       width2: Math.round((m.width ?? 0) * 2),
       pieces: m.pieces ?? [m.screen],
       ends: m.ends ?? [],
+      gaps: gapShare(m.dash),
     }));
     if (previous === null) {
       marks.forEach(begin);
@@ -351,12 +367,19 @@ export function follower(dt, v = VIEWER) {
       return;
     }
     const { pairs, matched, used } = match(marks);
-    const cut = cuts(marks, matched, used),
+    const detected = cuts(marks, matched, used),
+      stated = new Set(declared),
+      cut = new Set([...detected, ...stated]),
       next = new Map();
-    for (const scene of declared) cut.add(scene);
+    for (const { mark, ...jump } of jumps(previous, marks, cut, v))
+      found.jumps.push(row(t, mark, jump));
     for (const [c, p, d, pieces] of pairs)
       if (cut.has(c.scene)) begin(c);
-      else judge(t, c, p, d, pieces, next);
+      else {
+        judge(t, c, p, d, pieces, next);
+        const gaps = dashSnap(p, c, v.DASH);
+        if (gaps) found.dash_snaps.push(row(t, c, { gaps }));
+      }
     // A start whose mark is not followed on, past a cut or out of the picture, stands as it was found.
     found.starts.push(...waiting.values());
     waiting = next;
@@ -369,12 +392,14 @@ export function follower(dt, v = VIEWER) {
         standing = others.filter((o) => likeOf(o) === like && o.width2 === m.width2);
       return m.pieces.filter((a) => !standing.some((o) => o.pieces.some((b) => near(a, b))));
     };
+    // A mark that a declared cut keeping its stage brings pops, and is marked as brought at that cut.
     const pops = (list, kept, way, present, others) => {
       for (const m of list) {
         if (kept.has(m) || m.level < v.FIRM) continue;
-        if (cut.has(m.scene) || !present.has(m.scene)) continue;
+        if (!present.has(m.scene) || excused(way, m.scene, detected, stated)) continue;
         if (brought(m, others).reduce((n, b) => n + across(b), 0) < v.POP) continue;
-        found.pops.push(row(t, m, { way, level: m.level }));
+        const at = stated.has(m.scene) ? { declared_cut: true } : {};
+        found.pops.push(row(t, m, { way, level: m.level, ...at }));
       }
     };
     pops(marks, matched, "in", before, previous);

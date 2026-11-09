@@ -1,0 +1,11 @@
+## 1. Engine
+
+- [x] 1.1 Record each stroke's dash array in the headless composition and report a dash snap for a followed stroke whose gap share steps by 0.25 or more within one frame outside a cut; verify a test that fails on 0.16.0 and passes here. The four tests of `tests/picture/motion-dashes.test.mjs` fail on the 0.16.0 code and pass here.
+- [x] 1.2 Report a jump at a stage cut for a kept group moved whole at one shift of 8 px or more beyond its own motion holding half of its scene's firm ink, and judge the marks a declared cut brings when it changes less than 35% of its scene; verify the follower tests, each new one failing on 0.16.0. The six tests of `tests/picture/motion-cuts.test.mjs` fail on the 0.16.0 code and pass here, the glide test also fails on the shift-only rule, and the follower test now finds the name its declared cut brings at frame 102.
+- [x] 1.3 Refuse `motion_jumps` and `motion_dash_snaps` in `check-picture`, accept the exception kinds `jump` and `dash`, and count both in the review's motion record; verify the gate and measurement tests. `tests/picture/test_motion_gates.py`, `tests/test_film.py` and `tests/review/test_motion.py` pass, and the gate and review ones changed here fail on 0.16.0.
+
+## 2. Films and release
+
+- [x] 2.1 Run this lane's motion audit on the DDWG film's round-34 composition (`78bd563`) and its current one; verify that the round-34 cases are found (jumps at 165.78 and 256.80 s in English and 161.02 s in Chinese, pops at 300.18 and 54.73 s in English and 291.83 s in Chinese, dash snaps at 645.97 s in English and 640.6 s in Chinese) and that none remains on the current composition. All eight are found within two frames on `78bd563`, and none remains on `6820e9a`, where each edition shows one new pop and one new dash snap, both in 11 (`films.json`).
+- [x] 2.2 Run it on the ETHOS and essentials films' current compositions; verify that every new finding is listed with its time and scene under `build/evidence/gate-one-frame-changes/`. The ETHOS film has one jump and five pops at declared cuts in English and two jumps and two pops in Chinese, and the essentials film two pops in each edition (`films.json`).
+- [x] 2.3 Prepare 0.17.0: `VERSION`, the CHANGELOG section and the README's motion paragraph; verify `mise run check`. It passes: 165 Node tests, the Markdown check and 962 Python tests.

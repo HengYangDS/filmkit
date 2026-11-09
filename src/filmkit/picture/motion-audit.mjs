@@ -1,10 +1,11 @@
 /* Motion and transition audit of the picture: ghosts and residue, double exposure, stalls, pops and jumps, type scale
  * and camera framing, measured headlessly from the composition, and in `followed` every mark followed as a viewer sees
- * it move (motion-audit/follow.mjs) with the halts, starts, races and pops it finds and each scene's fastest glide and
- * flow (motion-audit/followed.mjs).
+ * it move (motion-audit/follow.mjs) with the halts, starts, races, pops, jumps at stage cuts and dash snaps it finds
+ * and each scene's fastest glide and flow (motion-audit/followed.mjs).
  * Usage: python -m filmkit.tools motion-audit <timeline.json> [fps] [--from s] [--to s] [--out report.json]
  * Every mark a scene paints is recorded with its ink level (opacity times its colour's rise above the ground), its
- * screen box, its box in its own drawing coordinates (its identity across frames) and, for words, the size shown.
+ * screen box, its box in its own drawing coordinates (its identity across frames), for words the size shown, and for a
+ * stroke or fill its drawn pieces and its dash pattern.
  * FILMKIT_TEXT_METRICS=<file> names the advance widths of the film's declared faces, as for the frame audit. */
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -82,6 +83,7 @@ const markOf = (paint) =>
               // Its drawn pieces on the screen: each subpath's box and its first and last points.
               pieces: paint.subs.filter((sub) => sub.length).map(bbox),
               ends: paint.subs.filter((sub) => sub.length).map((sub) => [sub[0], sub.at(-1)]),
+              dash: paint.dash,
             }),
       }
     : null;
