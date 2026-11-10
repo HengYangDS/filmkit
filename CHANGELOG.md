@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-10
+
 ### Changed
 
 - `compare-pictures` compares every frame of an edition's two pictures, not only the frames it samples, about one in twenty-two. One FFmpeg filter graph decodes each picture once as full-range grey: outside the caption band it refuses a frame where any luma sample differs between the two by more than 90 levels, and inside the band, where they differ by design, it refuses a frame of either picture where a sample lies more than 90 levels from both neighbouring frames while those agree within 30, so a caption that appears or leaves passes, and so does a mark that moves. Sixteen pictures rendered with 0.18.0 for the DDWG, essentials and ETHOS films held nine one-frame faults in seven pictures, each a fragment of a text glyph drawn wrong in only one of the two pictures and 124 to 219 levels from its twin, and the sampled frames passed all nine; four reached a delivered film. Between clean twins the largest difference measured over two whole delivered pairs, 54,000 and 36,000 frames, was 78 levels, at the edge of a glyph, and where two encodes draw a moving edge apart a one-frame difference that neither picture holds alone reached 93 levels at one sample, in the DDWG film's Chinese pair of round 36 at frame 30306: such a difference is refused only above 120 levels, between that residue and the weakest fault, since each of the nine faults departs in one picture from its own neighbouring frames, which agree. The sampled tile and PSNR measures are unchanged.
@@ -12,6 +14,12 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - Each delivered film names its version. Packaging reads the film repository's `VERSION`, which must hold a Semantic Versioning 2.0.0 version without build metadata, writes it into each film's QuickTime key Information with the label of the edition's language, 版本号 1.3.0 or Version 1.3.0, which Spotlight imports as the file's information, and names it in the line under each edition's title on its page and under the film's title on the entry page. The film package binds `VERSION` among its production inputs, so a film packaged under another version is stale, and the verifier refuses a delivered film or page that names another version. An entry page must hold its language links in a `<nav>`, before which the version line stands.
 
 This breaks a film without `VERSION` and every film packaged by an earlier release: packaging refuses the first until the repository records the version of the edition it builds, and the verifier refuses the second until it is packaged again, from the same pictures and soundtracks. A release published by an earlier engine carries no Information key and is reproduced under its own pinned engine.
+
+### Fixed
+
+- The README is titled Film Kit, the project's display name, and its opening sentence names the project so; `filmkit` still names the package, its modules, its commands and its paths.
+- The README's install example pins `v0.19.0`; the 0.18.0 release left it at `v0.17.0`.
+- The changelog's version links compare every release from 0.11.0 on with the one before it; they stopped at 0.10.0, and `[Unreleased]` compared from there.
 
 ## [0.18.0] - 2026-11-10
 
@@ -296,7 +304,16 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/HengYangDS/filmkit/compare/v0.18.0...v0.19.0
+[0.18.0]: https://github.com/HengYangDS/filmkit/compare/v0.17.0...v0.18.0
+[0.17.0]: https://github.com/HengYangDS/filmkit/compare/v0.16.0...v0.17.0
+[0.16.0]: https://github.com/HengYangDS/filmkit/compare/v0.15.0...v0.16.0
+[0.15.0]: https://github.com/HengYangDS/filmkit/compare/v0.14.0...v0.15.0
+[0.14.0]: https://github.com/HengYangDS/filmkit/compare/v0.13.0...v0.14.0
+[0.13.0]: https://github.com/HengYangDS/filmkit/compare/v0.12.0...v0.13.0
+[0.12.0]: https://github.com/HengYangDS/filmkit/compare/v0.11.0...v0.12.0
+[0.11.0]: https://github.com/HengYangDS/filmkit/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/HengYangDS/filmkit/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/HengYangDS/filmkit/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/HengYangDS/filmkit/compare/v0.8.0...v0.8.1

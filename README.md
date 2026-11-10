@@ -1,6 +1,6 @@
-# filmkit
+# Film Kit
 
-filmkit rebuilds a narrated bilingual explainer film, a Chinese and an English edition, from the film's tracked sources. It narrates each edition's script with a local speech model, assembles one soundtrack per edition at a single program level, times the captions, renders the picture with HyperFrames once with its captions and once without, packages a UHD master and a 1080p viewing film of each with FFmpeg, and verifies every film against the inputs it binds. The build is offline after one supply step.
+Film Kit rebuilds a narrated bilingual explainer film, a Chinese and an English edition, from the film's tracked sources. It narrates each edition's script with a local speech model, assembles one soundtrack per edition at a single program level, times the captions, renders the picture with HyperFrames once with its captions and once without, packages a UHD master and a 1080p viewing film of each with FFmpeg, and verifies every film against the inputs it binds. The build is offline after one supply step.
 
 The engine carries no film's content. Each film's repository holds its scripts, casts, pronunciation contract, pages, review policy and picture composition, and the engine reads them from the film it builds. The [DDWG introduction films](https://github.com/HengYangDS/data-department-work-guidelines-film) are built with it.
 
@@ -171,7 +171,7 @@ A film pins a release tag in its Python project and locks it:
 dependencies = ["filmkit"]
 
 [tool.uv.sources]
-filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.17.0" }
+filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.19.0" }
 ```
 
 Its `package.json` declares the npm packages the engine runs, at these versions: `hyperframes` 0.9.9, the renderer, which the engine checks before it stages, renders or runs a tool; `gsap` 3.15.0, which each staged document loads; and `puppeteer-core` 25.16.0 and `@puppeteer/browsers` 3.2.6, which drive and install the browser build. It also overrides `undici` to 7.30.1, because HyperFrames 0.9.9 pins 7.25.0, which known advisories affect.
