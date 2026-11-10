@@ -79,6 +79,7 @@ def packaging_root(tmp_path, monkeypatch):
         (edition.soundtrack, "soundtrack"),
         (edition.artifacts / "chapters.ffmeta", ";FFMETADATA1\n"),
         (edition.artifacts / delivery_packaging.COVER_JPEG, "cover"),
+        (tmp_path / "VERSION", "1.3.0\n"),
     ):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(body)
@@ -138,6 +139,7 @@ def test_each_film_is_encoded_finished_and_checked_in_work_before_it_is_linked_i
         "cover_sha256",
         "script_sha256",
         "chapters_sha256",
+        "version_sha256",
         "editions",
         "caption_owner",
     ]
@@ -286,6 +288,7 @@ def test_the_commands_carry_the_release_metadata(packaging_root):
         "-Keys:Copyright=© 2026 Yang HENG",
         "-Keys:Keywords=" + ", ".join(release["keywords"]),
         "-Keys:Year=2026",
+        "-Keys:Information=版本号 1.3.0",
         "-Keys:CreationDate=" + created.removeprefix("creation_time="),
     ]
     expected = []
@@ -375,6 +378,7 @@ def test_a_failed_check_leaves_no_film_in_place_and_keeps_the_work(packaging_roo
         {"changes": {"com.apple.quicktime.artist": specification.AUTHOR}},
         {"kind": "1080p-captioned"},
         {"chapters": "eng"},
+        {"changes": {"com.apple.quicktime.information": None}},
     ],
     ids=[
         "frames",
@@ -386,6 +390,7 @@ def test_a_failed_check_leaves_no_film_in_place_and_keeps_the_work(packaging_roo
         "second-author",
         "hd-mark",
         "chapters",
+        "version",
     ],
 )
 def test_a_finished_film_needs_every_frame_its_author_and_release(tmp_path, monkeypatch, change):
@@ -457,6 +462,7 @@ def test_the_release_prose_sets_typographic_quotes(tmp_path, monkeypatch):
     prose = {key: f'The {key} says "Done." It\'s done.' for key in ("comment", "description")}
     release = {**script["release"], **prose, "synopsis": 'An Agent reports "Done."'}
     repository.write(edition.script, {**script, "title": 'The "Sample" Reel', "release": release})
+    (tmp_path / "VERSION").write_text("1.3.0\n")
     tags = delivery_packaging.delivered_tags(edition, uhd)
     assert tags["title"] == tags["com.apple.quicktime.title"] == "The “Sample” Reel"
     assert tags["synopsis"] == "An Agent reports “Done.”"
@@ -464,6 +470,17 @@ def test_the_release_prose_sets_typographic_quotes(tmp_path, monkeypatch):
         assert (
             tags[key] == tags[f"com.apple.quicktime.{key}"] == f"The {key} says “Done.” It’s done."
         )
+
+
+def test_each_film_names_the_version_in_its_editions_language(tmp_path, monkeypatch):
+    scripts = {code: repository.read(production.Edition(code).script) for code in ("zh", "en")}
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    (tmp_path / "VERSION").write_text("2.0.0-rc.1\n")
+    for code, label in (("zh", "版本号"), ("en", "Version")):
+        edition = production.Edition(code)
+        repository.write(edition.script, scripts[code])
+        tags = delivery_packaging.delivered_tags(edition, production.RENDITIONS["uhd"])
+        assert tags["com.apple.quicktime.information"] == f"{label} 2.0.0-rc.1"
 
 
 def test_a_failed_encode_records_its_bindings_and_command(packaging_root, monkeypatch):
@@ -525,6 +542,8 @@ def test_a_package_resumes_its_verified_films_and_refuses_changed_inputs(packagi
     edition.film("1080p-captioned").write_text("changed\n")
     with pytest.raises(PackagingError, match="Completed package member differs"):
         delivery_packaging.package_film(edition)
+    (repository.ROOT / "VERSION").write_text("1.3.1\n")
+    assert delivery_packaging.stale_bindings(edition, json.loads(recorded)) == ["version_sha256"]
     edition.soundtrack.write_text("another soundtrack")
     with pytest.raises(PackagingError, match="bound to different production inputs"):
         delivery_packaging.package_film(edition)

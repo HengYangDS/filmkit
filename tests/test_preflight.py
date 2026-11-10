@@ -53,6 +53,7 @@ def edition(tmp_path, monkeypatch):
         if not (root / source).exists():
             put(root / source, f"fixture {path}")
     put(root / "content/source-manifest.json", {"members": []})
+    put(root / "VERSION", "1.3.0\n")
     edition = Edition("zh")
     script = {"duration": DURATION, "segments": [{"id": "01", "text": "先看数据。"}]}
     put(root / edition.script, script)
@@ -144,7 +145,7 @@ def test_every_stale_input_is_named_at_once_and_refuses(edition, monkeypatch, ca
         "concepts: 01: 复刻 is a counterexample of rebuild; 02: says no rendering of offline",
         "film_package: build/evidence/editions/zh/film-package.json binds other picture_sha256, "
         "uncaptioned_picture_sha256, caption_equivalence_sha256, soundtrack_sha256, cover_sha256, "
-        "script_sha256, chapters_sha256, caption_owner; set its films aside first",
+        "script_sha256, chapters_sha256, version_sha256, caption_owner; set its films aside first",
         "cover: not compared: the stage is not current",
     ):
         assert named in message

@@ -1,8 +1,9 @@
 """Verify delivered film editions against their current authored inputs.
 
 The checks cover the pinned canonical sources, narration custody, both rendered pictures and
-the record that they differ only by their captions, package bindings, complete media decoding
-of all four films and the recorded review thresholds.
+the record that they differ only by their captions, package bindings, the film's version that
+the films and pages name, complete media decoding of all four films and the recorded review
+thresholds.
 Aesthetic judgment belongs to the review record; human listening stays separate.
 The verifier reads and decodes; it writes nothing and prints each edition's report.
 
@@ -195,7 +196,7 @@ def language_index() -> dict:
 
 def verify_package(edition: production.Edition) -> dict:
     """Bind every delivered film, the picture each carries and the viewing package to their
-    inputs."""
+    inputs, the film's `VERSION` among them; the viewing package's pages must name its version."""
     output = edition.artifacts
     films = repository.read(edition.film_package)
     names = sorted(film.name for film in edition.films)
@@ -225,6 +226,7 @@ def verify_package(edition: production.Edition) -> dict:
         or viewing["timeline_sha256"] != repository.sha(edition.timeline)
         or viewing.get("player") != player.player_binding(edition)
         or viewing["author"] != specification.AUTHOR
+        or viewing.get("version") != packaging.film_version()
         or viewing["chapters"] != specification.CHAPTERS
         or any(
             member["sha256"] != repository.sha(output / member["path"])

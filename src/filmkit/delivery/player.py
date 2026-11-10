@@ -5,8 +5,9 @@ languages. A film declares only the summary each edition shows under the film,
 `editions.<code>.summary`, and the five colours of `[player]` (`filmkit.film`); the rest comes
 from the edition's script, timeline and delivered files:
 
-- the header: the title, then the author, the language, the running time and the frame rate,
-  and links to the other edition's player and to the entry page;
+- the header: the title, then the author, the language, the film's version as the edition labels
+  it, the running time and the frame rate, and links to the other edition's player and to the
+  entry page;
 - the video, which opens on the viewing film with its captions. Each version has two films: one
   whose picture draws the captions and one without them. The captions control, a button pressed
   while the captions show, switches the film to the other one of the same version, and a version
@@ -31,7 +32,10 @@ from the edition's script, timeline and delivered files:
   a page opened from disk. The transcript in the page stays the place to read.
 
 `player_binding` names what a page shows beyond the script and the timeline that the viewing
-package binds: the declared words and colours, and the size of each listed file.
+package binds: the declared words and colours, and the size of each listed file. Packaging reads
+the film's version and passes it to the page, which names it with the edition's label,
+版本号 1.3.0 or Version 1.3.0; `entry_version` is the line that names it with both labels under
+the film's title on the entry page.
 """
 
 from __future__ import annotations
@@ -74,6 +78,7 @@ WORDS = {
     "zh": {
         "lang": "zh-CN",
         "language": "中文",
+        "version": "版本号",
         "versions": "视频版本",
         "viewing": "观看版 · 1080p",
         "uhd": "超高清 4K · 2160p",
@@ -103,6 +108,7 @@ WORDS = {
     "en": {
         "lang": "en",
         "language": "English",
+        "version": "Version",
         "versions": "Video versions",
         "viewing": "Viewing edition · 1080p",
         "uhd": "4K UHD · 2160p",
@@ -173,6 +179,19 @@ def runtime_label() -> str:
     """The films' running time as the player and the entry page show it, minutes:seconds."""
     minutes, seconds = divmod(DURATION, 60)
     return f"{minutes:02d}:{seconds:02d}"
+
+
+def version_label(code: str, version: str) -> str:
+    """The film's version as an edition names it, with its label: 版本号 1.3.0, Version 1.3.0."""
+    return f"{WORDS[code]['version']} {version}"
+
+
+def entry_version(version: str) -> str:
+    """The entry page's line under the film's title: the version with both editions' labels."""
+    labels = " / ".join(
+        f'<span lang="{WORDS[code]["lang"]}">{WORDS[code]["version"]}</span>' for code in CODES
+    )
+    return f'<p class="version">{labels} {escape(version)}</p>'
 
 
 def size_label(size: int) -> str:
@@ -364,8 +383,9 @@ def controls(edition: Edition, parts: list[Part], words: dict[str, str]) -> str:
     )
 
 
-def player_page(edition: Edition) -> str:
-    """The edition's player page, from the film's declaration and the edition's files."""
+def player_page(edition: Edition, version: str) -> str:
+    """The edition's player page, from the film's declaration, its version and the edition's
+    files."""
     code = edition.code
     words, other_code = WORDS[code], next(c for c in CODES if c != code)
     other = WORDS[other_code]
@@ -384,7 +404,8 @@ def player_page(edition: Edition) -> str:
         f'hreflang="{other["lang"]}">{other["language"]}</a>'
         f'<a class="language" href="../index.html">{words["entry"]}</a></nav>'
     )
-    byline = f"{escape(AUTHOR)} · {words['language']} · {runtime_label()} · {FPS} fps"
+    shown = escape(version_label(code, version))
+    byline = f"{escape(AUTHOR)} · {words['language']} · {shown} · {runtime_label()} · {FPS} fps"
     return f"""<!doctype html>
 <html lang="{words["lang"]}">
 <head>

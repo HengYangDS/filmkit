@@ -76,6 +76,7 @@ def decoded(tmp_path, monkeypatch):
     repository.write(
         production.Edition("zh").script, {"title": script["title"], "release": script["release"]}
     )
+    (tmp_path / "VERSION").write_text("1.3.0\n")
     film = production.Edition("zh").film("uhd")
     film.parent.mkdir(parents=True)
     film.write_text("film\n")
@@ -175,6 +176,14 @@ def test_a_delivered_1080p_film_holds_a_keyframe_every_2_seconds(
     else:
         with pytest.raises(VerificationError, match=f"delivery contract: {film.name}"):
             delivery_verification.verify_media(edition, film, rendition)
+
+
+def test_a_delivered_film_names_the_repositorys_version(decoded):
+    film, check = decoded
+    information = "format/tags/com.apple.quicktime.information"
+    assert check({information: "版本号 1.3.0"})["video_frames"] == FRAMES
+    with pytest.raises(VerificationError, match=f"delivery contract: {film.name}"):
+        check({information: "版本号 1.2.0"})
 
 
 def test_a_decoded_soundtrack_of_another_length_is_refused(decoded, monkeypatch):

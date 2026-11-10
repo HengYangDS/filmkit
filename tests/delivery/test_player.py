@@ -129,12 +129,14 @@ def test_sizes_are_named_in_decimal_units():
 
 def test_the_player_shows_the_film_its_versions_and_chapters_over_a_hidden_track(delivered):
     edition = production.Edition("zh")
-    html = delivery_player.player_page(edition)
+    html = delivery_player.player_page(edition, "1.3.0")
     page = Page(html)
     assert page.all("html")[0]["lang"] == "zh-CN"
     assert page.all("title")[0]["text"] == "A <Reel> & Co"
+    # The line under the title names the film's version after the language.
     runtime = f"{specification.DURATION // 60:02d}:{specification.DURATION % 60:02d}"
-    assert f"{specification.AUTHOR} · 中文 · {runtime} · 60 fps" in page.all("header")[0]["text"]
+    byline = f"{specification.AUTHOR} · 中文 · 版本号 1.3.0 · {runtime} · 60 fps"
+    assert page.all("header")[0]["text"] == f"A <Reel> & Co{byline}English选择语言"
     # The film's colours, and its summary under the film.
     assert all(colour in html for colour in FILM.player.model_dump().values())
     assert FILM.editions["zh"].summary in page.all("section", id="summary")[0]["text"]
@@ -184,7 +186,7 @@ def test_the_player_shows_the_film_its_versions_and_chapters_over_a_hidden_track
 
 
 def test_the_page_runs_its_script_over_a_screen_that_can_hold_two_films(delivered):
-    html = delivery_player.player_page(production.Edition("zh"))
+    html = delivery_player.player_page(production.Edition("zh"), "1.3.0")
     page = Page(html)
     # The page's script is the engine's player-page.js, inlined whole.
     script = (Path(delivery_player.__file__).parent / "player-page.js").read_text()
@@ -200,7 +202,7 @@ def test_the_page_runs_its_script_over_a_screen_that_can_hold_two_films(delivere
 def test_the_transcript_heads_each_chapter_and_scene_with_its_time_and_gives_each_thought(
     delivered,
 ):
-    page = Page(delivery_player.player_page(production.Edition("zh")))
+    page = Page(delivery_player.player_page(production.Edition("zh"), "1.3.0"))
     buttons = page.all("button", class_="time")
     assert [(b["data-time"], b["text"], b["aria-label"]) for b in buttons] == [
         ("0", "0:00", "从 0:00 播放"),
@@ -232,7 +234,7 @@ def test_the_files_list_names_each_delivered_file_and_the_language_links_lead_to
     delivered,
 ):
     edition = production.Edition("zh")
-    html = delivery_player.player_page(edition)
+    html = delivery_player.player_page(edition, "1.3.0")
     page = Page(html)
     vtt = (edition.artifacts / "sample-reel-zh.vtt").stat().st_size
     srt = (edition.artifacts / "sample-reel-zh.srt").stat().st_size
@@ -278,9 +280,12 @@ def test_the_files_list_names_each_delivered_file_and_the_language_links_lead_to
 
 
 def test_the_english_player_speaks_english_and_names_chinese_in_chinese(delivered):
-    html = delivery_player.player_page(production.Edition("en"))
+    html = delivery_player.player_page(production.Edition("en"), "2.0.0")
     page = Page(html)
     assert page.all("html")[0]["lang"] == "en"
+    runtime = f"{specification.DURATION // 60:02d}:{specification.DURATION % 60:02d}"
+    byline = f"{specification.AUTHOR} · English · Version 2.0.0 · {runtime} · 60 fps"
+    assert page.all("header")[0]["text"] == f"A <Reel> & Co{byline}中文Choose a language"
     [track] = page.all("track")
     assert (track["kind"], track["srclang"], track["label"]) == (
         "metadata",
@@ -326,7 +331,7 @@ def test_an_absent_film_is_listed_without_a_size_and_the_binding_names_what_the_
 ):
     edition = production.Edition("zh")
     edition.film("uhd").unlink()
-    page = Page(delivery_player.player_page(edition))
+    page = Page(delivery_player.player_page(edition, "1.3.0"))
     assert [a["text"] for a in page.all("a", class_="file")][
         2
     ] == "影片 · 超高清 4K · 画面内含字幕 · MP4"
@@ -365,10 +370,16 @@ def test_packaging_writes_the_engines_player_and_records_what_it_shows(tmp_path,
     timeline["captions"] = [{"start": 2.0, "end": 3.0, "text": "旁白。", "segment": "01"}]
     repository.write(edition.timeline, timeline)
     captions_documents.subtitle_files(timeline, edition)
+    (tmp_path / "VERSION").write_text("1.3.0\n")
     delivery_packaging.package_metadata(edition)
-    assert (edition.artifacts / "index.html").read_text() == delivery_player.player_page(edition)
+    page = (edition.artifacts / "index.html").read_text()
+    assert page == delivery_player.player_page(edition, "1.3.0")
     record = repository.read(edition.viewing_package)
     assert record["player"] == delivery_player.player_binding(edition)
+    # The record names the version that both pages name.
+    assert record["version"] == "1.3.0"
+    entry = (tmp_path / delivery_packaging.LANGUAGE_INDEX).read_text()
+    assert '<span lang="en">Version</span> 1.3.0</p>' in entry
     assert "player_source_sha256" not in record
 
 

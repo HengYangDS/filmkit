@@ -47,6 +47,10 @@ def entry_template_changed(inputs):
     (inputs.root / delivery_packaging.INDEX).write_text("<another template>")
 
 
+def version_changed(inputs):
+    (inputs.root / "VERSION").write_text("1.3.1\n")
+
+
 def films(*keys, value):
     return lambda inputs: inputs.change(inputs.edition.film_package, *keys, value=value)
 
@@ -68,6 +72,8 @@ def viewing(*keys, value):
         (films("editions", "0", "picture", value=None), "Film package differs"),
         (films("cover_sha256", value="0"), "Film package differs"),
         (films("chapters_sha256", value="0"), "Film package differs"),
+        (films("version_sha256", value="0"), "Film package differs"),
+        (version_changed, "Film package differs"),
         (films("editions", "1", "path", value="sample-reel-zh-1080p.mp4"), "Film package differs"),
         (edition_repeated, "Film package differs"),
         (film_changed, "Film package differs"),
@@ -79,6 +85,8 @@ def viewing(*keys, value):
         (viewing("player", "files", "1", "bytes", value=1), "Viewing package differs"),
         (viewing("player", value=None), "Viewing package differs"),
         (viewing("author", value="Someone else"), "Viewing package differs"),
+        # Pages packaged at an earlier version name it while VERSION holds 1.3.0.
+        (viewing("version", value="1.2.0"), "Viewing package differs"),
         (viewing("chapters", value=7), "Viewing package differs"),
         (member_changed, "Viewing package differs"),
         (cover_differs_from_its_source, "Viewing package differs"),

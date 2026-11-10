@@ -21,11 +21,19 @@ keywords and creation date, so both kinds of player read them. The title and the
 set quotation marks as the captions do. FFmpeg's MP4 muxer tags its chapter text track English
 whatever the film's language, so the finished film's chapter track takes the edition's
 language in place (`filmkit.delivery.track_language`), and every track must carry it.
+
+A film names its version, the Semantic Versioning 2.0.0 version without build metadata that the
+film repository's `VERSION` holds (`film_version`), in the QuickTime key Information, which
+Spotlight imports as the file's information, labelled in the edition's language: 版本号 1.3.0 or
+Version 1.3.0. Packaging refuses a film without a valid `VERSION` before it writes anything. Both
+pages name the version, and the film package binds `VERSION` among the production inputs, so a
+film packaged under another version is stale.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from datetime import UTC, datetime
@@ -40,9 +48,11 @@ from filmkit.captions.timing import typeset
 from filmkit.delivery.player import (
     COVER_JPEG,
     COVER_PNG,
+    entry_version,
     player_binding,
     player_page,
     runtime_label,
+    version_label,
 )
 from filmkit.delivery.track_language import set_chapter_language
 from filmkit.film import FILM, copied_players
@@ -88,6 +98,30 @@ QUICKTIME_PREFIX = "com.apple.quicktime."
 CREATION_KEY = QUICKTIME_PREFIX + "creationdate"
 # The film that a delivery binding names for the real-browser player check.
 BOUND_FILM = {"slug": FILM.slug, "duration": DURATION}
+# The film repository's version, below its root, and the form it must take: a Semantic Versioning
+# 2.0.0 version without build metadata, such as 1.3.0 or 2.0.0-rc.1.
+VERSION = Path("VERSION")
+SEMANTIC_VERSION = re.compile(
+    r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?", re.ASCII
+)
+
+
+def film_version() -> str:
+    """The film's version: what its repository's `VERSION` holds without surrounding whitespace.
+
+    A missing `VERSION`, or one that holds anything but a Semantic Versioning 2.0.0 version
+    without build metadata, refuses, naming the file.
+    """
+    path = repository.ROOT / VERSION
+    held = path.read_text(encoding="utf-8", errors="replace").strip() if path.is_file() else None
+    if held is None or not SEMANTIC_VERSION.fullmatch(held):
+        found = "is missing" if held is None else f"holds {held!r}"
+        msg = (
+            f"The film's {VERSION} {found}; it must hold a Semantic Versioning 2.0.0 version "
+            "without build metadata, such as 1.3.0"
+        )
+        raise PackagingError(msg)
+    return held
 
 
 def viewing_members(edition: Edition) -> tuple[str, ...]:
@@ -104,20 +138,26 @@ def viewing_members(edition: Edition) -> tuple[str, ...]:
     )
 
 
-def package_language_index() -> dict:
-    """Derive one neutral entry point for the sibling language deliveries."""
+def package_language_index(version: str) -> dict:
+    """Derive one neutral entry point for the sibling language deliveries.
+
+    It names the film's version under the film's title, in a line of its own just before the
+    `<nav>` that holds the language links.
+    """
     source = repository.ROOT / INDEX
     destination = repository.ROOT / LANGUAGE_INDEX
     template = source.read_text()
-    for code in CODES:
-        if f'href="{code}/index.html"' not in template:
-            msg = "Delivery entry needs both sibling language links"
-            raise PackagingError(msg)
+    start = template.find("<nav")
+    nav = template[start : template.find("</nav>", start)] if start >= 0 else ""
+    if not all(f'href="{code}/index.html"' in nav for code in CODES):
+        msg = "Delivery entry needs both sibling language links in a <nav>"
+        raise PackagingError(msg)
     if "<base " in template:
         msg = "Delivery entry must not select a language through base"
         raise PackagingError(msg)
+    page = template.replace("/*RUNTIME*/", runtime_label())
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(template.replace("/*RUNTIME*/", runtime_label()))
+    destination.write_text(page.replace("<nav", f"{entry_version(version)}\n<nav", 1))
     return {
         "source": str(INDEX),
         "source_sha256": sha(source),
@@ -178,7 +218,8 @@ def refresh_shot_plan(edition: Edition, timeline: dict) -> None:
 
 
 def package_metadata(edition: Edition) -> None:
-    """Derive the viewing package from the current source-bound timeline."""
+    """Derive the viewing package from the current source-bound timeline and the film's version,
+    which must be valid before anything is written."""
     copied = copied_players(repository.ROOT, FILM)
     if copied:
         raise PackagingError(copied)
@@ -190,6 +231,7 @@ def package_metadata(edition: Edition) -> None:
             f"{edition.cover}; paint it from the staged picture with the cover check"
         )
         raise PackagingError(msg)
+    version = film_version()
     target_cover = output / COVER_PNG
     if not target_cover.exists() or sha(target_cover) != sha(source_cover):
         shutil.copy2(source_cover, target_cover)
@@ -202,13 +244,13 @@ def package_metadata(edition: Edition) -> None:
     if len(chapters) != CHAPTERS:
         msg = f"The films have {CHAPTERS} chapters, not {len(chapters)}"
         raise PackagingError(msg)
-    language_index = package_language_index()
+    language_index = package_language_index(version)
     with Image.open(output / COVER_PNG) as cover:
         if cover.width * 9 != cover.height * 16:
             msg = f"The cover must be 16:9, not {cover.width}x{cover.height}"
             raise PackagingError(msg)
         cover.convert("RGB").save(output / COVER_JPEG, quality=95)
-    (output / "index.html").write_text(player_page(edition), encoding="utf-8")
+    (output / "index.html").write_text(player_page(edition, version), encoding="utf-8")
     members = viewing_members(edition)
     write(
         edition.viewing_package,
@@ -218,6 +260,7 @@ def package_metadata(edition: Edition) -> None:
             "player": player_binding(edition),
             "language_index": language_index,
             "author": AUTHOR,
+            "version": version,
             "chapters": CHAPTERS,
             "members": [{"path": name, "sha256": sha(output / name)} for name in members],
             "scope": "Metadata and player derivation; actual playback checked separately",
@@ -228,7 +271,7 @@ def package_metadata(edition: Edition) -> None:
 
 def film_inputs(edition: Edition) -> dict[str, Path]:
     """The production inputs of the delivered films, by the record field of each SHA-256: both
-    pictures and the record of their equivalence among them."""
+    pictures and the record of their equivalence among them, and the film's `VERSION`."""
     return {
         "picture_sha256": edition.picture,
         "uncaptioned_picture_sha256": edition.rendered(captions=False).file,
@@ -237,6 +280,7 @@ def film_inputs(edition: Edition) -> dict[str, Path]:
         "cover_sha256": edition.artifacts / COVER_JPEG,
         "script_sha256": repository.ROOT / edition.script,
         "chapters_sha256": edition.artifacts / "chapters.ffmeta",
+        "version_sha256": repository.ROOT / VERSION,
     }
 
 
@@ -316,7 +360,8 @@ def quicktime_keys(edition: Edition) -> dict[str, str]:
 
     The author stands only under Author: Spotlight lists every author-bearing QuickTime key
     among a film's authors, so an Artist key would list the author twice, and the item-list
-    artist tags, which the release tags carry, do not count.
+    artist tags, which the release tags carry, do not count. Information names the film's
+    version with the edition's label.
     """
     script = read(edition.script)
     release = script["release"]
@@ -330,6 +375,7 @@ def quicktime_keys(edition: Edition) -> dict[str, str]:
         "Copyright": f"© {release['year']} {AUTHOR}",
         "Keywords": ", ".join(release["keywords"]),
         "Year": str(release["year"]),
+        "Information": version_label(edition.code, film_version()),
     }
 
 

@@ -27,6 +27,8 @@ from filmkit.film import FILM
 
 # The verified films last two seconds, the last of them credits.
 DURATION, CREDITS = 2, 1
+# The film's version, which the bound root's VERSION holds.
+VERSION = "1.3.0"
 
 
 def write_input(path: Path, body: str | bytes | dict) -> Path:
@@ -237,9 +239,11 @@ def picture(inputs: Inputs) -> None:
 
 
 def packages(inputs: Inputs) -> None:
-    """The four films, the viewing members, the entry page and both package records."""
+    """The film's version, the four films, the viewing members, the entry page and both package
+    records."""
     root, edition, sha = inputs.root, inputs.edition, repository.sha
     output = edition.artifacts
+    write_input(root / "VERSION", f"{VERSION}\n")
     write_input(root / edition.cover, b"cover png")
     for name in delivery_packaging.viewing_members(edition):
         write_input(
@@ -278,6 +282,7 @@ def packages(inputs: Inputs) -> None:
                 "languages": ["zh", "en"],
             },
             "author": specification.AUTHOR,
+            "version": VERSION,
             "chapters": delivery_packaging.CHAPTERS,
             "members": [
                 {"path": name, "sha256": sha(output / name)}
