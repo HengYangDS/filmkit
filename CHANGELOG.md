@@ -4,6 +4,11 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+
+- `compare-pictures` compares every frame of an edition's two pictures, not only the frames it samples, about one in twenty-two. One FFmpeg filter graph decodes each picture once as full-range grey: outside the caption band it refuses a frame where any luma sample differs between the two by more than 90 levels, and inside the band, where they differ by design, it refuses a frame of either picture where a sample lies more than 90 levels from both neighbouring frames while those agree within 30, so a caption that appears or leaves passes, and so does a mark that moves. Sixteen pictures rendered with 0.18.0 for the DDWG, essentials and ETHOS films held nine one-frame faults in seven pictures, each a fragment of a text glyph drawn wrong in only one of the two pictures and 124 to 219 levels from its twin, and the sampled frames passed all nine; four reached a delivered film. Between clean twins the largest difference measured over two whole delivered pairs, 54,000 and 36,000 frames, was 78 levels, at the edge of a glyph, and where two encodes draw a moving edge apart a one-frame difference that neither picture holds alone reached 93 levels at one sample, in the DDWG film's Chinese pair of round 36 at frame 30306: such a difference is refused only above 120 levels, between that residue and the weakest fault, since each of the nine faults departs in one picture from its own neighbouring frames, which agree. The sampled tile and PSNR measures are unchanged.
+- A refusal names each one-frame fault by its frame, time, box and peak and names the picture that holds it, the one whose frame departs from its own neighbouring frames, with the command that renders that picture again: `python -m filmkit.produce render-picture --language <code>`, with `--uncaptioned` for the picture without captions. A difference that lasts two frames or more is named by its frames. The record lists both, and each residue within the ceiling, under `encoded.every_frame`. No rendered byte changes; a picture that 0.18.0 passed with a one-frame fault is refused, and is rendered again.
+
 ## [0.18.0] - 2026-11-10
 
 ### Fixed

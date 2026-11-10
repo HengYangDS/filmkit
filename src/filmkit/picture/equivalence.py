@@ -18,7 +18,11 @@ record (`require_equivalence`). It compares the pictures at two levels:
   planes must stay within `TILE_LIMIT`, and the PSNR of all compared samples at or above
   `PSNR_FLOOR_DB`. The tile limit is the structural guard, which a missing label exceeds in its
   tile; the floor only has to catch a difference spread thinly across the whole frame, and lies
-  below the encoders' noise at a keyframe of the films' denser pictures.
+  below the encoders' noise at a keyframe of the films' denser pictures. Every frame of both
+  pictures is then scanned for a fault that lasts one frame (`filmkit.picture.faults`): outside
+  the band the two pictures are compared sample by sample, and inside it each picture against its
+  own neighbouring frames. A fault names the picture that holds it, and the refusal the command
+  that renders that picture again.
 
 The record, build/evidence/editions/<code>/caption-equivalence.json, binds the composition, the
 timeline, the engine version and both pictures' stage documents, files and receipts, and holds
@@ -40,6 +44,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+import filmkit.picture.faults as faults
 import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.picture.rendering import (
@@ -303,9 +308,10 @@ def encoded_report(edition: Edition, timeline: dict, band: dict | None, work: Pa
     }
 
 
-def findings_of(composition: dict, encoded: dict | None) -> list[str]:
-    """The record's findings: each composition instant that differs beyond its captions, and the
-    encoded frames that differ beyond the encoder's noise."""
+def findings_of(composition: dict, encoded: dict | None, code: str) -> list[str]:
+    """The record's findings: each composition instant that differs beyond its captions, the
+    sampled encoded frames that differ beyond the encoder's noise, and the one-frame faults and
+    lasting differences that the scan of every frame found (`faults.findings`)."""
     found = [
         f"composition at {row['time']:.3f} s: the captioned frame paints "
         f"{json.dumps(row['captioned'], ensure_ascii=False)}, the uncaptioned frame "
@@ -322,6 +328,7 @@ def findings_of(composition: dict, encoded: dict | None) -> list[str]:
         ]
         hidden = encoded["failing_frames"] - len(encoded["failing"])
         found += [f"encoded: {hidden} more frames differ"] if hidden > 0 else []
+        found += faults.findings(encoded["every_frame"], code)
     return found
 
 
@@ -334,14 +341,16 @@ def compare_pictures(edition: Edition) -> dict:
     bound = current_bindings(edition)
     timeline = repository.read(edition.timeline)
     composition = composition_report(edition, work)
-    painted_apart = composition["differing_instants"] > 0
-    encoded = (
-        None if painted_apart else encoded_report(edition, timeline, composition["band"], work)
-    )
+    encoded = None
+    if composition["differing_instants"] == 0:
+        encoded = encoded_report(edition, timeline, composition["band"], work)
+        files = {r.name: r.file for r in (edition.rendered(True), edition.rendered(False))}
+        rows, frames = tuple(encoded["excluded_rows"]), DURATION * FPS
+        encoded["every_frame"] = faults.scan(files, PICTURE_SIZE, rows, frames, FPS, work)
     if current_bindings(edition) != bound:
         msg = "A picture, the composition or the timeline changed while they were compared"
         raise PictureError(msg)
-    findings = findings_of(composition, encoded)
+    findings = findings_of(composition, encoded, edition.code)
     report = work / "composition.json"
     record = {
         **bound,
