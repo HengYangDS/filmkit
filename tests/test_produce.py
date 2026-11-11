@@ -48,15 +48,18 @@ def test_an_action_runs_its_owner_for_the_selected_edition(monkeypatch):
 def test_the_actions_are_the_documented_ones_in_order():
     assert [*produce.EDITION_ACTIONS] == [
         "select",
+        "fit",
         "assemble",
         "refresh-captions",
         "stage-picture",
         "check-picture",
+        "render-draft",
         "preflight",
         "render-picture",
         "package-metadata",
         "validate-picture",
         "compare-pictures",
+        "repair-pictures",
         "package-film",
     ]
 
@@ -87,6 +90,66 @@ def test_an_edition_action_passes_its_options_to_its_owner(monkeypatch, tmp_path
         (zh, {"captions": False}),
         (en, {}),
     ]
+
+
+def test_each_owner_keeps_its_own_deadline_default(monkeypatch):
+    calls = []
+
+    def owner(*arguments, **options):
+        calls.append((*arguments, options))
+
+    for name in ("render_picture", "render_draft", "repair_pictures"):
+        monkeypatch.setattr(produce, name, owner)
+    produce.main(["render-picture", "--language", "zh"])
+    produce.main(["render-draft", "--language", "zh"])
+    produce.main(["render-draft", "--language", "en", "--deadline", "900"])
+    produce.main(["repair-pictures", "--language", "zh"])
+    produce.main(["repair-pictures", "--language", "en", "--attempts", "3", "--deadline", "600"])
+    zh, en = production.Edition("zh"), production.Edition("en")
+    # A picture, and each picture a repair renders, takes 10800 s and a draft 3600 s unless
+    # --deadline gives another; a repair makes 2 attempts unless --attempts gives another.
+    assert calls == [
+        (zh, 10800, {"captions": True}),
+        (zh, 3600, {}),
+        (en, 900, {}),
+        (zh, 2, 10800, {}),
+        (en, 3, 600, {}),
+    ]
+
+
+def test_the_fit_action_passes_the_variants_it_reads_to_its_owner(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(produce, "fit", lambda *arguments: calls.append(arguments))
+    variants = tmp_path / "variants.json"
+    variants.write_text('{"calmer": {"tail_guard_seconds": 0.4}}')
+    produce.main(["fit", "--language", "zh", "--variants", str(variants)])
+    produce.main(["fit", "--language", "en"])
+    zh, en = production.Edition("zh"), production.Edition("en")
+    assert calls == [(zh, {"calmer": {"tail_guard_seconds": 0.4}}), (en, {})]
+    with pytest.raises(SystemExit) as stopped:
+        produce.main(["fit", "--language", "zh", "--variants", str(tmp_path / "absent.json")])
+    assert str(stopped.value.code).startswith("fit: The variants file ")
+    assert str(stopped.value.code).endswith("absent.json cannot be read: No such file or directory")
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize(
+    ("arguments", "message"),
+    [
+        (["assemble", "--variants", "variants.json"], "--variants applies only to fit"),
+        (["render-picture", "--attempts", "3"], "--attempts applies only to repair-pictures"),
+        (["compare-pictures", "--attempts", "1"], "--attempts applies only to repair-pictures"),
+    ],
+)
+def test_only_fit_takes_variants_and_only_repair_takes_attempts(
+    monkeypatch, capsys, arguments, message
+):
+    for name in ("assemble", "render_picture", "compare_pictures"):
+        monkeypatch.setattr(produce, name, lambda *_arguments, **_options: pytest.fail("ran"))
+    with pytest.raises(SystemExit) as stopped:
+        produce.main([*arguments, "--language", "zh"])
+    assert stopped.value.code == 2
+    assert message in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("action", ["check-picture", "compare-pictures", "package-film"])

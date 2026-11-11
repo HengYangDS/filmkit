@@ -12,7 +12,8 @@ a draft before the final render and confirms the final film before it is reviewe
 The record names the film, the timeline and the composition script it judged, the composition as
 it stands when the scan runs, so a draft is scanned as soon as it is rendered. With --language the
 timeline is the edition's and the record is its draft's (`Edition.draft_stills`), which
-`filmkit.preflight` requires bound to the current timeline and composition before a render.
+`filmkit.preflight` requires bound to the current timeline and composition before a render;
+`record_draft` writes it, for this command and for `filmkit.picture.draft`.
 
 Usage: python -m filmkit.picture.still_scan <movie> --language zh|en [--limit <seconds>]
        python -m filmkit.picture.still_scan <movie> <timeline> --out <record> [--limit <seconds>]
@@ -24,6 +25,7 @@ import argparse
 import json
 import subprocess
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -34,7 +36,6 @@ from filmkit.production import CODES, Edition
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
-    from pathlib import Path
 
 FPS, WIDTH, HEIGHT = 10, 480, 270
 # Sixty-fps frames into each 0.1 s sample at which the two phases are read.
@@ -194,6 +195,34 @@ def decode(movie: Path, phase: int = 0) -> Iterator[np.ndarray]:
         raise StillScanError(msg)
 
 
+def record_scan(movie: Path, timeline: Path, out: Path, limit: float = LIMIT_SECONDS) -> dict:
+    """Scan a film against a timeline at both phases and write the record at `out`.
+
+    Paths are below the film's root, or absolute. The record names the film, the timeline and the
+    composition script it judged, with each one's SHA-256, so its result stays bound to them, and
+    lists the still runs of the worse phase that carry at least `limit` seconds of speech.
+    """
+    film, judged = repository.ROOT / movie, repository.ROOT / timeline
+    words = repository.read(judged)
+    report = worst([scan(decode(film, phase), words) for phase in PHASES])
+    subjects = {
+        "movie": {"path": repository.relative(film), "sha256": repository.sha(film)},
+        "timeline": {"path": repository.relative(judged), "sha256": repository.sha(judged)},
+        "composition": {
+            "path": str(COMPOSITION_SCRIPT),
+            "sha256": repository.sha(repository.ROOT / COMPOSITION_SCRIPT),
+        },
+    }
+    record = {**subjects, **report, "limit_seconds": limit, "over_limit": over_limit(report, limit)}
+    repository.write(out, record)
+    return record
+
+
+def record_draft(edition: Edition, movie: Path, limit: float = LIMIT_SECONDS) -> dict:
+    """Scan an edition's draft against the edition's timeline into its draft record."""
+    return record_scan(movie, edition.timeline, edition.draft_stills, limit)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description="Report still pictures with speech in a rendered film."
@@ -208,37 +237,20 @@ def main(argv: list[str] | None = None) -> None:
         "--limit", type=float, default=LIMIT_SECONDS, help="Fail a still run with this much speech"
     )
     options = parser.parse_args(argv)
+    movie = Path(options.movie)
     if options.language is not None:
         if options.timeline is not None or options.out is not None:
             parser.error("--language names the timeline and the record")
-        edition = Edition(options.language)
-        options.timeline = repository.relative(edition.timeline)
-        options.out = repository.relative(edition.draft_stills)
+        record = record_draft(Edition(options.language), movie, options.limit)
     elif options.timeline is None or options.out is None:
         parser.error("give the timeline and --out, or --language")
-    timeline = repository.read(options.timeline)
-    movie = repository.ROOT / options.movie
-    report = worst([scan(decode(movie, phase), timeline) for phase in PHASES])
-    failing = over_limit(report, options.limit)
-    # The record names the film and timeline it judged, so its result stays bound to them.
-    subjects = {
-        "movie": {"path": options.movie, "sha256": repository.sha(movie)},
-        "timeline": {
-            "path": options.timeline,
-            "sha256": repository.sha(repository.ROOT / options.timeline),
-        },
-        "composition": {
-            "path": str(COMPOSITION_SCRIPT),
-            "sha256": repository.sha(repository.ROOT / COMPOSITION_SCRIPT),
-        },
-    }
-    repository.write(
-        options.out,
-        {**subjects, **report, "limit_seconds": options.limit, "over_limit": failing},
-    )
+    else:
+        timeline, out = Path(options.timeline), Path(options.out)
+        record = record_scan(movie, timeline, out, options.limit)
+    failing = record["over_limit"]
     print(
         json.dumps(
-            {"longest_fine_speech": report["longest_fine_speech"], "over_limit": len(failing)}
+            {"longest_fine_speech": record["longest_fine_speech"], "over_limit": len(failing)}
         )
     )
     if failing:

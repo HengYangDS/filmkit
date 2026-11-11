@@ -234,6 +234,27 @@ class Edition:
         return self.evidence / "draft-stills.json"
 
     @property
+    def draft_stage(self) -> Path:
+        """The stage of the edition's 10 fps draft (`filmkit.picture.draft`)."""
+        return repository.ROOT / "build/runtime/work/picture-draft" / self.code
+
+    @property
+    def draft_picture(self) -> Path:
+        """The edition's 10 fps draft, beside its stage."""
+        return self.draft_stage.with_name(f"{self.code}.mp4")
+
+    @property
+    def draft_receipt(self) -> Path:
+        """The render receipt of the edition's draft, beside its pictures' receipts."""
+        return self.evidence / "render/receipt-draft.json"
+
+    @property
+    def picture_repairs(self) -> Path:
+        """The numbered attempts of `filmkit.picture.repair`, each holding the pictures it found
+        faulty and rendered again."""
+        return self.evidence / "picture-repairs"
+
+    @property
     def film_package(self) -> Path:
         return self.evidence / "film-package.json"
 

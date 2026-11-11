@@ -212,6 +212,23 @@ def test_two_exceptions_of_one_motion_finding_refuse(declared):
         film.load(declared)
 
 
+def test_a_film_without_a_capture_captures_fast(declared):
+    assert film.FILM.picture.capture == "fast"
+    assert film.load(declared).picture.capture == "fast"
+
+
+def test_a_film_may_declare_screenshot_capture(declared):
+    rewrite(declared, "[picture]\n", '[picture]\ncapture = "screenshot"\n')
+    assert film.load(declared).picture.capture == "screenshot"
+
+
+def test_another_capture_is_refused_naming_its_field(declared):
+    rewrite(declared, "[picture]\n", '[picture]\ncapture = "drawelement"\n')
+    named = r"picture\.capture\s+Input should be 'fast' or 'screenshot'"
+    with pytest.raises(FilmError, match=named):
+        film.load(declared)
+
+
 # Review levels that hold the sample film's five dimensions.
 LEVELS = """[review.levels."信"]
 asks = "true to the source, to the other edition and to the words"

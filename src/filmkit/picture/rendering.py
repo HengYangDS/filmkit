@@ -5,9 +5,11 @@ timeline and the composition's script and style into the composition's template,
 copied timeline engine and fonts; its stage.json binds it to the current inputs. A render runs
 the locked HyperFrames renderer on the complete UHD stage with the supplied browser, telemetry,
 update checks and self-installs off, and records a receipt; validation binds the rendered
-picture to that receipt, the stage and the current inputs. A stage, render or receipt that
-differs from this contract raises `PictureError`, as does a film whose installed renderer is not
-the version the engine renders with.
+picture to that receipt, the stage and the current inputs. Every render passes the capture flag
+of the film's declared capture (`film.Picture.capture`) and its receipt records that mode;
+validation refuses a picture rendered in another mode, reading a receipt that records none by its
+command. A stage, render or receipt that differs from this contract raises `PictureError`, as does
+a film whose installed renderer is not the version the engine renders with.
 
 Each edition has two pictures (`production.Edition.rendered`): the captioned one, which draws
 the timeline's captions, and the uncaptioned one, whose document inlines the same timeline with
@@ -54,7 +56,9 @@ PICTURE_SIZE = (RENDITIONS["uhd"].width, RENDITIONS["uhd"].height)
 STAGE_SIZES = {(rendition.width, rendition.height) for rendition in RENDITIONS.values()}
 # The timeline engine a stage copies, below the film's npm packages.
 TIMELINE_ENGINE = Path("gsap/dist/gsap.min.js")
-# Seconds a renderer's process group has to exit after SIGTERM before SIGKILL ends it.
+# Seconds a picture's render may take, and a renderer's process group has to exit after SIGTERM
+# before SIGKILL ends it.
+DEADLINE = 10800
 STOP_GRACE_SECONDS = 10
 # The locked renderer's command and package manifest, below the film's npm packages, and the
 # renderer version the engine renders with.
@@ -68,6 +72,16 @@ TOOL_CACHE = Path("build/runtime/tool-cache")
 BROWSER = ("chrome-headless-shell", "152.0.7977.30")
 BROWSER_EXECUTABLE = "chrome-headless-shell-mac-arm64/chrome-headless-shell"
 BROWSER_SHA256 = "ed7c5c6aff7cc4dd88ee7746c0df97f08a454180b62b7063fc961ba42e10b6a1"
+# The renderer's capture flag for each capture mode a film may declare. Both set the renderer's
+# fast capture explicitly, so neither the caller's environment nor the renderer's own default for
+# the host and the worker count decides how the frames are captured.
+CAPTURE_FLAGS = {
+    "fast": "--experimental-fast-capture",
+    "screenshot": "--experimental-fast-capture=false",
+}
+# The renderer's encoding by quality: the delivered pictures' at CRF 14, and the draft's at the
+# rate its quality sets.
+QUALITIES = {"looks": ("--quality", "looks", "--crf", "14"), "draft": ("--quality", "draft")}
 
 
 class PictureError(ValueError):
@@ -498,6 +512,67 @@ def require_passing_gates(edition: Edition) -> None:
         raise PictureError(msg)
 
 
+def renderer_command(stage: Path, output: Path, fps: int, quality: str) -> list[str]:
+    """The locked renderer's command for a stage: the pictures' settings at a frame rate and a
+    quality of `QUALITIES`, with the capture flag of the film's declared capture."""
+    return [
+        str(repository.node_modules() / RENDERER),
+        "render",
+        str(stage),
+        "--output",
+        str(output),
+        "--fps",
+        str(fps),
+        *QUALITIES[quality],
+        "--workers",
+        "8",
+        "--gpu",
+        "--browser-gpu",
+        "--no-low-memory-mode",
+        CAPTURE_FLAGS[FILM.picture.capture],
+        "--strict",
+    ]
+
+
+def command_capture(command: list[str]) -> str | None:
+    """The capture mode whose flag a renderer command passes, or None unless exactly one."""
+    passed = [mode for mode, flag in CAPTURE_FLAGS.items() if flag in command]
+    return passed[0] if len(passed) == 1 else None
+
+
+def record_render(
+    command: list[str], stage: Path, output: Path, receipt: Path, deadline: float, picture: str
+) -> dict:
+    """Run a renderer command on a stage to its exit or deadline and write its receipt.
+
+    The receipt names the picture, the command and the capture it passes. A render that does
+    not exit 0 within its deadline, or whose stage changed meanwhile, raises `PictureError`
+    after its receipt is written.
+    """
+    source = sha(stage / "index.html")
+    started = datetime.now(UTC)
+    exit_code, timed_out = run_renderer(command, deadline)
+    record = {
+        "picture": picture,
+        "command": command,
+        "capture": command_capture(command),
+        "exit": exit_code,
+        "timed_out": timed_out,
+        "deadline_seconds": deadline,
+        "started_at": started.isoformat(),
+        "elapsed_seconds": (datetime.now(UTC) - started).total_seconds(),
+        "source_sha256": source,
+        "output_path": str(output),
+        "output_sha256": sha(output) if output.is_file() else None,
+    }
+    write(receipt, record)
+    print(json.dumps({key: record[key] for key in ("exit", "timed_out", "elapsed_seconds")}))
+    if exit_code != 0 or timed_out or source != sha(stage / "index.html"):
+        msg = "Native picture render did not complete from the current stage"
+        raise PictureError(msg)
+    return record
+
+
 def render_picture(edition: Edition, deadline: int, *, captions: bool = True) -> None:
     """Run the locked renderer on the complete current stage and record its receipt.
 
@@ -510,49 +585,9 @@ def render_picture(edition: Edition, deadline: int, *, captions: bool = True) ->
     require_renderer()
     require_passing_gates(edition)
     rendered = edition.rendered(captions)
-    stage = rendered.stage
-    require_current_stage(edition, stage, captions=captions)
-    picture = rendered.file
-    command = [
-        str(repository.node_modules() / RENDERER),
-        "render",
-        str(stage),
-        "--output",
-        str(picture),
-        "--fps",
-        str(FPS),
-        "--quality",
-        "looks",
-        "--crf",
-        "14",
-        "--workers",
-        "8",
-        "--gpu",
-        "--browser-gpu",
-        "--no-low-memory-mode",
-        "--experimental-fast-capture",
-        "--strict",
-    ]
-    source = sha(stage / "index.html")
-    started = datetime.now(UTC)
-    exit_code, timed_out = run_renderer(command, deadline)
-    receipt = {
-        "picture": rendered.name,
-        "command": command,
-        "exit": exit_code,
-        "timed_out": timed_out,
-        "deadline_seconds": deadline,
-        "started_at": started.isoformat(),
-        "elapsed_seconds": (datetime.now(UTC) - started).total_seconds(),
-        "source_sha256": source,
-        "output_path": str(picture),
-        "output_sha256": sha(picture) if picture.is_file() else None,
-    }
-    write(rendered.receipt, receipt)
-    print(json.dumps({key: receipt[key] for key in ("exit", "timed_out", "elapsed_seconds")}))
-    if exit_code != 0 or timed_out or source != sha(stage / "index.html"):
-        msg = "Native picture render did not complete from the current stage"
-        raise PictureError(msg)
+    require_current_stage(edition, rendered.stage, captions=captions)
+    command = renderer_command(rendered.stage, rendered.file, FPS, "looks")
+    record_render(command, rendered.stage, rendered.file, rendered.receipt, deadline, rendered.name)
 
 
 def recorded_at(recorded: str, current: Path, root: Path) -> bool:
@@ -573,14 +608,40 @@ def require_receipt_picture(receipt: dict, rendered: Rendered) -> None:
         raise PictureError(msg)
 
 
+def receipt_capture(receipt: dict) -> str | None:
+    """The capture mode a receipt's command passes, which the mode it records must be.
+
+    A receipt written before receipts recorded their capture is read by its command alone.
+    """
+    passed = command_capture(receipt.get("command") or [])
+    recorded = receipt.get("capture", passed)
+    if recorded != passed:
+        asked = f"{passed} capture" if passed else "no capture flag"
+        msg = f"The render receipt records {recorded} capture, but its command passes {asked}"
+        raise PictureError(msg)
+    return passed
+
+
+def require_receipt_capture(receipt: dict) -> None:
+    """Refuse a receipt of another capture mode than the film declares."""
+    captured, declared = receipt_capture(receipt), FILM.picture.capture
+    if captured != declared:
+        msg = (
+            f"The picture was rendered with {captured or 'no'} capture; the film declares "
+            f"{declared} capture"
+        )
+        raise PictureError(msg)
+
+
 def validate_picture_binding(edition: Edition, receipt: dict, *, captions: bool = True) -> None:
     """Bind one complete native render, of the captioned picture or with `captions` False of the
-    uncaptioned one, to the exact staged current inputs."""
+    uncaptioned one, to the exact staged current inputs and the declared capture."""
     rendered = edition.rendered(captions)
     require_receipt_picture(receipt, rendered)
     require_completed_receipt(receipt, rendered.stage)
     require_current_stage(edition, rendered.stage, captions=captions)
     require_receipt_places(receipt, rendered.stage, rendered.file)
+    require_receipt_capture(receipt)
 
 
 def validate_picture(edition: Edition, *, captions: bool = True) -> dict:

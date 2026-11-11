@@ -38,6 +38,7 @@ PLACEHOLDERS = (
 RECEIPT_KEYS = [
     "picture",
     "command",
+    "capture",
     "exit",
     "timed_out",
     "deadline_seconds",
@@ -121,11 +122,13 @@ def render(monkeypatch, edition, fake, deadline):
 
 
 def completed_receipt(edition):
-    """A receipt of a completed render of the current stage, beside its picture."""
+    """A receipt of a completed render of the current stage, beside its picture, written before
+    receipts recorded their capture."""
     stage, picture = edition.picture_stage, edition.picture
     put(picture, "rendered picture")
+    command = ["hyperframes", "render", str(stage), "--output", str(picture)]
     return {
-        "command": ["hyperframes", "render", str(stage), "--output", str(picture)],
+        "command": [*command, "--experimental-fast-capture"],
         "exit": 0,
         "timed_out": False,
         "source_sha256": repository.sha(stage / "index.html"),

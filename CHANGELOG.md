@@ -4,6 +4,23 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.20.0] - UNRELEASED
+
+### Added
+
+- `produce render-draft --language zh|en` renders and scans an edition's 10 fps draft, which each film lane's `draft.py` did: it stages the captioned picture afresh at 1920x1080 in `build/runtime/work/picture-draft/<edition>/`, renders it to `<edition>.mp4` beside its stage in draft quality with the pictures' other settings, at niceness 10, or the caller's if higher, and within `--deadline` (3600 s), writes its receipt to `build/evidence/editions/<edition>/render/receipt-draft.json` and writes the still scan to `draft-stills.json`, the record that `preflight` reads, where a copy of the lanes' script once missed it. It removes the edition's earlier draft record and receipt first, and refuses a render that does not complete, scanning nothing, and a draft with a still picture over the limit, after writing its record. It needs no passing gate record.
+- `produce fit --language zh|en [--variants <file>]` runs the assembly's own steps up to the gap allocation, which the lanes' `dryfit.py` mirrored, and prints for the script's pause policy and for each variant the speech, the designed gaps, the closing quiet, the runtime left free or missing, the allocated gaps and the verdict. It writes nothing but the assembly's decode work files, refuses as `assemble` would when the script's own policy does not fit, and validates every variant before it decodes anything; a variants file is named below the film's root or absolutely, a variant replaces whole fields of `voice_performance`, a field the pause policy does not read is refused, and a variant never decides the exit, even where its clips or gaps cannot be designed.
+- `[picture] capture` declares how the renderer captures each frame: `fast`, the default, passes `--experimental-fast-capture` as before, and `screenshot` passes `--experimental-fast-capture=false` in its place. `render-picture` and `render-draft` honour it, each render receipt records it as `capture`, and validation refuses a picture rendered in another mode, reading a receipt that records none by its command. Whether screenshot capture avoids the one-frame faults is not shown.
+- `produce repair-pictures --language zh|en [--attempts <n>]` renders again only the pictures that hold the one-frame faults a refused, current `compare-pictures` record attributes, as the lanes' render chains did by hand, and compares again, at most 2 times unless `--attempts` gives another number. Each attempt keeps the faulty pictures, their receipts and the refused record in `build/evidence/editions/<edition>/picture-repairs/<n>/` with an `attempt.json`, numbered across runs; a render or comparison that fails inside an attempt is recorded there, and its refusal names the folder and the commands that bring the edition back. It refuses any other finding, a difference that no one picture holds and a fault that remains after the last attempt; a sampled frame that differs beyond the encoders' noise only because such a fault lands on it stays repairable. `compare-pictures` names `repair-pictures` as the next step of a refusal that it can answer.
+
+### Changed
+
+- `--deadline` takes each owner's own default, 10800 s for a picture and 3600 s for a draft, and `--variants` and `--attempts` are refused for other actions.
+- `assemble` runs the steps it shares with `fit`, `bound_recordings`, `decode_recordings`, `designed_clips` and `allocate`, in its present order, and every render builds its command with `rendering.renderer_command` and writes its receipt with `rendering.record_render`.
+- The sample film's picture task stages both pictures of each edition, then renders and scans its draft and passes `preflight` before it renders them.
+
+No film's bytes change: a film that declares no capture renders with 0.19.0's command, element for element, `assemble` writes the same soundtrack, timeline and receipt, and the new commands write only new files. A receipt written by 0.19.0 stays valid for a film that declares no capture. A film that declares `capture` cannot go back to 0.19.0 without removing it, since 0.19.0 refuses the field.
+
 ## [0.19.0] - 2026-11-10
 
 ### Changed

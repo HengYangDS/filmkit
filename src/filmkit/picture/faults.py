@@ -25,7 +25,9 @@ turns them into full-range grey and writes, for each pair, one plane that holds 
 Each fault holds its frame, its time, its box in picture pixels (left, top, right and bottom, the
 last two exclusive), its peak, its picture and whether it is a residue. The peak is the largest
 difference from the twin or, in the caption band, from the nearer neighbouring frame. A refusal
-names the command that renders the faulty picture again.
+names the command that renders the faulty picture again. `repairable` reads from a refused
+comparison record the faults that rendering one picture again may repair, by that picture, for
+`filmkit.picture.repair`, and refuses a record that holds any other finding.
 """
 
 from __future__ import annotations
@@ -73,8 +75,10 @@ GREY = "scale=out_range=full,format=gray"
 # How every decode starts, and how it writes its frames: raw grey, one plane per frame.
 DECODE = ["ffmpeg", "-v", "error", "-nostdin"]
 RAW = ["-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "gray", "pipe:1"]
-# The command that renders the captioned picture again; with --uncaptioned, the other one.
+# The command that renders the captioned picture again; with --uncaptioned, the other one. And the
+# command that renders again each picture that holds a fault, and compares the two again.
 RENDER = "python -m filmkit.produce render-picture --language {code}"
+REPAIR = "python -m filmkit.produce repair-pictures --language {code}"
 
 
 def apart(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -394,3 +398,60 @@ def findings(report: dict, code: str) -> list[str]:
     hidden = report["lasting_runs"] - len(report["lasting"])
     found += [f"encoded: {hidden} more runs of differing frames"] if hidden > 0 else []
     return found
+
+
+def repairable(record: dict, code: str) -> dict[str, list[dict]]:
+    """The one-frame faults of a comparison record by the picture that holds each; none where the
+    record passed.
+
+    Refused, naming each reason, where the record holds a finding that rendering one picture again
+    cannot repair: composition instants that differ beyond their captions, a sampled frame beyond
+    the encoders' noise where no one picture holds a fault outside the caption band, a difference
+    that lasts two frames or more, a one-frame difference above a residue's ceiling that no one
+    picture holds, or more differences than it lists. A fault outside the band that lands on a
+    sampled frame fails that frame's measures too, so that frame alone stays repairable. The
+    fields decide, never the findings' text.
+    """
+    if record.get("verdict") == "pass":
+        return {}
+    encoded, reasons, named = record["encoded"], [], {}
+    every = encoded.get("every_frame", {})
+    listed = [row for row in every.get("faults", []) if not row["residue"]]
+    held = {row["frame"] for row in listed if row["picture"] and not row["caption_band"]}
+    differing = record["composition"].get("differing_instants", 0)
+    if differing:
+        reasons.append(f"the compositions differ beyond their captions at {differing} instants")
+    failing = encoded.get("failing", [])
+    reasons += [
+        f"sampled frame {row['frame']} differs beyond the encoders' noise without a one-frame "
+        "fault of one picture there"
+        for row in failing
+        if row["frame"] not in held
+    ]
+    hidden = encoded.get("failing_frames", 0) - len(failing)
+    sampled = f"{hidden} more sampled frames differ beyond the encoders' noise"
+    reasons += [sampled] if hidden > 0 else []
+    lasting = every.get("lasting", [])
+    reasons += [
+        f"the pictures differ over frames {run['first']}-{run['last']} in box {run['box']}"
+        for run in lasting
+    ]
+    hidden = every.get("lasting_runs", 0) - len(lasting)
+    reasons += [f"{hidden} more runs of frames differ"] if hidden > 0 else []
+    for row in listed:
+        if row["picture"] is None:
+            reasons.append(
+                f"frame {row['frame']} differs by {row['peak']} levels in box {row['box']} and "
+                f"no one picture holds it; render both pictures again with "
+                f"{RENDER.format(code=code)} and with --uncaptioned"
+            )
+        else:
+            named.setdefault(row["picture"], []).append(row)
+    hidden = every.get("fault_frames", 0) - len(listed)
+    unlisted = f"{hidden} more one-frame differences are not listed with a picture"
+    reasons += [unlisted] if hidden > 0 else []
+    if reasons or not named:
+        found = "; ".join(reasons) or "it names no fault of one picture"
+        msg = f"The comparison record holds what rendering one picture again cannot repair: {found}"
+        raise PictureError(msg)
+    return named

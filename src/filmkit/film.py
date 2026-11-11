@@ -155,11 +155,16 @@ class Motion(Declared):
 
 class Picture(Declared):
     """The font files the picture stages below fonts/, in their order, how its wrapped labels
-    break, and the motion it keeps."""
+    break, the motion it keeps, and how the renderer captures its frames.
+
+    `capture` is `fast`, the default, which turns the renderer's fast capture on as earlier
+    releases did, or `screenshot`, which turns it off (`filmkit.picture.rendering`).
+    """
 
     fonts: tuple[str, ...] = Field(min_length=1)
     wrapping: Wrapping = Field(default_factory=Wrapping)
     motion: Motion = Field(default_factory=Motion)
+    capture: Literal["fast", "screenshot"] = "fast"
 
     @field_validator("fonts")
     @classmethod

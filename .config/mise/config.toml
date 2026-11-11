@@ -60,26 +60,30 @@ run = [
 ]
 
 [tasks."sample:picture"]
-description = "Stage each sample edition's picture, check its geometry, its cover and its audits, render and validate it and its uncaptioned picture, and compare the two"
+description = "Stage both of each sample edition's pictures, check the geometry, the cover and the audits, render and scan its draft and pass the pre-render check, then render and validate both pictures and compare them"
 dir = "{{config_root}}/examples/sample-film"
 run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language zh --uncaptioned",
   "uv run --python 3.12 --frozen --offline python -m filmkit.tools geometry-check build/runtime/work/final-delivery-zh-uhd build/evidence/editions/zh/picture-geometry.json 2",
   "uv run --python 3.12 --frozen --offline python -m filmkit.tools player-check cover build/runtime/work/final-delivery-zh-uhd assets/cover/sample-reel-cover.png build/runtime/work/cover-zh.png",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce check-picture --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-draft --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce preflight --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language zh --uncaptioned",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language zh --uncaptioned",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language zh --uncaptioned",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce compare-pictures --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language en",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language en --uncaptioned",
   "uv run --python 3.12 --frozen --offline python -m filmkit.tools geometry-check build/runtime/work/final-delivery-en-uhd build/evidence/editions/en/picture-geometry.json 2",
   "uv run --python 3.12 --frozen --offline python -m filmkit.tools player-check cover build/runtime/work/final-delivery-en-uhd assets/cover/sample-reel-cover-en.png build/runtime/work/cover-en.png",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce check-picture --language en",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-draft --language en",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce preflight --language en",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language en",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language en --uncaptioned",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language en --uncaptioned",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language en --uncaptioned",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce compare-pictures --language en",

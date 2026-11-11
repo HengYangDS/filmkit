@@ -22,7 +22,8 @@ record (`require_equivalence`). It compares the pictures at two levels:
   pictures is then scanned for a fault that lasts one frame (`filmkit.picture.faults`): outside
   the band the two pictures are compared sample by sample, and inside it each picture against its
   own neighbouring frames. A fault names the picture that holds it, and the refusal the command
-  that renders that picture again.
+  that renders that picture again; a refusal whose every finding `repair-pictures` can repair
+  (`faults.repairable`) names that command as its next step.
 
 The record, build/evidence/editions/<code>/caption-equivalence.json, binds the composition, the
 timeline, the engine version and both pictures' stage documents, files and receipts, and holds
@@ -332,6 +333,16 @@ def findings_of(composition: dict, encoded: dict | None, code: str) -> list[str]
     return found
 
 
+def next_step(record: dict, code: str) -> str:
+    """The clause that names `repair-pictures` as a refused record's next step where the repair
+    accepts the record, and nothing where it would refuse it."""
+    try:
+        faults.repairable(record, code)
+    except PictureError:
+        return ""
+    return f"; next: {faults.REPAIR.format(code=code)}"
+
+
 def compare_pictures(edition: Edition) -> dict:
     """Compare the edition's two pictures at both levels, write the record and refuse a finding."""
     for captions in (True, False):
@@ -366,7 +377,7 @@ def compare_pictures(edition: Edition) -> dict:
     print(json.dumps({"verdict": record["verdict"], "findings": len(findings)}))
     if findings:
         msg = f"The {edition.code} pictures differ beyond their captions: " + "; ".join(findings)
-        raise PictureError(msg)
+        raise PictureError(msg + next_step(record, edition.code))
     return record
 
 

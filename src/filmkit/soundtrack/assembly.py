@@ -8,6 +8,10 @@ leveled, and the clips are laid out with the designed gaps at one program level.
 soundtrack is refused, before anything is written, for an unmarked pause above the film's limit
 (`narration.flow`) or a declared term said unlike its reference (`narration.terms`). The
 timeline, the captions and the receipt record the result.
+
+The steps up to the gap allocation, `bound_recordings`, `decode_recordings`, `designed_clips` and
+`allocate`, are the ones that the runtime fit (`filmkit.soundtrack.fit`) runs, so the two cannot
+lay out the same recordings apart.
 """
 
 from __future__ import annotations
@@ -42,6 +46,7 @@ from filmkit.soundtrack.level import (
     program_gain,
 )
 from filmkit.soundtrack.pauses import (
+    PauseError,
     allocate_designed_gaps,
     begin_clip,
     design_thought_pauses,
@@ -106,7 +111,31 @@ class Clip:
     chapter_gain_db: float = 0.0
 
 
-def _bound_inputs(script: dict, edition: Edition) -> tuple[dict, dict]:
+@dataclass(frozen=True)
+class Allocation:
+    """How the designed gaps share the runtime before the credits, in samples.
+
+    It holds each gap's kind and designed pause, the speech of the clips with their thought
+    pauses, the closing quiet and the runtime, and the gaps that `allocate_designed_gaps` gives,
+    or, where the narration does not fit the runtime or the declared gap limits, its refusal.
+    """
+
+    kinds: list[str]
+    designed: list[int]
+    speech: int
+    closing: int
+    total: int
+    gaps: list[int] | None
+    refusal: str | None
+
+    @property
+    def free(self) -> int:
+        """The runtime the allocation shares among the gaps beyond their designed pauses, as it
+        counts it; negative where the narration exceeds the runtime."""
+        return self.total - self.speech - sum(self.designed) - self.closing
+
+
+def bound_recordings(script: dict, edition: Edition) -> tuple[dict, dict]:
     """The selected recording and alignment of each segment, bound to its exact script text."""
     records = {r["id"]: r for r in read(edition.narration_selected)["records"]}
     alignments = {r["id"]: r for r in read(edition.alignment_selected)["records"]}
@@ -172,6 +201,19 @@ def _decode(record: dict, source: Path) -> np.ndarray:
             .reshape(-1, 2)
             .copy()
         )
+
+
+def decode_recordings(
+    edition: Edition, segments: list[dict], records: dict[str, dict]
+) -> dict[str, np.ndarray]:
+    """Decode each segment's selected recording, through a work file below the edition's
+    assembly work folder."""
+    work = repository.ROOT / "build/runtime/work/audio-assembly" / edition.code
+    work.mkdir(parents=True, exist_ok=True)
+    return {
+        segment["id"]: _decode(records[segment["id"]], work / f"{segment['id']}-source.wav")
+        for segment in segments
+    }
 
 
 def _shape_inner_quiet(
@@ -293,6 +335,62 @@ def _designed_clip(
         shaped.capped,
         shaped.lengthened,
     )
+
+
+def designed_clips(
+    segments: list[dict],
+    records: dict[str, dict],
+    alignments: dict[str, dict],
+    decoded: dict[str, np.ndarray],
+    policy: dict,
+    releases: dict[str, dict[int, float]],
+) -> list[Clip]:
+    """Shape each decoded recording, measure every thought boundary, design each thought join
+    and trim each segment's clip to its voice, under one pause policy.
+
+    The decoded samples are taken from `decoded` as they are shaped.
+    """
+    shaped = {
+        segment["id"]: _shape_inner_quiet(
+            segment, decoded.pop(segment["id"]), alignments[segment["id"]]["items"], policy
+        )
+        for segment in segments
+    }
+    inner, overhead = _boundary_measures(segments, shaped)
+    targets = thought_pause_targets(segments, policy, inner, overhead)
+    return [
+        _designed_clip(
+            segment,
+            records[segment["id"]],
+            shaped.pop(segment["id"]),
+            policy,
+            targets=targets[segment["id"]],
+            releases=releases[segment["id"]],
+            inner=inner[segment["id"]],
+        )
+        for segment in segments
+    ]
+
+
+def allocate(segments: list[dict], clips: list[Clip], policy: dict) -> Allocation:
+    """Share the runtime before the credits among the gaps before the segments, by the
+    designed pauses, limits and weights of a pause policy."""
+    kinds = gap_kinds(segments)
+    total = (DURATION - CREDITS_DURATION) * RATE
+    speech = sum(len(clip.samples) for clip in clips)
+    bases = gap_pause_targets(segments, policy)
+    designed = [round(base * RATE) for base in bases]
+    try:
+        gaps, closing = allocate_designed_gaps(kinds, speech, policy, RATE, total, bases=bases)
+    except PauseError as error:
+        closing = round(policy["pauses"]["closing"] * RATE)
+        return Allocation(kinds, designed, speech, closing, total, None, str(error))
+    return Allocation(kinds, designed, speech, closing, total, gaps, None)
+
+
+def gap_seconds(kinds: list[str], gaps: list[int]) -> list[dict]:
+    """Each gap before a segment by its kind and its seconds, as the receipt records them."""
+    return [{"kind": kind, "seconds": gap / RATE} for kind, gap in zip(kinds, gaps, strict=True)]
 
 
 def _chapter_gains(clips: list[Clip], tolerance_db: float | None) -> dict[str, float]:
@@ -456,9 +554,7 @@ def _receipt(
         "script_sha256": sha(edition.script),
         "assembly_mode": "native-speech-designed-pauses",
         "designed_pause_policy": policy,
-        "gaps": [
-            {"kind": kind, "seconds": gap / RATE} for kind, gap in zip(kinds, gaps, strict=True)
-        ],
+        "gaps": gap_seconds(kinds, gaps),
         "closing_seconds": closing / RATE,
         "records": records,
         "sample_rate": RATE,
@@ -482,39 +578,15 @@ def assemble(edition: Edition) -> None:
     script = read(edition.script)
     policy = designed_pause_policy(script.get("voice_performance", {}))
     segments = script["segments"]
-    records, alignments = _bound_inputs(script, edition)
+    records, alignments = bound_recordings(script, edition)
     releases = segment_releases(policy, segments)
     abrupt = _abrupt_thoughts(segments, records, releases)
     if abrupt:
         msg = f"Thought takes end abruptly without a declared release: {', '.join(abrupt)}"
         raise AssemblyError(msg)
-    work = repository.ROOT / "build/runtime/work/audio-assembly" / edition.code
-    work.mkdir(parents=True, exist_ok=True)
     edition.artifacts.mkdir(parents=True, exist_ok=True)
-    decoded = {
-        segment["id"]: _decode(records[segment["id"]], work / f"{segment['id']}-source.wav")
-        for segment in segments
-    }
-    shaped = {
-        segment["id"]: _shape_inner_quiet(
-            segment, decoded.pop(segment["id"]), alignments[segment["id"]]["items"], policy
-        )
-        for segment in segments
-    }
-    inner, overhead = _boundary_measures(segments, shaped)
-    targets = thought_pause_targets(segments, policy, inner, overhead)
-    clips = [
-        _designed_clip(
-            segment,
-            records[segment["id"]],
-            shaped.pop(segment["id"]),
-            policy,
-            targets=targets[segment["id"]],
-            releases=releases[segment["id"]],
-            inner=inner[segment["id"]],
-        )
-        for segment in segments
-    ]
+    decoded = decode_recordings(edition, segments, records)
+    clips = designed_clips(segments, records, alignments, decoded, policy, releases)
     gains = _chapter_gains(clips, policy["chapter_level_tolerance"])
     clips = [
         dataclasses.replace(
@@ -524,14 +596,12 @@ def assemble(edition: Edition) -> None:
         )
         for clip in clips
     ]
-    kinds = gap_kinds(segments)
-    total = (DURATION - CREDITS_DURATION) * RATE
-    speech = sum(len(clip.samples) for clip in clips)
-    gaps, closing = allocate_designed_gaps(
-        kinds, speech, policy, RATE, total, bases=gap_pause_targets(segments, policy)
-    )
+    allocation = allocate(segments, clips, policy)
+    if allocation.gaps is None:
+        raise PauseError(allocation.refusal)
+    kinds, gaps, closing = allocation.kinds, allocation.gaps, allocation.closing
     soundtrack, timeline_segments, audio_records = _lay_out(clips, gaps, kinds)
-    if sum(gaps) + speech + closing != total:
+    if sum(gaps) + allocation.speech + closing != allocation.total:
         msg = "Designed assembly failed exact sample accounting"
         raise AssemblyError(msg)
     refused = _speech_refusals(edition, soundtrack, timeline_segments)

@@ -24,6 +24,8 @@ LABEL = "drawbox=x=8:y=6:w=24:h=8:color=white:t=fill:enable='between(t,0.5,1)'"
 BAND = {"left": 600, "top": 880, "right": 1320, "bottom": 1000}
 CUES = [{"start": 0.5, "end": 1.0, "text": "One."}]
 RENDER = "python -m filmkit.produce render-picture --language zh"
+# The next step a refusal names when repair-pictures can answer each of its findings.
+NEXT = "; next: python -m filmkit.produce repair-pictures --language zh"
 
 
 def square(x, y, grey, frames):
@@ -106,7 +108,7 @@ def test_a_glyph_fragment_for_one_frame_between_the_sampled_frames_is_refused(ed
         "encoded frame 77 at 1.283 s: the captioned picture holds a one-frame fault of 150 levels "
         f"in box [40, 10, 44, 14] outside the caption band; render it again with {RENDER}"
     )
-    assert message == f"The zh pictures differ beyond their captions: {fault}"
+    assert message == f"The zh pictures differ beyond their captions: {fault}{NEXT}"
     assert (record["findings"], record["verdict"]) == ([fault], "refuse")
     # The sampled frames pass; the comparison of every frame finds the fragment.
     assert record["encoded"]["failing_frames"] == 0
@@ -131,7 +133,7 @@ def test_a_caption_glyph_broken_for_one_frame_is_refused_in_the_caption_band(edi
     message, record = refusal(edition)
     assert message.endswith(
         "encoded frame 50 at 0.833 s: the captioned picture holds a one-frame fault of 150 levels "
-        f"in box [40, 44, 44, 48] in the caption band; render it again with {RENDER}"
+        f"in box [40, 44, 44, 48] in the caption band; render it again with {RENDER}{NEXT}"
     )
     every = record["encoded"]["every_frame"]
     # The two pictures are not compared in the band; each is judged by its own frames.
@@ -200,6 +202,7 @@ def test_a_fault_in_the_uncaptioned_picture_names_its_render_command(edition):
     assert message.endswith(
         "encoded frame 77 at 1.283 s: the uncaptioned picture holds a one-frame fault of 150 "
         f"levels in box [40, 10, 44, 14] outside the caption band; render it again with {command}"
+        f"{NEXT}"
     )
     faults = record["encoded"]["every_frame"]["faults"]
     assert [(fault["frame"], fault["picture"]) for fault in faults] == [(77, "uncaptioned")]
@@ -283,7 +286,7 @@ def test_without_a_caption_band_every_row_is_compared(edition, monkeypatch):
     assert message.endswith(
         "encoded frame 50 at 0.833 s: the uncaptioned picture holds a one-frame fault of 150 "
         f"levels in box [40, 44, 44, 48] outside the caption band; render it again with {RENDER} "
-        "--uncaptioned"
+        f"--uncaptioned{NEXT}"
     )
     encoded = record["encoded"]
     assert (encoded["excluded_rows"], encoded["every_frame"]["band_changes"]) == ([0, 0], {})
