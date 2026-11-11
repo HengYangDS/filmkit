@@ -4,7 +4,7 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
-## [0.20.0] - UNRELEASED
+## [0.20.0] - 2026-11-12
 
 ### Added
 
@@ -319,7 +319,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/HengYangDS/filmkit/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/HengYangDS/filmkit/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/HengYangDS/filmkit/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/HengYangDS/filmkit/compare/v0.16.0...v0.17.0
