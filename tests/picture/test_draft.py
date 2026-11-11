@@ -23,7 +23,7 @@ from filmkit.specification import DURATION
 EARLIER = {"over_limit": [], "limit_seconds": 3.5, "movie": {"path": "earlier.mp4"}}
 
 
-def lanes_command(stage, draft, capture="--experimental-fast-capture"):
+def lanes_command(stage, draft, capture="--experimental-fast-capture", browser="--browser-gpu"):
     """The film lanes' draft.py command after the renderer's path."""
     return [
         "render",
@@ -37,7 +37,7 @@ def lanes_command(stage, draft, capture="--experimental-fast-capture"):
         "--workers",
         "8",
         "--gpu",
-        "--browser-gpu",
+        browser,
         "--no-low-memory-mode",
         capture,
         "--strict",
@@ -103,15 +103,18 @@ def test_the_draft_renders_at_niceness_10_or_the_callers_with_its_input_closed_i
     assert (run["stdin"], run["session_leader"]) == ("", True)
 
 
-def test_the_draft_honours_the_declared_capture(film_root, monkeypatch):
+@pytest.mark.parametrize(
+    ("capture", "browser"), [("screenshot", "--browser-gpu"), ("software", "--no-browser-gpu")]
+)
+def test_the_draft_honours_the_declared_capture(film_root, monkeypatch, capture, browser):
     scanning(monkeypatch, 40, 0)
-    picture = FILM.picture.model_copy(update={"capture": "screenshot"})
+    picture = FILM.picture.model_copy(update={"capture": capture})
     monkeypatch.setattr(picture_rendering, "FILM", FILM.model_copy(update={"picture": picture}))
     picture_draft.render_draft(Edition("en"), 60)
     stage, draft, receipt_path = places("en")
-    off = lanes_command(stage, draft, "--experimental-fast-capture=false")
+    off = lanes_command(stage, draft, "--experimental-fast-capture=false", browser)
     assert [run["argv"] for run in film_root.runs()] == [off]
-    assert repository.read(receipt_path)["capture"] == "screenshot"
+    assert repository.read(receipt_path)["capture"] == capture
 
 
 @pytest.mark.ffmpeg

@@ -217,14 +217,15 @@ def test_a_film_without_a_capture_captures_fast(declared):
     assert film.load(declared).picture.capture == "fast"
 
 
-def test_a_film_may_declare_screenshot_capture(declared):
-    rewrite(declared, "[picture]\n", '[picture]\ncapture = "screenshot"\n')
-    assert film.load(declared).picture.capture == "screenshot"
+@pytest.mark.parametrize("capture", ["screenshot", "software"])
+def test_a_film_may_declare_screenshot_or_software_capture(declared, capture):
+    rewrite(declared, "[picture]\n", f'[picture]\ncapture = "{capture}"\n')
+    assert film.load(declared).picture.capture == capture
 
 
 def test_another_capture_is_refused_naming_its_field(declared):
     rewrite(declared, "[picture]\n", '[picture]\ncapture = "drawelement"\n')
-    named = r"picture\.capture\s+Input should be 'fast' or 'screenshot'"
+    named = r"picture\.capture\s+Input should be 'fast', 'screenshot' or 'software'"
     with pytest.raises(FilmError, match=named):
         film.load(declared)
 

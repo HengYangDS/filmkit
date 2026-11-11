@@ -2,7 +2,7 @@
 
 ### Requirement: A film declares how its picture is captured
 
-A film MAY declare `[picture] capture` as `fast` or `screenshot`; a film that declares none captures `fast`. Every render of its picture SHALL pass the renderer's fast capture explicitly on for `fast`, as earlier releases did, and explicitly off for `screenshot`. Each render receipt SHALL record the mode, and validation SHALL refuse a picture whose receipt records another mode than the declaration, reading a receipt that records none by its command.
+A film MAY declare `[picture] capture` as `fast`, `screenshot` or `software`; one that declares none captures `fast`. Every render of its picture SHALL pass the renderer's browser and capture flags of the declared mode explicitly. Each render receipt SHALL record the mode, and validation SHALL refuse a picture whose receipt records another mode than the declaration, reading a receipt that records none by its command.
 
 #### Scenario: A film that declares no capture
 
@@ -13,6 +13,11 @@ A film MAY declare `[picture] capture` as `fast` or `screenshot`; a film that de
 
 - **WHEN** a film declares `capture = "screenshot"` and renders its pictures and its draft
 - **THEN** each command passes `--experimental-fast-capture=false` where `fast` passes `--experimental-fast-capture`, and each receipt records `screenshot`
+
+#### Scenario: A film that declares software capture
+
+- **WHEN** a film declares `capture = "software"` and renders its pictures and its draft
+- **THEN** each command passes `--no-browser-gpu` where `fast` passes `--browser-gpu` and `--experimental-fast-capture=false` where `fast` passes `--experimental-fast-capture`, and each receipt records `software`
 
 #### Scenario: Another capture value
 

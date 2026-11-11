@@ -1,5 +1,5 @@
-"""The capture declaration: the flag each render passes the renderer, the mode its receipt records,
-and the mode validation reads back from a receipt."""
+"""The capture declaration: the flags each render passes the renderer, the mode its receipt
+records, and the mode validation reads back from a receipt."""
 
 import pytest
 
@@ -24,9 +24,11 @@ def rendered(film_root, captions: bool = True) -> dict:
     return repository.read(edition.rendered(captions).receipt)
 
 
-def picture_command(film_root, captions: bool, capture_flag: str) -> list[str]:
+def picture_command(
+    film_root, captions: bool, capture_flag: str, browser_flag: str = "--browser-gpu"
+) -> list[str]:
     """filmkit 0.19.0's renderer command for a picture of the Chinese edition, with the capture
-    flag given."""
+    and browser flags given."""
     places = Edition("zh").rendered(captions)
     return [
         str(film_root.renderer),
@@ -43,7 +45,7 @@ def picture_command(film_root, captions: bool, capture_flag: str) -> list[str]:
         "--workers",
         "8",
         "--gpu",
-        "--browser-gpu",
+        browser_flag,
         "--no-low-memory-mode",
         capture_flag,
         "--strict",
@@ -70,8 +72,43 @@ def test_screenshot_capture_turns_fast_capture_off_in_its_place(film_root, monke
     picture_rendering.validate_picture_binding(Edition("zh"), receipt, captions=captions)
 
 
+@pytest.mark.parametrize("captions", [True, False])
+def test_software_capture_draws_in_the_software_rasterizer(film_root, monkeypatch, captions):
+    declaring(monkeypatch, "software")
+    receipt = rendered(film_root, captions)
+    expected = picture_command(
+        film_root, captions, "--experimental-fast-capture=false", "--no-browser-gpu"
+    )
+    assert receipt["command"] == expected
+    assert [run["argv"] for run in film_root.runs()] == [expected[1:]]
+    assert receipt["capture"] == "software"
+    picture_rendering.validate_picture_binding(Edition("zh"), receipt, captions=captions)
+
+
 @pytest.mark.parametrize(
-    ("rendered_with", "declared"), [("fast", "screenshot"), ("screenshot", "fast")]
+    ("flags", "mode"),
+    [
+        (["--browser-gpu", "--experimental-fast-capture"], "fast"),
+        (["--experimental-fast-capture"], "fast"),
+        (["--browser-gpu", "--experimental-fast-capture=false"], "screenshot"),
+        (["--no-browser-gpu", "--experimental-fast-capture=false"], "software"),
+        (["--no-browser-gpu", "--experimental-fast-capture"], None),
+        (["--browser-gpu"], None),
+        (["--experimental-fast-capture", "--experimental-fast-capture=false"], None),
+    ],
+)
+def test_a_command_names_its_capture_by_its_capture_and_browser_flags(flags, mode):
+    assert picture_rendering.command_capture(["hyperframes", "render", *flags]) == mode
+
+
+@pytest.mark.parametrize(
+    ("rendered_with", "declared"),
+    [
+        ("fast", "screenshot"),
+        ("screenshot", "fast"),
+        ("screenshot", "software"),
+        ("software", "screenshot"),
+    ],
 )
 def test_validation_refuses_a_picture_of_another_capture(
     film_root, monkeypatch, rendered_with, declared

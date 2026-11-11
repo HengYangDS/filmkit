@@ -5,11 +5,12 @@ timeline and the composition's script and style into the composition's template,
 copied timeline engine and fonts; its stage.json binds it to the current inputs. A render runs
 the locked HyperFrames renderer on the complete UHD stage with the supplied browser, telemetry,
 update checks and self-installs off, and records a receipt; validation binds the rendered
-picture to that receipt, the stage and the current inputs. Every render passes the capture flag
-of the film's declared capture (`film.Picture.capture`) and its receipt records that mode;
-validation refuses a picture rendered in another mode, reading a receipt that records none by its
-command. A stage, render or receipt that differs from this contract raises `PictureError`, as does
-a film whose installed renderer is not the version the engine renders with.
+picture to that receipt, the stage and the current inputs. Every render passes the browser and
+capture flags of the film's declared capture (`film.Picture.capture`) and its receipt records
+that mode; validation refuses a picture rendered in another mode, reading a receipt that records
+none by its command. A stage, render or receipt that differs from this contract raises
+`PictureError`, as does a film whose installed renderer is not the version the engine renders
+with.
 
 Each edition has two pictures (`production.Edition.rendered`): the captioned one, which draws
 the timeline's captions, and the uncaptioned one, whose document inlines the same timeline with
@@ -72,12 +73,15 @@ TOOL_CACHE = Path("build/runtime/tool-cache")
 BROWSER = ("chrome-headless-shell", "152.0.7977.30")
 BROWSER_EXECUTABLE = "chrome-headless-shell-mac-arm64/chrome-headless-shell"
 BROWSER_SHA256 = "ed7c5c6aff7cc4dd88ee7746c0df97f08a454180b62b7063fc961ba42e10b6a1"
-# The renderer's capture flag for each capture mode a film may declare. Both set the renderer's
-# fast capture explicitly, so neither the caller's environment nor the renderer's own default for
-# the host and the worker count decides how the frames are captured.
+# The renderer's browser flag and capture flag for each capture mode a film may declare. Each
+# sets the browser's rasterizer and the renderer's fast capture explicitly, so neither the
+# caller's environment nor the renderer's own default for the host and the worker count decides
+# how the frames are drawn and captured. `fast` and `screenshot` draw in the host's GPU;
+# `software` draws in the browser's software rasterizer (SwiftShader) and captures by screenshot.
 CAPTURE_FLAGS = {
-    "fast": "--experimental-fast-capture",
-    "screenshot": "--experimental-fast-capture=false",
+    "fast": ("--browser-gpu", "--experimental-fast-capture"),
+    "screenshot": ("--browser-gpu", "--experimental-fast-capture=false"),
+    "software": ("--no-browser-gpu", "--experimental-fast-capture=false"),
 }
 # The renderer's encoding by quality: the delivered pictures' at CRF 14, and the draft's at the
 # rate its quality sets.
@@ -514,7 +518,8 @@ def require_passing_gates(edition: Edition) -> None:
 
 def renderer_command(stage: Path, output: Path, fps: int, quality: str) -> list[str]:
     """The locked renderer's command for a stage: the pictures' settings at a frame rate and a
-    quality of `QUALITIES`, with the capture flag of the film's declared capture."""
+    quality of `QUALITIES`, with the browser and capture flags of the film's declared capture."""
+    browser, capture = CAPTURE_FLAGS[FILM.picture.capture]
     return [
         str(repository.node_modules() / RENDERER),
         "render",
@@ -527,16 +532,20 @@ def renderer_command(stage: Path, output: Path, fps: int, quality: str) -> list[
         "--workers",
         "8",
         "--gpu",
-        "--browser-gpu",
+        browser,
         "--no-low-memory-mode",
-        CAPTURE_FLAGS[FILM.picture.capture],
+        capture,
         "--strict",
     ]
 
 
 def command_capture(command: list[str]) -> str | None:
-    """The capture mode whose flag a renderer command passes, or None unless exactly one."""
-    passed = [mode for mode, flag in CAPTURE_FLAGS.items() if flag in command]
+    """The capture mode a renderer command passes: the mode of its capture flag and its browser
+    flag, a command without a browser flag drawing in the host's GPU, as the renderer's own flag
+    default does on a host with one; None unless it passes exactly one capture flag of a mode."""
+    captures = {flags[1] for flags in CAPTURE_FLAGS.values() if flags[1] in command}
+    browser = "--no-browser-gpu" if "--no-browser-gpu" in command else "--browser-gpu"
+    passed = [mode for mode, flags in CAPTURE_FLAGS.items() if flags == (browser, *captures)]
     return passed[0] if len(passed) == 1 else None
 
 
