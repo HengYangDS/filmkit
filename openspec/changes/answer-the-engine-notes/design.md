@@ -90,6 +90,8 @@ A cue that is itself one quotation is recorded rather than refused, since the na
 
 The earlier design recorded settled runs without refusing them, because only a stage's intent tells a settled composition from a paused build. The reviewers do not draw that line: they count any still state 50 px off for 2 s. Every film's picture also has a native repair: glide the picture as one on the word that widens it, or stand midway between its lasting states. The essentials repair `f0e7924` uses both.
 
+A still run is timed from where the glide that settles into it passed 50 px. Round 37's 29.2 (Z37-2) eased out to 87 px left over 0.23 s and then stood still for 1.90 s until a stage cut: the reviewers counted 2.13 s from the frame it passed 50 px, while the 4 px band starts only at the first steady frame. The frames just before a still run, after its scene's last stage cut, that stand more than 50 px off on its side and move toward its offset without reversing now count in its time. They must move at 15 px/s or more: a picture that creeps, as a build-up whose edge grows 40 px over 3 s does, breaks into short still runs that each glide in from the last, and the build-up limit stays its rule. A run's offset stays its still frames'; the glide adds time only.
+
 ### Pieces: a followed mark pops by what it gains whole
 
 The follower already records each mark's drawn pieces, one per subpath, and uses them to tell a mark that grows or turns from one that travels. A mark that appears or vanishes pops by the pieces no like mark holds. A mark it follows is never checked again, so one stroke that draws several lines can gain a line whole in one frame and report nothing: the DDWG 25.2 pattern.

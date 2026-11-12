@@ -271,3 +271,66 @@ test("a still state that a stage cut or the next scene replaces is finished, not
     [[true], [], []],
   );
 });
+
+/* The reviewers' runs of frames every 0.05 s from 0 to 3 s of scene "29", the picture's box standing `dxAt(t)` px
+ * off, with a stage cut of the scene declared at `cutAt` that brings a centred picture. */
+function glided(dxAt, cutAt = Infinity) {
+  const runs = reviewedRuns(0.05);
+  for (let k = 0; k * 0.05 < 3 - 1e-9; k++) {
+    const t = k * 0.05,
+      cut = Math.abs(t - cutAt) < 1e-9;
+    runs.frame(t, "29", t < cutAt - 1e-9 ? offBy(dxAt(t)) : offBy(0), cut);
+  }
+  return runs.finish();
+}
+const spans = (list) =>
+  list.map((v) => [
+    v.scene,
+    +v.start.toFixed(2),
+    +v.end.toFixed(2),
+    +(v.end - v.start).toFixed(2),
+    Math.round(v.worst),
+  ]);
+
+test("a still state is timed from the frame where the glide that settles into it passed 50 px", () => {
+  // As 29.2's end in DDWG round 37: the picture glides left, passes 50 px off at 0.5 s and settles at 0.75 s, then
+  // stands still 87 px left for 1.9 s until a stage cut of its scene at 2.65 s.
+  const runs = glided((t) => (t < 0.15 ? 0 : t < 0.75 ? -51 - 144 * (t - 0.5) : -87), 2.65);
+  assert.deepEqual(spans(runs.finished), [["29", 0.5, 2.65, 2.15, -87]]);
+  assert.deepEqual([runs.settled, runs.held, runs.builds], [[], [], []]);
+});
+
+test("a glide counts toward a still state only on its side, moving toward it, after the last stage cut", () => {
+  // Each still state stands 87 px left for under 2 s; the frames each case names would bring it to 2 s or more if they
+  // counted.
+  const none = { builds: [], held: [], settled: [], finished: [] };
+  // Moving left from 95 px right, it steps across the centre at 0.45 s: the 0.25 s on the right side do not count.
+  const across = [95, 85, 75, 65, 55, -60, -70, -80];
+  assert.deepEqual(
+    glided((t) => (t < 0.2 ? 0 : t < 0.6 ? across[Math.round((t - 0.2) / 0.05)] : -87), 2.4),
+    none,
+  );
+  // Out to 99 px and back: the 0.35 s it moves out do not count, only the 0.1 s back.
+  assert.deepEqual(
+    glided(
+      (t) =>
+        t < 0.5 ? 0 : t < 0.85 ? -51 - 137 * (t - 0.5) : t < 0.95 ? -99 + 120 * (t - 0.85) : -87,
+      2.75,
+    ),
+    none,
+  );
+  // Standing 60 px left for 1 s before it steps out: a still state does not move toward the next.
+  assert.deepEqual(
+    glided((t) => (t < 0.1 ? 0 : t < 1.1 ? -60 : -87), 2.9),
+    none,
+  );
+  // Gliding in before a stage cut that brings the state at 1.1 s: the stage before the cut is not its glide.
+  const cutAt = 1.1,
+    runs = reviewedRuns(0.05);
+  for (let k = 0; k * 0.05 < 3 - 1e-9; k++) {
+    const t = k * 0.05,
+      dx = t < 0.6 ? 0 : t < cutAt - 1e-9 ? -51 - 70 * (t - 0.6) : -87;
+    runs.frame(t, "29", offBy(dx), Math.abs(t - cutAt) < 1e-9);
+  }
+  assert.deepEqual(runs.finish(), none);
+});

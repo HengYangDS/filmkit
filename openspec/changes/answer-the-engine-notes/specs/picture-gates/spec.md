@@ -66,7 +66,7 @@ An appearance of a label SHALL be a run of frames in which it is legible in its 
 
 ### Requirement: The frame audit measures still states off centre
 
-The frame audit SHALL report per scene each run of 2 seconds or more in which that box stands more than 50 px off while its left and right edges stay within 4 px, with its start, its end and its largest offset in px. It SHALL report as held a run whose next frame, after no stage cut, holds a wider box of the same scene that contains it, and as finished a run whose next frame shows another scene or follows a stage cut of its scene.
+The frame audit SHALL report per scene each run of 2 s or more in which that box stands more than 50 px off while its left and right edges stay within 4 px, timed from where a glide of 15 px/s or more settling into it passed 50 px, with its start, end and largest offset in px. It SHALL report as held a run whose next frame, after no stage cut, holds a wider box of the same scene that contains it, and as finished a run whose next frame shows another scene or follows a stage cut of its scene.
 
 #### Scenario: A settled composition off centre
 
@@ -92,6 +92,11 @@ The frame audit SHALL report per scene each run of 2 seconds or more in which th
 
 - **WHEN** the lit picture stands still 70 px off for 2.5 seconds and the next frame shows the next scene's picture
 - **THEN** the audit reports one finished run and no settled run
+
+#### Scenario: A still state that a glide settles into
+
+- **WHEN** the lit picture glides out past 50 px off 0.25 seconds before it settles, then stands still 87 px off for 1.9 seconds until a stage cut the composition declares for its scene
+- **THEN** the audit reports one finished run for that scene, 2.15 seconds long from the frame the glide passed 50 px, with its offset of 87 px
 
 ### Requirement: The sync audit lists caption cues that echo labels
 
