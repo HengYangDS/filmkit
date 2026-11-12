@@ -6,7 +6,7 @@ Three facts about the repository's entry points changed on 2026-11-01. The owner
 
 ## What Changes
 
-- `.ethos/release.toml` names the GitLab peer at its new address, `http://192.168.64.101:18086/dig/misc/tools/films/filmkit`.
+- `.ethos/release.toml` names the GitLab peer at its new address, `http://c9454cb5dbc4549ee2710a37d17bd90c.e7284e457c9e496905dd7d9ea1a679db.private-peer.invalid`.
 - The README and NOTICE link to `https://github.com/HengYangDS/data-department-work-guidelines-film`.
 - `CONTRIBUTING.md` explains how to prepare the tools, change the engine in an ETHOS Work Lane, verify a change, commit, and cut and publish a release. The README's development section points to it, and the Changelog records it under Unreleased.
 
