@@ -48,9 +48,11 @@ Joining with "," and no space is the only encoding tested that keeps Chinese phr
 
 The verifier reads the result back because the importer, not the file, decides what a viewer finds. Where `mdimport` is absent (Linux CI), the readback is recorded as unavailable rather than failing. A new module, `delivery/spotlight.py`, owns the import and the parse. `mdimport -t -d2` prints an old-style property list, and the module parses its `kMDItemKeywords` and `kMDItemAuthors` arrays, unescaping `\Uxxxx`.
 
+The same readback checks the authors. A film that carried the author in both its author and artist keys imported the author twice, and Finder showed "Yang HENG (2)" until a user saw it (2026-11-09). The verifier now refuses any authors other than the declared author, once. An importer that reads no keywords at all is refused like a split phrase, since the readback could not then show the keywords whole.
+
 ### Player links: a new tab, proved by clicking
 
-`target="_blank" rel="noopener"` keeps the page and its playback. The alternative, `download`, would save gigabytes on a click; the player promises no film download. The readback already opens each page in Chromium through Playwright. It now clicks each film and cover link, waits for the new page, checks that page's address names the linked file, closes it, and checks the player's address is unchanged.
+`target="_blank" rel="noopener"` keeps the page and its playback. The alternative, `download`, would save gigabytes on a click; the player promises no film download. The readback already opens each page in Chromium through puppeteer-core. It now clicks each film and cover link, waits for the new page, checks that page's address names the linked file, closes it, and checks the player's address is unchanged.
 
 ### Caption pace: the brief-cue rule, extended
 
@@ -61,6 +63,8 @@ The verifier reads the result back because the importer, not the file, decides w
 - it never holds past the next cue's start.
 
 The rate counts the shown text's characters, spaces included, over its interval: the measure the reviewers used, which gave "The inference is that the vendor" 28.6 characters per second. The rule applies to English only. The reviewers' notes concern English, and a Chinese limit would need its own reading-rate basis.
+
+On the three films' current English timelines no fast cue can join or hold: each join would pass 66 characters or a sentence end, and contiguous English cues leave no quiet to hold into. Such a cue reads fast because the voice says its words fast, so a caption rule cannot slow it without parting the caption from its words. The caption record lists it with its rate, and the film answers it in the narration, with a calmer take of its thought.
 
 Joining changes the cue list, so an English edition that adopts the release refreshes its captions and renders its captioned picture again. Every joined or held cue keeps its words and its start, so the caption equivalence and the cue-word checks hold.
 
