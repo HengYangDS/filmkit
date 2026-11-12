@@ -1,6 +1,6 @@
 ## Context
 
-The [proposal](proposal.md) names the four steps and the [specs](specs/) their behaviour. Each step exists today as a lane script that drives filmkit 0.19.0's internals:
+The [proposal](proposal.md) names the four steps and the [specs](specs) their behaviour. Each step exists today as a lane script that drives filmkit 0.19.0's internals:
 
 - `build/runtime/work/picture/draft.py`, byte-identical in the three film lanes: `rendering.stage_picture(Edition(code), stage, DURATION, 1920, 1080)` into `build/runtime/work/picture-draft/<code>/`, the renderer under `nice -n 10` with `--fps 10 --quality draft --workers 8 --gpu --browser-gpu --no-low-memory-mode --experimental-fast-capture --strict` and a 3600 s deadline through `rendering.run_renderer`, then `python -m filmkit.picture.still_scan <draft> --language <code>` in a subprocess.
 - `dryfit.py` in the ETHOS lane: `assembly.assemble` copied up to `allocate_designed_gaps`, through the module's private functions, with each variant's fields merged into the script's `voice_performance`.
