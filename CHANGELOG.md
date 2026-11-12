@@ -4,6 +4,10 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+
+- The supply moves to ETHOS 0.2.0-beta.9, whose embedded OpenSpec CLI is 2.0.0. The CI projection stays as it is.
+
 ## [0.21.0] - 2026-11-12
 
 ### Added
