@@ -69,6 +69,7 @@ def edition(tmp_path, monkeypatch):
             "caption_count": 0,
             "alignment_limits": "Model-aligned words",
             "caption_timing": "Timed",
+            "captions_above_reading_rate": [],
         },
     )
     write_json(
@@ -99,7 +100,14 @@ def test_a_current_edition_refreshes_its_cues_and_its_selection_binding(edition,
     assert [cue["text"] for cue in timeline["captions"]] == ["甲乙。", "丙丁。"]
     assert timeline["captions"][0]["start"] == 2.0
     assert receipt["caption_count"] == 2
-    assert list(receipt)[-3:] == ["caption_count", "alignment_limits", "caption_timing"]
+    assert list(receipt)[-4:] == [
+        "caption_count",
+        "alignment_limits",
+        "caption_timing",
+        "captions_above_reading_rate",
+    ]
+    # A Chinese edition has no reading rate, so no cue stands above one.
+    assert receipt["captions_above_reading_rate"] == []
     assert receipt["caption_timing"].startswith("Nonoverlapping exact word-bound semantic cues")
     script_sha256 = sha256(repository.ROOT / edition.script)
     assert read(edition.narration_selected)["script_sha256"] == script_sha256

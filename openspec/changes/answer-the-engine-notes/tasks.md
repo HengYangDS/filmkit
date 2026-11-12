@@ -11,14 +11,14 @@
 
 ## 3. English caption pace
 
-- [ ] 3.1 Add tests to `tests/captions/test_timing.py`, each failing on 0.20.0:
+- [x] 3.1 Add tests to `tests/captions/test_timing.py`, each failing on 0.20.0:
   - a cue above 25 characters per second joins its neighbour in the same sentence within the limit;
   - a fast cue at a sentence end holds to the rate and no further than the next cue's start;
   - a cue within the rate is unchanged;
   - Chinese cues are unchanged;
   - every cue keeps its words and its start.
-- [ ] 3.2 Extend `steady_short_cues` with the English reading rate of 25 characters per second. Done when the tests of 3.1 and the existing caption tests pass, and the three films' current English timelines give no cue above the rate that a join or a hold could bring within it.
-- [ ] 3.3 Record each English cue still above the rate, with its rate, in the edition's caption record. Done when a test shows a cue that can neither join nor hold listed at its rate, and the three films' current timelines list their fast cues: ETHOS 4, DDWG 4, essentials 3.
+- [x] 3.2 Extend `steady_short_cues` with the English reading rate of 25 characters per second. Done when the tests of 3.1 and the existing caption tests pass, and the three films' current English timelines give no cue above the rate that a join or a hold could bring within it.
+- [x] 3.3 Record each English cue still above the rate, with its rate, in the edition's caption record. Done when a test shows a cue that can neither join nor hold listed at its rate, and the three films' current timelines list their fast cues: ETHOS 4, DDWG 4, essentials 3.
 
 ## 4. Inflected labels
 

@@ -160,7 +160,7 @@ def refresh_captions(edition: Edition) -> None:
     _adopt_caption_authoring(timeline, script)
     timeline["captions"] = timed_caption_cues(timeline, edition.code)
     write(edition.timeline, timeline)
-    receipt.update(caption_receipt_fields(timeline))
+    receipt.update(caption_receipt_fields(timeline, edition.code))
     write(edition.audio_assembly, receipt)
     subtitle_files(timeline, edition)
     if selected is not None and selected != read(edition.narration_selected):

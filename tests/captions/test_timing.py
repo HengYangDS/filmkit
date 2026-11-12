@@ -171,6 +171,147 @@ def test_a_brief_caption_holds_into_the_quiet_without_moving_the_next_one():
     assert lent[1]["start"] == 2.75
 
 
+def cue_at(start, end, text, segment="08"):
+    """An English caption cue of one segment."""
+    return {"start": start, "end": end, "text": text, "segment": segment}
+
+
+# A finished sentence, then "The inference is that the vendor": 32 characters shown for 1.12 s,
+# 28.6 characters per second, whose sentence goes on 0.05 s later in 30 characters.
+INFERENCE = [
+    cue_at(0.0, 2.96, "The observation is that the first correction has disappeared. "),
+    cue_at(2.96, 4.08, "The inference is that the vendor "),
+    cue_at(4.13, 6.0, "can correct a value more than "),
+    cue_at(6.0, 8.0, "once, so the remedy tells the records apart. "),
+]
+
+
+def test_a_fast_english_cue_joins_its_neighbour_in_its_sentence():
+    paced = captions_timing.steady_short_cues(INFERENCE, 66, rate=25)
+    # The sentence before it has ended, so it joins the next cue: 62 characters on one line.
+    assert [cue["text"] for cue in paced] == [
+        INFERENCE[0]["text"],
+        "The inference is that the vendor can correct a value more than ",
+        INFERENCE[3]["text"],
+    ]
+    assert len(paced[1]["text"].strip()) == 62
+    assert (paced[1]["start"], paced[1]["end"]) == (2.96, 6.0)
+
+
+def test_a_fast_english_cue_at_a_sentence_end_holds_to_the_rate():
+    # 26 characters end their sentence after 0.9 s, and the next cue starts 0.6 s later.
+    held = captions_timing.steady_short_cues(
+        [
+            cue_at(0.0, 2.0, "Each record keeps its source. "),
+            cue_at(2.0, 2.9, "No one else may change it. "),
+            cue_at(3.5, 5.5, "The review reads it back. "),
+        ],
+        66,
+        rate=25,
+    )
+    assert [cue["text"] for cue in held][1] == "No one else may change it. "
+    assert held[1]["start"] == 2.0
+    assert held[1]["end"] == pytest.approx(3.04)
+    assert held[2]["start"] == 3.5
+    # 30 characters shown for 1.1 s with 0.04 s of quiet after them hold to the next cue's start.
+    capped = captions_timing.steady_short_cues(
+        [cue_at(0.0, 1.1, "And this one got it all wrong. "), cue_at(1.14, 3.0, "It goes back. ")],
+        66,
+        rate=25,
+    )
+    assert capped[0]["start"] == 0.0
+    assert capped[0]["end"] == pytest.approx(1.14)
+    assert capped[1]["start"] == 1.14
+
+
+def test_an_english_cue_within_the_rate_is_unchanged():
+    # 40 characters shown for 2 s read at 20 characters per second, and 30 shown for 1.2 s at 25.
+    cues = [
+        cue_at(0.0, 2.0, "Every change names the record it changes "),
+        cue_at(2.0, 3.2, "And if it got something wrong, "),
+        cue_at(3.2, 5.0, "the review sends it back. "),
+    ]
+    assert captions_timing.steady_short_cues(cues, 66, rate=25) == cues
+
+
+def test_a_fast_cue_that_can_neither_join_nor_hold_is_recorded_at_its_rate():
+    # 32 characters shown for 1.12 s; the next cue of its sentence starts as it ends, and the two
+    # would make a line of 69 characters.
+    cues = [
+        cue_at(0.0, 2.96, "The observation is that the first correction has disappeared. "),
+        cue_at(2.96, 4.08, "The inference is that the vendor "),
+        cue_at(4.08, 6.0, "can correct a value more than once. "),
+    ]
+    paced = captions_timing.steady_short_cues(cues, 66, rate=25)
+    assert paced == cues
+    fields = captions_timing.caption_receipt_fields({"captions": paced}, "en")
+    assert fields["captions_above_reading_rate"] == [
+        {
+            "segment": "08",
+            "start": 2.96,
+            "end": 4.08,
+            "text": "The inference is that the vendor",
+            "characters_per_second": 28.6,
+        }
+    ]
+
+
+def test_paced_cues_keep_their_words_and_their_starts():
+    cues = [
+        *INFERENCE,
+        cue_at(8.0, 8.9, "No one else may change it. "),
+        cue_at(9.5, 11.0, "The review reads it back. "),
+    ]
+    paced = captions_timing.steady_short_cues(cues, 66, rate=25)
+    assert len(paced) == len(cues) - 1
+    assert "".join(cue["text"] for cue in paced) == "".join(cue["text"] for cue in cues)
+    # Each paced cue starts where the first cue of its words started.
+    starts, position = {}, 0
+    for cue in cues:
+        starts[position] = cue["start"]
+        position += len(cue["text"])
+    position = 0
+    for cue in paced:
+        assert cue["start"] == starts[position]
+        position += len(cue["text"])
+
+
+def one_segment(text, phrases, words):
+    """A timeline of one segment that authors its cue phrases, each timed with no tail."""
+    spoken = segment(
+        text=text,
+        utterance_groups=[text],
+        caption_phrases=phrases,
+        voice_start=0.0,
+        voice_end=words[-1][2],
+        words=[{"text": word, "start": start, "end": end} for word, start, end in words],
+    )
+    return {"caption_timing": {"tail_seconds": 0}, "segments": [spoken]}
+
+
+def test_only_english_cues_are_held_to_the_reading_rate():
+    # 37 characters spoken in 1.1 s before 0.9 s of quiet: the English cue holds to 1.48 s.
+    words = [("Nothing", 0.0, 0.2), ("may", 0.2, 0.3), ("change", 0.3, 0.55), ("the", 0.55, 0.6)]
+    words += [("source", 0.6, 0.85), ("record.", 0.85, 1.1), ("It", 2.0, 2.3), ("stays.", 2.3, 3.0)]
+    english = one_segment(
+        "Nothing may change the source record. It stays.",
+        ["Nothing may change the source record. ", "It stays."],
+        words,
+    )
+    cues = captions_timing.timed_caption_cues(english, "en")
+    assert [(cue["start"], cue["end"]) for cue in cues] == [(0.0, pytest.approx(1.48)), (2.0, 3.0)]
+    # 31 Chinese characters shown for 1.1 s keep their interval: Chinese cues have no rate.
+    numbers = "一二三四五六七八九十" * 3
+    spoken = [(ch, k * 1.1 / 30, (k + 1) * 1.1 / 30) for k, ch in enumerate(numbers)]
+    chinese = one_segment(
+        numbers + "。天地。",
+        [numbers + "。", "天地。"],
+        [*spoken, ("天", 2.0, 2.4), ("地", 2.4, 3.0)],
+    )
+    cues = captions_timing.timed_caption_cues(chinese, "zh")
+    assert [(cue["start"], cue["end"]) for cue in cues] == [(0.0, pytest.approx(1.1)), (2.0, 3.0)]
+
+
 @pytest.mark.parametrize(
     ("text", "display"),
     [
@@ -190,5 +331,10 @@ def test_the_display_copy_sets_typographic_quotes(text, display):
 
 
 def test_the_receipt_counts_the_cues_and_states_their_timing():
-    fields = captions_timing.caption_receipt_fields({"captions": [{}, {}]})
-    assert fields == {"caption_count": 2, "caption_timing": captions_timing.CAPTION_TIMING}
+    # A Chinese edition has no reading rate, so no cue stands above one.
+    fields = captions_timing.caption_receipt_fields({"captions": [{}, {}]}, "zh")
+    assert fields == {
+        "caption_count": 2,
+        "caption_timing": captions_timing.CAPTION_TIMING,
+        "captions_above_reading_rate": [],
+    }

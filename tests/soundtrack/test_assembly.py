@@ -99,8 +99,14 @@ def test_assembly_lays_out_each_recording_with_its_own_level_and_exact_samples(t
     assert not pcm[: records[0]["start_sample"]].any()
     assert not pcm[records[1]["start_sample"] + records[1]["frames"] :].any()
     # Both receipt writers give the caption fields the same place.
-    assert list(receipt)[-3:] == ["caption_count", "alignment_limits", "caption_timing"]
+    assert list(receipt)[-4:] == [
+        "caption_count",
+        "alignment_limits",
+        "caption_timing",
+        "captions_above_reading_rate",
+    ]
     assert receipt["caption_count"] == len(timeline["captions"]) == 4
+    assert receipt["captions_above_reading_rate"] == []
 
 
 class Decoded(Exception):

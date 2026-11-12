@@ -545,11 +545,12 @@ def _receipt(
     peak: int,
     program_level: dict,
 ) -> dict:
-    """The assembly receipt: the policy, the gaps, each record and the program level.
+    """The assembly receipt: the policy, the gaps, each record, the program level and the
+    caption fields.
 
     The gaps before the segments and the closing quiet are given in samples.
     """
-    captions = caption_receipt_fields(timeline)
+    captions = caption_receipt_fields(timeline, edition.code)
     return {
         "script_sha256": sha(edition.script),
         "assembly_mode": "native-speech-designed-pauses",
@@ -570,6 +571,7 @@ def _receipt(
         "caption_count": captions["caption_count"],
         "alignment_limits": ALIGNMENT_LIMITS,
         "caption_timing": captions["caption_timing"],
+        "captions_above_reading_rate": captions["captions_above_reading_rate"],
     }
 
 

@@ -3,7 +3,9 @@
 A cue is bound to the exact aligned words of its phrase, never crosses a thought, and never
 changes the waveform. The declared caption timing gives a cue's tail after its last word, the
 early start a brief cue that ends a line may take, and, for English, the full-interval hold. A
-brief cue then joins its sentence or holds into the quiet after it.
+brief cue, or an English cue read faster than 25 characters per second, then joins its sentence
+or holds into the quiet after it. The assembly receipt lists each English cue still read faster,
+with its rate.
 """
 
 from __future__ import annotations
@@ -41,6 +43,9 @@ _OPENING_QUOTE = re.compile(r'(?:^|(?<=[\s(\[{\u2013\u2014]))"')
 BRIEF_CUE_SECONDS = 1.0
 # A brief cue joins its neighbour only across less quiet than this.
 CUE_JOIN_QUIET_SECONDS = 0.25
+# The most characters per second, spaces included, at which an edition's cue is read: the
+# measure of the English reviews. Chinese cues have no reading rate.
+READING_RATES = {"en": 25}
 
 
 def typeset(text: str) -> str:
@@ -59,9 +64,15 @@ def shown_text(cue: dict) -> str:
     return cue.get("display_text", cue["text"])
 
 
-def caption_receipt_fields(timeline: dict) -> dict:
-    """The assembly receipt's caption fields: the number of cues and how they are timed."""
-    return {"caption_count": len(timeline["captions"]), "caption_timing": CAPTION_TIMING}
+def caption_receipt_fields(timeline: dict, code: str) -> dict:
+    """The assembly receipt's caption fields: the number of cues, how they are timed, and each
+    cue still read faster than the edition's reading rate, with its rate."""
+    captions = timeline["captions"]
+    return {
+        "caption_count": len(captions),
+        "caption_timing": CAPTION_TIMING,
+        "captions_above_reading_rate": captions_above_rate(captions, READING_RATES.get(code)),
+    }
 
 
 @dataclass(frozen=True)
@@ -198,28 +209,58 @@ def timed_caption_cues(timeline: dict, code: str) -> list[dict]:
     _lead_short_sentence_ends(cues, spans, timing.lead)
     if timing.full_interval:
         _hold_full_interval(cues, timeline["segments"])
-    cues = steady_short_cues(cues, CAPTION_LIMITS[code])
+    cues = steady_short_cues(cues, CAPTION_LIMITS[code], rate=READING_RATES.get(code))
     if any(cue["end"] <= cue["start"] for cue in cues):
         msg = "Caption alignment must have a positive readable interval"
         raise CaptionError(msg)
     return cues
 
 
-def steady_short_cues(
-    cues: list[dict], limit: int, minimum: float = BRIEF_CUE_SECONDS
-) -> list[dict]:
-    """Give every caption time to be read: join a brief cue to its sentence or hold it.
+def reading_time(cue: dict, minimum: float, rate: float | None) -> float:
+    """The time a cue needs to be read: `minimum`, or longer when its shown characters, spaces
+    included, need it at `rate` characters per second."""
+    if rate is None:
+        return minimum
+    return max(minimum, len(shown_text(cue).strip()) / rate)
 
-    A cue shorter than ``minimum`` joins an adjacent cue of the same segment and thought
-    when no sentence ends between them and the joined line still fits; otherwise it
-    holds into the quiet before the following cue of the segment, which still starts on
-    its first word.
+
+def captions_above_rate(captions: list[dict], rate: float | None) -> list[dict]:
+    """The cues still shown for less time than `rate` characters per second needs, each with
+    its shown text and its rate; with no rate, none."""
+    if rate is None:
+        return []
+    return [
+        {
+            "segment": cue["segment"],
+            "start": round(cue["start"], 3),
+            "end": round(cue["end"], 3),
+            "text": shown_text(cue).strip(),
+            "characters_per_second": round(
+                len(shown_text(cue).strip()) / (cue["end"] - cue["start"]), 1
+            ),
+        }
+        for cue in captions
+        if cue["end"] - cue["start"] < reading_time(cue, 0, rate) - 1e-9
+    ]
+
+
+def steady_short_cues(
+    cues: list[dict], limit: int, minimum: float = BRIEF_CUE_SECONDS, rate: float | None = None
+) -> list[dict]:
+    """Give every caption time to be read: join a brief or fast cue to its sentence or hold it.
+
+    A cue shorter than ``minimum``, or read faster than ``rate`` characters per second, joins
+    an adjacent cue of the same segment and thought, under 0.25 s of quiet, when no sentence
+    ends between them and the joined line still fits; otherwise it holds into the quiet before
+    the following cue of the segment until it is read in time, and that cue still starts on its
+    first word.
     """
     result = [dict(cue) for cue in cues]
     index = 0
     while index < len(result):
         cue = result[index]
-        if cue["end"] - cue["start"] >= minimum - 1e-9:
+        needed = reading_time(cue, minimum, rate)
+        if cue["end"] - cue["start"] >= needed - 1e-9:
             index += 1
             continue
         for left, right in ((index - 1, index), (index, index + 1)):
@@ -248,6 +289,6 @@ def steady_short_cues(
             following = result[index + 1] if index + 1 < len(result) else None
             if following and following["segment"] == cue["segment"]:
                 quiet = max(0.0, following["start"] - cue["end"])
-                cue["end"] += min(minimum - (cue["end"] - cue["start"]), quiet)
+                cue["end"] += min(needed - (cue["end"] - cue["start"]), quiet)
             index += 1
     return result
