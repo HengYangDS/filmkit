@@ -4,6 +4,10 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+
+- The supply moves to ETHOS 0.2.0-beta.8, and the CI projection to `jdx/mise-action` 5.2.7. The release declaration no longer names a peer's forge repository or a local command, which 0.2.0-beta.6 retired.
+
 ## [0.20.0] - 2026-11-12
 
 ### Added
