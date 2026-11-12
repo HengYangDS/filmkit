@@ -8,7 +8,7 @@
 ## 2. Player links
 
 - [x] 2.1 Add tests: every film and cover link of a built player carries `target="_blank"` and `rel="noopener"`, and the readback fails a page whose cover link lacks them, naming the page and the link. Done when each test fails on 0.20.0.
-- [ ] 2.2 Write the attributes in `player.file_link`. In `player-read.mjs`, click each film and cover link, require a new page whose address names the file, close it, and require the player's address unchanged. Done when the tests of 2.1 pass and `mise run sample:build` reads both players back.
+- [x] 2.2 Write the attributes in `player.file_link`. In `player-read.mjs`, click each film and cover link, require a new page whose address names the file, close it, and require the player's address unchanged. Done when the tests of 2.1 pass and both players that `mise run sample:build` packages read back in the player check (`build/evidence/answer-the-engine-notes/sample/players.json`).
 
 ## 3. English caption pace
 
@@ -47,7 +47,7 @@
 
   Add tests for `check-picture`: it refuses a record that lists a held run or a settled run.
 
-- [ ] 5.2 Report held runs in `rules/balance.mjs`, `frame-audit/composition.mjs` and `frame-audit/report.mjs`, and gate `off_centre_held` and `off_centre_settled` in `gates.py`. Done when the tests of 5.1 pass and the sample film passes `check-picture`.
+- [x] 5.2 Report held runs in `rules/balance.mjs`, `frame-audit/composition.mjs` and `frame-audit/report.mjs`, and gate `off_centre_held` and `off_centre_settled` in `gates.py`. Done when the tests of 5.1 pass and the sample film passes `check-picture` (`build/evidence/answer-the-engine-notes/sample/sample4-sample:picture.log`).
 - [x] 5.3 Add a test, failing on the current rule, that a glide passing 50 px 0.25 s before it settles, then standing still 87 px off for 1.9 s until a stage cut, is reported as a finished run of 2.15 s; then time each still run in `reviewedRuns` from the glide that settles into it. Done when the test and the existing balance tests pass, and the four film records of 7.1 are measured again.
 
 ## 6. A stroke's pieces
@@ -57,9 +57,9 @@
   - a link of the same stroke drawn on from its first point does not;
   - a link that turns from a vertical stub into a horizontal line does not;
   - the existing follow, cut and dash tests pass unchanged.
-- [ ] 6.2 Pair the drawn pieces of each followed pair in `motion-audit/follow.mjs`, and pop by each piece left unpaired at ink 60 or more and 12 px or more across. Done when the tests of 6.1 pass and the sample film passes `check-picture`.
+- [x] 6.2 Pair the drawn pieces of each followed pair in `motion-audit/follow.mjs`, and pop by each piece left unpaired at ink 60 or more and 12 px or more across. Done when the tests of 6.1 pass and the sample film passes `check-picture` (`build/evidence/answer-the-engine-notes/sample/sample4-sample:picture.log`).
 
 ## 7. Release and acceptance
 
 - [x] 7.1 Run each film's current English timeline through the new cue rule, and each film's current composition through the new balance and piece rules on its current timelines; record the cues that join or hold and the runs and pops refused, film by film, under `build/evidence/answer-the-engine-notes/films/`. Done when the records name the essentials and ETHOS films' current pictures and DDWG's repaired n8 as passing, DDWG's round-37 English 06 settled runs, its held runs in both editions and its 29.2 end as refused, and its round-37 25.2 lines as pops.
-- [ ] 7.2 Write the CHANGELOG entry, the README's adoption notes and `VERSION` 0.21.0. Done when `mise run check` passes, and the sample film builds and verifies with its keywords read back where `mdimport` exists.
+- [x] 7.2 Write the CHANGELOG entry, the README's adoption notes and `VERSION` 0.21.0. Done when `mise run check` passes, and the sample film builds and verifies with its keywords read back where `mdimport` exists (`build/evidence/answer-the-engine-notes/sample/sample4-sample:verify.log`).
