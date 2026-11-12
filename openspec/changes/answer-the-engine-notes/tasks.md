@@ -38,7 +38,7 @@
 
 ## 5. Balance as the reviewers count it
 
-- [ ] 5.1 Add tests for `reviewedRuns`, each failing on 0.20.0:
+- [x] 5.1 Add tests for `reviewedRuns`, each failing on 0.20.0:
   - a still run that the next frame grows from is reported as held with its span and offset;
   - a build-up within its limit is not;
   - settled and finished runs are reported as before.

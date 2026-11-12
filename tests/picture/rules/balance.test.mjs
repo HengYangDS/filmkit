@@ -165,8 +165,8 @@ test("a settled composition off centre for 2 s or more is a reviewers' run; a gr
   );
   assert.equal(still.settled.length, 1);
   assert.ok(near(still.settled[0].worst, 60) && near(still.settled[0].start, 0.5));
-  assert.deepEqual(still.builds, []);
-  // 70 px off for 3 s while its right edge grows by 40 px is a build-up within its limit: neither run.
+  assert.deepEqual([still.builds, still.held], [[], []]);
+  // 70 px off for 3 s while its right edge grows by 40 px is a build-up within its limit: no run.
   const growing = sampled(
     reviewedRuns(1 / 30),
     0,
@@ -177,11 +177,8 @@ test("a settled composition off centre for 2 s or more is a reviewers' run; a gr
       return [x0, y0, x1 + (40 * t) / 3, y1];
     },
   );
-  assert.deepEqual(growing, { builds: [], settled: [], finished: [] });
-  // A still state that the next part grows from is a build-up held while it waits: no settled run. The same state
-  // followed by another picture of its scene, or by nothing lit, is a settled composition.
-  const waiting = (t) => (t < 2.5 ? offBy(70) : [offBy(70)[0], 300, offBy(70)[2] + 300, 700]);
-  assert.deepEqual(sampled(reviewedRuns(1 / 30), 0, 3, () => "09", waiting).settled, []);
+  assert.deepEqual(growing, { builds: [], held: [], settled: [], finished: [] });
+  // The same still state followed by another picture of its scene, or by nothing lit, is a settled composition.
   const replaced = sampled(
     reviewedRuns(1 / 30),
     0,
@@ -189,10 +186,7 @@ test("a settled composition off centre for 2 s or more is a reviewers' run; a gr
     () => "09",
     (t) => (t < 2.5 ? offBy(70) : offBy(0, 100)),
   );
-  assert.deepEqual(
-    replaced.settled.map((v) => near(v.end, 2.5)),
-    [true],
-  );
+  assert.deepEqual([replaced.settled.map((v) => near(v.end, 2.5)), replaced.held], [[true], []]);
   const fading = sampled(
     reviewedRuns(1 / 30),
     0,
@@ -200,10 +194,7 @@ test("a settled composition off centre for 2 s or more is a reviewers' run; a gr
     () => "09",
     (t) => (t < 2.5 ? offBy(70) : null),
   );
-  assert.deepEqual(
-    fading.settled.map((v) => near(v.worst, 70)),
-    [true],
-  );
+  assert.deepEqual([fading.settled.map((v) => near(v.worst, 70)), fading.held], [[true], []]);
   // A lone mark centred where it stands is within both limits.
   const lone = sampled(
     reviewedRuns(1 / 30),
@@ -212,10 +203,30 @@ test("a settled composition off centre for 2 s or more is a reviewers' run; a gr
     () => "09",
     () => offBy(0, 60),
   );
-  assert.deepEqual(lone, { builds: [], settled: [], finished: [] });
+  assert.deepEqual(lone, { builds: [], held: [], settled: [], finished: [] });
 });
 
-test("a still state that a stage cut or the next scene replaces is finished, not grown from", () => {
+test("a still state that the next part grows from is held, with its span and offset", () => {
+  // 70 px off for 2.5 s; then the picture widens to the right while it keeps every part it showed.
+  const waiting = (t) => (t < 2.5 ? offBy(70) : [offBy(70)[0], 300, offBy(70)[2] + 300, 700]);
+  const runs = sampled(reviewedRuns(1 / 30), 0, 3, () => "09", waiting);
+  assert.deepEqual(
+    runs.held.map((v) => [v.scene, near(v.start, 0), near(v.end, 2.5), near(v.worst, 70)]),
+    [["09", true, true, true]],
+  );
+  assert.deepEqual([runs.settled, runs.finished], [[], []]);
+  // Held for 1.9 s, it is within the limit.
+  const brief = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    3,
+    () => "09",
+    (t) => waiting(t + 0.6),
+  );
+  assert.deepEqual(brief, { builds: [], held: [], settled: [], finished: [] });
+});
+
+test("a still state that a stage cut or the next scene replaces is finished, not held", () => {
   // 70 px off for 2.5 s; at 2.5 s a stage cut of its scene brings a wider box that contains it.
   const cutAt = 2.5,
     wider = [offBy(70)[0], 300, offBy(70)[2] + 300, 700];
@@ -230,7 +241,7 @@ test("a still state that a stage cut or the next scene replaces is finished, not
     );
   }
   const replaced = runs.finish();
-  assert.deepEqual(replaced.settled, []);
+  assert.deepEqual([replaced.settled, replaced.held], [[], []]);
   assert.deepEqual(
     replaced.finished.map((v) => [v.scene, near(v.start, 0), near(v.worst, 70)]),
     [["07", true, true]],
@@ -243,8 +254,11 @@ test("a still state that a stage cut or the next scene replaces is finished, not
     (t) => (t < 2.5 ? "07" : "08"),
     (t) => (t < 2.5 ? offBy(70) : offBy(0)),
   );
-  assert.deepEqual([next.settled.length, next.finished.map((v) => v.scene)], [0, ["07"]]);
-  // Without the cut the wider box grew from the state, which waited for it: no run.
+  assert.deepEqual(
+    [next.settled.length, next.held.length, next.finished.map((v) => v.scene)],
+    [0, 0, ["07"]],
+  );
+  // Without the cut the wider box grew from the state, which waited for it: it is held.
   const grown = sampled(
     reviewedRuns(1 / 30),
     0,
@@ -252,5 +266,8 @@ test("a still state that a stage cut or the next scene replaces is finished, not
     () => "07",
     (t) => (t < cutAt ? offBy(70) : wider),
   );
-  assert.deepEqual(grown, { builds: [], settled: [], finished: [] });
+  assert.deepEqual(
+    [grown.held.map((v) => near(v.worst, 70)), grown.settled, grown.finished],
+    [[true], [], []],
+  );
 });

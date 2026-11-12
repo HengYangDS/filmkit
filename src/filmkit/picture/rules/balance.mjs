@@ -68,9 +68,9 @@ export function balanceRuns(step) {
 
 /** Balance as the reviews since DDWG round 29 measure it, on full-size frames: the box of every paint brighter than
  * grey 60 in rows 120-919 (rules/ink.mjs litAtFullSize) and its horizontal offset from x 960. A build-up may stand
- * more than 90 px off for less than 1.5 s; a settled composition, its box's left and right edges steady within 4 px,
- * may stand more than 50 px off for less than 2 s. A still state that the next parts grow from is a build-up, held
- * while they are still to come, not a settled composition. A lone mark centred where it stands is within both. */
+ * more than 90 px off for less than 1.5 s; a still state, its box's left and right edges steady within 4 px, may stand
+ * more than 50 px off for less than 2 s, whether it is a settled composition or held while the next parts that grow
+ * from it are still to come. A lone mark centred where it stands is within both. */
 export const REVIEWED_BAND = [120, 919],
   REVIEWED_BUILD = { px: 90, seconds: 1.5 },
   REVIEWED_SETTLED = { px: 50, seconds: 2, steady: 4 };
@@ -78,14 +78,14 @@ export const REVIEWED_BAND = [120, 919],
 /** Joins frames sampled every `step` seconds into the reviewers' off-centre runs. `frame(t, scene, box, cut)` takes
  * the scene the frame falls in, the frame's lit box in the band, or null when nothing is lit, and whether a stage cut
  * the composition declares for that scene falls since the previous sample; a frame of another scene, a frame without
- * a lit box and a gap in the samples each end a run, and a settled run also ends when an edge moves more than 4 px from
- * where it stood when the run began, or at a stage cut. A still run is left out when the frame that ends it, after no
- * stage cut, holds a wider box of the same scene that contains it: the picture grew from it. A still run that the next
+ * a lit box and a gap in the samples each end a run, and a still run also ends when an edge moves more than 4 px from
+ * where it stood when the run began, or at a stage cut. A still run is held when the frame that ends it, after no stage
+ * cut, holds a wider box of the same scene that contains it: the picture grew from it. A still run that the next
  * frame replaces, by a stage cut of its scene or by another scene's picture, is a finished composition: no part can
- * still dock to it. `finish()` returns `builds`, `settled` and `finished`, each run with its scene, start, end and
- * largest offset in px, signed. */
+ * still dock to it. Every other still run is settled. `finish()` returns `builds`, `held`, `settled` and `finished`,
+ * each run with its scene, start, end and largest offset in px, signed. */
 export function reviewedRuns(step) {
-  const runs = { builds: [], settled: [], finished: [] },
+  const runs = { builds: [], held: [], settled: [], finished: [] },
     open = { builds: null, settled: null },
     least = { builds: REVIEWED_BUILD.seconds, settled: REVIEWED_SETTLED.seconds },
     { steady: STEADY } = REVIEWED_SETTLED;
@@ -134,7 +134,7 @@ export function reviewedRuns(step) {
         if (Math.abs(dx) > Math.abs(run.worst)) run.worst = dx;
         return;
       }
-      if (run && !cut && grewFrom(run, t, scene, box)) open.settled = null;
+      if (run && !cut && grewFrom(run, t, scene, box)) close("settled", "held");
       else close("settled", run && replaced(run, t, scene, box, cut) ? "finished" : "settled");
       if (box && Math.abs(dx) > REVIEWED_SETTLED.px)
         open.settled = { scene, start: t, end: t + step, worst: dx, left: box[0], right: box[2] };

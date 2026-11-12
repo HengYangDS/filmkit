@@ -77,8 +77,11 @@ FRAME_GATES = (
     "off_centre",
     "off_centre_runs",
     # Balance as the reviews since round 29 measure it, on the full-size lit box of every frame:
-    # build-ups, and still states that a stage cut or the next scene replaced.
+    # build-ups, and every still state the reviewers count, whether the next part grows from it,
+    # it ends within its stage or a stage cut or the next scene replaces it.
     "off_centre_builds",
+    "off_centre_held",
+    "off_centre_settled",
     "off_centre_finished",
     "sparse_runs",
     "thin_lit",
@@ -95,10 +98,6 @@ FRAME_GATES = (
     "touching_marks",
     "mixed_case",
 )
-# The frame audit's findings that the record lists for the reviewers and that refuse nothing: the
-# still states off centre that end within their stage, which are a settled composition or a
-# build-up held while its next parts are still to come, as only the stage's intent tells.
-FRAME_RECORDED = ("off_centre_settled",)
 # Seconds a still picture may hold under speech: the reviewers' limit for a held picture.
 STILL_LIMIT = 3.5
 # Seconds of the frames before the first word that show every word of the declared title.
@@ -166,21 +165,15 @@ def text_findings(texts: dict) -> list[str]:
     return found
 
 
-def recorded_findings(frame: dict, sync: dict) -> list[str]:
+def recorded_findings(sync: dict) -> list[str]:
     """The findings the record lists for the reviewers and that refuse nothing.
 
-    They are the frame audit's recorded measures, the thoughts that hold the previous picture,
-    since a deliberate index may stay while the first new name arrives, and the caption cues
-    mostly drawn as labels, since labels may name the marks whose words a cue says, or a cue may
-    quote what the picture shows.
+    They are the thoughts that hold the previous picture, since a deliberate index may stay
+    while the first new name arrives, and the caption cues mostly drawn as labels, since labels
+    may name the marks whose words a cue says, or a cue may quote what the picture shows.
     """
-    found = [
-        f"frame {key}: {json.dumps(frame[key], ensure_ascii=False)}"
-        for key in FRAME_RECORDED
-        if frame.get(key)
-    ]
     continuity = sync["continuity"]
-    found += [
+    found = [
         f"sync held over {row['thought']} {row['held']:.2f} s" for row in continuity["held_over"]
     ]
     found += [
@@ -436,7 +429,7 @@ def check_picture(edition: Edition) -> dict:
             for name, path in reports
         },
         "gated_findings": findings,
-        "recorded_findings": recorded_findings(frame, sync) + painting + declared + kept,
+        "recorded_findings": recorded_findings(sync) + painting + declared + kept,
         "verdict": "refuse" if findings else "pass",
     }
     repository.write(edition.picture_gates, record)

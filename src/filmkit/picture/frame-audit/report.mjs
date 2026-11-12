@@ -69,6 +69,7 @@ export function frameReport({
   sparseRuns,
   offCentreRuns,
   offCentreBuilds,
+  offCentreHeld,
   offCentreSettled,
   offCentreFinished,
   thinRuns,
@@ -211,10 +212,11 @@ export function frameReport({
      * a tenth of the band, per scene, with their span and the largest offset or the least cover. */
     off_centre_runs: runsByScene(offCentreRuns),
     /* Balance as the reviews since round 29 measure it, in every frame of a scene: runs of 1.5 s or more whose
-     * full-size lit box stands more than 90 px off x 960, and settled runs of 2 s or more, the box's edges steady
-     * within 4 px, more than 50 px off, per scene, with their span and the largest offset in px; a settled run that a
-     * stage cut or the next scene replaces is a finished one. */
+     * full-size lit box stands more than 90 px off x 960, and still runs of 2 s or more, the box's edges steady within
+     * 4 px, more than 50 px off, per scene, with their span and the largest offset in px: a held run, which the next
+     * frame grows from, a finished one, which a stage cut or the next scene replaces, and a settled one. */
     off_centre_builds: pxRunsByScene(offCentreBuilds),
+    off_centre_held: pxRunsByScene(offCentreHeld),
     off_centre_settled: pxRunsByScene(offCentreSettled),
     off_centre_finished: pxRunsByScene(offCentreFinished),
     thin_runs: runsByScene(thinRuns),

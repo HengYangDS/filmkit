@@ -480,6 +480,7 @@ const report = frameReport({
   sparseRuns: composition.sparseRuns,
   offCentreRuns: composition.offCentreRuns,
   offCentreBuilds: composition.offCentreBuilds,
+  offCentreHeld: composition.offCentreHeld,
   offCentreSettled: composition.offCentreSettled,
   offCentreFinished: composition.offCentreFinished,
   thinRuns: composition.thinRuns,

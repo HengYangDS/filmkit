@@ -193,6 +193,22 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
             },
             "frame off_centre_builds",
         ),
+        # Every still state off centre that the reviewers count refuses: one the next part grows
+        # from, one that ends within its stage and one that its stage leaves.
+        (
+            {
+                **CLEAN,
+                "frame": {**CLEAN["frame"], "off_centre_held": {"09": ["0.00-2.50 70.0 px"]}},
+            },
+            'frame off_centre_held: {"09": ["0.00-2.50 70.0 px"]}',
+        ),
+        (
+            {
+                **CLEAN,
+                "frame": {**CLEAN["frame"], "off_centre_settled": {"09": ["0.50-3.00 60.0 px"]}},
+            },
+            'frame off_centre_settled: {"09": ["0.50-3.00 60.0 px"]}',
+        ),
         (
             {
                 **CLEAN,
@@ -290,19 +306,6 @@ def test_a_gated_finding_writes_a_refused_record_and_refuses(film, monkeypatch, 
     record = repository.read(edition.picture_gates)
     assert record["verdict"] == "refuse"
     assert len(record["gated_findings"]) == 1 and named in record["gated_findings"][0]
-
-
-def test_a_still_state_off_centre_is_recorded_and_refuses_nothing(film, monkeypatch):
-    # Whether a still state is a settled composition or a build-up waiting for its next parts
-    # only the stage's intent tells, so the reviewers judge it from the record.
-    frame = {**CLEAN["frame"], "off_centre_settled": {"09": ["0.50-3.00 60.0 px"]}}
-    audits(monkeypatch, {**CLEAN, "frame": frame})
-    record = gates.check_picture(Edition("zh"))
-    assert record["verdict"] == "pass" and record["gated_findings"] == []
-    assert record["recorded_findings"] == [
-        'frame off_centre_settled: {"09": ["0.50-3.00 60.0 px"]}'
-    ]
-    assert set(gates.FRAME_RECORDED).isdisjoint(gates.FRAME_GATES)
 
 
 def test_a_held_picture_and_a_partial_echo_are_recorded_and_refuse_nothing(film, monkeypatch):

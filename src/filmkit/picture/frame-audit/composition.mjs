@@ -168,12 +168,13 @@ export function compositionMeasures({ film, step, thoughts }) {
   }
   /* Balance as the reviews since round 29 measure it, in every frame, spoken or not: the box of every paint lit at full
    * size whose extent reaches rows 120-919, a text by its box, a stroke by its path widened by half its width and a
-   * fill by its path, joined per scene, the timeline segment the frame falls in, into off-centre build-ups, settled
-   * runs and finished ones, which a stage cut the composition declares for the scene, or the next scene, replaces
-   * (rules/balance.mjs). */
+   * fill by its path, joined per scene, the timeline segment the frame falls in, into off-centre build-ups and still
+   * runs: held ones, which the next frame grows from, finished ones, which a stage cut the composition declares for
+   * the scene, or the next scene, replaces, and settled ones (rules/balance.mjs). */
   const reviewed = reviewedRuns(step),
     isLitAtFullSize = litAtFullSize(film.palette),
     offCentreBuilds = [],
+    offCentreHeld = [],
     offCentreSettled = [],
     offCentreFinished = [];
   function reviewedBalance(f) {
@@ -287,8 +288,9 @@ export function compositionMeasures({ film, step, thoughts }) {
     const { off, thin } = runs.finish();
     offCentreRuns.push(...off);
     thinRuns.push(...thin);
-    const { builds, settled, finished } = reviewed.finish();
+    const { builds, held, settled, finished } = reviewed.finish();
     offCentreBuilds.push(...builds);
+    offCentreHeld.push(...held);
     offCentreSettled.push(...settled);
     offCentreFinished.push(...finished);
   }
@@ -307,6 +309,7 @@ export function compositionMeasures({ film, step, thoughts }) {
     sparseRuns,
     offCentreRuns,
     offCentreBuilds,
+    offCentreHeld,
     offCentreSettled,
     offCentreFinished,
     thinRuns,

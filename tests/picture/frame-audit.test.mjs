@@ -64,13 +64,19 @@ test("the frame audit reports a stretch of the film, its traces, its marks and i
     "sparse_runs",
     "off_centre_runs",
     "off_centre_builds",
+    "off_centre_held",
     "off_centre_settled",
     "off_centre_finished",
     "thin_runs",
   ])
     assert.ok(report[key] && typeof report[key] === "object", key);
   // The reviewers' balance runs, with their span and largest offset in px.
-  for (const key of ["off_centre_builds", "off_centre_settled", "off_centre_finished"])
+  for (const key of [
+    "off_centre_builds",
+    "off_centre_held",
+    "off_centre_settled",
+    "off_centre_finished",
+  ])
     for (const runs of Object.values(report[key]))
       assert.ok(
         runs.every((run) => /^[\d.]+-[\d.]+ -?[\d.]+ px$/.test(run)),
