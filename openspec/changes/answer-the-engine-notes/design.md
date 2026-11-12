@@ -90,17 +90,15 @@ The earlier design recorded settled runs without refusing them, because only a s
 
 The follower already records each mark's drawn pieces, one per subpath, and uses them to tell a mark that grows or turns from one that travels. A mark that appears or vanishes pops by the pieces no like mark holds. A mark it follows is never checked again, so one stroke that draws several lines can gain a line whole in one frame and report nothing: the DDWG 25.2 pattern.
 
-The follower now pairs the pieces of each followed pair:
+The follower now pairs the pieces of each followed pair, in `motion-audit/pieces.mjs`:
 
-- an open piece with the piece drawn from the same first point;
+- an open piece with the piece drawn from the same first point, or ending at the same last point;
 - a closed piece with the one at the same centre;
-- each where the pair's shared shift puts it.
+- each under whichever shift pairs the most pieces: the pair's motion, the pieces' own shift in order, or none.
 
-A piece left unpaired, at the mark's ink of 60 or more and 12 px or more across, pops, as an appearing mark's pieces do today. The rule keeps the existing cases quiet:
+A piece left unpaired may still continue a leftover piece of the other frame that moves as a mark of its own, as a balance pan, a gate bar or a ruler's tick does inside one stroke; this second pass waives the follower's small-mark rule, so an arc grown from a 5 px seed continues. A piece left unpaired after both, at the mark's ink of 60 or more and 12 px or more across, pops, as an appearing mark's pieces do today.
 
-- a piece drawn on starts small;
-- a link that turns a corner keeps its first point;
-- a row's square that grows in from nothing is under 12 px across when it first shows.
+The strict pairing by first point and centre alone misfired on every film. ETHOS 03's path split at a station's gap, DDWG 17's stamp arc grew from its seed, and span and ruler ticks slid inside their strokes; each refinement has a test. Measured at 30 fps on the six editions, the rule adds exactly the six DDWG 25.2 lines (three in each edition, `film.js:8198`) and changes no other finding. One case stays unseen: a piece removed and another drawn near it in the same frame reads as one piece that moved.
 
 A dash pattern opening or shutting stays the dash-snap audit's, since dashes are not subpaths.
 

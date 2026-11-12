@@ -165,10 +165,10 @@ const MOTIONS = [
 ];
 const lineOf = (code) => `film.js:${MOTIONS.findIndex((line) => line.includes(code)) + 1}`;
 
-async function audit() {
+async function audit(composition = MOTIONS) {
   const root = await scratchFolder();
   await mkdir(join(root, "picture"));
-  await writeFile(join(root, "picture/film.js"), MOTIONS.join("\n"));
+  await writeFile(join(root, "picture/film.js"), composition.join("\n"));
   const words = Array.from({ length: 45 }, (_, k) => ({
     text: "word",
     start: 0.5 + k * 0.2,
@@ -254,6 +254,121 @@ test("the motion audit follows every mark and finds each motion a viewer sees as
     jumps: 0,
     dash_snaps: 0,
   });
+});
+
+/* Scene 01 draws four strokes of several pieces. The carried links: the first is said at frame 10 and inks in over
+ * 0.3 s, the second joins the stroke whole at full ink at frame 30 while the first stands, the third draws on from its
+ * first point from frame 45, 8 px in its first frame, and the first leaves the stroke whole at frame 100. The turning
+ * stroke holds a short standing link and a link drawn on from a start that rises from frame 60, which turns from a
+ * vertical stub into a horizontal line at frame 75 as the start rises through its corner; the standing link, which the
+ * turned link's box holds, leaves the stroke whole at frame 95. From frame 100 a path that a gap splits from frame 120
+ * and joins again at frame 150, and a ring's arcs, the second of which lights from its middle at frame 110 from a seed
+ * 5 px across to 31 px across in the next frame, as a stamp's arc lights. */
+const PIECES = [
+  'var P = { ground: "#0F1519", ink: "#ECE8DF" };',
+  'var ctx = document.getElementById("picture").getContext("2d");',
+  "var scenes = {};",
+  'scenes["01"] = function (t) {',
+  "  const n = Math.round(t * 30);",
+  "  ctx.strokeStyle = P.ink;",
+  "  ctx.lineWidth = 3;",
+  "  if (n >= 10) {",
+  "    ctx.globalAlpha = Math.min(1, (n - 9) / 9);",
+  "    ctx.beginPath();",
+  "    if (n < 100) ctx.moveTo(200, 300), ctx.lineTo(400, 300);",
+  "    if (n >= 30) ctx.moveTo(200, 360), ctx.lineTo(400, 360);",
+  "    if (n >= 45) ctx.moveTo(200, 420), ctx.lineTo(200 + Math.min(200, 8 * (n - 44)), 420);",
+  "    ctx.stroke(); // the carried links",
+  "  }",
+  "  if (n >= 50) {",
+  "    const k = Math.min(20, Math.max(0, n - 60)), sy = 830 - (k <= 8 ? k * k : 64 + 16 * (k - 8));",
+  "    const reach = Math.min(200, Math.max(0, 40 * (n - 74)));",
+  "    ctx.globalAlpha = Math.min(1, (n - 49) / 10);",
+  "    ctx.beginPath();",
+  "    if (n < 95) ctx.moveTo(1250, 600), ctx.lineTo(1350, 600);",
+  "    ctx.moveTo(1400, sy), ctx.lineTo(1400, 650);",
+  "    if (reach > 0) ctx.lineTo(1400 - reach, 650);",
+  "    ctx.stroke(); // the turning link",
+  "  }",
+  "  if (n >= 100) {",
+  "    const gap = n >= 120 && n < 150, lit = n < 110 ? 0 : ([1, 6, 15][n - 110] ?? 30) * (Math.PI / 180);",
+  "    ctx.globalAlpha = Math.min(1, (n - 99) / 9);",
+  "    ctx.beginPath();",
+  "    for (const [a, b] of gap ? [[200, 572], [628, 1000]] : [[200, 1000]]) ctx.moveTo(a, 950), ctx.lineTo(b, 950);",
+  "    ctx.stroke(); // the path a gap splits",
+  "    ctx.beginPath();",
+  "    for (const [m, w] of [[0.75 * Math.PI, Math.PI / 6], [0.25 * Math.PI, lit]].filter(([, w]) => w > 0)) {",
+  "      ctx.moveTo(1500 + 150 * Math.cos(m - w), 300 + 150 * Math.sin(m - w));",
+  "      ctx.arc(1500, 300, 150, m - w, m + w);",
+  "    }",
+  "    ctx.stroke(); // the lit arcs",
+  "  }",
+  "  ctx.globalAlpha = 1;",
+  "};",
+  "window.renderFrame = function (t) {",
+  '  window.__sceneId = "01";',
+  '  scenes["01"](t);',
+  "  window.__sceneId = null;",
+  "  window.__filmLayout = { time: t, texts: [] };",
+  "};",
+  "",
+];
+const pieceLine = (code) => `film.js:${PIECES.findIndex((line) => line.includes(code)) + 1}`;
+let piecesAudit;
+/* The pops of the stroke drawn at the line holding `code`, from one audit of the composition. */
+async function popsOf(code) {
+  const { report } = await (piecesAudit ??= audit(PIECES));
+  const at = (t) => +t.toFixed(2);
+  return report.followed.pops
+    .filter((v) => v.origin === pieceLine(code))
+    .map((v) => [at(v.t), v.way, v.kind, v.level, v.piece]);
+}
+
+test("a stroke pops by a link that joins it whole at full ink, from the stroke's line", async () => {
+  const { report } = await (piecesAudit ??= audit(PIECES));
+  // The second link joins at frame 30 while the first, inked in over 0.3 s, stands: the stroke pops in by that link.
+  assert.deepEqual(
+    (await popsOf("the carried links")).find((v) => v[0] === 1),
+    [1, "in", "stroke", 221, [200, 360, 400, 360]],
+  );
+  // check-picture refuses it as a pop that names the stroke's line.
+  const finding = report.followed.findings.find((v) => v.origin === pieceLine("the carried links"));
+  assert.deepEqual(
+    [finding?.kind, finding?.scene, finding?.start, finding?.way, finding?.level, finding?.frames],
+    ["pop", "01", 1, "in", 221, 1],
+  );
+});
+
+test("a link drawn on from its first point pops no piece of its stroke", async () => {
+  // The third link draws on from frame 45, 8 px long in its first frame: the stroke pops only where a link joins or
+  // leaves it whole.
+  assert.deepEqual(await popsOf("the carried links"), [
+    [1, "in", "stroke", 221, [200, 360, 400, 360]],
+    [3.33, "out", "stroke", 221, [200, 300, 400, 300]],
+  ]);
+});
+
+test("a stroke that loses its first link whole pops out by that link, not by one its order shifts", async () => {
+  // In their order the links that stay stand where the one before each stood; the stroke's motion places them.
+  assert.deepEqual(
+    (await popsOf("the carried links")).find((v) => v[1] === "out"),
+    [3.33, "out", "stroke", 221, [200, 300, 400, 300]],
+  );
+});
+
+test("a link that turns from a vertical stub into a horizontal line keeps its piece by its first point", async () => {
+  // Its start rises up to 16 px a frame while the short link stands, and its box flips at the corner at frame 75: no
+  // pop. The short link, drawn ahead of it, leaves the stroke whole at frame 95 and pops out.
+  assert.deepEqual(await popsOf("the turning link"), [
+    [3.17, "out", "stroke", 221, [1250, 600, 1350, 600]],
+  ]);
+});
+
+test("a path that a gap splits and joins again, and an arc lit from a seed, pop no piece", async () => {
+  // Each piece of the split path keeps one end of the path, and the joined path both ends of its pieces; the arc grows
+  // from a seed too small to place by its own growth.
+  assert.deepEqual(await popsOf("the path a gap splits"), []);
+  assert.deepEqual(await popsOf("the lit arcs"), []);
 });
 
 test("the least-cost assignment pairs each row with the column that costs least in all", () => {

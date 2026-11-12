@@ -52,5 +52,6 @@ None.
   - Counting English syllables by sound (essentials EN13-n12).
   - Calibrating the level steps between thoughts against listening (ETHOS zh-R16-02, DDWG Z36-6).
   - The supply refresh of HyperFrames and mlx-audio, which re-narrates every take.
+  - A gate on picture cuts inside a sentence (DDWG Z36-1, Z37-3). The audits know stage cuts but not sentence starts, and the films declare some such cuts, so it needs its own design.
 
-  Each of these needs a listening calibration or changes narration bindings, so a later release carries it.
+  The first four need a listening calibration or change narration bindings, and the last needs a design of its own, so a later release carries each.

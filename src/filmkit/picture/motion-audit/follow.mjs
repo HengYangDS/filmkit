@@ -27,10 +27,14 @@
  * vanish or appear in it, or when the composition declares a cut of the scene in it; no mark is followed across a cut,
  * and a scene's first and last frames are cuts. A cut the composition declares that changes less than the CUT share
  * excuses the marks it takes away and not the marks it brings. A mark that appears or vanishes pops only by the pieces
- * it brings or takes: those that no like mark of the other frame holds in place, together at least POP across. */
+ * it brings or takes: those that no like mark of the other frame holds in place, together at least POP across. A mark
+ * followed outside a cut, at ink FIRM or more, also pops by each drawn piece at least POP across that it gains or loses
+ * whole (pieces.mjs) and that no like mark of the other frame holds in place, as one stroke that draws several lines
+ * pops by a line that joins it at full ink in one frame. */
 import { leastCostAssignment } from "./assignment.mjs";
 import { excused, jumps } from "./cuts.mjs";
 import { dashSnap, gapShare } from "./dashes.mjs";
+import { leftPieces } from "./pieces.mjs";
 
 /** The viewer's thresholds: ink levels, pixels per second at 1080p, shares and pixels across. */
 export const VIEWER = Object.freeze({
@@ -160,8 +164,9 @@ function piecesMeet(p, c, s) {
  * marks, each {scene, kind, text, width, level, screen, pieces, ends, dash}, in order, `pieces` the boxes and `ends`
  * the first and last points of the drawn subpaths of a stroke or fill and `dash` a stroke's dash pattern, and the
  * scenes whose stage cut the composition declares in that frame; `finish()` returns what it found: the halts, starts,
- * races, pops, jumps and dash snaps, each with its time, mark and speeds, shift or gap shares, and for each scene the
- * fastest glide (a text, or a mark more than DOT across) and flow (a smaller mark) with their times. */
+ * races, pops, jumps and dash snaps, each with its time, mark and speeds, shift or gap shares, a pop by a piece with
+ * the piece's box, and for each scene the fastest glide (a text, or a mark more than DOT across) and flow (a smaller
+ * mark) with their times. */
 export function follower(dt, v = VIEWER) {
   const reach = v.REACH * dt,
     unfollowed = 4 * v.TURN * dt;
@@ -216,6 +221,14 @@ export function follower(dt, v = VIEWER) {
     // pattern continues it.
     const ink = Math.abs(p.level - c.level) / 1000 + Math.abs(p.gaps - c.gaps);
     return { d, pieces, miss: miss + (p.width2 === c.width2 ? 0 : 0.5) + ink };
+  }
+
+  /* The shift by which the follower would follow a drawn piece a as a mark into the piece b: moved whole, grown,
+   * shrunk or redrawn, or met where its own place moved, within reach; null where it would not. */
+  function follows(a, b) {
+    const own = piecesShift(a, b),
+      s = wholeMove(a, b) ?? growth(a, b) ?? (own && piecesMeet(a, b, own) ? own : null);
+    return s && Math.hypot(...s) <= reach ? s : null;
   }
 
   /* Pair the marks of one group by the assignment of least total miss; a crowd too large to assign is paired greedily. */
@@ -373,24 +386,28 @@ export function follower(dt, v = VIEWER) {
       next = new Map();
     for (const { mark, ...jump } of jumps(previous, marks, cut, v))
       found.jumps.push(row(t, mark, jump));
+    // The pairs judged outside a cut whose marks both have drawn pieces, with the shifts that may place their pieces.
+    const judged = [];
     for (const [c, p, d, pieces] of pairs)
       if (cut.has(c.scene)) begin(c);
       else {
         judge(t, c, p, d, pieces, next);
         const gaps = dashSnap(p, c, v.DASH);
         if (gaps) found.dash_snaps.push(row(t, c, { gaps }));
+        if (p.ends.length && c.ends.length) judged.push([c, p, [d, pieces ?? d, [0, 0]]]);
       }
     // A start whose mark is not followed on, past a cut or out of the picture, stands as it was found.
     found.starts.push(...waiting.values());
     waiting = next;
     const before = new Set(previous.map((p) => p.scene)),
       after = new Set(marks.map((c) => c.scene));
-    // The pieces of a mark that no like mark of the other frame holds in place, to 2 px: what it brings or takes.
+    // The pieces of a mark, or those listed, that no like mark of the other frame holds in place, to 2 px: what it
+    // brings or takes.
     const near = (a, b) => a.every((x, k) => Math.abs(x - b[k]) <= 2);
-    const brought = (m, others) => {
+    const brought = (m, others, list = m.pieces) => {
       const like = likeOf(m),
         standing = others.filter((o) => likeOf(o) === like && o.width2 === m.width2);
-      return m.pieces.filter((a) => !standing.some((o) => o.pieces.some((b) => near(a, b))));
+      return list.filter((a) => !standing.some((o) => o.pieces.some((b) => near(a, b))));
     };
     // A mark that a declared cut keeping its stage brings pops, and is marked as brought at that cut.
     const pops = (list, kept, way, present, others) => {
@@ -404,6 +421,20 @@ export function follower(dt, v = VIEWER) {
     };
     pops(marks, matched, "in", before, previous);
     pops(previous, used, "out", after, marks);
+    // A followed firm mark pops by each piece it gains or loses whole that no like mark of the other frame holds.
+    const piecePops = (m, list, way, others) => {
+      if (m.level < v.FIRM) return;
+      const listed = list.map((k) => m.pieces[k]);
+      for (const b of brought(m, others, listed).filter((b) => across(b) >= v.POP)) {
+        const piece = b.map((x) => Math.round(10 * x) / 10);
+        found.pops.push(row(t, m, { way, level: m.level, piece }));
+      }
+    };
+    for (const [c, p, shifts] of judged) {
+      const { gained, lost } = leftPieces(p, c, shifts, follows);
+      piecePops(c, gained, "in", previous);
+      piecePops(p, lost, "out", marks);
+    }
     for (const c of marks) if (!matched.has(c)) begin(c);
     previous = marks;
   }

@@ -49,7 +49,7 @@
 
 ## 6. A stroke's pieces
 
-- [ ] 6.1 Add tests to `tests/picture/motion-follow.test.mjs`, each failing on 0.20.0:
+- [x] 6.1 Add tests to `tests/picture/motion-follow.test.mjs`, each failing on 0.20.0:
   - a stroke of three links whose second link joins whole at full ink while the first stands pops by that link, naming the stroke's line;
   - a link of the same stroke drawn on from its first point does not;
   - a link that turns from a vertical stub into a horizontal line does not;
