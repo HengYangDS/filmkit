@@ -284,6 +284,19 @@ def test_a_cue_that_is_one_quotation_is_not_a_whole_echo():
     assert (joined["whole"], joined["quoted"]) == (True, False)
 
 
+def test_a_quotation_followed_by_its_lists_punctuation_is_one_quotation():
+    # A list of quoted items sets each item's comma after its closing mark, so a cue that holds
+    # one item ends in that comma; the cue is still one quotation. Words after the closing mark
+    # make it none.
+    film = captioned((4.0, 6.5, "“Agreed in principle”, "))
+    trace = frames(3.0, 6.5, "Agreed in principle")
+    (quoted,) = picture_sync_audit.continuity(film, trace, step=0.1)["caption_echoes"]
+    assert (quoted["whole"], quoted["quoted"], quoted["share"]) == (False, True, 1.0)
+    assert picture_sync_audit.quotation("“Agreed in principle”; ")
+    assert not picture_sync_audit.quotation("“Agreed in principle”, they said")
+    assert not picture_sync_audit.quotation("“Solve it”, “test it”")
+
+
 def test_a_cue_mostly_drawn_as_labels_during_it_is_a_partial_echo():
     film = captioned((4.0, 6.5, "Solve the whole problem."))
     # Two labels drawn during the cue repeat all four words between them.

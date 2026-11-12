@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import bisect
 import json
+import unicodedata
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -309,10 +310,12 @@ def held_over(
 
 def quotation(text: str) -> bool:
     """Whether a cue is itself one quotation: it opens with a quotation mark, and the matching
-    mark first closes it at its end."""
+    mark first closes it at its end, after which only punctuation and spaces may follow, as the
+    comma after an item of a quoted list does."""
     text = text.strip()
     close = QUOTATION_MARKS.get(text[:1])
-    return close is not None and len(text) > 1 and text.find(close, 1) == len(text) - 1
+    end = text.find(close, 1) if close is not None else -1
+    return end > 0 and all(unicodedata.category(c)[0] in "PZ" for c in text[end + 1 :])
 
 
 def label_runs(trace_lines: Iterable[str], step: float) -> dict[str, list[tuple[float, float]]]:

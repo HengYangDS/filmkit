@@ -80,6 +80,10 @@ Snowball is a published, maintained algorithm. It maps "availability" and "avail
 
 Each appearance takes the nearest occurrence of its words within 8 s that an earlier appearance has not taken, so two appearances are never judged against one utterance. An appearance with no such occurrence shows a named thing again without its words, as a recap does; the audit records it as a recall and judges nothing, as it lists a label far from its words today.
 
+### Quotations: the closing mark and its list's punctuation
+
+A cue that is itself one quotation is recorded rather than refused, since the narration then reads out what the picture shows. The test asked that the closing mark end the cue, but a quotation inside a list carries the list's comma after it: DDWG's `“Agreed in principle”, `. The test now ignores punctuation and spaces after the closing mark; a cue with words after its closing mark is still no quotation.
+
 ### Balance: held runs reported and every still run gated
 
 `reviewedRuns` drops a still run when the next frame grows from it, so a build held still while its next part waits leaves no trace. That is the state the reviewers counted in essentials 03.7 and 06.6. The change keeps such a run as `held` instead of dropping it. `check-picture` refuses `off_centre_held` and `off_centre_settled` alongside `off_centre_builds` and `off_centre_finished`.

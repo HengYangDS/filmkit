@@ -35,6 +35,7 @@
   - a label legible again without its words within 8 s is recorded as a recall and not judged;
   - a label that fades out for less than 1 s at a stage cut is judged once.
 - [x] 4.5 Judge each appearance of a label in `sync_audit.audit`, from runs in `legible_labels`, and list recalls in the report. Done when the tests of 4.4 and 4.2 pass, and the essentials film's current trace judges its 06.6 "Acceptance" on its own words.
+- [x] 4.6 Add a test, failing on 0.20.0, that a cue of one quotation followed by its list's punctuation, such as `“Agreed in principle”, `, counts as a quotation; then let `sync_audit.quotation` ignore punctuation and spaces after the closing mark. Done when the test and the existing sync audit tests pass.
 
 ## 5. Balance as the reviewers count it
 

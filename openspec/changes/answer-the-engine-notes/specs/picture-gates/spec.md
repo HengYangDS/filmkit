@@ -93,6 +93,35 @@ The frame audit SHALL report per scene each run of 2 seconds or more in which th
 - **WHEN** the lit picture stands still 70 px off for 2.5 seconds and the next frame shows the next scene's picture
 - **THEN** the audit reports one finished run and no settled run
 
+### Requirement: The sync audit lists caption cues that echo labels
+
+The sync audit SHALL list each caption cue of three or more words whose words all stand, in their order, in one label legible during the cue, and each such cue of which at least 80% of the words stand in labels legible during it, with the cue's start, its text and the labels. `check-picture` SHALL refuse the first kind and record the second; a cue that is itself one quotation counts as the second kind.
+
+#### Scenario: A cue drawn whole in one label
+
+- **WHEN** the cue `The people watching the pipeline report this back,` shows while the label `The people watching the pipeline report this back` is legible
+- **THEN** the audit lists it as a whole echo, and `check-picture` refuses and names the cue's start and text
+
+#### Scenario: A cue drawn in two labels
+
+- **WHEN** the cue `things can change without the view showing it:` shows while the labels `Things can change` and `Without the view showing it` are legible
+- **THEN** the audit lists it as a partial echo of 100%, and `check-picture` records it without refusing
+
+#### Scenario: A cue that quotes what the picture shows
+
+- **WHEN** the cue `“Deduplicate by stock code and date.”` shows while the label `Deduplicate by stock code and date` is legible
+- **THEN** the audit lists it as a quoted echo of 100%, and `check-picture` records it as a quotation without refusing
+
+#### Scenario: A short cue
+
+- **WHEN** a cue of two words shows while a label holds both
+- **THEN** the audit lists no echo for it
+
+#### Scenario: A quotation followed by its list's comma
+
+- **WHEN** the cue `“Agreed in principle”, ` shows while the label `Agreed in principle` is legible
+- **THEN** the audit lists it as a quoted echo of 100%, and `check-picture` records it as a quotation without refusing
+
 ## REMOVED Requirements
 
 ### Requirement: The picture gate refuses a picture off the reviewers' balance
