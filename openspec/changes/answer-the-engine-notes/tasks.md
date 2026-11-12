@@ -45,7 +45,16 @@
 
 - [ ] 5.2 Report held runs in `rules/balance.mjs`, `frame-audit/composition.mjs` and `frame-audit/report.mjs`, and gate `off_centre_held` and `off_centre_settled` in `gates.py`. Done when the tests of 5.1 pass and the sample film passes `check-picture`.
 
-## 6. Release and acceptance
+## 6. A stroke's pieces
 
-- [ ] 6.1 Run each film's current English timeline through the new cue rule. Run its current composition through the new balance rules on its current timelines. Record the cues that join or hold and the runs refused, film by film, under `build/evidence/answer-the-engine-notes/films/`. Done when the records name the essentials film's repaired pictures as passing and DDWG's English 06 runs as refused.
-- [ ] 6.2 Write the CHANGELOG entry, the README's adoption notes and `VERSION` 0.21.0. Done when `mise run check` passes, and the sample film builds and verifies with its keywords read back where `mdimport` exists.
+- [ ] 6.1 Add tests to `tests/picture/motion-follow.test.mjs`, each failing on 0.20.0:
+  - a stroke of three links whose second link joins whole at full ink while the first stands pops by that link, naming the stroke's line;
+  - a link of the same stroke drawn on from its first point does not;
+  - a link that turns from a vertical stub into a horizontal line does not;
+  - the existing follow, cut and dash tests pass unchanged.
+- [ ] 6.2 Pair the drawn pieces of each followed pair in `motion-audit/follow.mjs`, and pop by each piece left unpaired at ink 60 or more and 12 px or more across. Done when the tests of 6.1 pass and the sample film passes `check-picture`.
+
+## 7. Release and acceptance
+
+- [ ] 7.1 Run each film's current English timeline through the new cue rule. Run its current composition through the new balance and piece rules on its current timelines. Record the cues that join or hold and the runs and pops refused, film by film, under `build/evidence/answer-the-engine-notes/films/`. Done when the records name the essentials film's repaired pictures as passing, DDWG's English 06 runs as refused, and DDWG's round-37 25.2 lines as pops.
+- [ ] 7.2 Write the CHANGELOG entry, the README's adoption notes and `VERSION` 0.21.0. Done when `mise run check` passes, and the sample film builds and verifies with its keywords read back where `mdimport` exists.

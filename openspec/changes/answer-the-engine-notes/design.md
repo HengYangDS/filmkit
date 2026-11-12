@@ -18,6 +18,7 @@ Evidence for each item is under `build/evidence/answer-the-engine-notes/`:
 - English captions read at 25 characters per second or less wherever a join or a hold allows it.
 - A sync audit that judges a label by its inflected words in its own thought, rather than leaving it unjudged.
 - A balance gate that counts every still state off centre that the reviewers count.
+- A motion audit that sees a piece a stroke gains or loses whole.
 
 **Non-Goals:**
 
@@ -81,12 +82,31 @@ Each appearance takes the nearest occurrence of its words within 8 s that an ear
 
 The earlier design recorded settled runs without refusing them, because only a stage's intent tells a settled composition from a paused build. The reviewers do not draw that line: they count any still state 50 px off for 2 s. Every film's picture also has a native repair: glide the picture as one on the word that widens it, or stand midway between its lasting states. The essentials repair `f0e7924` uses both.
 
+### Pieces: a followed mark pops by what it gains whole
+
+The follower already records each mark's drawn pieces, one per subpath, and uses them to tell a mark that grows or turns from one that travels. A mark that appears or vanishes pops by the pieces no like mark holds. A mark it follows is never checked again, so one stroke that draws several lines can gain a line whole in one frame and report nothing: the DDWG 25.2 pattern.
+
+The follower now pairs the pieces of each followed pair:
+
+- an open piece with the piece drawn from the same first point;
+- a closed piece with the one at the same centre;
+- each where the pair's shared shift puts it.
+
+A piece left unpaired, at the mark's ink of 60 or more and 12 px or more across, pops, as an appearing mark's pieces do today. The rule keeps the existing cases quiet:
+
+- a piece drawn on starts small;
+- a link that turns a corner keeps its first point;
+- a row's square that grows in from nothing is under 12 px across when it first shows.
+
+A dash pattern opening or shutting stays the dash-snap audit's, since dashes are not subpaths.
+
 ## Risks / Trade-offs
 
 - **[Gating settled and held runs refuses current pictures.]** DDWG's English 06 holds two settled runs (−72 px for 2.4 s, +61 px for 3.7 s). Mitigation: the films adopt the release at their next editions, which repair those stages before rendering; the refusal names each run's span and offset.
 - **[`mdimport` behaviour differs between macOS releases.]** Mitigation: the readback refuses only a stray space and a split Chinese phrase. It records everything else, and records "unavailable" where `mdimport` is absent.
 - **[A stem match in a long thought could pick the wrong mention.]** Mitigation: the search is ordered and nearest-first within one thought; a match is recorded as inflected, so a reviewer can see it.
 - **[A new dependency.]** Mitigation: a pure-Python package pinned by version and hash in `uv.lock`, under a permissive licence, loaded only by the sync audit.
+- **[Piece pops refuse pictures that passed.]** A composition that draws several pieces in one stroke and lets one appear whole now fails, as DDWG's 25.2 does on its round-37 build. Mitigation: the pop names the drawing line, and the repair is native: give each piece its own ink ramp or draw it on its words.
 
 ## Migration Plan
 
@@ -94,7 +114,7 @@ Release 0.21.0. Each film's next edition:
 
 1. Pins the tag.
 2. Refreshes the English captions where cues join.
-3. Repairs any still state the gate refuses.
+3. Repairs any still state or piece pop the gate refuses.
 4. Renders the captioned pictures again where captions changed, and packages both editions.
 5. Reads back the keywords and links.
 
