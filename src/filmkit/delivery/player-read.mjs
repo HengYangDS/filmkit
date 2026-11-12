@@ -3,8 +3,8 @@
  * This part only collects what each page shows and does: it opens the entry page and each player, switches versions,
  * turns the captions off and on, paused and playing, and switches a version with them off, watching what the page
  * paints through each switch (player-frames.mjs), clicks every control of the page, reads the browser's own captions
- * control, plays from a chapter and a transcript time and saves each download. The page's film is the video `#film`.
- * player-verdict.mjs judges what it collects. */
+ * control, plays from a chapter and a transcript time, saves each download and clicks each film and cover link. The
+ * page's film is the video `#film`. player-verdict.mjs judges what it collects. */
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
@@ -29,12 +29,14 @@ const VERSIONS = [
   ["-uhd.mp4", "-uhd-uncaptioned.mp4", [3840, 2160]],
   ["-1080p-captioned.mp4", "-1080p-uncaptioned.mp4", [1920, 1080]],
 ];
-/* A saved download has this long to end, a page this long to show it left, a switched film this long to show, and a
- * switch is watched this long after it shows, in milliseconds. */
+/* A saved download has this long to end, a page this long to show it left, a switched film this long to show, a
+ * switch is watched this long after it shows, and a film or cover link has this long to open its file in a new tab,
+ * in milliseconds. */
 const SAVING = 10000,
   SETTLING = 150,
   SWITCHING = 10000,
-  SETTLED = 300;
+  SETTLED = 300,
+  OPENING = 10000;
 
 /** A file's SHA-256, streamed so that a film need not fit in memory. */
 export async function digestFile(path) {
@@ -310,6 +312,34 @@ async function saveDownloads(page, root, code, files) {
   }
 }
 
+/** Click each film and cover link of a files list, `files` as read, and see where it opens: the address of the new
+ * tab that it opened, which is closed again, or null for none, and whether the player stayed at its own address. A
+ * player that left is opened again, so the read goes on. */
+export async function openFileLinks(page, files) {
+  const browser = page.browser(),
+    home = page.url(),
+    opened = [];
+  for (const [index, { target: name, embedded }] of files.entries()) {
+    if (embedded) continue;
+    const known = new Set(browser.targets());
+    const tab = browser
+      .waitForTarget(
+        (target) =>
+          target.type() === "page" &&
+          !known.has(target) &&
+          !["", "about:blank"].includes(target.url()),
+        { timeout: OPENING },
+      )
+      .catch(() => null);
+    await (await page.$$("a.file"))[index].click();
+    const created = await tab;
+    opened.push({ name, address: created?.url() ?? null, stayed: page.url() === home });
+    await (await created?.page())?.close();
+    if (page.url() !== home) await page.goto(home, { waitUntil: "networkidle0" });
+  }
+  return opened;
+}
+
 /* Click every control of the page in turn, hiding the track again after any that shows it, so each is named. */
 const sweepControls = (page) =>
   page.evaluate(async () => {
@@ -380,6 +410,8 @@ export async function readPlayer(page, root, code, binding, screenshot) {
           (a.getAttribute("href").startsWith("data:") ? "" : a.getAttribute("href")),
         text: a.textContent,
         embedded: a.getAttribute("href").startsWith("data:"),
+        opens_in: a.getAttribute("target"),
+        rel: a.getAttribute("rel"),
       })),
     );
     const track = await page.$eval("track", (t) => ({
@@ -405,6 +437,7 @@ export async function readPlayer(page, root, code, binding, screenshot) {
     );
     read.native_caption_controls = await nativeCaptionControls(page);
     read.saved = await saveDownloads(page, root, code, read.files);
+    read.opened = await openFileLinks(page, read.files);
     const { duration } = binding.film;
     for (const [file, , dimensions] of VERSIONS)
       read.editions.push(await switchVersion(page, file, dimensions, duration, expected.cover));

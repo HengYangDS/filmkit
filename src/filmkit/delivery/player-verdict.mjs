@@ -10,8 +10,9 @@
  * marks the transcript paragraph that holds it. No switch paints the cover or one flat colour where the film should
  * be (player-frames.mjs). A chapter button and a transcript time play from their time; the
  * language links lead to the other edition's player and to the entry page; each file the list names carries the size
- * of the member it leads to; no link opens raw text in a tab, and each text file is a download that saves the
- * delivered bytes and leaves the page where it is. */
+ * of the member it leads to; each film and cover link carries `target="_blank" rel="noopener"` and, clicked, opens its
+ * file in a new tab while the player keeps its own address; no link opens raw text in a tab, and each text file is a
+ * download that saves the delivered bytes and leaves the page where it is. */
 import { posix } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
@@ -113,6 +114,15 @@ export function linkProblems(pagePath, hrefs, members) {
     else if (RAW_TEXT.test(href)) problems.push(`${href} opens raw text in a tab`);
   }
   return problems;
+}
+
+/* Whether a tab's address names the delivery member at `member`, a path below the destination. */
+function namesMember(address, member) {
+  try {
+    return decodeURIComponent(new URL(address).pathname).endsWith(`/${member}`);
+  } catch {
+    return false;
+  }
 }
 
 /** A file's size in decimal units, rounded half up, exactly as the engine's player names it
@@ -252,9 +262,9 @@ export function switchProblems(step, duration) {
 }
 
 /** Why a player's read, `read`, differs from what the delivery holds, `expected`: its language, chapters, links,
- * language links, files list and caption downloads, its track and opening film, each version, whether any control can
- * show the track, and the chapter and transcript times. Only what was read is judged, so a read that stopped is judged
- * as far as it got. */
+ * language links, files list, the tabs its film and cover links open and its caption downloads, its track and opening
+ * film, each version, whether any control can show the track, and the chapter and transcript times. Only what was read
+ * is judged, so a read that stopped is judged as far as it got. */
 export function playerProblems(read, expected) {
   const { code, slug, duration, chapters, members, sizes, vtt, srt_cues } = expected,
     path = `${code}/index.html`,
@@ -311,6 +321,18 @@ export function playerProblems(read, expected) {
         expect(!saved.navigated, `${name} navigated away from the page`);
       }
     }
+  if (has("files"))
+    for (const { target: name, embedded, opens_in, rel } of read.files)
+      expect(
+        embedded || (opens_in === "_blank" && (rel ?? "").split(/\s+/).includes("noopener")),
+        `the link to ${name} lacks target="_blank" rel="noopener"`,
+      );
+  for (const { name, address, stayed } of read.opened ?? []) {
+    if (address === null) problems.push(`${name} opened no new tab`);
+    else
+      expect(namesMember(address, resolved(path, name)), `${name} opened ${address}, not the file`);
+    expect(stayed, `${name} took the player away from its own address`);
+  }
   if (has("track")) {
     const { kind, srclang, label, text } = read.track;
     expect(

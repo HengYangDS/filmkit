@@ -181,6 +181,15 @@ test("a page passes when none of its checks found a problem", () => {
 /* What a delivery holds for the Chinese player, and a read of a player that does all it should. */
 const VTT = "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\n一\n";
 const CUES = [[1000, 2000, "一"]];
+/* The films and covers the files list shows, each a link that opens in a new tab. */
+const LINKED = [
+  "sample-reel-zh-1080p-captioned.mp4",
+  "sample-reel-zh-1080p-uncaptioned.mp4",
+  "sample-reel-zh-uhd.mp4",
+  "sample-reel-zh-uhd-uncaptioned.mp4",
+  "sample-reel-cover.png",
+  "sample-reel-cover.jpg",
+];
 const EXPECTED = {
   code: "zh",
   slug: "sample-reel",
@@ -196,7 +205,7 @@ const EXPECTED = {
     ["zh/chapters.ffmeta", 13_005],
     ["zh/sample-reel-zh.vtt", 13_005],
     ["zh/sample-reel-zh.srt", 13_005],
-    ["zh/sample-reel-zh-uhd.mp4", 262_800_000],
+    ...LINKED.map((name) => [`zh/${name}`, 262_800_000]),
   ]),
   vtt: VTT,
   srt_cues: CUES,
@@ -249,11 +258,8 @@ const CAPTIONS = [
   },
   switched("-uhd.mp4", { control: "captions", captions: true, playing: true }),
 ];
-const SHOWN = Array.from({ length: 6 }, () => ({
-  target: "sample-reel-zh-uhd.mp4",
-  text: "影片 · 超高清 4K · 画面内含字幕 · MP4 · 263 MB",
-  embedded: false,
-}));
+const LINK = { embedded: false, opens_in: "_blank", rel: "noopener" };
+const SHOWN = LINKED.map((target) => ({ target, text: `${target} · 263 MB`, ...LINK }));
 const DOWNLOADS = [
   "sample-reel-zh-transcript.md",
   "chapters.json",
@@ -273,6 +279,8 @@ const READ = {
   plain_downloads: [],
   files: FILES,
   saved: DOWNLOADS.map((name) => ({ name, state: "completed", same: true, navigated: false })),
+  // Each film and cover opened its file in a new tab, and the player stayed where it was.
+  opened: LINKED.map((name) => ({ name, address: `file:///delivery/zh/${name}`, stayed: true })),
   track: { kind: "metadata", srclang: "zh", label: "中文字幕", text: VTT },
   opening: {
     src: "sample-reel-zh-1080p-captioned.mp4",
@@ -351,6 +359,33 @@ test("a player that misses what the delivery holds names each problem", () => {
     "the transcript link does not open the transcript",
     "a transcript time of 22.872 s played from 40 s",
   ]);
+});
+
+test("a page whose cover link opens in place of the player fails, naming the page and the link", () => {
+  // The PNG cover's link has no target, and the JPEG cover's opens another file with a hold on the player.
+  const changed = (list, key, changes) => list.map((item) => ({ ...item, ...changes[item[key]] }));
+  const read = {
+    ...READ,
+    files: changed(READ.files, "target", {
+      "sample-reel-cover.png": { opens_in: null, rel: null },
+      "sample-reel-cover.jpg": { rel: null },
+    }),
+    opened: changed(READ.opened, "name", {
+      "sample-reel-cover.png": { address: null, stayed: false },
+      "sample-reel-cover.jpg": { address: "file:///delivery/zh/sample-reel-cover.png" },
+    }),
+  };
+  assert.deepEqual(verdict("zh/index.html", playerProblems(read, EXPECTED)), {
+    page: "zh/index.html",
+    verdict: "fail",
+    problems: [
+      'the link to sample-reel-cover.png lacks target="_blank" rel="noopener"',
+      'the link to sample-reel-cover.jpg lacks target="_blank" rel="noopener"',
+      "sample-reel-cover.png opened no new tab",
+      "sample-reel-cover.png took the player away from its own address",
+      "sample-reel-cover.jpg opened file:///delivery/zh/sample-reel-cover.png, not the file",
+    ],
+  });
 });
 
 test("a version must keep the time, keep the track hidden, mark its paragraph and decode", () => {

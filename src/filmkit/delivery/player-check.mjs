@@ -10,8 +10,9 @@
  * every film since the pictures draw the captions, and no control of the page or the browser can show it; a cue marks
  * its transcript paragraph; a version switch keeps the time; all four films' duration and dimensions with decoding at
  * three seek points; a chapter jump and a transcript time that play from their time; the language links; the sizes the
- * files list names, no link that opens raw text, and the bytes each download saves without leaving the page. Requests
- * outside the destination are refused and recorded; screenshots are written beside the receipt.
+ * files list names, each film and cover link opening its file in a new tab while the player stays, no link that opens
+ * raw text, and the bytes each download saves without leaving the page. Requests outside the destination are refused
+ * and recorded; screenshots are written beside the receipt.
  * cover: paints window.renderCover() from a staged UHD document and compares its pixels with the tracked cover; a
  * painting with no tracked cover yet is written, reported uncompared and fails, so the painting can become the cover.
  * No human hearing or complete-film playback is claimed.
@@ -184,7 +185,7 @@ export async function checkPlayers(bindingPath, receiptPath) {
     destination: binding.destination,
     binding_sha256: await digestFile(bindingPath),
     scope:
-      "Real-browser links, the captions control, the hidden caption track and every control that could show it, version switching, decode at seek points, chapter and transcript seeking, the files list and its downloads, with a verdict per page; no human hearing or complete-film playback",
+      "Real-browser links, the captions control, the hidden caption track and every control that could show it, version switching, decode at seek points, chapter and transcript seeking, the files list, the new tabs its film and cover links open and its downloads, with a verdict per page; no human hearing or complete-film playback",
     pages: [],
     console_errors: [],
     console_warnings: [],

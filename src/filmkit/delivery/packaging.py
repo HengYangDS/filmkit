@@ -361,7 +361,9 @@ def quicktime_keys(edition: Edition) -> dict[str, str]:
     The author stands only under Author: Spotlight lists every author-bearing QuickTime key
     among a film's authors, so an Artist key would list the author twice, and the item-list
     artist tags, which the release tags carry, do not count. Information names the film's
-    version with the edition's label.
+    version with the edition's label. The keywords are one value joined by commas alone, since
+    Spotlight keeps a space after a comma at the start of the next keyword of a mostly Chinese
+    value (`filmkit.delivery.spotlight`).
     """
     script = read(edition.script)
     release = script["release"]
@@ -373,7 +375,7 @@ def quicktime_keys(edition: Edition) -> dict[str, str]:
         "Description": typeset(release["description"]),
         "Comment": typeset(release["comment"]),
         "Copyright": f"© {release['year']} {AUTHOR}",
-        "Keywords": ", ".join(release["keywords"]),
+        "Keywords": ",".join(release["keywords"]),
         "Year": str(release["year"]),
         "Information": version_label(edition.code, film_version()),
     }

@@ -2,7 +2,8 @@
 
 The checks cover the pinned canonical sources, narration custody, both rendered pictures and
 the record that they differ only by their captions, package bindings, the film's version that
-the films and pages name, complete media decoding of all four films and the recorded review
+the films and pages name, complete media decoding of all four films, the keywords and authors
+Spotlight imports from each film where the host has `mdimport`, and the recorded review
 thresholds.
 Aesthetic judgment belongs to the review record; human listening stays separate.
 The verifier reads and decodes; it writes nothing and prints each edition's report.
@@ -21,6 +22,7 @@ from pathlib import Path
 
 import filmkit.delivery.packaging as packaging
 import filmkit.delivery.player as player
+import filmkit.delivery.spotlight as spotlight
 import filmkit.media as media
 import filmkit.narration.selection as narration_selection
 import filmkit.narration.spoken_units as narration_spoken_units
@@ -305,6 +307,38 @@ def verify_media(edition: production.Edition, path: Path, rendition: production.
     }
 
 
+def verify_spotlight(edition: production.Edition, files: list[Path]) -> dict:
+    """Read each delivered film's keywords and authors back as Spotlight imports them, where the
+    host has `mdimport`.
+
+    A film is refused with an imported keyword that has a space at either end, a declared
+    Chinese keyword that does not import whole, or any authors but the declared author, once.
+    Each film records the keywords and authors imported and the declared keywords the importer
+    split into words (`filmkit.delivery.spotlight`).
+    """
+    declared = repository.read(repository.ROOT / edition.script)["release"]["keywords"]
+    films = []
+    for path in files:
+        imported = spotlight.imported(path)
+        if imported is None:
+            return {"readback": "unavailable"}
+        problems = [
+            *spotlight.keyword_problems(declared, imported["keywords"]),
+            *spotlight.author_problems(specification.AUTHOR, imported["authors"]),
+        ]
+        if problems:
+            msg = f"Spotlight imports {path.name} otherwise than declared: {'; '.join(problems)}"
+            raise VerificationError(msg)
+        films.append(
+            {
+                "path": str(path.relative_to(repository.ROOT)),
+                **imported,
+                "split_into_words": spotlight.split_into_words(declared, imported["keywords"]),
+            }
+        )
+    return {"readback": "mdimport", "films": films}
+
+
 def verify_review(
     edition: production.Edition, files: list[Path], record: Path | None = None
 ) -> dict:
@@ -392,6 +426,7 @@ def qualify(
         "picture": verify_picture(edition),
         "package": verify_package(edition),
         "media": [verify_media(edition, path, renditions[path.name]) for path in sorted(files)],
+        "spotlight": verify_spotlight(edition, sorted(files)),
     }
     report["review"] = (
         {"verdict": "not_reviewed"} if technical_only else verify_review(edition, sorted(files))

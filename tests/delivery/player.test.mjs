@@ -1,5 +1,6 @@
-/** Exercise the pure parts of the delivered-player and cover checks: the delivery members, binding verification,
- * PNG decoding and the cover comparison. */
+/** Exercise the parts of the delivered-player and cover checks that need no browser: the delivery members, binding
+ * verification, PNG decoding and the cover comparison, and how the read clicks the films and covers of a files list,
+ * against a stand-in browser. */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -20,6 +21,7 @@ import {
   digestFile,
   seekPoints,
 } from "../../src/filmkit/delivery/player-check.mjs";
+import { openFileLinks } from "../../src/filmkit/delivery/player-read.mjs";
 
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const FILM = { slug: "sample-reel", duration: 60 };
@@ -260,6 +262,61 @@ test("a painting without a tracked cover is reported uncompared and does not pas
 
 test("seek points sit two seconds in, at the middle and four seconds before the end", () => {
   assert.deepEqual(seekPoints(1500), [2, 750, 1496]);
+});
+
+test("each film and cover link is clicked, the tab it opens is closed, and a player that left is opened again", async () => {
+  const home = "file:///delivery/zh/index.html",
+    tabs = [],
+    closed = [],
+    visits = [];
+  let address = home;
+  // A stand-in browser looks for the new tab once the click has happened, and gives up at once.
+  const browser = {
+    targets: () => [...tabs],
+    waitForTarget: async (found, { timeout }) => {
+      await new Promise((resolve) => setTimeout(resolve));
+      const tab = tabs.find(found);
+      if (!tab) throw Error(`Waiting for target failed: ${timeout}ms exceeded`);
+      return tab;
+    },
+  };
+  // A link with a target opens its file in a new tab; one without takes the player there.
+  const link = (href, target) => ({
+    click: async () => {
+      const url = new URL(href, home).href,
+        page = async () => ({ close: async () => closed.push(url) });
+      if (target) tabs.push({ type: () => "page", url: () => url, page });
+      else address = url;
+    },
+  });
+  const page = {
+    browser: () => browser,
+    url: () => address,
+    $$: async () => [
+      link("sample-reel-zh-uhd.mp4", "_blank"),
+      link("sample-reel-cover.png"),
+      link("data:,"),
+    ],
+    goto: async (url) => visits.push((address = url)),
+  };
+  const files = [
+    { target: "sample-reel-zh-uhd.mp4", embedded: false },
+    { target: "sample-reel-cover.png", embedded: false },
+    { target: "chapters.json", embedded: true },
+  ];
+  assert.deepEqual(await openFileLinks(page, files), [
+    {
+      name: "sample-reel-zh-uhd.mp4",
+      address: "file:///delivery/zh/sample-reel-zh-uhd.mp4",
+      stayed: true,
+    },
+    { name: "sample-reel-cover.png", address: null, stayed: false },
+  ]);
+  // The film's tab is closed, the download is not clicked, and the player is opened again after the cover took it.
+  assert.deepEqual(
+    [closed, visits, address],
+    [["file:///delivery/zh/sample-reel-zh-uhd.mp4"], [home], home],
+  );
 });
 
 test("the player check refuses a malformed invocation before opening a browser", () => {

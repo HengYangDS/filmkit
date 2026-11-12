@@ -286,7 +286,9 @@ def test_the_commands_carry_the_release_metadata(packaging_root):
         "-Keys:Description=从源文件重建影片的示例；中文；纯 2D；仅旁白",
         "-Keys:Comment=filmkit 的示例影片，供测试和演示；内容依据 ddwg-film 的 README",
         "-Keys:Copyright=© 2026 Yang HENG",
-        "-Keys:Keywords=" + ", ".join(release["keywords"]),
+        # One value joined by commas alone: Spotlight keeps a space after a comma at the start of
+        # the next Chinese keyword.
+        "-Keys:Keywords=示例影片,影片重建,旁白,字幕,核对",
         "-Keys:Year=2026",
         "-Keys:Information=版本号 1.3.0",
         "-Keys:CreationDate=" + created.removeprefix("creation_time="),

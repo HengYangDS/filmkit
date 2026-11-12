@@ -1,12 +1,12 @@
 ## 1. Spotlight keywords
 
-- [ ] 1.1 Add tests for the keywords value and its readback. A release's keywords pack as one value joined by "," with no space. A fixture of `mdimport -t -d2` output parses into keywords and authors, `\Uxxxx` escapes decoded. The verifier refuses a keyword imported with a leading space and a Chinese phrase not imported whole, records an English phrase split into words, and records "unavailable" when `mdimport` is absent. Done when each test fails on 0.20.0 and the failures are recorded under `build/evidence/answer-the-engine-notes/tests/`.
-- [ ] 1.2 Join the keywords with "," in `packaging.quicktime_keys`. Add `filmkit.delivery.spotlight` for the import and the parse, and call it from the film verification. Done when the tests of 1.1 pass.
-- [ ] 1.3 Add tests, failing on 0.20.0, that the verifier refuses a film whose imported authors are the declared author twice and passes one whose authors are exactly the declared author; then check the authors in `filmkit.delivery.spotlight`. Done when the tests pass.
+- [x] 1.1 Add tests for the keywords value and its readback. A release's keywords pack as one value joined by "," with no space. A fixture of `mdimport -t -d2` output parses into keywords and authors, `\Uxxxx` escapes decoded. The verifier refuses a keyword imported with a leading space and a Chinese phrase not imported whole, records an English phrase split into words, and records "unavailable" when `mdimport` is absent. Done when each test fails on 0.20.0 and the failures are recorded under `build/evidence/answer-the-engine-notes/tests/`.
+- [x] 1.2 Join the keywords with "," in `packaging.quicktime_keys`. Add `filmkit.delivery.spotlight` for the import and the parse, and call it from the film verification. Done when the tests of 1.1 pass.
+- [x] 1.3 Add tests, failing on 0.20.0, that the verifier refuses a film whose imported authors are the declared author twice and passes one whose authors are exactly the declared author; then check the authors in `filmkit.delivery.spotlight`. Done when the tests pass.
 
 ## 2. Player links
 
-- [ ] 2.1 Add tests: every film and cover link of a built player carries `target="_blank"` and `rel="noopener"`, and the readback fails a page whose cover link lacks them, naming the page and the link. Done when each test fails on 0.20.0.
+- [x] 2.1 Add tests: every film and cover link of a built player carries `target="_blank"` and `rel="noopener"`, and the readback fails a page whose cover link lacks them, naming the page and the link. Done when each test fails on 0.20.0.
 - [ ] 2.2 Write the attributes in `player.file_link`. In `player-read.mjs`, click each film and cover link, require a new page whose address names the file, close it, and require the player's address unchanged. Done when the tests of 2.1 pass and `mise run sample:build` reads both players back.
 
 ## 3. English caption pace

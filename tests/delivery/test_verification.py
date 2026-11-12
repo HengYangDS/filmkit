@@ -14,7 +14,7 @@ from filmkit.delivery.verification import VerificationError
 def qualified(tmp_path, monkeypatch):
     """Every check of an edition replaced by a marker of its call."""
     monkeypatch.setattr(repository, "ROOT", tmp_path)
-    for name in ("sources", "narration", "picture", "package"):
+    for name in ("sources", "narration", "picture", "package", "spotlight"):
         monkeypatch.setattr(delivery_verification, f"verify_{name}", lambda *_, n=name: n)
     monkeypatch.setattr(
         delivery_verification,
@@ -42,6 +42,7 @@ def test_an_edition_is_qualified_as_its_four_current_films():
         "picture",
         "package",
         "media",
+        "spotlight",
         "review",
         "limits",
     ]

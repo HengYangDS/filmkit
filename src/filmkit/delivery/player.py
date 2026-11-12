@@ -26,7 +26,8 @@ from the edition's script, timeline and delivered files:
 - the files list: each delivered file by kind, version, format and size, in decimal units, and
   for each film whether its picture draws the captions; the dot before a size follows a closing
   full-width bracket without a space. A browser shows the films and covers as a viewer expects,
-  so they are links. It would show every other file as raw text, so the Markdown
+  so they are links, each opening its file in a new tab so that a click never replaces the
+  player. It would show every other file as raw text, so the Markdown
   transcript, the chapter files and the SRT and WebVTT captions are downloads, labelled by kind
   and purpose, as data URLs of their bytes, since a browser ignores `download` on a file beside
   a page opened from disk. The transcript in the page stays the place to read.
@@ -265,9 +266,11 @@ def sized(label: str, size: int | None) -> str:
 
 
 def file_link(edition: Edition, name: str, label: str) -> str:
-    """A files list entry: a link to the file, named by its kind, version, format and size."""
+    """A files list entry: a link to the file, named by its kind, version, format and size, that
+    opens the file in a new tab, which has no hold on the player, so the player and its playback
+    stay."""
     shown = sized(label, file_size(edition, name))
-    return f'<li><a class="file" href="{name}">{shown}</a></li>'
+    return f'<li><a class="file" href="{name}" target="_blank" rel="noopener">{shown}</a></li>'
 
 
 def embedded(edition: Edition, name: str, media_type: str) -> str:

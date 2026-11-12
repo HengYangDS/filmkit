@@ -279,6 +279,15 @@ def test_the_files_list_names_each_delivered_file_and_the_language_links_lead_to
     assert not any("download" in a or "下载" in a["text"] for a in files[:6])
 
 
+def test_each_film_and_cover_opens_in_a_new_tab_beside_the_player(delivered):
+    page = Page(delivery_player.player_page(production.Edition("zh"), "1.3.0"))
+    files = page.all("a", class_="file")
+    # A click keeps the player and its playback, and the new tab has no hold on the player.
+    assert [(a.get("target"), a.get("rel")) for a in files[:6]] == [("_blank", "noopener")] * 6
+    # A download saves its data where the page stands, opening no tab.
+    assert [(a.get("target"), a.get("rel")) for a in files[6:]] == [(None, None)] * 5
+
+
 def test_the_english_player_speaks_english_and_names_chinese_in_chinese(delivered):
     html = delivery_player.player_page(production.Edition("en"), "2.0.0")
     page = Page(html)

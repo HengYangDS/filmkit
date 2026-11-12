@@ -1,0 +1,113 @@
+Imported '/private/tmp/sample-reel/zh/sample-reel-zh-uhd.mp4' of type 'public.mpeg-4' with plugIn /System/Library/Spotlight/CoreMedia.mdimporter.
+42 attributes returned
+{
+    ":MD:DeviceId" = 16777233;
+    ":MD:kMDItemPath" = "/private/tmp/sample-reel/zh/sample-reel-zh-uhd.mp4";
+    "_kMDItemContentChangeDate" = "2026-11-12 08:07:37 +0000";
+    "_kMDItemCreationDate" = "2026-11-12 08:07:37 +0000";
+    "_kMDItemCreatorCode" = 0;
+    "_kMDItemDisplayNameWithExtensions" =     {
+        "" = "sample-reel-zh-uhd.mp4";
+    };
+    "_kMDItemFileName" = "sample-reel-zh-uhd.mp4";
+    "_kMDItemFinderFlags" = 0;
+    "_kMDItemFinderLabel" = 0;
+    "_kMDItemFromImporter" = 1;
+    "_kMDItemIsEvictedFile" = "<null>";
+    "_kMDItemIsExtensionHidden" = 0;
+    "_kMDItemIsFromImporter" = 1;
+    "_kMDItemOwnerGroupID" = 0;
+    "_kMDItemOwnerUserID" = 501;
+    "_kMDItemTypeCode" = 0;
+    "com_apple_metadata_modtime" = "816163657.079433";
+    kMDItemAlbum = "\U793a\U4f8b\U5f71\U7247 \U00b7 \U4ece\U6e90\U6587\U4ef6\U5230\U6210\U7247";
+    kMDItemAuthors =     (
+        "Yang HENG"
+    );
+    kMDItemCodecs =     (
+        "H.264"
+    );
+    kMDItemComment = "filmkit \U7684\U793a\U4f8b\U5f71\U7247\Uff0c\U4f9b\U6d4b\U8bd5\U548c\U6f14\U793a\Uff1b\U5185\U5bb9\U4f9d\U636e ddwg-film \U7684 README";
+    kMDItemContentCreationDate = "2026-11-12 08:07:37 +0000";
+    kMDItemContentModificationDate = "2026-11-12 08:07:37 +0000";
+    kMDItemContentType = "public.mpeg-4";
+    kMDItemContentTypeTree =     (
+        "public.mpeg-4",
+        "public.movie",
+        "public.audiovisual-content",
+        "public.data",
+        "public.item",
+        "public.content"
+    );
+    kMDItemCopyright = "\U00a9 2026 Yang HENG";
+    kMDItemDateAdded = "2026-11-12 08:07:37 +0000";
+    kMDItemDescription = "\U4ece\U6e90\U6587\U4ef6\U91cd\U5efa\U5f71\U7247\U7684\U793a\U4f8b\Uff1b\U4e2d\U6587\Uff1b\U7eaf 2D\Uff1b\U4ec5\U65c1\U767d";
+    kMDItemDisplayName =     {
+        "" = "sample-reel-zh-uhd.mp4";
+    };
+    kMDItemDocumentIdentifier = 0;
+    kMDItemDurationSeconds = 1;
+    kMDItemInformation = "\U7248\U672c\U53f7 0.19.0";
+    kMDItemKeywords =     (
+        DDWG,
+        "\U6570\U636e\U8d28\U91cf",
+        "\U4eba\U4e0e\U4eba\U5de5\U667a\U80fd\U7684\U534f\U4f5c"
+    );
+    kMDItemKind =     {
+        "" = "MPEG-4 movie";
+        ar = "\U0641\U064a\U0644\U0645 MPEG-4";
+        ca = "V\U00eddeo MPEG-4";
+        cs = "Film MPEG-4";
+        da = "MPEG-4-film";
+        de = "MPEG-4-Film";
+        el = "\U03a4\U03b1\U03b9\U03bd\U03af\U03b1 MPEG-4";
+        en = "MPEG-4 movie";
+        "en_AU" = "MPEG-4 movie";
+        "en_CA" = "MPEG-4 movie";
+        "en_GB" = "MPEG-4 movie";
+        "en_IN" = "MPEG-4 movie";
+        "en_PH" = "MPEG-4 movie";
+        es = "V\U00eddeo MPEG-4";
+        "es_419" = "Video MPEG-4";
+        "es_US" = "Video MPEG-4";
+        fi = "MPEG-4-elokuva";
+        fr = "Vid\U00e9o MPEG-4";
+        "fr_CA" = "Vid\U00e9o MPEG-4";
+        he = "\U05e1\U05e8\U05d8 MPEG-4";
+        hi = "MPEG-4 \U092b\U093c\U093f\U0932\U094d\U092e";
+        hr = "MPEG-4 film";
+        hu = "MPEG-4 film";
+        id = "Film MPEG-4";
+        it = "Filmato MPEG-4";
+        ja = "MPEG-4\U30e0\U30fc\U30d3\U30fc";
+        ko = "MPEG-4 \Ub3d9\Uc601\Uc0c1";
+        ms = "Filem MPEG-4";
+        nl = "MPEG-4-film";
+        no = "MPEG-4-film";
+        pl = "film MPEG-4";
+        "pt_BR" = "Filme MPEG-4";
+        "pt_PT" = "Filme MPEG-4";
+        ro = "film MPEG-4";
+        ru = "\U0412\U0438\U0434\U0435\U043e MPEG-4";
+        sk = "MPEG-4 film";
+        sl = "Film MPEG-4";
+        sv = "MPEG-4-film";
+        th = "\U0e20\U0e32\U0e1e\U0e22\U0e19\U0e15\U0e23\U0e4c\U0e41\U0e1a\U0e1a MPEG-4";
+        tr = "MPEG-4 filmi";
+        uk = "\U0424\U0456\U043b\U044c\U043c MPEG-4";
+        vi = "Phim MPEG-4";
+        "zh_CN" = "MPEG-4\U5f71\U7247";
+        "zh_HK" = "MPEG-4\U96fb\U5f71";
+        "zh_TW" = "MPEG-4\U5f71\U7247";
+    };
+    kMDItemLogicalSize = 3296;
+    kMDItemMediaTypes =     (
+        Video
+    );
+    kMDItemPhysicalSize = 4096;
+    kMDItemPixelHeight = 64;
+    kMDItemPixelWidth = 64;
+    kMDItemStreamable = 0;
+    kMDItemTotalBitRate = 8;
+    kMDItemVideoBitRate = 8;
+}
