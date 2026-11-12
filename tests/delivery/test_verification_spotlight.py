@@ -40,13 +40,15 @@ PRINTED = {
         "act",
     ],
     "DDWG,authority to act": ["DDWG", "authority", "to", "act"],
+    # An importer that reads no keywords prints no keywords array.
+    "": [],
 }
 
 
 def keywords_array(items: list[str]) -> str:
-    """A keywords array laid out as the importer prints it."""
+    """A keywords array laid out as the importer prints it, and none for none."""
     lines = ",\n".join(f"        {item}" for item in items)
-    return f"    kMDItemKeywords =     (\n{lines}\n    );"
+    return f"    kMDItemKeywords =     (\n{lines}\n    );" if items else ""
 
 
 def authors_array(count: int) -> str:
@@ -142,6 +144,12 @@ def test_an_english_phrase_split_into_words_is_recorded_and_passes(verify):
     assert [film["keywords"] for film in films] == [["DDWG", "authority", "to", "act"]] * 4
     assert [film["split_into_words"] for film in films] == [["authority to act"]] * 4
     assert report["verdict"] == "pass"
+
+
+def test_a_film_whose_keywords_import_none_is_refused(verify):
+    # With no keyword read back, a viewer finds the film by none of its declared keywords.
+    with pytest.raises(VerificationError, match="no keyword imports"):
+        verify("en", ["DDWG", "authority to act"], "")
 
 
 def test_the_declared_author_imported_once_passes_and_is_recorded(verify):

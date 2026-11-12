@@ -311,8 +311,9 @@ def verify_spotlight(edition: production.Edition, files: list[Path]) -> dict:
     """Read each delivered film's keywords and authors back as Spotlight imports them, where the
     host has `mdimport`.
 
-    A film is refused with an imported keyword that has a space at either end, a declared
-    Chinese keyword that does not import whole, or any authors but the declared author, once.
+    A film is refused with an imported keyword that has a space at either end, no imported keyword
+    while the release declares some, a declared Chinese keyword that does not import whole, or any
+    authors but the declared author, once.
     Each film records the keywords and authors imported and the declared keywords the importer
     split into words (`filmkit.delivery.spotlight`).
     """

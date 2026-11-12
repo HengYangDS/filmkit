@@ -8,8 +8,9 @@ on 2026-11-12 found: a mostly Chinese value only at its commas, keeping a space 
 the start of the next keyword, and a mostly Latin value at its commas and at every space, so an
 English phrase imports as its words. Packaging therefore joins the keywords with commas alone.
 
-A film fails the readback with an imported keyword that has a space at either end, or with a
-declared keyword holding a Han character that no imported keyword holds whole (`keyword_problems`).
+A film fails the readback with an imported keyword that has a space at either end, with no imported
+keyword while the release declares some, or with a declared keyword holding a Han character that no
+imported keyword holds whole (`keyword_problems`).
 A declared keyword without one that does not import whole was split into its words, which is the
 importer's behaviour; the readback records it (`split_into_words`). A film also fails with any
 authors but the declared author, once (`author_problems`): Spotlight lists the author of every
@@ -70,10 +71,11 @@ def imported(path: Path) -> dict[str, list[str]] | None:
 
 
 def keyword_problems(declared: list[str], keywords: list[str]) -> list[str]:
-    """Why a film's imported keywords fail: one with a space at either end, or a declared keyword
-    holding a Han character that no imported keyword holds whole."""
+    """Why a film's imported keywords fail: one with a space at either end, none while some are
+    declared, or a declared keyword holding a Han character that no imported keyword holds whole."""
     whole = {keyword.strip() for keyword in keywords}
     return [
+        *(["no keyword imports"] if declared and not keywords else []),
         *(f'"{k}" imports with a space at an end' for k in keywords if k != k.strip()),
         *(f'"{k}" does not import whole' for k in declared if re.search(HAN, k) and k not in whole),
     ]

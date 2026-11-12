@@ -3,6 +3,7 @@
 - [x] 1.1 Add tests for the keywords value and its readback. A release's keywords pack as one value joined by "," with no space. A fixture of `mdimport -t -d2` output parses into keywords and authors, `\Uxxxx` escapes decoded. The verifier refuses a keyword imported with a leading space and a Chinese phrase not imported whole, records an English phrase split into words, and records "unavailable" when `mdimport` is absent. Done when each test fails on 0.20.0 and the failures are recorded under `build/evidence/answer-the-engine-notes/tests/`.
 - [x] 1.2 Join the keywords with "," in `packaging.quicktime_keys`. Add `filmkit.delivery.spotlight` for the import and the parse, and call it from the film verification. Done when the tests of 1.1 pass.
 - [x] 1.3 Add tests, failing on 0.20.0, that the verifier refuses a film whose imported authors are the declared author twice and passes one whose authors are exactly the declared author; then check the authors in `filmkit.delivery.spotlight`. Done when the tests pass.
+- [x] 1.4 Refuse a film whose keywords import none while its release declares some, as design § Keywords decides, so an English edition's empty readback is not recorded as every phrase split. Done when its test fails on the code of 1.2 and passes after.
 
 ## 2. Player links
 

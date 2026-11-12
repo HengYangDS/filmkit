@@ -2,7 +2,7 @@
 
 ### Requirement: A film's keywords import whole where the importer allows
 
-Packaging SHALL write each film's QuickTime keywords as the release's keywords joined by "," with no space. Where the host has `mdimport`, the verifier SHALL read each delivered film's imported keywords and SHALL refuse a film with an imported keyword that has a leading or trailing space, or a declared keyword holding a Chinese character that does not import whole. Where the host has no `mdimport`, the verifier SHALL record the readback as unavailable.
+Packaging SHALL write each film's QuickTime keywords as the release's keywords joined by "," with no space. Where the host has `mdimport`, the verifier SHALL read each delivered film's imported keywords and SHALL refuse a film with an imported keyword that has a leading or trailing space, no keyword while some are declared, or a declared keyword holding a Chinese character that does not import whole. Where the host has no `mdimport`, the verifier SHALL record the readback as unavailable.
 
 #### Scenario: Chinese keywords in Spotlight
 
@@ -18,6 +18,11 @@ Packaging SHALL write each film's QuickTime keywords as the release's keywords j
 
 - **WHEN** a delivered film carries the QuickTime keywords `DDWG, 数据质量` and the host has `mdimport`
 - **THEN** the verifier refuses the film, naming the keyword imported with a leading space
+
+#### Scenario: Keywords the importer does not read
+
+- **WHEN** an English edition declares the keyword "authority to act" and `mdimport` imports no keyword from its film
+- **THEN** the verifier refuses the film
 
 ### Requirement: A film's author imports as the declared author alone
 
