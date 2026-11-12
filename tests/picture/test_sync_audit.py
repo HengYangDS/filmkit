@@ -34,9 +34,9 @@ def line(t, label, contrast=4.0, scene="01"):
     return f"{t:.2f}\t{scene}\t{contrast:.2f}\t1.000\t{label}\n"
 
 
-def frames(a, b, label):
+def frames(a, b, label, scene="01"):
     """One trace row per 0.1 s frame from a to b inclusive."""
-    return [line(a + k / 10, label) for k in range(round((b - a) * 10) + 1)]
+    return [line(a + k / 10, label, scene=scene) for k in range(round((b - a) * 10) + 1)]
 
 
 def test_labels_are_judged_against_their_spoken_clause():
@@ -77,6 +77,151 @@ def test_a_label_far_ahead_or_behind_its_words_is_out_of_sync():
         "ahead-in-clause",
         "after-words",
     ]
+
+
+def scene(scene_id, *thoughts):
+    """A timeline of one scene whose thoughts are each a list of words with their times."""
+    texts = [" ".join(text for text, _, _ in thought) for thought in thoughts]
+    groups = [text + " " for text in texts[:-1]] + texts[-1:]
+    words = [{"text": text, "start": a, "end": b} for thought in thoughts for text, a, b in thought]
+    segment = {"id": scene_id, "text": "".join(groups), "utterance_groups": groups, "words": words}
+    return {"segments": [segment]}
+
+
+# "available" said 0.19 s after the label "Availability" stands at 330.17 s, "availability" 8.43 s
+# after it, in the next thought.
+AVAILABLE = [("Data", 330.0, 330.18), ("is", 330.18, 330.36), ("available", 330.36, 330.9)]
+AVAILABLE += [("when", 330.9, 331.1), ("it", 331.1, 331.2), ("is", 331.2, 331.3)]
+AVAILABLE += [("needed.", 331.3, 331.8)]
+AVAILABILITY = [("Availability", 338.6, 339.2), ("is", 339.2, 339.3), ("checked.", 339.3, 339.8)]
+
+
+def test_an_english_label_is_judged_by_its_inflected_words_in_its_own_thought():
+    film = scene("05", AVAILABLE, AVAILABILITY)
+    report, judged = picture_sync_audit.audit(film, [line(330.17, "Availability", scene="05")])
+    assert report["far_from_words"] == []
+    assert judged == [
+        {
+            "scene": "05",
+            "label": "Availability",
+            "legible": 330.17,
+            "spoken": 330.36,
+            "spoken_end": 330.9,
+            "clause_start": 330.0,
+            "delta": -0.19,
+            "occurrences": 1,
+            "verdict": "in-sync",
+            "match": "inflected",
+        }
+    ]
+
+
+def test_an_exact_occurrence_within_8_s_still_judges_an_english_label():
+    film = scene("05", AVAILABLE, AVAILABILITY)
+    # Its words said 1.2 s after it stands judge it, as before.
+    near = picture_sync_audit.audit(film, [line(337.4, "Availability", scene="05")])[1]
+    assert [(row["spoken"], row["delta"], row["match"]) for row in near] == [(338.6, -1.2, "exact")]
+    # They judge it within 8 s even where its own thought says the word in another form.
+    within = picture_sync_audit.audit(film, [line(331.0, "Availability", scene="05")])[1]
+    assert [(row["spoken"], row["verdict"], row["match"]) for row in within] == [
+        (338.6, "before-clause", "exact")
+    ]
+
+
+def test_words_that_only_look_alike_do_not_match():
+    # "Publish" stands over "public", whose stem differs; "Published" over "publish" matches.
+    public = [("The", 10.0, 10.2), ("public", 10.2, 10.6), ("record", 10.6, 11.0)]
+    public += [("is", 11.0, 11.1), ("read.", 11.1, 11.5)]
+    publish = [("We", 20.0, 20.1), ("publish", 20.1, 20.5), ("it", 20.5, 20.6)]
+    publish += [("daily.", 20.6, 21.0)]
+    film = scene("09", public, publish)
+    trace = [line(10.1, "Publish", scene="09"), line(20.0, "Published", scene="09")]
+    report, judged = picture_sync_audit.audit(film, trace)
+    assert report["far_from_words"] == [
+        {"scene": "09", "label": "Publish", "legible": 10.1, "spoken": [20.1]}
+    ]
+    assert [(row["label"], row["spoken"], row["match"]) for row in judged] == [
+        ("Published", 20.1, "inflected")
+    ]
+
+
+def test_an_inflected_match_outside_the_labels_thought_is_not_taken():
+    records = [("Records", 332.5, 333.0), ("are", 333.0, 333.2), ("checked.", 333.2, 334.0)]
+    late = [("Availability", 345.0, 345.6), ("matters.", 345.6, 346.2)]
+    film = scene("05", AVAILABLE, records, late)
+    # Standing in the second thought, the label is not judged by the first thought's "available".
+    report, judged = picture_sync_audit.audit(film, [line(333.0, "Availability", scene="05")])
+    assert judged == []
+    assert report["far_from_words"] == [
+        {"scene": "05", "label": "Availability", "legible": 333.0, "spoken": [345.0]}
+    ]
+    # Standing in the first thought, it is.
+    first = picture_sync_audit.audit(film, [line(330.17, "Availability", scene="05")])[1]
+    assert [(row["spoken"], row["match"]) for row in first] == [(330.36, "inflected")]
+
+
+def test_chinese_labels_match_as_before():
+    words = [("验收", 1.0, 1.4), ("标准。", 1.4, 1.8), ("可用", 4.0, 4.4), ("数据。", 4.4, 4.8)]
+    film = scene("02", words[:2], words[2:])
+    film["segments"][0]["text"] = "验收标准。可用数据。"
+    film["segments"][0]["utterance_groups"] = ["验收标准。", "可用数据。"]
+    trace = [line(1.1, "验收标准", scene="02"), line(4.2, "可用性", scene="02")]
+    report, judged = picture_sync_audit.audit(film, trace)
+    assert [(row["label"], row["spoken"], row["match"]) for row in judged] == [
+        ("验收标准", 1.0, "exact")
+    ]
+    # No Chinese label is looked for by another form of its words.
+    assert report["unmatched"] == [{"scene": "02", "label": "可用性", "legible": 4.2}]
+
+
+# "Acceptance" said in three thoughts of one scene: at 214.4 s, 217.0 s and 330.4 s.
+ACCEPTANCE = scene(
+    "06",
+    [("Acceptance", 214.4, 215.0), ("comes", 215.0, 215.3), ("first.", 215.3, 215.8)],
+    [("Acceptance", 217.0, 217.6), ("is", 217.6, 217.7), ("checked.", 217.7, 218.2)],
+    [("Then", 330.0, 330.2), ("acceptance", 330.4, 331.0), ("is", 331.0, 331.1)],
+)
+
+
+def test_a_label_shown_again_on_its_words_is_judged_at_each_appearance():
+    # Legible from 214.2 s, illegible from 240.1 s, and legible again at 330.2 s on its words.
+    trace = frames(214.2, 240.0, "Acceptance", "06") + frames(330.2, 332.0, "Acceptance", "06")
+    report, judged = picture_sync_audit.audit(ACCEPTANCE, trace)
+    assert [(row["legible"], row["spoken"], row["verdict"]) for row in judged] == [
+        (214.2, 214.4, "in-sync"),
+        (330.2, 330.4, "in-sync"),
+    ]
+    assert report["labels_judged"] == 2
+    assert report["recalls"] == []
+
+
+def test_a_label_shown_again_without_its_words_is_a_recall():
+    # Legible on its words, illegible for 3 s, then legible again with its words not said again.
+    label = "Solve the whole problem"
+    trace = frames(4.0, 5.0, label) + frames(8.0, 9.0, label)
+    report, judged = picture_sync_audit.audit(timeline(), trace)
+    assert [(row["legible"], row["spoken"]) for row in judged] == [(4.0, 4.0)]
+    assert report["recalls"] == [{"scene": "01", "label": label, "legible": 8.0}]
+    assert report["far_from_words"] == []
+    assert report["labels_unmatched"] == 0
+
+
+def test_a_later_appearance_takes_the_nearest_words_no_earlier_one_took():
+    # Shown again 3 s after it went, the label takes the words said 2 s before it, which the
+    # first appearance left; shown a third time, it finds no words within 8 s.
+    trace = frames(214.2, 216.0, "Acceptance", "06") + frames(219.0, 221.0, "Acceptance", "06")
+    trace += frames(300.0, 302.0, "Acceptance", "06")
+    report, judged = picture_sync_audit.audit(ACCEPTANCE, trace)
+    assert [(row["legible"], row["spoken"]) for row in judged] == [(214.2, 214.4), (219.0, 217.0)]
+    assert report["recalls"] == [{"scene": "06", "label": "Acceptance", "legible": 300.0}]
+
+
+def test_a_label_faded_briefly_at_a_stage_cut_is_judged_once():
+    # It fades for 0.4 s at a cut and stands again in its place while its words come again.
+    trace = frames(214.2, 216.0, "Acceptance", "06") + frames(216.5, 218.0, "Acceptance", "06")
+    report, judged = picture_sync_audit.audit(ACCEPTANCE, trace)
+    assert [(row["legible"], row["spoken"]) for row in judged] == [(214.2, 214.4)]
+    assert report["recalls"] == []
 
 
 def test_speech_without_a_legible_name_for_over_a_second_is_reported():

@@ -22,19 +22,19 @@
 
 ## 4. Inflected labels
 
-- [ ] 4.1 Add `snowballstemmer` to the project's dependencies through `uv add`, at its latest stable release. Done when `uv sync --frozen` installs it and its licence is recorded in `NOTICE`.
-- [ ] 4.2 Add tests to `tests/picture/test_sync_audit.py`, each failing on 0.20.0:
+- [x] 4.1 Add `snowballstemmer` to the project's dependencies through `uv add`, at its latest stable release. Done when `uv sync --frozen` installs it and its licence is recorded in `NOTICE`.
+- [x] 4.2 Add tests to `tests/picture/test_sync_audit.py`, each failing on 0.20.0:
   - "Availability" is judged against "available" in its own thought when "availability" comes 8.4 s later;
   - an exact occurrence within 8 s still wins;
   - "Publish" does not match "public";
   - a stem match outside the label's thought is not taken;
   - Chinese labels match as before.
-- [ ] 4.3 Look up inflected occurrences in `sync_audit.audit` and record the match as inflected. Done when the tests of 4.2 pass.
-- [ ] 4.4 Add tests to `tests/picture/test_sync_audit.py`, each failing on 0.20.0:
+- [x] 4.3 Look up inflected occurrences in `sync_audit.audit` and record the match as inflected. Done when the tests of 4.2 pass.
+- [x] 4.4 Add tests to `tests/picture/test_sync_audit.py`, each failing on 0.20.0:
   - a label legible again after 1 s or more illegible, with its words said again within 8 s, is judged twice;
   - a label legible again without its words within 8 s is recorded as a recall and not judged;
   - a label that fades out for less than 1 s at a stage cut is judged once.
-- [ ] 4.5 Judge each appearance of a label in `sync_audit.audit`, from runs in `legible_labels`, and list recalls in the report. Done when the tests of 4.4 and 4.2 pass, and the essentials film's current trace judges its 06.6 "Acceptance" on its own words.
+- [x] 4.5 Judge each appearance of a label in `sync_audit.audit`, from runs in `legible_labels`, and list recalls in the report. Done when the tests of 4.4 and 4.2 pass, and the essentials film's current trace judges its 06.6 "Acceptance" on its own words.
 
 ## 5. Balance as the reviewers count it
 

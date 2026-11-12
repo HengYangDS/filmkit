@@ -39,6 +39,9 @@ own licenses, which the licenses above do not cover:
   of Chromium and its components;
 - mlx-audio 0.6.4 and MLX under the MIT License, with the other Python packages that
   uv.lock pins, each under its own license;
+- snowballstemmer 3.1.1, the Snowball stemmers in pure Python, which the sync audit loads,
+  Copyright (c) 2001 Dr Martin Porter, (c) 2004, 2005 Richard Boulton, (c) 2013 Yoshiki
+  Shibukawa and (c) 2006-2025 Olly Betts, under the BSD 3-Clause License;
 - the speech models that the supply step downloads, each under the Apache License 2.0:
   mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16 at revision a6eb4f68,
   mlx-community/Qwen3-ASR-0.6B-bf16 at revision eae2b51f and

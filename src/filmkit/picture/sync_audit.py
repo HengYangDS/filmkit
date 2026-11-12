@@ -1,14 +1,19 @@
 """Measure sound-picture sync: when each label is legible against when it is spoken.
 
 Reads a label trace written by frame-audit.mjs (TRACE=<file>) and the timeline it ran
-on. A label is legible from the first frame its contrast reaches 3:1. Labels and their
-" · " parts whose letters occur verbatim in their scene's words are matched to the
-spoken occurrence nearest that frame (within 8 s). A label is out of sync when it is
-legible more than 0.3 s before the clause that speaks it begins, more than 1.5 s ahead
-of its words within that clause, or more than 0.5 s after its words end. Labels with no
-verbatim spoken match are listed and counted, not judged. The report also lists speech that runs
-over 1.0 s without a legible name, thoughts that keep the previous picture over 1.0 s, and caption
-cues that labels repeat: a cue drawn whole as one label, or mostly as labels drawn during it.
+on. A label is legible in a frame where its contrast reaches 3:1, and each run of its legible
+frames that begins after at least 1 s illegible in its scene is an appearance. Labels and their
+" · " parts are judged at each appearance against the spoken occurrence of their letters that
+starts nearest its first legible frame, within 8 s, and that no earlier appearance took; an
+English label with no such occurrence is matched by the Snowball stems of its words in its
+thought, and the match is recorded as inflected (`filmkit.picture.label_matches`). A label is
+out of sync when it is legible more than 0.3 s before the clause that speaks it begins, more
+than 1.5 s ahead of its words within that clause, or more than 0.5 s after its words end. Labels
+with no spoken match are listed and counted, not judged, as is a first appearance whose words
+are said only farther away; a later appearance without its words is listed as a recall. The
+report also lists speech that runs over 1.0 s without a legible name, thoughts that keep the
+previous picture over 1.0 s, and caption cues that labels repeat: a cue drawn whole as one
+label, or mostly as labels drawn during it.
 Given the mark trace that frame-audit.mjs writes (MARKS=<file>), it also lists seats: a
 mark that stands in speech for more than 0.6 s before a name is legible at it. A segment
 whose aligned words do not spell its text raises `PictureError`.
@@ -25,22 +30,31 @@ from __future__ import annotations
 import argparse
 import bisect
 import json
-import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import filmkit.narration.spoken_units as spoken_units
 import filmkit.repository as repository
+from filmkit.picture.label_matches import (
+    english,
+    exact_matches,
+    inflected_matches,
+    spoken_index,
+    thought_words,
+    units,
+    words,
+)
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, PictureError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
-# Chinese commas close a clause; English commas mostly separate list items, so only
-# stops and colons close one.
-BOUNDARY = set("，。；：！？.;:!?")
+    from filmkit.picture.label_matches import Occurrence
+
 # A label is legible from the first frame its contrast reaches this ratio.
 LEGIBLE_CONTRAST = 3
+# A label legible again after more than this many seconds without a legible frame in its scene
+# appears again.
+APPEARANCE_GAP = 1.0
 # Seconds a label may lead its words within their clause, and trail their end.
 AHEAD_IN_CLAUSE = 1.5
 AFTER_WORDS = 0.5
@@ -54,52 +68,9 @@ ECHO_WORDS = 3
 ECHO_SHARE = 0.8
 # The quotation marks that open and close a cue that is itself one quotation.
 QUOTATION_MARKS = {"“": "”", "‘": "’", "「": "」", '"': '"'}
-# A cue's and a label's words: each CJK character, or a run of other letters and digits with its
-# apostrophes.
-_CJK = "\u3400-\u9fff\uf900-\ufaff"
-_WORD = re.compile(rf"[{_CJK}]|[^\W_{_CJK}]+(?:['\u2019][^\W_{_CJK}]+)*")
 # The verdicts of a label out of sync, and the report's counts that reviews read.
 VERDICTS = ("before-clause", "ahead-in-clause", "after-words")
 SUMMARY_KEYS = ("tolerance", "labels_judged", "labels_unmatched", "out_of_sync", *VERDICTS)
-
-
-def units(text: str) -> str:
-    """A text's letters and digits, lowercased: the units labels and words are matched by."""
-    return "".join(ch for ch in text if ch.isalnum()).lower()
-
-
-def spoken_index(segment: dict) -> tuple[str, list[float], list[float], list[int]]:
-    """A scene's normalized words, each unit's start and end, and its clause opening.
-
-    A clause opens after each stop in the segment text, so the words must spell its text.
-    """
-    joined, starts, ends = [], [], []
-    for word in segment["words"]:
-        u = units(word["text"])
-        joined.append(u)
-        starts.extend([word["start"]] * len(u))
-        ends.extend([word["end"]] * len(u))
-    spoken = "".join(joined)
-    opens, current, k = [], 0, 0
-    for ch in segment.get("text", ""):
-        if ch in BOUNDARY:
-            current = k
-        elif ch.isalnum():
-            opens.append(current)
-            k += 1
-    if len(opens) != len(spoken) or spoken != units(segment.get("text", "")):
-        msg = f"{segment['id']}: the aligned words do not cover the segment text"
-        raise PictureError(msg)
-    return spoken, starts, ends, opens
-
-
-def occurrences(haystack: str, needle: str) -> list[int]:
-    """Every start of `needle` in `haystack`, overlapping ones included."""
-    found, at = [], haystack.find(needle)
-    while at >= 0:
-        found.append(at)
-        at = haystack.find(needle, at + 1)
-    return found
 
 
 def trace_rows(lines: Iterable[str], width: int) -> Iterator[tuple[float, str, list[str]]]:
@@ -115,36 +86,31 @@ def trace_rows(lines: Iterable[str], width: int) -> Iterator[tuple[float, str, l
             yield float(parts[0]), parts[1], parts[2:]
 
 
-def legible_labels(trace_lines: Iterable[str]) -> dict[tuple[str, str], float]:
-    """The first legible time of each label of each scene, whole and by its " · " parts."""
-    first = {}
+def legible_labels(trace_lines: Iterable[str]) -> dict[tuple[str, str], list[float]]:
+    """The first legible time of each appearance of each label of each scene, whole and by its
+    " · " parts: of each run of its legible frames that begins after at least 1 s illegible."""
+    seen: dict[tuple[str, str], set[float]] = {}
     for t, scene, fields in trace_rows(trace_lines, 5):
         contrast, text = float(fields[0]), fields[2]
         if contrast < LEGIBLE_CONTRAST:
             continue
         # A label is judged whole and by its " · " parts; spacing is not part of a name.
         pieces = {text.strip()} | {p.strip() for p in text.split("·") if p.strip()}
-        for piece in sorted(pieces):
-            key = (scene, piece)
-            if key not in first or t < first[key]:
-                first[key] = t
-    return first
+        for piece in pieces:
+            seen.setdefault((scene, piece), set()).add(t)
+    appearances = {}
+    for key, times in seen.items():
+        ordered = sorted(times)
+        appearances[key] = [
+            t for k, t in enumerate(ordered) if not k or t - ordered[k - 1] > APPEARANCE_GAP + 1e-9
+        ]
+    return appearances
 
 
-def nearest_match(
-    index: tuple[str, list[float], list[float], list[int]], needle: str, shown: float
-) -> tuple[list[tuple[float, float, float]], tuple[float, float, float] | None]:
-    """The spoken occurrences of a label's units, and the one that starts nearest its frame.
-
-    Each occurrence is its start, its end and the start of its clause in the scene's spoken
-    index; without one, the nearest is None.
-    """
-    spoken, starts, ends, opens = index
-    matches = [
-        (starts[h], ends[h + len(needle) - 1], starts[opens[h]])
-        for h in occurrences(spoken, needle)
-    ]
-    return matches, min(matches, key=lambda match: abs(shown - match[0]), default=None)
+def nearest(found: list[Occurrence], shown: float, taken: set[Occurrence]) -> Occurrence | None:
+    """The occurrence that starts nearest `shown`, within 8 s, of those no appearance took."""
+    free = [o for o in found if o not in taken and abs(shown - o[0]) <= FAR_FROM_WORDS]
+    return min(free, key=lambda occurrence: abs(shown - occurrence[0]), default=None)
 
 
 def verdict(shown: float, start: float, end: float, clause: float, tolerance: float) -> str:
@@ -162,10 +128,18 @@ def verdict(shown: float, start: float, end: float, clause: float, tolerance: fl
     return "in-sync"
 
 
-def summarize(judged: list[dict], far: list[dict], unmatched: list[dict], tolerance: float) -> dict:
-    """An audit's report: its counts, the labels out of sync, unspoken and far from words.
+def summarize(
+    judged: list[dict],
+    far: list[dict],
+    unmatched: list[dict],
+    recalls: list[dict],
+    tolerance: float,
+) -> dict:
+    """An audit's report: its counts, the labels out of sync, unspoken and far from words, and
+    the recalls.
 
-    A label counts as unmatched when it is listed as unspoken or as far from its words.
+    A label counts as unmatched when it is listed as unspoken or as far from its words; a
+    recall is neither judged nor unmatched.
     """
     out = [row for row in judged if row["verdict"] != "in-sync"]
     return {
@@ -177,6 +151,7 @@ def summarize(judged: list[dict], far: list[dict], unmatched: list[dict], tolera
         "findings": out,
         "unmatched": unmatched,
         "far_from_words": far,
+        "recalls": recalls,
         "by_scene": {
             scene: sum(1 for row in out if row["scene"] == scene)
             for scene in sorted({row["scene"] for row in out})
@@ -187,44 +162,62 @@ def summarize(judged: list[dict], far: list[dict], unmatched: list[dict], tolera
 def audit(
     timeline: dict, trace_lines: Iterable[str], tolerance: float = 0.3
 ) -> tuple[dict, list[dict]]:
-    """Judge each legible label of a trace against its spoken words; return a report."""
-    index = {segment["id"]: spoken_index(segment) for segment in timeline["segments"]}
-    labels = sorted(legible_labels(trace_lines).items(), key=lambda kv: (kv[0][0], kv[1], kv[0][1]))
-    judged, far, unmatched = [], [], []
-    for (scene, label), shown in labels:
+    """Judge each appearance of each legible label against its spoken words; return a report.
+
+    An appearance takes the nearest exact occurrence of its label's words within 8 s that no
+    earlier appearance took, and an English label without one its nearest inflected occurrence
+    in its thought, as `filmkit.picture.label_matches` finds them. A label its scene never says
+    is unspoken, a first appearance whose words are said only farther away is far from them,
+    and a later appearance without its words is a recall.
+    """
+    segments = {segment["id"]: segment for segment in timeline["segments"]}
+    index = {key: spoken_index(segment) for key, segment in segments.items()}
+    judged, far, unmatched, recalls = [], [], [], []
+    for (scene, label), appearances in legible_labels(trace_lines).items():
         needle = units(label)
         # A label grown part by part is judged by its parts, each at its own first
         # legible frame.
         if scene not in index or len(needle) < 2 or "·" in label:
             continue
-        matches, nearest = nearest_match(index[scene], needle, shown)
-        if nearest is None:
-            unmatched.append({"scene": scene, "label": label, "legible": round(shown, 3)})
-            continue
-        start, end, clause = nearest
-        # A spoken match more than 8 s away names something else: a recap, a heading
-        # or another reference. It is listed, because a cue taken from an earlier
-        # occurrence of its words shows the same way.
-        if abs(shown - start) > FAR_FROM_WORDS:
-            spoken = [round(match[0], 3) for match in matches]
-            far.append(
-                {"scene": scene, "label": label, "legible": round(shown, 3), "spoken": spoken}
+        exact, taken = exact_matches(index[scene], needle), set()
+        for number, shown in enumerate(appearances):
+            row = {"scene": scene, "label": label, "legible": round(shown, 3)}
+            kind, found = "exact", exact
+            match = nearest(found, shown, taken)
+            if match is None and english(label):
+                kind = "inflected"
+                found = inflected_matches(segments[scene], index[scene], label, shown)
+                match = nearest(found, shown, taken)
+            if match is None:
+                # A spoken match more than 8 s away names something else: a recap, a heading
+                # or another reference. It is listed, because a cue taken from an earlier
+                # occurrence of its words shows the same way.
+                if number:
+                    recalls.append(row)
+                elif exact:
+                    far.append({**row, "spoken": [round(o[0], 3) for o in exact]})
+                else:
+                    unmatched.append(row)
+                continue
+            taken.add(match)
+            start, end, clause = match
+            judged.append(
+                {
+                    **row,
+                    "spoken": round(start, 3),
+                    "spoken_end": round(end, 3),
+                    "clause_start": round(clause, 3),
+                    "delta": round(shown - start, 3),
+                    "occurrences": len(found),
+                    "verdict": verdict(shown, start, end, clause, tolerance),
+                    "match": kind,
+                }
             )
-            continue
-        judged.append(
-            {
-                "scene": scene,
-                "label": label,
-                "legible": round(shown, 3),
-                "spoken": round(start, 3),
-                "spoken_end": round(end, 3),
-                "clause_start": round(clause, 3),
-                "delta": round(shown - start, 3),
-                "occurrences": len(matches),
-                "verdict": verdict(shown, start, end, clause, tolerance),
-            }
-        )
-    return summarize(judged, far, unmatched, tolerance), judged
+    lists = [
+        sorted(rows, key=lambda row: (row["scene"], row["legible"], row["label"]))
+        for rows in (judged, far, unmatched, recalls)
+    ]
+    return summarize(*lists, tolerance), lists[0]
 
 
 def thought_spans(segment: dict) -> list[tuple[str, float, float]]:
@@ -232,16 +225,10 @@ def thought_spans(segment: dict) -> list[tuple[str, float, float]]:
 
     A segment without utterance groups is one thought.
     """
-    words = segment["words"]
-    groups = segment.get("utterance_groups", [segment["text"]])
-    try:
-        spans = spoken_units.thought_spans(segment["text"], words, groups)
-    except spoken_units.AlignmentError as error:
-        msg = f"{segment['id']}: {error}"
-        raise PictureError(msg) from error
+    spoken = segment["words"]
     return [
-        (f"{segment['id']}.{index}", words[span.first]["start"], words[span.last]["end"])
-        for index, span in enumerate(spans, 1)
+        (f"{segment['id']}.{index}", spoken[first]["start"], spoken[last]["end"])
+        for index, (first, last) in enumerate(thought_words(segment), 1)
     ]
 
 
@@ -318,11 +305,6 @@ def held_over(
         if len(before - now) >= max(1, len(before) // 2) and now - before:
             return round(v - a, 2) if v - a > limit else None
     return None
-
-
-def words(text: str) -> list[str]:
-    """A text's words as a caption cue and a label are compared: lowercased, one apostrophe."""
-    return [word.lower().replace("\u2019", "'") for word in _WORD.findall(text)]
 
 
 def quotation(text: str) -> bool:
@@ -488,10 +470,11 @@ def seats(
 
 def print_report(report: dict) -> None:
     """Print the report's counts as JSON, then one line per finding."""
-    lists = ("findings", "far_from_words", "continuity")
+    lists = ("findings", "far_from_words", "recalls", "continuity")
     summary = {k: v for k, v in report.items() if k not in lists}
     counts = {k: len(v) for k, v in report["continuity"].items()}
-    print(json.dumps({**summary, "far_from_words": len(report["far_from_words"]), **counts}))
+    listed = {k: len(report[k]) for k in ("far_from_words", "recalls")}
+    print(json.dumps({**summary, **listed, **counts}))
     for row in report["findings"]:
         print(
             f"{row['scene']}  {row['verdict']:15s} {row['delta']:+.2f}s"
@@ -504,6 +487,8 @@ def print_report(report: dict) -> None:
             f"{row['scene']}  far-from-words  legible {row['legible']:.2f}"
             f"  spoken {spoken}  {row['label']}"
         )
+    for row in report["recalls"]:
+        print(f"{row['scene']}  recall  legible {row['legible']:.2f}  {row['label']}")
     for row in report["continuity"]["unnamed_speech"]:
         print(f"{row['thought']}  unnamed-speech  {row['from']:.2f}-{row['to']:.2f}")
     for row in report["continuity"]["held_over"]:
