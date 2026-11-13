@@ -22,8 +22,14 @@
       only in each take's wall-clock `elapsed`. @puppeteer/browsers 3.2.7 installed
       chrome-headless-shell 152.0.7977.30 with its pinned SHA-256. `mise run sample:build` passed
       from 07:56:09 to 08:03:51, and both editions verify.
-- [ ] 1.4 Move `[supply] mise_version` to Mise 2026.11.7 and generate both pipelines again; done
-      when `ethos lane project --check --json` reports both projections conforming.
+- [x] 1.4 Move `[supply] mise_version` to Mise 2026.11.7 and generate both pipelines again; done
+      when `ethos lane project --check --json` reports both projections conforming. The check
+      reports both conforming; only the workflow's Mise line changed. The official Mise 2026.11.7
+      macOS archive, whose digest equals the API's and `SHASUMS256.txt`, lists `http:ethos`
+      0.2.0-beta.9, node 26.13.0, python 3.12.16 and uv 0.13.7 under `MISE_LOCKED=1`, and the lock's
+      bytes are unchanged. GitLab's macOS jobs run the Mise of their runner's guest, last observed
+      at 2026.10.25 on 2026-11-02; its current version is not observed, because the job log does not
+      print it.
 
 ## 2. Release
 
