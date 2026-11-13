@@ -37,7 +37,7 @@ packages = ["src/filmkit"]
 
 [dependency-groups]
 dev = [
-  "coverage==7.17.2",
+  "coverage==7.17.3",
   "fonttools==4.68.0",
   "pytest==9.2.0",
   "pytest-cov==7.1.0",

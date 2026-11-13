@@ -2,6 +2,7 @@ min_version = "2026.10.14"
 
 [settings]
 locked = true
+minimum_release_age = "0h"
 
 # The repository's common verbs; the npm scripts and the frozen uv environment they call own the commands.
 [tasks.bootstrap]
@@ -119,7 +120,7 @@ run = [
 [tools]
 node = "26.13.1"
 python = "3.12.16"
-uv = "0.13.7"
+uv = "0.13.8"
 
 # The ETHOS release declaration as published with v0.2.0-beta.9.
 [tools."http:ethos"]
