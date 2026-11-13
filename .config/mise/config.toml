@@ -117,7 +117,7 @@ run = [
 # The ETHOS gates resolve these only from this lock, never from PATH: Node for the picture checks,
 # Python and uv for the suite. Python stays on the 3.12 line that the films select.
 [tools]
-node = "26.13.0"
+node = "26.13.1"
 python = "3.12.16"
 uv = "0.13.7"
 
