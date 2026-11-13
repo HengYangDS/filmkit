@@ -33,8 +33,9 @@
 
 ## 2. Release
 
-- [ ] 2.1 Prepare 0.21.1 in `VERSION`, the Changelog and the README's install line; done when the
-      repository check passes.
+- [x] 2.1 Prepare 0.21.1 in `VERSION`, the Changelog and the README's install line; done when the
+      repository check passes. `mise run check` passes with the release edits: the Node tests, the
+      Markdown check and 1,102 Python tests, from 08:07:54 to 08:09:21.
 
 ## Deferred
 

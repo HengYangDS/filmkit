@@ -4,9 +4,13 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-11-13
+
 ### Changed
 
-- The supply moves to ETHOS 0.2.0-beta.9, whose embedded OpenSpec CLI is 2.0.0. The CI projection stays as it is.
+- The supply moves to ETHOS 0.2.0-beta.9, whose embedded OpenSpec CLI is 2.0.0.
+- The hosted GitHub jobs install Mise 2026.11.7; GitLab's macOS jobs keep the Mise their runner provides.
+- The locks take the releases that were at least 24 hours old on 13 November 2026: Pydantic 2.14.3, transformers 5.22.2, sentencepiece 0.2.3, miniaudio 1.73, typer 0.29.1 and eight more Python packages, and @puppeteer/browsers 3.2.7, prettier 3.10.0, hono 4.13.18, ws 8.22.2 and three more npm packages. With every take synthesized again under the new locks, the sample film's eight takes, their word alignment and their recognition are byte-identical. mlx-audio stays 0.6.4, whose decode rule every film's takes are bound to; HyperFrames, puppeteer-core, GSAP and the undici override stay where they are until a release that compares the films' frames moves them.
 
 ## [0.21.0] - 2026-11-12
 
@@ -346,7 +350,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/HengYangDS/filmkit/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/HengYangDS/filmkit/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/HengYangDS/filmkit/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/HengYangDS/filmkit/compare/v0.18.0...v0.19.0
