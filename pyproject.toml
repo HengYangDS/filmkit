@@ -9,7 +9,7 @@ dependencies = [
   "mlx-audio==0.6.4",
   "numpy==2.5.4",
   "pillow==13.0.0",
-  "pydantic==2.14.2",
+  "pydantic==2.14.3",
   "pypinyin==0.55.0",
   "snowballstemmer==3.1.1",
 ]
@@ -37,7 +37,7 @@ packages = ["src/filmkit"]
 
 [dependency-groups]
 dev = [
-  "coverage==7.17.0",
+  "coverage==7.17.2",
   "fonttools==4.68.0",
   "pytest==9.2.0",
   "pytest-cov==7.1.0",
