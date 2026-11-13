@@ -4,6 +4,12 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-11-13
+
+### Security
+
+- The supply moves to Node 26.13.1, a security release of the 26 line with nine fixes rated high under seven CVE identifiers, mostly in its `http2` and `tls` modules, six rated medium and three rated low. Node runs filmkit's Node tests, its Markdown formatting and the picture pipeline, and the sample film builds and verifies on it.
+
 ## [0.21.1] - 2026-11-13
 
 ### Changed
@@ -350,7 +356,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.21.2...HEAD
+[0.21.2]: https://github.com/HengYangDS/filmkit/compare/v0.21.1...v0.21.2
 [0.21.1]: https://github.com/HengYangDS/filmkit/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/HengYangDS/filmkit/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/HengYangDS/filmkit/compare/v0.19.0...v0.20.0
