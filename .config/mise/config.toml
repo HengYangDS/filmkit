@@ -122,13 +122,13 @@ node = "26.13.1"
 python = "3.12.16"
 uv = "0.13.8"
 
-# The ETHOS release declaration as published with v0.2.0-beta.9.
+# The ETHOS release declaration as published with v0.2.0-beta.10.
 [tools."http:ethos"]
-version = "0.2.0-beta.9"
+version = "0.2.0-beta.10"
 
 [tools."http:ethos".platforms]
-linux-arm64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.9/ethos-0.2.0-beta.9-linux-arm64.tar.gz", checksum = "sha256:2de6164354d9169c9fce7fa329ebcdc0d0c30c8b7bba2577ea4b012f9fabe2c2", bin_path = "ethos/bin" }
-linux-x64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.9/ethos-0.2.0-beta.9-linux-x64.tar.gz", checksum = "sha256:524e75838a21b3cadd42e4a98c8d8394c12d08c4d8bad4f9cd5c5ad002a0b3a5", bin_path = "ethos/bin" }
-macos-arm64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.9/ethos-0.2.0-beta.9-macos-arm64.tar.gz", checksum = "sha256:c38e92b5b15fae69b677b51e7b7c3f6b78b05dcd5de5dfd2887dcb8c66008384", bin_path = "ethos/bin" }
-windows-arm64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.9/ethos-0.2.0-beta.9-windows-arm64.tar.gz", checksum = "sha256:52de43cd286d944050de10c420cc3e99222a2c777c4619daf454f89bb4e96100", bin_path = "ethos/bin" }
-windows-x64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.9/ethos-0.2.0-beta.9-windows-x64.tar.gz", checksum = "sha256:beac4ddd347de6592f1057f61a79bc6b13ba906de26a9e0315e43869ffb1f8b4", bin_path = "ethos/bin" }
+linux-arm64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.10/ethos-0.2.0-beta.10-linux-arm64.tar.gz", checksum = "sha256:83ffab595486d3348ea66a2037744c4e1aed0d6ec3096773885aa69382bade0d", bin_path = "ethos/bin" }
+linux-x64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.10/ethos-0.2.0-beta.10-linux-x64.tar.gz", checksum = "sha256:0b7fc1b3644acece99dac60fa72cd26f657c7114aeec1b9234be5de3fc618651", bin_path = "ethos/bin" }
+macos-arm64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.10/ethos-0.2.0-beta.10-macos-arm64.tar.gz", checksum = "sha256:d2b0823b9fa9eee14e3e1552be3dd1e08ddef0805da4413f9dc89754fb4a1771", bin_path = "ethos/bin" }
+windows-arm64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.10/ethos-0.2.0-beta.10-windows-arm64.tar.gz", checksum = "sha256:83da972766ddbe19c78cf38ca2487c55ea0dbcc77c22f91d031b956e67543c72", bin_path = "ethos/bin" }
+windows-x64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.10/ethos-0.2.0-beta.10-windows-x64.tar.gz", checksum = "sha256:7579ac5d119a8039b422a18e4b20db3f3088100e5eb9664d7b4e80131b2c4f81", bin_path = "ethos/bin" }
