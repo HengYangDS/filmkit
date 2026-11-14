@@ -92,8 +92,8 @@ def test_an_unknown_field_refuses(declared):
 
 
 def test_clarity_floors_name_both_editions_in_decibels(declared):
-    assert film.FILM.review.clarity_minimum_db == {"zh": 18.0, "en": 17.0}
-    floors = "clarity_minimum_db = { zh = 18.0, en = 17.0 }"
+    assert film.FILM.review.clarity_minimum_db == {"zh": 18.0, "en": 16.0}
+    floors = "clarity_minimum_db = { zh = 18.0, en = 16.0 }"
     for wrong in ("{ zh = 18.0 }", "{ zh = 18.0, fr = 17.0 }", "{ zh = 0, en = 17.0 }"):
         rewrite(declared, floors, f"clarity_minimum_db = {wrong}")
         with pytest.raises(FilmError, match=r"review\.clarity_minimum_db"):

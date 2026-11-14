@@ -263,7 +263,7 @@ def test_a_first_round_states_that_no_earlier_review_exists(root, put, monkeypat
         assert "working files are in" not in text
         assert not re.search(r"\{[a-z_]+\}", text)
         # The floors come from the declaration's clarity_minimum_db.
-        assert "Voice clarity floors the film declares: 18 dB Chinese, 17 dB English." in text
+        assert "Voice clarity floors the film declares: 18 dB Chinese, 16 dB English." in text
     review = review_prompts.FILM.review.model_copy(update={"clarity_minimum_db": None})
     monkeypatch.setattr(
         review_prompts, "FILM", review_prompts.FILM.model_copy(update={"review": review})
