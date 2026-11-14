@@ -197,6 +197,15 @@ def test_designed_pause_policy_refuses_incomplete_contracts(designed_policy, ove
         designed_policy(**overrides)
 
 
+def test_a_thought_level_tolerance_may_be_as_tight_as_a_quarter_decibel(designed_policy):
+    # Adjacent thoughts at opposite edges of the tolerance stand twice the tolerance apart, so a
+    # film that wants steps of half a decibel or less declares a quarter.
+    assert designed_policy(thought_level_tolerance_db=0.25)["level_tolerance"] == 0.25
+    message = re.escape("thought_level_tolerance_db must be a number from 0.25 to 6.0")
+    with pytest.raises(soundtrack_policy.PausePolicyError, match=message):
+        designed_policy(thought_level_tolerance_db=0.2)
+
+
 def test_released_tails_name_one_thought_join_of_a_segment(designed_policy):
     segments = [
         {"id": "01", "utterance_groups": ["一。"]},

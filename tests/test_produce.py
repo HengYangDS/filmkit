@@ -51,6 +51,7 @@ def test_the_actions_are_the_documented_ones_in_order():
         "fit",
         "assemble",
         "refresh-captions",
+        "check-sound",
         "stage-picture",
         "check-picture",
         "render-draft",

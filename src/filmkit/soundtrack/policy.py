@@ -199,7 +199,7 @@ def designed_pause_policy(performance: dict) -> dict:
     boundary_margin = performance.get("thought_boundary_margin_seconds", 0.0)
     _range("thought_boundary_margin_seconds", boundary_margin, 0, 0.2)
     level_tolerance = _optional(
-        "thought_level_tolerance_db", performance.get("thought_level_tolerance_db"), 0.5, 6.0
+        "thought_level_tolerance_db", performance.get("thought_level_tolerance_db"), 0.25, 6.0
     )
     chapter_tolerance = _optional(
         "chapter_level_tolerance_db", performance.get("chapter_level_tolerance_db"), 0.1, 3.0

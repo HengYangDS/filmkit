@@ -11,8 +11,11 @@ captions (`filmkit.picture.equivalence`). `--variants` names fit's pause-policy 
 below the film's root or an absolute one (`filmkit.soundtrack.fit`), and `--attempts` bounds
 repair-pictures (`filmkit.picture.repair`); every other action refuses them.
 A refusal by an action's owner exits with status 1 and "<action>: <reason>" on standard
-error. Assembling a soundtrack and refreshing captions first refuse while a review round binds
-the edition's films and has not set them aside (`filmkit.review.set_aside.require_set_aside`).
+error. check-sound measures the assembled soundtrack with its refreshed captions and refuses a
+segment under the film's clarity floor, an abrupt or cut ending and a stopped phrase
+(`filmkit.soundtrack.gates`). Assembling a soundtrack and refreshing captions first refuse while
+a review round binds the edition's films and has not set them aside
+(`filmkit.review.set_aside.require_set_aside`).
 The command owns no goal, approval, repository lifecycle, service or task state.
 
 Usage: python -m filmkit.produce <edition action> --language zh|en [--uncaptioned] [options]
@@ -49,6 +52,7 @@ from filmkit.review import ReviewError
 from filmkit.review.set_aside import require_set_aside
 from filmkit.soundtrack.assembly import AssemblyError, assemble
 from filmkit.soundtrack.fit import VariantsError, fit, read_variants
+from filmkit.soundtrack.gates import check_sound
 from filmkit.soundtrack.level import LevelError
 from filmkit.soundtrack.pauses import PauseError
 from filmkit.soundtrack.policy import PausePolicyError
@@ -83,6 +87,7 @@ EDITION_ACTIONS: dict[str, Callable[[Edition, argparse.Namespace], object]] = {
     ),
     "assemble": lambda edition, _: after_set_aside(edition, assemble),
     "refresh-captions": lambda edition, _: after_set_aside(edition, refresh_captions),
+    "check-sound": lambda edition, _: check_sound(edition),
     "stage-picture": lambda edition, options: stage_picture(
         edition,
         options.output,

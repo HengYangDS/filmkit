@@ -49,15 +49,17 @@ run = [
 ]
 
 [tasks."sample:sound"]
-description = "Select each sample edition's recordings, assemble its soundtrack and write its captions"
+description = "Select each sample edition's recordings, assemble its soundtrack, write its captions and pass the sound gate"
 dir = "{{config_root}}/examples/sample-film"
 run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce select --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce assemble --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce refresh-captions --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce check-sound --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce select --language en",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce assemble --language en",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce refresh-captions --language en",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce check-sound --language en",
 ]
 
 [tasks."sample:picture"]

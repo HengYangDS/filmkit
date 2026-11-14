@@ -220,6 +220,11 @@ class Edition:
         return self.evidence / "picture-geometry.json"
 
     @property
+    def sound_gates(self) -> Path:
+        """The record of the measures that check-sound took on the assembled soundtrack."""
+        return self.evidence / "sound-gates.json"
+
+    @property
     def picture_sync(self) -> Path:
         return self.evidence / "picture-sync.json"
 
