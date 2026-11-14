@@ -79,6 +79,69 @@ def test_the_fall_does_not_depend_on_where_the_take_starts_on_the_frame_grid():
     assert len(falls) == 1
 
 
+def test_an_endings_voicing_and_verdict_do_not_depend_on_where_the_take_starts():
+    # The voicing is read on every phase of the grid, as the fall is, so the same take placed
+    # a few samples later is judged alike.
+    judged = {
+        tuple(
+            narration_take_edges.final_fall(
+                np.concatenate([np.zeros(k, "<i2"), stop(2)]), RATE
+            ).items()
+        )
+        for k in range(RATE // 1000)
+    }
+    assert len(judged) == 1
+
+
+def hiss(seconds: float, dbfs: float, seed: int) -> np.ndarray:
+    """Unvoiced noise at `dbfs`."""
+    return 10 ** (dbfs / 20) * np.random.default_rng(seed).standard_normal(round(seconds * RATE))
+
+
+def closed(level_dbfs: float = -25) -> np.ndarray:
+    """A voiced syllable at `level_dbfs` that closes within 2 ms."""
+    hold = voiced(0.6) * 10 ** (level_dbfs / 20) / 0.22
+    ramp = round(0.002 * RATE)
+    hold[-ramp:] *= np.linspace(1, 0, ramp) ** 3
+    return np.concatenate([np.zeros(240), hold])
+
+
+def test_a_closure_before_a_heard_release_is_not_the_ending():
+    # A stop consonant closes the vowel at once; its release 50 ms later peaks under the take's
+    # own bound, is heard at the delivered level and dies away. The release is the ending.
+    burst = hiss(0.08, -42, 11) * np.exp(-np.arange(round(0.08 * RATE)) / (0.006 * RATE))
+    quiet = [hiss(0.08, -80, 4), np.zeros(round(0.03 * RATE))]
+    released = pcm(np.concatenate([closed(), hiss(0.05, -80, 3), burst, *quiet]))
+    fall = narration_take_edges.final_fall(released, RATE)
+    assert fall["final_fall_ms"] >= narration_take_edges.FALL_MS
+    assert fall["final_voicing"] < narration_take_edges.FALL_VOICING
+    assert narration_take_edges.ending(released, RATE)["natural"]
+    # The same closure with nothing after it is a cut.
+    cut = narration_take_edges.ending(pcm(np.concatenate([closed(), *quiet])), RATE)
+    assert cut["final_fall_ms"] < narration_take_edges.FALL_MS
+    assert not cut["natural"]
+    # A sound after the cut that itself stops at once, such as a click, excuses nothing.
+    click = pcm(np.concatenate([closed(), hiss(0.03, -80, 3), hiss(0.001, -43, 12), *quiet]))
+    clicked = narration_take_edges.ending(click, RATE)
+    assert clicked["final_fall_ms"] < narration_take_edges.FALL_MS
+    assert clicked["final_voicing"] >= narration_take_edges.FALL_VOICING
+    assert not clicked["natural"]
+
+
+def test_a_cut_is_judged_by_the_voicing_where_its_own_fall_begins():
+    # After a loud unvoiced sound, a voice under the take's own bound is cut within 2 ms. Only
+    # the lowered bounds show the cut, and the voicing is read there, not where the hiss ends.
+    voice = voiced(0.08) * 10 ** (-47 / 20) / 0.22
+    voice[-round(0.002 * RATE) :] *= np.linspace(1, 0, round(0.002 * RATE)) ** 3
+    quiet = [hiss(0.08, -80, 3), np.zeros(round(0.03 * RATE))]
+    take = pcm(np.concatenate([np.zeros(240), hiss(0.3, -30, 5), voice, *quiet]))
+    cut = narration_take_edges.ending(take, RATE)
+    assert cut["final_fall_ms"] < narration_take_edges.FALL_MS
+    assert cut["final_fall_gain_db"] > 0
+    assert cut["final_voicing"] >= narration_take_edges.FALL_VOICING
+    assert not cut["natural"]
+
+
 def tone(seconds: float, dbfs: float) -> np.ndarray:
     """A steady voice at `dbfs`.
 

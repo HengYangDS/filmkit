@@ -14,12 +14,14 @@ from filmkit.soundtrack.quiet import HEARD_QUIET_DBFS, clip_start
 
 # A voiced final syllable that falls from LOUD_DBFS to STOPPED_DBFS in under FALL_MS stops
 # inside the syllable instead of dying away; round-21 takes that a listener heard cut fell in
-# 2-4 ms, against a median of 22 ms over every ending. The fall is the median over every
-# sample phase of the 1 ms frame grid, so it does not depend on where a take starts. It is
-# judged on the take's own scale and with both bounds lowered by each whole decibel of gain
-# up to FALL_GAIN_DB, which covers the program gain with the thought and chapter leveling
-# (2.7-5.4 dB in round 23): a voice that fades below LOUD_DBFS before it is cut is heard
-# louder in the soundtrack, where the same cut stops at once.
+# 2-4 ms, against a median of 22 ms over every ending. The fall and the voicing before it are
+# medians over every sample phase of the 1 ms frame grid, so they do not depend on where a
+# take starts. The ending is judged on the take's own scale and with both bounds lowered by
+# each whole decibel of gain up to FALL_GAIN_DB, which covers the program gain with the
+# thought and chapter leveling (2.7-5.4 dB in round 23): a voice that fades below LOUD_DBFS
+# before it is cut is heard louder in the soundtrack, where the same cut stops at once. A fall
+# after which the sound rises again and dies away is a closure before its release, as of a
+# stop consonant, and the release is the ending.
 FALL_MS = 6
 FALL_VOICING = 0.8
 FALL_GAIN_DB = 6
@@ -45,11 +47,14 @@ def voicing(x: np.ndarray, rate: int) -> float:
 def final_fall(pcm: np.ndarray, rate: int, gains: tuple[float, ...] = FALL_GAINS) -> dict:
     """How fast a take's last loud syllable falls silent, and how voiced it was before.
 
-    On 1 ms RMS frames the fall runs from the last frame at or above LOUD_DBFS to the first
-    later frame at or below STOPPED_DBFS. It is the median over every sample phase of the
-    frame grid, taken with both bounds lowered by each of `gains` in decibels, and the
-    shortest of these is reported with the gain that gives it. The voicing is that of the
-    15 ms before the fall on the take's own scale.
+    On 1 ms RMS frames, with both bounds lowered by each of `gains` in decibels, the fall runs
+    from the last frame at or above LOUD_DBFS to the first later frame at or below
+    STOPPED_DBFS, and the voicing is that of the 15 ms before that last frame ends; each is
+    the median over every sample phase of the frame grid. A fall is not the ending when the
+    sound rises again after it and dies away: when the last frame loud at the greatest gain
+    ends after the fall's stop and falls in FALL_MS or more. Of the falls that are the ending,
+    the shortest that is voiced and under FALL_MS is reported with its gain and voicing, or
+    else the shortest.
     """
     x = pcm.astype(np.float64) / 32768
     ms = rate // 1000
@@ -58,25 +63,47 @@ def final_fall(pcm: np.ndarray, rate: int, gains: tuple[float, ...] = FALL_GAINS
         frames = (len(x) - phase) // ms
         shifted = x[phase : phase + frames * ms].reshape(-1, ms)
         grids.append(20 * np.log10(np.sqrt(np.mean(shifted**2, axis=1)) + 1e-12))
-    fall, gain = None, 0
+    judged = {}
     for lowered in gains:
-        falls = []
-        for levels in grids:
+        ends, falls = [], []
+        for phase, levels in enumerate(grids):
             loud = np.flatnonzero(levels >= LOUD_DBFS - lowered)
             if len(loud):
                 last = int(loud[-1])
                 stopped = np.flatnonzero(levels[last:] <= STOPPED_DBFS - lowered)
                 falls.append(int(stopped[0]) if len(stopped) else len(levels) - last)
-        if falls and (fall is None or float(np.median(falls)) < fall):
-            fall, gain = float(np.median(falls)), lowered
-    loud = np.flatnonzero(grids[0] >= LOUD_DBFS)
-    if fall is None or not len(loud):
-        return {"final_fall_ms": fall, "final_fall_gain_db": gain, "final_voicing": 0.0}
-    end = (int(loud[-1]) + 1) * ms
+                ends.append(phase + (last + 1) * ms)
+        judged[lowered] = (ends, falls)
+    heard, release = judged[max(gains)]
+    released = bool(release) and float(np.median(release)) >= FALL_MS
+    endings = []
+    for lowered, (ends, falls) in judged.items():
+        if not falls:
+            continue
+        stop = np.median([end + (fall - 1) * ms for end, fall in zip(ends, falls, strict=True)])
+        if not (released and float(np.median(heard)) > float(stop)):
+            endings.append((float(np.median(falls)), lowered, tuple(ends)))
+    if not endings:
+        return {"final_fall_ms": None, "final_fall_gain_db": 0, "final_voicing": 0.0}
+    voiced: dict[tuple[int, ...], float] = {}
+
+    def voicing_before(ends: tuple[int, ...]) -> float:
+        if ends not in voiced:
+            voiced[ends] = float(
+                np.median([voicing(x[max(0, end - 15 * ms) : end], rate) for end in ends])
+            )
+        return voiced[ends]
+
+    stopping = [
+        ending
+        for ending in endings
+        if ending[0] < FALL_MS and voicing_before(ending[2]) >= FALL_VOICING
+    ]
+    fall, gain, ends = min(stopping or endings, key=lambda ending: ending[0])
     return {
         "final_fall_ms": fall,
         "final_fall_gain_db": gain,
-        "final_voicing": round(voicing(x[max(0, end - 15 * ms) : end], rate), 2),
+        "final_voicing": round(voicing_before(ends), 2),
     }
 
 
