@@ -25,6 +25,9 @@ def cue(start: float, end: float, text: str = "数据先行。", **extra) -> dic
         [cue(0.0, 0.5, "数" * 34)],
         [cue(0.0, 0.5, display_text="交付先行。")],
         [cue(0.0, 0.5, display_text="数据\n先行。")],
+        [cue(0.0, 0.5, "The film's data.")],
+        [cue(0.0, 0.5, 'It says "Done."')],
+        [cue(0.0, 0.5, "The film's data.", display_text="The film’s data.")],
     ],
     ids=[
         "before-start",
@@ -35,6 +38,9 @@ def cue(start: float, end: float, text: str = "数据先行。", **extra) -> dic
         "too-long",
         "other-words",
         "display-two-lines",
+        "straight-apostrophe",
+        "straight-quotes",
+        "straight-text-beside-its-display-copy",
     ],
 )
 @pytest.mark.usefixtures("short_films")
@@ -47,6 +53,12 @@ def test_captions_outside_the_caption_contract_are_refused(captions):
 def test_single_line_captions_within_their_limit_and_before_the_credits_pass():
     captions = [cue(0.0, 0.5, "数" * 33), cue(0.35, 1.0, display_text="数据，先行。")]
     assert delivery_verification.verify_captions({"captions": captions}, "zh") == 2
+
+
+@pytest.mark.usefixtures("short_films")
+def test_typeset_english_captions_pass():
+    captions = [cue(0.0, 0.5, "The film’s data. "), cue(0.5, 1.0, "It says “Done.”")]
+    assert delivery_verification.verify_captions({"captions": captions}, "en") == 2
 
 
 def test_current_narration_passes_and_validates_every_selected_recording(inputs):

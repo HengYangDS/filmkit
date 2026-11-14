@@ -6,13 +6,13 @@ import re
 
 import pytest
 
+import filmkit.captions.documents as captions_documents
 import filmkit.captions.refresh as captions_refresh
 import filmkit.produce as produce
 import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.review.round as review_round
 
-TEXT = "甲乙。丙丁。"
 WORDS = (("甲", 2.0, 2.4), ("乙", 2.4, 2.8), ("丙", 3.4, 3.8), ("丁", 3.8, 4.2))
 
 
@@ -25,20 +25,20 @@ def write_json(path, value) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False))
 
 
-@pytest.fixture
-def edition(tmp_path, monkeypatch):
+def stage(tmp_path, monkeypatch, code, groups, words, captions=()):
     """Stage an assembled edition: script, cast, timeline, waveform, receipt and selection."""
-    release = repository.read(production.Edition("zh").script)["release"]
+    release = repository.read(production.Edition(code).script)["release"]
     monkeypatch.setattr(repository, "ROOT", tmp_path)
-    edition = production.Edition("zh")
+    edition = production.Edition(code)
+    text = "".join(groups)
     segment = {
         "id": "01",
         "chapter": "a",
         "chapter_title": "A",
         "title": "Scene 01",
-        "utterance_groups": ["甲乙。", "丙丁。"],
-        "text": TEXT,
-        "spoken_text": TEXT,
+        "utterance_groups": list(groups),
+        "text": text,
+        "spoken_text": text,
     }
     script = {
         "title": "Sample Reel",
@@ -55,10 +55,15 @@ def edition(tmp_path, monkeypatch):
         "voice_end": 4.3,
         "gap_before": 2.0,
         "gap_kind": "opening",
-        "words": [{"text": word, "start": start, "end": end} for word, start, end in WORDS],
+        "words": [{"text": word, "start": start, "end": end} for word, start, end in words],
         "end": 6.0,
     }
-    timeline = {**script, "segments": [timed], "timing_state": "Assembled", "captions": []}
+    timeline = {
+        **script,
+        "segments": [timed],
+        "timing_state": "Assembled",
+        "captions": list(captions),
+    }
     write_json(edition.timeline, timeline)
     edition.soundtrack.write_bytes(b"RIFF narration")
     write_json(
@@ -75,12 +80,18 @@ def edition(tmp_path, monkeypatch):
     write_json(
         edition.narration_selected,
         {
-            "records": [{"id": "01", "text": TEXT}],
+            "records": [{"id": "01", "text": text}],
             "script_sha256": "0" * 64,
             "cast_sha256": sha256(tmp_path / edition.cast),
         },
     )
     return edition
+
+
+@pytest.fixture
+def edition(tmp_path, monkeypatch):
+    """An assembled Chinese edition of two thoughts."""
+    return stage(tmp_path, monkeypatch, "zh", ["甲乙。", "丙丁。"], WORDS)
 
 
 def read(path) -> dict:
@@ -192,3 +203,49 @@ def test_a_refresh_over_a_reviewed_build_waits_for_its_set_aside(edition):
     )
     produce.main(["refresh-captions", "--language", "zh"])
     assert [cue["text"] for cue in read(edition.timeline)["captions"]] == ["甲乙。", "丙丁。"]
+
+
+# An English edition assembled before cues were typeset: each cue's text is the script's, and a
+# cue with a straight mark carries its display copy beside it.
+ENGLISH_GROUPS = ["It isn't done. ", 'The film\'s record says "Done."']
+ENGLISH_WORDS = (
+    ("It", 2.0, 2.2),
+    ("isn't", 2.2, 2.6),
+    ("done.", 2.6, 3.2),
+    ("The", 3.8, 3.9),
+    ("film's", 3.9, 4.3),
+    ("record", 4.3, 4.7),
+    ("says", 4.7, 5.0),
+    ('"Done."', 5.0, 5.6),
+)
+ENGLISH_CUES = [(2.0, 3.45, "It isn’t done. "), (3.8, 5.85, "The film’s record says “Done.”")]
+
+
+def test_a_refresh_typesets_the_cues_and_keeps_the_subtitles(tmp_path, monkeypatch):
+    before = [
+        {"start": start, "end": end, "text": text, "segment": "01", "display_text": shown}
+        for (start, end, shown), text in zip(ENGLISH_CUES, ENGLISH_GROUPS, strict=True)
+    ]
+    edition = stage(tmp_path, monkeypatch, "en", ENGLISH_GROUPS, ENGLISH_WORDS, before)
+    edition.artifacts.mkdir(parents=True, exist_ok=True)
+    captions_documents.subtitle_files(read(edition.timeline), edition)
+    subtitles = [edition.artifacts / f"{edition.prefix}.{kind}" for kind in ("srt", "vtt")]
+    written = [path.read_bytes() for path in subtitles]
+    captions_refresh.refresh_captions(edition)
+    timeline = read(edition.timeline)
+    # Each cue now holds the text it shows, and no cue holds a straight mark.
+    assert timeline["captions"] == [
+        {"start": start, "end": pytest.approx(end), "text": text, "segment": "01"}
+        for start, end, text in ENGLISH_CUES
+    ]
+    assert not any(mark in cue["text"] for cue in timeline["captions"] for mark in "'\"")
+    # The subtitles are the same bytes, and their lines are the cues' text.
+    assert [path.read_bytes() for path in subtitles] == written
+    lines = subtitles[0].read_text().splitlines()
+    assert [lines[2], lines[6]] == [text.strip() for _, _, text in ENGLISH_CUES]
+    # The narration, its thoughts and its aligned words stay the script's and the aligner's.
+    script = read(repository.ROOT / edition.script)["segments"][0]
+    timed = timeline["segments"][0]
+    assert all(timed[key] == value for key, value in script.items())
+    assert [word["text"] for word in timed["words"]] == [word for word, _, _ in ENGLISH_WORDS]
+    assert read(edition.audio_assembly)["captions_above_reading_rate"] == []

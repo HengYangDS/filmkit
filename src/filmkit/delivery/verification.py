@@ -20,6 +20,7 @@ import json
 import wave
 from pathlib import Path
 
+import filmkit.captions.timing as captions_timing
 import filmkit.delivery.packaging as packaging
 import filmkit.delivery.player as player
 import filmkit.delivery.spotlight as spotlight
@@ -65,7 +66,7 @@ def verify_sources() -> dict:
 
 
 def verify_captions(timeline: dict, code: str) -> int:
-    """Captions stay single-line, within their limit and before the credits."""
+    """Captions stay single-line, typeset, within their limit and before the credits."""
     limit, prior_end = specification.CAPTION_LIMITS[code], 0.0
     for cue in timeline["captions"]:
         display = cue.get("display_text", cue["text"])
@@ -73,6 +74,7 @@ def verify_captions(timeline: dict, code: str) -> int:
             0 <= cue["start"] < cue["end"] <= DURATION - CREDITS_DURATION
             and cue["start"] >= prior_end - 0.15
             and all("\n" not in v and len(v) <= limit for v in (cue["text"], display))
+            and all(captions_timing.typeset(v) == v for v in (cue["text"], display))
             and narration_spoken_units.units(display) == narration_spoken_units.units(cue["text"])
         ):
             msg = f"Caption differs from the caption contract: {cue}"

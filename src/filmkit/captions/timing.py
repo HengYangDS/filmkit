@@ -1,11 +1,13 @@
-"""Time each edition's caption cues to its narration and set their display copy.
+"""Time each edition's caption cues to its narration and typeset the text they show.
 
 A cue is bound to the exact aligned words of its phrase, never crosses a thought, and never
-changes the waveform. The declared caption timing gives a cue's tail after its last word, the
-early start a brief cue that ends a line may take, and, for English, the full-interval hold. A
-brief cue, or an English cue read faster than 25 characters per second, then joins its sentence
-or holds into the quiet after it. The assembly receipt lists each English cue still read faster,
-with its rate.
+changes the waveform. Its text is the display copy of its phrase, with typographic quotation
+marks, while the segment's narration and aligned words stay as the script and the aligner wrote
+them. The declared caption timing gives a cue's tail after its last word, the early start a
+brief cue that ends a line may take, and, for English, the full-interval hold. A brief cue, or
+an English cue read faster than 25 characters per second, then joins its sentence or holds into
+the quiet after it. The assembly receipt lists each English cue still read faster, with its
+rate.
 """
 
 from __future__ import annotations
@@ -60,7 +62,8 @@ def typeset(text: str) -> str:
 
 
 def shown_text(cue: dict) -> str:
-    """The text a caption cue shows: its display copy when it is set differently."""
+    """The text a caption cue shows: its text, or the display copy that a cue timed before
+    cues held their typeset text carries beside the script's."""
     return cue.get("display_text", cue["text"])
 
 
@@ -121,8 +124,9 @@ def _segment_cues(
     """A segment's cues on its exact aligned words, and the speech span each one may show.
 
     A cue starts on its first word, within the voice, and holds the declared tail after its
-    last word, but not into the next word or past the segment. A cue's span runs from the end
-    of the word before it to the end of its own last word.
+    last word, but not into the next word or past the segment. Its text is its phrase as the
+    segment's typeset text sets it, so the cues of a segment join into that text. A cue's span
+    runs from the end of the word before it to the end of its own last word.
     """
     stream, times = aligned_lookup(
         segment["text"],
@@ -146,15 +150,14 @@ def _segment_cues(
         next_word_start = (
             times[position + length][0] if position + length < len(times) else segment["end"]
         )
-        cue = {
-            "start": max(segment["voice_start"], times[position][0]),
-            "end": min(last_word_end + timing.tail, next_word_start, segment["end"]),
-            "text": phrase,
-            "segment": segment["id"],
-        }
-        if display[offset : offset + len(phrase)] != phrase:
-            cue["display_text"] = display[offset : offset + len(phrase)]
-        cues.append(cue)
+        cues.append(
+            {
+                "start": max(segment["voice_start"], times[position][0]),
+                "end": min(last_word_end + timing.tail, next_word_start, segment["end"]),
+                "text": display[offset : offset + len(phrase)],
+                "segment": segment["id"],
+            }
+        )
         before = times[position - 1][1] if position else segment["voice_start"]
         spans.append((max(segment["voice_start"], before), last_word_end))
         position += length
@@ -272,7 +275,6 @@ def steady_short_cues(
                 and second["start"] - first["end"] < CUE_JOIN_QUIET_SECONDS
                 and not SENTENCE_END.search(first["text"])
                 and len(first["text"] + second["text"]) <= limit
-                and len(shown_text(first) + shown_text(second)) <= limit
             ):
                 joined = {
                     "start": first["start"],
@@ -280,8 +282,6 @@ def steady_short_cues(
                     "text": first["text"] + second["text"],
                     "segment": first["segment"],
                 }
-                if "display_text" in first or "display_text" in second:
-                    joined["display_text"] = shown_text(first) + shown_text(second)
                 result[left : right + 1] = [joined]
                 index = left
                 break

@@ -330,6 +330,75 @@ def test_the_display_copy_sets_typographic_quotes(text, display):
     assert len(display) == len(text)
 
 
+# A contraction, a possessive and a quoted reply of two sentences, as a script writes them: the
+# cue boundaries it authors, the narration they join into and the words an aligner returns.
+QUOTED_PHRASES = [
+    "They don't ",
+    "guess at the film's state. ",
+    'It says "Done. All tests pass." ',
+    "It stays.",
+]
+QUOTED = "".join(QUOTED_PHRASES)
+QUOTED_WORDS = [
+    ("They", 0.0, 0.2),
+    ("don't", 0.2, 0.5),
+    ("guess", 0.5, 0.8),
+    ("at", 0.8, 0.9),
+    ("the", 0.9, 1.0),
+    ("film's", 1.0, 1.3),
+    ("state.", 1.3, 1.7),
+    ("It", 2.0, 2.1),
+    ("says", 2.1, 2.3),
+    ('"Done.', 2.3, 2.6),
+    ("All", 2.8, 2.9),
+    ("tests", 2.9, 3.1),
+    ('pass."', 3.1, 3.4),
+    ("It", 3.8, 4.0),
+    ("stays.", 4.0, 5.0),
+]
+QUOTED_CUES = [
+    (0.0, 1.7, "They don’t guess at the film’s state. "),
+    (2.0, 3.4, "It says “Done. All tests pass.” "),
+    (3.8, 5.0, "It stays."),
+]
+
+
+def test_an_english_cue_holds_its_typeset_text():
+    spoken = one_segment(QUOTED, QUOTED_PHRASES, QUOTED_WORDS)
+    cues = captions_timing.timed_caption_cues(spoken, "en")
+    # The brief first phrase joins its sentence, and every cue holds the text it shows.
+    assert [(cue["start"], cue["end"], cue["text"]) for cue in cues] == QUOTED_CUES
+    assert all(set(cue) == {"start", "end", "text", "segment"} for cue in cues)
+    assert "".join(cue["text"] for cue in cues) == captions_timing.typeset(QUOTED)
+    assert not any(mark in cue["text"] for cue in cues for mark in "'\"")
+    # The narration and its aligned words stay as the script and the aligner wrote them.
+    assert spoken["segments"][0]["text"] == QUOTED
+    assert [word["text"] for word in spoken["segments"][0]["words"]] == [
+        word for word, _, _ in QUOTED_WORDS
+    ]
+
+
+def test_typeset_narration_times_the_same_cues():
+    # A script that sets its own typographic marks gets the same cues at the same times.
+    typeset = captions_timing.typeset
+    written = one_segment(QUOTED, QUOTED_PHRASES, QUOTED_WORDS)
+    marked = one_segment(
+        typeset(QUOTED),
+        [typeset(phrase) for phrase in QUOTED_PHRASES],
+        [(typeset(word), start, end) for word, start, end in QUOTED_WORDS],
+    )
+    assert "".join(typeset(phrase) for phrase in QUOTED_PHRASES) == typeset(QUOTED)
+    cues = captions_timing.timed_caption_cues(written, "en")
+    assert cues == captions_timing.timed_caption_cues(marked, "en")
+
+
+def test_a_cue_timed_before_cues_were_typeset_shows_its_display_copy():
+    assert captions_timing.shown_text({"text": "It's done.", "display_text": "It’s done."}) == (
+        "It’s done."
+    )
+    assert captions_timing.shown_text({"text": "It’s done."}) == "It’s done."
+
+
 def test_the_receipt_counts_the_cues_and_states_their_timing():
     # A Chinese edition has no reading rate, so no cue stands above one.
     fields = captions_timing.caption_receipt_fields({"captions": [{}, {}]}, "zh")
