@@ -9,4 +9,4 @@
 
 ## 3. Release
 
-- [ ] 3.1 Record the fix in the Changelog and set the version to 0.22.2; done when `mise run check` passes.
+- [x] 3.1 Record the fix in the Changelog and set the version to 0.22.2; done when `mise run check` passes. Every command of `mise run check` passed in the lane at 424af2c on 15 November: the dependency checks, 189 Node tests run one file at a time, the Markdown check and 1,141 Python tests. The full proof runs on the release head.
