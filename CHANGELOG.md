@@ -19,6 +19,11 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - A script may declare `thought_level_tolerance_db` from 0.25 dB (was 0.5 dB), so that two adjacent thoughts at opposite edges of the tolerance stand at most half a decibel apart.
 - `film:compare` no longer decodes a rebuilt film that holds its published film's size and SHA-256: it reports an identical file whose layers hold and whose PSNR is not measured. Without a recorded floor such a film still does not pass, and the report says that it calibrates none. A film that differs in any byte is compared as before.
 
+### Removed
+
+- The Prettier, Ruff and Taplo configuration files, which repeated settings that ETHOS ships and
+  always applies; formatting and linting are decided by the same settings as before.
+
 ## [0.21.3] - 2026-11-14
 
 ### Changed
