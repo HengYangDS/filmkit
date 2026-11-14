@@ -11,7 +11,7 @@
 
 ## 3. Picture
 
-- [x] 3.1 Record the clear gap between neighbouring names on one row in the geometry check and gate it with `--gate-row-gaps`; done when the measure finds every pair the reviewers' notes name on the delivered films and the check fails for them only when gated.
+- [x] 3.1 Record the clear gap between neighbouring names on one row in the geometry check and gate it with `--gate-row-gaps`; done when the measure finds every pair the reviewers' notes name on the delivered films and the check fails for them only when gated. In Chrome on the delivered stages (14 November) the record holds the five DDWG pairs of EN40-16 and essentials' ZH16-n3 pair, plus pairs the other reviews accepted; a sentence set as two runs with a joining mark between them is not a pair.
 - [x] 3.2 Record every stretch of glides and flows over the pace line in the motion audit and gate those over a film's declared `picture.motion.pace_limit`; done when the audit's stretches cover the glides the notes name and a film without a limit is not refused.
 - [x] 3.3 Test one-frame transients and edge slivers in the comparison of an edition's two masters; done when a synthetic one-frame fault refuses and the delivered masters' events stay under the declared bound.
 

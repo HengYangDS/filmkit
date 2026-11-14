@@ -16,5 +16,5 @@ The geometry check SHALL record every pair of neighbouring names of one scene th
 
 #### Scenario: Texts that are not neighbours
 
-- **WHEN** two texts share one registered whole, stand under half an em apart, are set in different sizes, or have a lit mark between them
+- **WHEN** two texts share one registered whole, stand under half an em apart, are set in different sizes, have a lit mark between them, or the first ends in a joining mark such as 、 or a comma after its words
 - **THEN** no row gap is recorded

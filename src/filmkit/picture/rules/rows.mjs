@@ -9,7 +9,8 @@
  * measured from 49 px, 1.66 em, on.
  *
  * A name is a scene's label whose whole text, the one it is registered with or its own, holds a letter, and each of
- * its painted runs that reads at LEGIBLE:1 or more is judged, a closing comma painted on its own included. Two runs
+ * its painted runs that reads at LEGIBLE:1 or more is judged, a closing comma painted on its own included; a run that
+ * ends in a joining mark (、 ， , ; ；) reads on into the run after it, so the two are one sentence, not neighbours. Two runs
  * stand on one row when the middles of their boxes are within LEVEL em of each other: the reviews' scripts take ink
  * 7 px apart in height at 1080p, a quarter of an em, as one row. A run's neighbour is the nearest run of its scene to
  * its right on its row; it is judged when it belongs to another name, so the runs and lines of one name and a term
@@ -39,6 +40,9 @@ export function rowGaps(level) {
   const face = (v) => v.shown ?? v.size;
   const whole = (v) => v.whole ?? v.text;
   const middle = (v) => (v.bounds[1] + v.bounds[3]) / 2;
+  // A run of words that ends in a joining mark reads on into the run after it: one sentence set as two runs. A mark
+  // painted on its own is a name's closing mark, which ends it.
+  const continues = (v) => /\p{L}.*[、，,;；]\s*$/u.test(v.text);
   const meets = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
   /* Liang-Barsky: does segment p-q enter rectangle r? */
   const crosses = ([x0, y0], [x1, y1], [rx0, ry0, rx1, ry1]) => {
@@ -103,7 +107,7 @@ export function rowGaps(level) {
               Math.abs(middle(v) - middle(a)) <= LEVEL * Math.min(face(a), face(v)),
           )
           .sort((u, v) => gapTo(u) - gapTo(v))[0];
-        if (!b || whole(a) === whole(b)) continue;
+        if (!b || whole(a) === whole(b) || continues(a)) continue;
         const em = Math.min(face(a), face(b)),
           gap = gapTo(b);
         if (Math.abs(face(a) - face(b)) > FACE * em || gap < JOIN * em || gap >= FLOOR * em)

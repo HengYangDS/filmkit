@@ -118,6 +118,13 @@ test("the words and lines of one name, and a name beside its qualifier, are not 
   // Runs a word space apart, under half an em, read as one line whatever they are registered as.
   assert.deepEqual(still(pair(12)), []);
   assert.equal(still(pair(16)).length, 1);
+  // One sentence set as two runs, the first ending in a joining mark (a Chinese enumeration or clause mark, a comma
+  // or a semicolon), reads on into the second whatever each is registered as: the mark says the line continues.
+  assert.deepEqual(still([name("威胁到数据、生产、", 400, 230), name("下游或合规", 648, 130)]), []);
+  assert.deepEqual(
+    still([name("Threatens data, production,", 400, 300), name("downstream use", 736, 170)]),
+    [],
+  );
   // A note beside a name is set in the other text size: a lead-in or a qualifier, not a neighbouring name.
   const note = { size: 25, bounds: [400, 503, 550, 526] };
   assert.deepEqual(still(pair(30, note)), []);
