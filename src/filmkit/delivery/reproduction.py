@@ -10,7 +10,9 @@ script and composition. Each rebuilt film that the release publishes must have i
 film's frame count, decoded audio, streams, chapters and tags, and every decoded frame's PSNR
 against it at or above the floor that the manifest records. Without a floor the comparison
 reports the lowest frames, so that they can be inspected and the floor recorded, and does not
-pass.
+pass. A rebuilt film that holds its published film's size and SHA-256 decodes as it does: the
+comparison decodes neither, reports an identical file whose every layer holds and whose PSNR
+is not measured, and, without a floor, still does not pass, for such a film calibrates none.
 
 A release publishes either all four films of each edition, with the uncaptioned picture's stage
 document recorded beside the captioned one's, or, published before the films without captions
@@ -179,7 +181,10 @@ def changed_sources(release: Release) -> list[str]:
 
 
 def published(release: Release) -> dict[str, Path]:
-    """Each published asset, refused unless it holds the bytes the manifest records."""
+    """Each published asset, refused unless it holds the bytes the manifest records.
+
+    A comparison may then take an asset's recorded size and SHA-256 for its file's.
+    """
     folder, found = repository.ROOT / RELEASE, {}
     for asset in release.assets:
         path = folder / asset.name
@@ -297,21 +302,61 @@ def container(path: Path) -> dict:
     }
 
 
-def film(name: str, rebuilt: Path, published: Path, floor: float | None) -> dict:
-    """A rebuilt film against its published film: frames, audio, container and picture."""
+def identical_film(asset: Asset, floor: float | None) -> dict:
+    """A rebuilt film that holds its published film's bytes: every layer holds, none decoded.
+
+    Equal bytes decode to equal frames and audio, so no frame is counted and no PSNR measured.
+    Such a film exercises no floor: without a recorded one it does not pass, and calibrates none.
+    """
+    note = "The rebuilt file holds the published film's bytes: no frame or audio was decoded"
+    if floor is None:
+        note += ", so that it measures no minimum and calibrates no floor"
+    return {
+        "asset": asset.name,
+        "identical_file": True,
+        "sha256": asset.sha256,
+        "note": f"{note}.",
+        "frames": None,
+        "audio": "identical",
+        "container": "identical",
+        "psnr": {
+            "floor_db": floor,
+            "measured": False,
+            "identical_frames": None,
+            "minimum_db": None,
+            "mean_db": None,
+            "lowest": [],
+            "below_floor": [],
+        },
+        "failing": [],
+        "verdict": "calibrating" if floor is None else "pass",
+    }
+
+
+def film(asset: Asset, rebuilt: Path, published: Path, floor: float | None) -> dict:
+    """A rebuilt film against its published film: frames, audio, container and picture.
+
+    `published` holds the bytes that `asset` records; a rebuilt film of that size and SHA-256
+    is reported as an identical file, and any other is decoded.
+    """
+    name = asset.name
     if not rebuilt.is_file():
         return {"asset": name, "verdict": "fail", "failing": ["missing"]}
+    if rebuilt.stat().st_size == asset.bytes and repository.sha(rebuilt) == asset.sha256:
+        return identical_film(asset, floor)
     frames = media.video_stream(media.probe(published)).get("nb_frames")
     psnr = frame_psnr(rebuilt, published)
     finite = sorted((value, index) for index, value in enumerate(psnr) if math.isfinite(value))
     below = [index for index, value in enumerate(psnr) if floor is not None and value < floor]
     result = {
         "asset": name,
+        "identical_file": False,
         "frames": len(psnr),
         "audio": "identical" if decoded_audio(rebuilt) == decoded_audio(published) else "differs",
         "container": "identical" if container(rebuilt) == container(published) else "differs",
         "psnr": {
             "floor_db": floor,
+            "measured": True,
             "identical_frames": len(psnr) - len(finite),
             "minimum_db": finite[0][0] if finite else None,
             "mean_db": sum(value for value, _ in finite) / len(finite) if finite else None,
@@ -334,8 +379,13 @@ def film(name: str, rebuilt: Path, published: Path, floor: float | None) -> dict
     return result
 
 
-def compare_edition(edition: production.Edition, record: EditionRecord, assets: dict) -> dict:
-    """One edition's every layer against its published assets and its manifest record."""
+def compare_edition(
+    edition: production.Edition, record: EditionRecord, assets: dict, listed: dict[str, Asset]
+) -> dict:
+    """One edition's every layer against its published assets and its manifest record.
+
+    `assets` holds each published asset's file and `listed` its record in the manifest.
+    """
     layers = members(edition)
     uncaptioned = edition.rendered(captions=False).stage / "index.html"
     return {
@@ -353,7 +403,7 @@ def compare_edition(edition: production.Edition, record: EditionRecord, assets: 
             if layer == "document"
         ],
         "films": [
-            film(name, source, assets[name], record.picture_floor_db.get(name))
+            film(listed[name], source, assets[name], record.picture_floor_db.get(name))
             for name, (layer, source) in layers.items()
             if layer == "film" and name in assets
         ],
@@ -390,11 +440,12 @@ def compare() -> dict:
         msg = f"The film-bound sources differ from the release manifest: {', '.join(changed)}"
         raise ReproductionError(msg)
     assets = published(release)
+    listed = {asset.name: asset for asset in release.assets}
     report = {
         "release": release.version,
         "ffmpeg": repository.run(["ffmpeg", "-version"]).stdout.decode().splitlines()[0],
         "editions": {
-            code: compare_edition(production.Edition(code), release.editions[code], assets)
+            code: compare_edition(production.Edition(code), release.editions[code], assets, listed)
             for code in production.CODES
         },
     }

@@ -188,8 +188,78 @@ def release(tmp_path, monkeypatch, films) -> Release:
     return published
 
 
+@pytest.fixture
+def decodes(monkeypatch) -> list[str]:
+    """The name of each film that the comparison decodes, with every decode standing in for six
+    equal frames, equal audio and an equal container, so that no damaged file reaches FFmpeg."""
+    decoded = []
+
+    def frames(rebuilt: Path, _published: Path) -> list[float]:
+        decoded.append(rebuilt.name)
+        return [float("inf")] * 6
+
+    monkeypatch.setattr(reproduction, "frame_psnr", frames)
+    monkeypatch.setattr(reproduction, "decoded_audio", lambda _path: "audio")
+    monkeypatch.setattr(reproduction, "container", lambda _path: {})
+    return decoded
+
+
+@pytest.mark.usefixtures("unleveled")
+def test_a_film_that_holds_the_published_bytes_passes_every_layer_and_is_not_decoded(
+    release, decodes
+):
+    report = release.compare()
+    assert report["verdict"] == "pass"
+    assert decodes == []
+    uhd = report["editions"]["zh"]["films"][0]
+    assert uhd["identical_file"] is True
+    assert uhd["sha256"] == repository.sha(release.folder / "sample-reel-zh-uhd.mp4")
+    assert (uhd["audio"], uhd["container"]) == ("identical", "identical")
+    # Nothing was decoded: the report counts no frame and measures no PSNR.
+    unmeasured = dict.fromkeys(("identical_frames", "minimum_db", "mean_db"))
+    assert (uhd["frames"], uhd["failing"], uhd["verdict"]) == (None, [], "pass")
+    assert uhd["psnr"] == {"floor_db": 30.0, "measured": False, "lowest": [], "below_floor": []} | (
+        unmeasured
+    )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda film: film.write_bytes(film.read_bytes()[:-1] + b"\xff"),
+        lambda film: film.write_bytes(film.read_bytes() + b"\x00"),
+    ],
+    ids=["one byte changed", "one byte longer"],
+)
+def test_a_film_that_differs_by_one_byte_is_decoded(release, decodes, change):
+    change(production.Edition("zh").film("uhd"))
+    films = release.compare()["editions"]["zh"]["films"]
+    assert decodes == ["sample-reel-zh-uhd.mp4"]
+    assert (films[0]["identical_file"], films[0]["frames"]) == (False, 6)
+    assert (films[0]["psnr"]["measured"], films[0]["psnr"]["identical_frames"]) == (True, 6)
+    assert "sha256" not in films[0]
+    assert [film["identical_file"] for film in films[1:]] == [True, True, True]
+
+
+@pytest.mark.usefixtures("unleveled")
+def test_without_a_floor_a_film_that_holds_the_published_bytes_calibrates_none(release, decodes):
+    release.record(floors=None)
+    report = release.compare()
+    assert decodes == []
+    assert report["verdict"] == "calibrating"
+    uhd = report["editions"]["zh"]["films"][0]
+    assert (uhd["identical_file"], uhd["verdict"]) == (True, "calibrating")
+    psnr = uhd["psnr"]
+    assert (psnr["floor_db"], psnr["measured"], psnr["minimum_db"]) == (None, False, None)
+    assert "calibrates no floor" in uhd["note"]
+    with pytest.raises(SystemExit, match="calibrating"):
+        reproduction.main(["--read-only"])
+
+
 @pytest.mark.usefixtures("unleveled")
 def test_a_faithful_rebuild_passes_and_reports_every_layer(release):
+    # A rebuilt film is packaged anew: it decodes as the published film without holding its bytes.
+    shutil.copyfile(release.films["later"], production.Edition("zh").film("uhd"))
     report = release.compare()
     assert report["verdict"] == "pass"
     assert report["release"] == "1.0.0"
@@ -206,6 +276,7 @@ def test_a_faithful_rebuild_passes_and_reports_every_layer(release):
     uhd = zh["films"][0]
     assert uhd["asset"] == "sample-reel-zh-uhd.mp4"
     assert (uhd["frames"], uhd["audio"], uhd["container"]) == (6, "identical", "identical")
+    assert (uhd["identical_file"], uhd["psnr"]["measured"]) == (False, True)
     assert uhd["psnr"]["identical_frames"] == 6
     assert uhd["psnr"]["minimum_db"] is None
     assert uhd["verdict"] == "pass"
