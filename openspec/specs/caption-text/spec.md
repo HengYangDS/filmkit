@@ -27,7 +27,7 @@ The Chinese caption phrasing SHALL keep each closing quotation mark or bracket t
 
 ### Requirement: The display copy sets typographic quotation marks
 
-The display copy of captions, subtitles, transcripts and their headings, chapter titles and the films' title, comment, description and synopsis tags SHALL set each apostrophe as a right single quotation mark, and each straight double quotation mark as a left one where it begins the text or follows a space, an opening bracket or a dash, and as a right one elsewhere. It SHALL change no other character, so a cue's text, its timing and the waveform stay as they are.
+The display copy of captions, subtitles, transcripts and their headings, chapter titles and the films' title, comment, description and synopsis tags SHALL set each apostrophe as a right single quotation mark, and each straight double quotation mark as a left one where it begins the text or follows a space, an opening bracket or a dash, and as a right one elsewhere. It SHALL change no other character, so a cue's timing and the waveform stay as they are.
 
 #### Scenario: A quoted sentence in English
 
@@ -110,3 +110,18 @@ An English cue read faster than 25 characters per second SHALL join an adjacent 
 
 - **WHEN** a cue of 32 characters is shown for 1.12 s, joining it with the next cue of its sentence would make a line of 69 characters, and the next cue starts as it ends
 - **THEN** it keeps its text and times, and the edition's caption record lists it at 28.6 characters per second
+
+### Requirement: A cue's text is its typeset display copy
+
+Each caption cue the engine writes into a timeline SHALL hold as its text its phrase as the segment's typeset text sets it, with no separate display copy, so a segment's cues join into its typeset narration. The segment's narration, thoughts and aligned words SHALL stay as the script and the aligner wrote them, and verification SHALL refuse a cue that holds a straight apostrophe or a straight double quotation mark.
+
+#### Scenario: A contraction, a possessive and a quotation
+
+- **WHEN** a segment reads They don't guess at the film's state. It says "Done. All tests pass."
+- **THEN** its cues read They don’t guess at the film’s state. and It says “Done. All tests pass.”, at the times and with the subtitle lines they had before
+- **AND** the segment's text and words are unchanged
+
+#### Scenario: A timeline built before
+
+- **WHEN** an English timeline's cue reads the film's data beside the display copy the film’s data
+- **THEN** verification refuses it until `produce refresh-captions` rewrites the cue as the film’s data
