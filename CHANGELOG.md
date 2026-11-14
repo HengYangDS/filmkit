@@ -4,6 +4,31 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-11-15
+
+### Security
+
+- `package.json` overrides `undici` to 7.30.2, which fixes six advisories in 7.30.1, one rated high
+  (GHSA-mqg3-3v4r-cm32, a redirect chain's final response cached under the original request key) and
+  five rated medium.
+
+### Changed
+
+- The engine renders with HyperFrames 0.9.46 and drives the browser with puppeteer-core 25.17.0, and
+  each staged document loads GSAP 3.15.1. The browser build stays Chrome Headless Shell
+  152.0.7977.30, because 0.9.46 still declares that build. Built at v0.22.0 and again on these
+  inputs, the sample film's twelve films decode to the same frames, 43,200 of 43,200, and the eight
+  with sound to the same audio; the files differ only in the renderer version and the creation time
+  their containers record. A new renderer can change the frames a film renders, so a film keeps its
+  current filmkit pin until it produces, reviews and accepts an edition on a release that carries
+  this one.
+- The npm lock takes postcss 8.5.33.
+
+### Fixed
+
+- The README and `NOTICE` name @puppeteer/browsers 3.2.7, the version `package.json` has pinned
+  since 0.21.3, and the Changelog links the 0.21.3, 0.22.0 and 0.22.1 sections.
+
 ## [0.22.0] - 2026-11-15
 
 ### Added
@@ -391,7 +416,10 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.21.2...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.22.1...HEAD
+[0.22.1]: https://github.com/HengYangDS/filmkit/compare/v0.22.0...v0.22.1
+[0.22.0]: https://github.com/HengYangDS/filmkit/compare/v0.21.3...v0.22.0
+[0.21.3]: https://github.com/HengYangDS/filmkit/compare/v0.21.2...v0.21.3
 [0.21.2]: https://github.com/HengYangDS/filmkit/compare/v0.21.1...v0.21.2
 [0.21.1]: https://github.com/HengYangDS/filmkit/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/HengYangDS/filmkit/compare/v0.20.0...v0.21.0
