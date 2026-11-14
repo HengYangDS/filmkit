@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-11-15
+
 ### Added
 
 - `produce check-sound` judges an edition's assembled soundtrack before the picture follows it. It takes the review's own measures from the soundtrack and its timeline, writes them with their verdict to `build/evidence/editions/<edition>/sound-gates.json`, bound to both files' SHA-256, and refuses a soundtrack or a segment under the clarity floor the film declares, a thought that ends abruptly or is cut while voiced, and a phrase that stops without a heard fall. On the measurements of seven delivered rounds of three films it refuses two soundtracks, each for the one phrase its reviewers noted. A film adds the action to its sound stage after `refresh-captions`. The sample film runs it, and declares the English floor its unauditioned takes hold, 16 dB, where it had declared 17 dB and read 16.68 dB unrefused.

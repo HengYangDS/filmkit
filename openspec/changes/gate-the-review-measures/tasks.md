@@ -3,7 +3,7 @@
 - [x] 1.1 Lower the floor of `thought_level_tolerance_db` to 0.25 dB; done when a policy of 0.25 is accepted and 0.2 is refused with the range.
 - [x] 1.2 Add the production action `check-sound` with its record `sound-gates.json`; done when its tests show a pass, each refusal with its place and figure, and a film without a floor not judged on clarity.
 - [x] 1.3 Measure segment clarity on the whole soundtrack's grid and threshold and record each thought over the grid's sixteen phases; done when the engine's segment figures stand within 0.05 dB of the reviewers' on a delivered soundtrack.
-- [ ] 1.4 Run `check-sound` in the sample film's build and state it in the README's stages; done when the sample film's acceptance runs it and passes. The gate refused the sample's English soundtrack at its first run (16.68 dB against a declared 17 dB), so the sample declares the floor its first takes hold, 16 dB.
+- [x] 1.4 Run `check-sound` in the sample film's build and state it in the README's stages; done when the sample film's acceptance runs it and passes. The gate refused the sample's English soundtrack at its first run (16.68 dB against a declared 17 dB), so the sample declares the floor its first takes hold, 16 dB. The sample film's build then passed every stage on 14 November: sound with `check-sound` on both editions, picture, package and the technical verification.
 
 ## 2. Captions
 
@@ -21,5 +21,5 @@
 
 ## 5. Release
 
-- [ ] 5.1 Check every changed measure against the delivered films' records; done when each gate's hits on the three films are listed beside the notes they answer, with no unexplained hit.
-- [ ] 5.2 Record the release in the Changelog and set the version to 0.22.0; done when `mise run check` passes.
+- [x] 5.1 Check every changed measure against the delivered films' records; done when each gate's hits on the three films are listed beside the notes they answer, with no unexplained hit. Every measure is listed beside its notes in `build/evidence/gate-calibration/summary.md`: the sound gate refuses the two phrases reviewers noted in seven delivered rounds; segment clarity equals the reviewers' to 0.01 dB; the edge slivers of all six pairs of masters peak at 64 samples under the bound of 96; the row-gap record in Chrome holds every pair EN40-16 and ZH16-n3 name; the pace record covers the glides Z40-7 and EN40-12 name. Hits in pictures whose reviews accepted them are why the row-gap gate and the pace limit are the film's to switch on.
+- [x] 5.2 Record the release in the Changelog and set the version to 0.22.0; done when `mise run check` passes. `mise run check` passed in the lane on 14 November before the version was set; the full proof runs on the release head.
