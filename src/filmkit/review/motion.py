@@ -1,7 +1,8 @@
 """The motion an edition's reviewers read, from the motion report its picture gate judged.
 
 `check-picture` follows every mark of the edition's picture as a viewer sees it move and gates
-its halts, starts, races, pops, jumps and dash snaps (`filmkit.picture.gates`). The review's
+its halts, starts, races, pops, jumps, dash snaps and stretches over the pace line
+(`filmkit.picture.gates`). The review's
 measurement reports that same judgment, so reviewers judge motion from measurement rather than
 from contact sheets: the counts of each kind of event, the findings and how many of them the
 film declares, the fastest glide and flow of each scene and of the edition, and every finding
@@ -30,9 +31,11 @@ METHOD = (
     "all outside stage cuts, and a declared cut that keeps its stage excuses only the marks it "
     "takes away; jumps are the firm marks a stage cut keeps but moves whole by one shift of 8 px "
     "or more beyond their own motion, holding half the scene's firm ink; each finding is a run of "
-    "frames of one kind, scene and line"
+    "frames of one kind, scene and line; a pace is a stretch of consecutive frames in which marks "
+    "of one scene move over 450 px/s, a stage with the marks it carries and those moving within "
+    "it counted once, by its fastest mark"
 )
-KINDS = ("halts", "starts", "races", "pops", "jumps", "dash_snaps")
+KINDS = ("halts", "starts", "races", "pops", "jumps", "dash_snaps", "paces")
 # The prefixes of the gate record's motion findings.
 MOTION_GATES = tuple(f"{name} " for name in GATED.values())
 

@@ -126,7 +126,7 @@ class MotionException(Declared):
     edition: Literal["zh", "en"]
     scene: Stated
     source: Annotated[str, StringConstraints(pattern=r"^(film\.js:[1-9][0-9]*|[^\s:]+\.m?js)$")]
-    kind: Literal["halt", "start", "race", "pop", "jump", "dash"]
+    kind: Literal["halt", "start", "race", "pop", "jump", "dash", "pace"]
     reason: Stated
 
 
@@ -136,9 +136,16 @@ class Motion(Declared):
     A finding of an edition that one of the edition's exceptions names by its scene, its line or
     module and its kind is recorded with the reason instead of refused, and an exception that no
     finding of its edition matches is refused.
+
+    `pace_limit` is the fastest a glide or a flow may move, in px/s at 1080p, from the line of
+    450 at which the motion audit records a stretch to under the 900 at which it calls a race.
+    Reviews hold films of a calm register to 450 and have accepted faster glides in others, so
+    the limit is the film's to declare: without one a stretch over 450 is recorded, with one a
+    stretch whose peak exceeds it is refused.
     """
 
     exceptions: tuple[MotionException, ...] = ()
+    pace_limit: Annotated[float, Field(ge=450, lt=900)] | None = None
 
     @field_validator("exceptions")
     @classmethod

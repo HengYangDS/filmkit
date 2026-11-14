@@ -15,7 +15,10 @@ turns them into full-range grey and writes, for each pair, one plane that holds 
   agree within TOLERANCE, holds it. A one-frame difference that no one picture holds alone, as
   where two encodes draw a moving edge apart, is refused only above NOISE_CEILING levels; the
   report keeps one within it as residue. A difference that lasts two frames or more is no render's
-  fault, and is named by its frames.
+  fault, and is named by its frames. Beside those cells the plane holds the share of each cell's
+  samples more than `slivers.LEVEL` levels apart, from which `filmkit.picture.slivers` measures
+  each frame's densest block; a frame beyond its bound for edge slivers is judged like a frame
+  with a lit cell, at that level, and the report keeps the slivers within the bound.
 - the caption band: inside the band the pictures differ by design, so each picture's band rows,
   stacked under the cells, are judged by its own frames, two of them kept in hand. A sample more
   than THRESHOLD levels from both neighbouring frames while those agree within TOLERANCE is a
@@ -35,10 +38,12 @@ from __future__ import annotations
 import math
 import subprocess
 import threading
+from functools import partial
 from typing import TYPE_CHECKING
 
 import numpy as np
 
+import filmkit.picture.slivers as slivers
 import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
 
@@ -97,14 +102,14 @@ def box_of(held: np.ndarray, left: int, top: int) -> list[int]:
     ]
 
 
-def departs(frames: np.ndarray, index: int, where: np.ndarray) -> bool:
+def departs(frames: np.ndarray, index: int, where: np.ndarray, level: int = THRESHOLD) -> bool:
     """Whether frame `index` of consecutive grey frames lies, at a sample of `where`, more than
-    THRESHOLD levels from each frame beside it, while two frames beside it agree within
+    `level` levels from each frame beside it, while two frames beside it agree within
     TOLERANCE."""
     beside = [frames[i] for i in (index - 1, index + 1) if 0 <= i < len(frames)]
     held = where.copy()
     for other in beside:
-        held &= apart(frames[index], other) > THRESHOLD
+        held &= apart(frames[index], other) > level
     if len(beside) == 2:
         held &= apart(*beside) <= TOLERANCE
     return bool(held.any())
@@ -178,27 +183,32 @@ def scan_command(
     paths: list[Path], size: tuple[int, int], rows: tuple[int, int], fps: int
 ) -> list[str]:
     """The FFmpeg command that decodes both pictures once, pairs their frames by number and
-    writes for each pair one grey plane: the twin comparison's cells and, where the caption band
-    has rows, those cells widened to the picture's width over each picture's band rows."""
+    writes for each pair one grey plane: the twin comparison's cells beside the edge slivers'
+    cells and, where the caption band has rows, those cells widened to the picture's width over
+    each picture's band rows."""
     width, (top, bottom) = size[0], rows
     padded = [-(-side // CELL) * CELL for side in size]
     columns, cell_rows = padded[0] // CELL, padded[1] // CELL
     pad = f"pad={padded[0]}:{padded[1]}," if padded != list(size) else ""
-    twin = (
-        f"[a][b]blend=all_mode=difference:shortest=1,{pad}lut=y='255*gt(val,{THRESHOLD})',"
-        f"scale={columns}:{cell_rows}:flags=area"
-    )
+    twin = [
+        f"[a][b]blend=all_mode=difference:shortest=1,{pad}split[over0][over1]",
+        *(
+            f"[over{n}]lut=y='255*gt(val,{level})',scale={columns}:{cell_rows}:flags=area[cells{n}]"
+            for n, level in enumerate((THRESHOLD, slivers.LEVEL))
+        ),
+    ]
     grey = [f"[{n}:v:0]setpts=N/({fps}*TB),{GREY}" for n in range(2)]
     if bottom > top:
         graph = [
             *(f"{chain},split[{name}][{name}all]" for chain, name in zip(grey, "ab", strict=True)),
-            f"{twin},pad={width}:{cell_rows}[cells]",
+            *twin,
+            f"[cells0][cells1]hstack,pad={width}:{cell_rows}[cells]",
             *(f"[{name}all]crop={width}:{bottom - top}:0:{top}[{name}band]" for name in "ab"),
             "[cells][aband][bband]vstack=inputs=3:shortest=1[out]",
         ]
     else:
         graph = [f"{chain}[{name}]" for chain, name in zip(grey, "ab", strict=True)]
-        graph.append(f"{twin}[out]")
+        graph += [*twin, "[cells0][cells1]hstack[out]"]
     inputs = [argument for path in paths for argument in ("-i", str(path))]
     return [*DECODE, *inputs, "-filter_complex", ";".join(graph), "-map", "[out]", *RAW]
 
@@ -272,6 +282,11 @@ def neighbouring(path: Path, first: int, count: int, box: list[int], fps: int) -
     return np.frombuffer(done.stdout, dtype=np.uint8).reshape(shape)
 
 
+def twin_difference(pictures: dict[str, Path], fps: int, frame: int, box: list[int]) -> np.ndarray:
+    """How far apart the two pictures are at one frame within a box, decoded again there."""
+    return apart(*(neighbouring(path, frame, 1, box, fps)[0] for path in pictures.values()))
+
+
 def fault(
     change: dict, fps: int, picture: str | None, *, caption_band: bool, residue: bool = False
 ) -> dict:
@@ -295,8 +310,9 @@ def attribute(
     around it within its cells: the box and peak of its samples more than THRESHOLD levels apart
     outside the caption band, and the picture whose frame departs from its own neighbouring
     frames there, or None where not exactly one does, in which case a peak within NOISE_CEILING
-    is a residue."""
-    frame, cells = run["first"], run["box"]
+    is a residue. A frame beyond the bound for edge slivers is judged at its run's level within
+    its blocks, keeps its samples and is no residue."""
+    frame, cells, level = run["first"], run["box"], run.get("level", THRESHOLD)
     first = max(0, frame - 1)
     length = min(count - 1, frame + 1) - first + 1
     stacks = {
@@ -304,17 +320,18 @@ def attribute(
     }
     index = frame - first
     difference = apart(*(stack[index] for stack in stacks.values()))
-    differs = difference > THRESHOLD
+    differs = difference > level
     differs[max(0, rows[0] - cells[1]) : max(0, rows[1] - cells[1])] = False
     if not differs.any():
         msg = f"Frame {frame} differs at every frame's comparison but not when decoded again"
         raise PictureError(msg)
-    holding = [name for name, stack in stacks.items() if departs(stack, index, differs)]
+    holding = [name for name, stack in stacks.items() if departs(stack, index, differs, level)]
     peak = int(difference[differs].max())
     change = {"frame": frame, "box": box_of(differs, *cells[:2]), "peak": peak}
     picture = holding[0] if len(holding) == 1 else None
-    residue = picture is None and peak <= NOISE_CEILING
-    return fault(change, fps, picture, caption_band=False, residue=residue)
+    dense = {"samples": run["samples"]} if "samples" in run else {}
+    residue = not dense and picture is None and peak <= NOISE_CEILING
+    return fault(change, fps, picture, caption_band=False, residue=residue) | dense
 
 
 def scan(
@@ -326,23 +343,28 @@ def scan(
     work: Path,
 ) -> dict:
     """Compare both pictures, named by `pictures`, at every frame outside the caption band `rows`,
-    scan each one's band rows, and report what the record keeps."""
+    measure their edge slivers there, scan each one's band rows, and report what the record
+    keeps."""
     width, height = size[0], rows[1] - rows[0]
-    twin = Twin(size, rows)
+    twin, blocks = Twin(size, rows), slivers.Blocks(size, rows, CELL)
     bands = {name: Band(rows[0]) for name in pictures} if height > 0 else {}
-    stride = width if bands else twin.shape[1]
+    columns = twin.shape[1]
+    stride = width if bands else 2 * columns
     start = stride * twin.shape[0]
 
     def add(frame: int, plane: np.ndarray) -> None:
-        twin.add(frame, plane[:start].reshape(-1, stride)[:, : twin.shape[1]])
+        cells = plane[:start].reshape(-1, stride)
+        twin.add(frame, cells[:, :columns])
+        blocks.add(frame, cells[:, columns : 2 * columns])
         for n, band in enumerate(bands.values()):
             rows_of_band = plane[start + n * width * height : start + (n + 1) * width * height]
             band.add(frame, rows_of_band.reshape(height, width))
 
     command = scan_command(list(pictures.values()), size, rows, fps)
     decode(command, start + len(bands) * width * height, work / "every-frame.log", count, add)
-    single = [run for run in twin.runs if run["first"] == run["last"]]
-    lasting = [run for run in twin.runs if run["first"] < run["last"]]
+    runs = sorted([*twin.runs, *blocks.refused(twin.runs)], key=lambda run: run["first"])
+    single = [run for run in runs if run["first"] == run["last"]]
+    lasting = [run for run in runs if run["first"] < run["last"]]
     found = [attribute(pictures, run, rows, count, fps) for run in single[:EXAMINED]]
     found += [
         fault(change, fps, name, caption_band=True)
@@ -363,22 +385,26 @@ def scan(
         "faults": sorted(found, key=lambda row: (row["residue"], row["frame"]))[:LISTED],
         "fault_frames": len(single) + changes - residues,
         "residue_frames": residues,
+        "slivers": blocks.report(fps, partial(twin_difference, pictures, fps)),
     }
 
 
 def findings(report: dict, code: str) -> list[str]:
     """A report's findings: each one-frame fault that is no residue, with the command that renders
-    its picture again, and each difference that lasts."""
+    its picture again, and each difference that lasts; one beyond the bound for edge slivers
+    names its samples and the bound."""
     found = []
     faults = [row for row in report["faults"] if not row["residue"]]
     for row in faults:
         at = f"encoded frame {row['frame']} at {row['time']:.3f} s"
         where = "in the caption band" if row["caption_band"] else "outside the caption band"
+        where += slivers.beyond(row)
         if row["picture"] is None:
+            above = "" if "samples" in row else f", above a residue's ceiling of {NOISE_CEILING}"
             found.append(
                 f"{at}: the pictures differ for one frame by {row['peak']} levels in box "
-                f"{row['box']} {where}, above a residue's ceiling of {NOISE_CEILING}, and no one "
-                "picture alone departs from its neighbouring frames"
+                f"{row['box']} {where}{above}, and no one picture alone departs from its "
+                "neighbouring frames"
             )
             continue
         command = RENDER.format(code=code) + (
@@ -392,7 +418,8 @@ def findings(report: dict, code: str) -> list[str]:
     found += [f"encoded: {hidden} more one-frame differences"] if hidden > 0 else []
     found += [
         f"encoded frames {run['first']}-{run['last']}: the pictures differ by more than "
-        f"{report['threshold']} levels in box {run['box']} outside the caption band"
+        f"{run.get('level', report['threshold'])} levels in box {run['box']} outside the caption "
+        f"band{slivers.beyond(run)}"
         for run in report["lasting"]
     ]
     hidden = report["lasting_runs"] - len(report["lasting"])

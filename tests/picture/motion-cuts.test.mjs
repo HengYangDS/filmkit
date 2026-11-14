@@ -214,5 +214,6 @@ test("the motion audit reports a jump and a pop a declared cut brings, each from
     pops: 1,
     jumps: 1,
     dash_snaps: 0,
+    paces: 0,
   });
 });

@@ -30,10 +30,12 @@
  * it brings or takes: those that no like mark of the other frame holds in place, together at least POP across. A mark
  * followed outside a cut, at ink FIRM or more, also pops by each drawn piece at least POP across that it gains or loses
  * whole (pieces.mjs) and that no like mark of the other frame holds in place, as one stroke that draws several lines
- * pops by a line that joins it at full ink in one frame. */
+ * pops by a line that joins it at full ink in one frame. A mark whose speed counts towards its scene's fastest glide
+ * or flow and is over PACE is brisker than a calm picture moves; such marks form the scene's pace stretches (pace.mjs). */
 import { leastCostAssignment } from "./assignment.mjs";
 import { excused, jumps } from "./cuts.mjs";
 import { dashSnap, gapShare } from "./dashes.mjs";
+import { overPace, PACE, paceRuns } from "./pace.mjs";
 import { leftPieces } from "./pieces.mjs";
 
 /** The viewer's thresholds: ink levels, pixels per second at 1080p, shares and pixels across. */
@@ -47,6 +49,8 @@ export const VIEWER = Object.freeze({
   MOVING: 60,
   REST: 1.5,
   RACE: 900,
+  // A glide or a flow over PACE is brisker than the reviews pass (pace.mjs).
+  PACE,
   // No edge of a followed mark moves faster than REACH, and its velocity changes within one frame by at most TURN or
   // its own speed.
   REACH: 4500,
@@ -165,13 +169,16 @@ function piecesMeet(p, c, s) {
  * the first and last points of the drawn subpaths of a stroke or fill and `dash` a stroke's dash pattern, and the
  * scenes whose stage cut the composition declares in that frame; `finish()` returns what it found: the halts, starts,
  * races, pops, jumps and dash snaps, each with its time, mark and speeds, shift or gap shares, a pop by a piece with
- * the piece's box, and for each scene the fastest glide (a text, or a mark more than DOT across) and flow (a smaller
- * mark) with their times. */
+ * the piece's box, for each scene the fastest glide (a text, or a mark more than DOT across) and flow (a smaller
+ * mark) with their times, and in `paces` each stretch of a scene's marks over PACE by its fastest mark (pace.mjs). */
 export function follower(dt, v = VIEWER) {
   const reach = v.REACH * dt,
     unfollowed = 4 * v.TURN * dt;
   const found = { halts: [], starts: [], races: [], pops: [], jumps: [], dash_snaps: [] },
-    speeds = {};
+    speeds = {},
+    paces = paceRuns(dt);
+  // The marks of the frame being judged that move over PACE.
+  let fast = [];
   // Each start waits, by its track, for the step after it, which tells a start at speed from an eased one.
   let waiting = new Map(),
     previous = null,
@@ -337,6 +344,7 @@ export function follower(dt, v = VIEWER) {
     const kind = m.kind !== "text" && Math.max(...dims(m.screen)) <= v.DOT ? "flow" : "glide";
     const best = (speeds[scene] ??= {})[kind];
     if (!best || speed > best.speed) speeds[scene][kind] = { speed, t };
+    if (overPace(speed, v.PACE)) fast.push(row(t, m, { speed, move: kind }));
   }
 
   function judge(t, c, p, d, pieces, next) {
@@ -388,6 +396,7 @@ export function follower(dt, v = VIEWER) {
       found.jumps.push(row(t, mark, jump));
     // The pairs judged outside a cut whose marks both have drawn pieces, with the shifts that may place their pieces.
     const judged = [];
+    fast = [];
     for (const [c, p, d, pieces] of pairs)
       if (cut.has(c.scene)) begin(c);
       else {
@@ -396,6 +405,7 @@ export function follower(dt, v = VIEWER) {
         if (gaps) found.dash_snaps.push(row(t, c, { gaps }));
         if (p.ends.length && c.ends.length) judged.push([c, p, [d, pieces ?? d, [0, 0]]]);
       }
+    paces.frame(t, fast);
     // A start whose mark is not followed on, past a cut or out of the picture, stands as it was found.
     found.starts.push(...waiting.values());
     waiting = next;
@@ -443,7 +453,7 @@ export function follower(dt, v = VIEWER) {
     found.starts.push(...waiting.values());
     waiting = new Map();
     for (const list of Object.values(found)) list.sort((a, b) => a.t - b.t);
-    return { ...found, speeds };
+    return { ...found, paces: paces.finish(), speeds };
   }
   return { frame, finish };
 }

@@ -28,16 +28,35 @@ RENDER = "python -m filmkit.produce render-picture --language zh"
 NEXT = "; next: python -m filmkit.produce repair-pictures --language zh"
 
 
+def box(x, y, width, height, grey, frames):
+    """A box of full-range `grey` at (x, y), drawn in the frames the expression selects."""
+    colour = f"0x{grey:02X}{grey:02X}{grey:02X}"
+    return f"drawbox=x={x}:y={y}:w={width}:h={height}:color={colour}:t=fill:enable='{frames}'"
+
+
 def square(x, y, grey, frames):
     """A 4x4 square of full-range `grey` at (x, y), drawn in the frames the expression selects."""
-    colour = f"0x{grey:02X}{grey:02X}{grey:02X}"
-    return f"drawbox=x={x}:y={y}:w=4:h=4:color={colour}:t=fill:enable='{frames}'"
+    return box(x, y, 4, 4, grey, frames)
 
 
 # A glyph fragment 150 levels lighter than the ground above the caption band at frame 77, which is
 # not sampled, and a fragment 150 levels darker than the caption inside it at frame 50.
 FRAGMENT = square(40, 10, 170, "eq(n,77)")
 BROKEN = square(40, 44, 105, "eq(n,50)")
+# The record of the edge slivers where the pictures nowhere lie more than 40 levels apart.
+NO_SLIVERS = {
+    "level": 40,
+    "block_pixels": 32,
+    "bound": equivalence.faults.slivers.BOUND,
+    "noted_from": 33,
+    "jump": 12,
+    "agreement": 6,
+    "largest": 0,
+    "transient_frames": 0,
+    "events": [],
+    "event_runs": 0,
+    "frames_beyond_the_bound": 0,
+}
 
 
 def encode(path, *boxes):
@@ -72,8 +91,7 @@ def reporting(band):
     return run
 
 
-@pytest.fixture
-def edition(tmp_path, monkeypatch):
+def prepared(tmp_path, monkeypatch):
     """The Chinese edition with valid pictures, its timeline, its composition and a composition
     report that finds no paint apart from the captions."""
     monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
@@ -91,6 +109,12 @@ def edition(tmp_path, monkeypatch):
         (rendered.stage / "index.html").write_text(f"<html>{rendered.name}</html>")
         repository.write(rendered.receipt, {"picture": rendered.name})
     return edition
+
+
+@pytest.fixture
+def edition(tmp_path, monkeypatch):
+    """The Chinese edition, prepared for a comparison of the pictures a test draws."""
+    return prepared(tmp_path, monkeypatch)
 
 
 def refusal(edition):
@@ -191,6 +215,7 @@ def test_a_caption_that_appears_and_leaves_passes(edition):
         "faults": [],
         "fault_frames": 0,
         "residue_frames": 0,
+        "slivers": NO_SLIVERS,
     }
 
 

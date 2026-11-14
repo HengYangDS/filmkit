@@ -1,6 +1,7 @@
 /* What the follower found (follow.mjs), as the motion report lists it: each frame's halts, starts, races, pops, jumps
- * and dash snaps, traced to the composition line that drew their marks, a jump by its heaviest mark; the findings they
- * form, one for each run of frames of one kind, scene and line; and each scene's fastest glide and flow. */
+ * and dash snaps, and each stretch over the pace line by its fastest mark (pace.mjs), traced to the composition line
+ * that drew their marks, a jump by its heaviest mark; the findings they form, one for each run of frames of one kind,
+ * scene and line, and one for each pace stretch; and each scene's fastest glide and flow. */
 import { round } from "./report.mjs";
 
 const KINDS = {
@@ -10,10 +11,13 @@ const KINDS = {
   pops: "pop",
   jumps: "jump",
   dash_snaps: "dash",
+  paces: "pace",
 };
 /* What a finding of each kind measures over its events: a pop its way and highest ink, and whether a declared cut that
  * keeps its stage brought it; a jump its longest shift and the marks it moved; a dash snap the gap shares it stepped
- * from and to; any other its highest speed. */
+ * from and to; a pace stretch its fastest mark's speed, when it was fastest (`at`) and whether it glides or flows, with
+ * the stretch's own start, end and frames and the most marks it held over the line at once; any other its highest
+ * speed. */
 const MEASURES = {
   pop: (events) => ({
     way: events[0].way,
@@ -25,6 +29,18 @@ const MEASURES = {
     return { shift, distance, marks };
   },
   dash: (events) => ({ gaps: [events[0].gaps[0], events.at(-1).gaps[1]] }),
+  pace: (events) => {
+    const peak = events.reduce((a, e) => (e.speed > a.speed ? e : a));
+    return {
+      start: round(Math.min(...events.map((e) => e.start)), 3),
+      end: round(Math.max(...events.map((e) => e.end)), 3),
+      at: peak.t,
+      speed: peak.speed,
+      move: peak.move,
+      marks: Math.max(...events.map((e) => e.marks)),
+      frames: events.reduce((n, e) => n + e.frames, 0),
+    };
+  },
 };
 const speedOf = (events) => ({ speed: Math.max(...events.map((e) => e.from ?? e.to ?? e.speed)) });
 
@@ -85,8 +101,8 @@ function findingsOf(list, kind, dt) {
   }
   return findings.map(({ events, ...finding }) => ({
     ...finding,
-    ...(MEASURES[kind] ?? speedOf)(events),
     frames: new Set(events.map((e) => e.t)).size,
+    ...(MEASURES[kind] ?? speedOf)(events),
     paints: [...new Set(events.flatMap((e) => e.paints ?? [e.kind]))],
     texts: [...new Set(events.flatMap((e) => e.texts ?? [e.text]).filter(Boolean))],
   }));

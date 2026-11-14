@@ -7,7 +7,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { spanOf } from "../../src/filmkit/picture/frame-audit/marks.mjs";
-import { inspectFilm, instrument } from "../../src/filmkit/picture/geometry-check.mjs";
+import { inspectFilm, instrument, judged } from "../../src/filmkit/picture/geometry-check.mjs";
 import {
   canvasStandIn,
   canvasSweep,
@@ -16,17 +16,25 @@ import {
 import { analysis } from "../../src/filmkit/picture/rules/frame.mjs";
 import { inkLevel, readingLoad } from "../../src/filmkit/picture/rules/ink.mjs";
 import { faintLabels, listTracker, nameRules } from "../../src/filmkit/picture/rules/names.mjs";
+import { rowGaps } from "../../src/filmkit/picture/rules/rows.mjs";
 import { authoredTimeline, SAMPLE } from "./sample-film.mjs";
 
 // Scripts run in a context keep their file name, so coverage attributes them to their sources.
 const COMPOSITION = join(SAMPLE, "picture/film.js");
 // The page program is measured against the film's own palette, as the composition defines it.
 const { palette } = openComposition(await authoredTimeline("zh"));
+// Every rule the page program runs, by its source, as the check hands them to the page.
+const RULES = Object.fromEntries(
+  [inkLevel, readingLoad, analysis, nameRules, listTracker, faintLabels, rowGaps].map((rule) => [
+    rule.name,
+    rule.toString(),
+  ]),
+);
 
 /* The real-browser check's page code on the headless canvas: a context class whose methods are the stand-in's, which
  * hands each paint to `deliver`, so the check's instrumentation wraps them as it wraps CanvasRenderingContext2D in the
- * browser, and film.js draws on it. */
-function pageCanvas(film, deliver = () => {}) {
+ * browser, and film.js draws on it. The film element declares the frame's `width`. */
+function pageCanvas(film, deliver = () => {}, width = "1920") {
   const STYLE = [
     "globalAlpha",
     "strokeStyle",
@@ -55,7 +63,7 @@ function pageCanvas(film, deliver = () => {}) {
       },
     });
   const canvas = { getContext: () => new CanvasRenderingContext2D(inner) },
-    element = { dataset: { width: "1920" } };
+    element = { dataset: { width } };
   return {
     window: { FILM: film },
     document: { getElementById: (id) => (id === "picture" ? canvas : element) },
@@ -63,12 +71,15 @@ function pageCanvas(film, deliver = () => {}) {
   };
 }
 
-/* The page as the browser runs it: the instrumentation, then film.js, both in the page's own realm. */
-async function headlessPage(film) {
-  const page = pageCanvas(film),
+/* The page as the browser runs it: the instrumentation, then film.js, both in the page's own realm. `source` is a
+ * composition to run in place of the sample film's, on a frame `width` wide. */
+async function headlessPage(film, source = null, width = "1920") {
+  const page = pageCanvas(film, () => {}, width),
     context = vm.createContext(page);
   vm.runInContext(`(${instrument})()`, context);
-  vm.runInContext(await readFile(COMPOSITION, "utf8"), context, { filename: COMPOSITION });
+  vm.runInContext(source ?? (await readFile(COMPOSITION, "utf8")), context, {
+    filename: COMPOSITION,
+  });
   return { window: page.window, context };
 }
 
@@ -128,12 +139,7 @@ test("the stand-in samples every path as the real-browser instrumentation does",
 test("the real-browser page program runs every rule from its source and keeps the receipt's fields", async () => {
   const film = await authoredTimeline("zh"),
     { context, window } = await headlessPage(film);
-  const rules = Object.fromEntries(
-    [inkLevel, readingLoad, analysis, nameRules, listTracker, faintLabels].map((rule) => [
-      rule.name,
-      rule.toString(),
-    ]),
-  );
+  const rules = RULES;
   // The program runs in the page's realm, as page.evaluate runs it, on the palette read from the page.
   const program = vm.runInContext(`(${inspectFilm})`, context),
     pagePalette = structuredClone(vm.runInContext("({ ...P })", context));
@@ -150,15 +156,75 @@ test("the real-browser page program runs every rule from its source and keeps th
   assert.equal(window.__paintedText.length, 3);
 });
 
+/* A composition of one scene whose three names stand on one row from its first frame, each painted in a 30 px face
+ * and registered at the nominal size 20, on a frame of any width: the second starts `gap` px after the first ends and
+ * the third 90 px after the second. */
+const ROW = (gap) =>
+  [
+    'var P = { ground: "#0F1519", ink: "#ECE8DF" };',
+    'var ctx = document.getElementById("picture").getContext("2d");',
+    'var k = Number(document.getElementById("film").dataset.width) / 1920;',
+    "var layout = [];",
+    "function name(value, x) {",
+    "  ctx.setTransform(k, 0, 0, k, 0, 0);",
+    '  ctx.font = "30px Sample";',
+    '  ctx.textAlign = "left";',
+    '  ctx.textBaseline = "alphabetic";',
+    "  ctx.globalAlpha = 1;",
+    "  ctx.fillStyle = P.ink;",
+    "  ctx.fillText(value, x, 500);",
+    "  const right = x + ctx.measureText(value).width;",
+    "  layout.push({ text: value, bounds: [x, 476, right, 506], color: P.ink, alpha: 1, role: 'label',",
+    "    scene: window.__sceneId, placed: true, size: 20 });",
+    "  return right;",
+    "}",
+    "window.renderFrame = function () {",
+    "  layout = [];",
+    '  window.__sceneId = "01";',
+    `  name("Resource", name("Technical", name("Compliance", 400) + ${gap}) + 90);`,
+    "  window.__sceneId = null;",
+    "  window.__filmLayout = { time: 0, texts: layout };",
+    "};",
+    "",
+  ].join("\n");
+const ROW_FILM = {
+  duration: 2,
+  segments: [{ id: "01", chapter: 1, start: 0, voice_start: 0.2, voice_end: 1.8 }],
+};
+/* The findings of the page program over that composition's two seconds at 60 fps, every second frame. */
+async function rowFindings(gap, width = "1920") {
+  const { context } = await headlessPage(ROW_FILM, ROW(gap), width);
+  const result = vm.runInContext(`(${inspectFilm})`, context)(RULES, { ...palette }, 120, 2, 60);
+  assert.deepEqual(structuredClone(result.errors), []);
+  // A row gap is recorded apart from the findings, which the check gates.
+  assert.deepEqual(structuredClone(result.findings), []);
+  return structuredClone(result.row_gaps);
+}
+
+test("the page program records names closer than 1.5 em on one row, by the size the frame paints them at", async () => {
+  // 36 px is 1.2 em of the painted 30 px face, though 1.8 em of the nominal size the film registers.
+  const pair = {
+    kind: "row_gap",
+    scene: "01",
+    text: "Compliance | Technical",
+    pair: ["Compliance", "Technical"],
+    gap: 36,
+    em: 1.2,
+    floor: 1.5,
+    first: 0,
+    frames: 60,
+  };
+  assert.deepEqual(await rowFindings(36), [pair]);
+  // A UHD frame paints the face twice as large; the finding stays in px and em of the logical 1080p frame.
+  assert.deepEqual(await rowFindings(36, "3840"), [pair]);
+  // 45 px is 1.5 em: the row passes.
+  assert.deepEqual(await rowFindings(45), []);
+});
+
 test("the page program finds the same in the test's realm as in the page's", async () => {
   const film = await authoredTimeline("en"),
     { context } = await headlessPage(film);
-  const rules = Object.fromEntries(
-    [inkLevel, readingLoad, analysis, nameRules, listTracker, faintLabels].map((rule) => [
-      rule.name,
-      rule.toString(),
-    ]),
-  );
+  const rules = RULES;
   const frames = Math.round(film.duration * 60);
   const inPage = structuredClone(
     vm.runInContext(`(${inspectFilm})`, context)(rules, palette, frames, 30, 60),
@@ -195,7 +261,9 @@ test("an arc samples the sweep a canvas draws, in the stand-in and the page inst
   for (const name of Object.keys(inner))
     CanvasRenderingContext2D.prototype[name] = (...args) => inner[name](...args);
   for (const key of ["globalAlpha", "lineWidth", "strokeStyle", "fillStyle"])
-    Object.defineProperty(CanvasRenderingContext2D.prototype, key, { get: () => inner[key] });
+    Object.defineProperty(CanvasRenderingContext2D.prototype, key, {
+      get: () => inner[key],
+    });
   const window = {},
     context = vm.createContext({
       window,
@@ -246,4 +314,24 @@ test("the stand-in and the page instrumentation sample each path a canvas draws 
   } finally {
     for (const name of Object.keys(page)) delete globalThis[name];
   }
+});
+
+test("the row gaps refuse only for a film that gates them", () => {
+  const gap = {
+    kind: "row_gap",
+    scene: "01",
+    text: "Compliance | Technical",
+    gap: 36,
+    em: 1.2,
+  };
+  const report = { findings: [], row_gaps: [gap], errors: [] };
+  // Recorded, and the check passes: reviews of some films accept closer names.
+  assert.deepEqual(judged(report, false), { findings: [], passed: true });
+  // Gated with --gate-row-gaps: the pair is a finding and the check fails.
+  assert.deepEqual(judged(report, true), { findings: [gap], passed: false });
+  // An error fails the check whatever the gate.
+  assert.equal(
+    judged({ ...report, row_gaps: [], errors: [{ message: "x", t: 0 }] }, false).passed,
+    false,
+  );
 });

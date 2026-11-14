@@ -15,7 +15,7 @@ const AUDIT_MOTION = fileURLToPath(
 
 /* Scene 01 runs to 6 s and scene 02 from then on; every motion is set by the frame's number at 30 fps, n. A dot flows
  * along a link at 300 px/s, entering and leaving by size; a dot moves at 240 px/s, halts dead and sets off again; a
- * name eases 440 px across 0.8 s; a name races 600 px in 0.4 s; a counter changes its words in place; a name pops in
+ * name eases 440 px across 0.8 s, over the pace line; a name races 600 px in 0.4 s; a counter changes its words in place; a name pops in
  * and out; a name gives way to another at the stage cut the composition declares at frame 102, which keeps the rest of
  * its stage, so the name it brings pops; a card glides while a link draws on from it; a rule is drawn on in place,
  * 1,200 px in eight frames, its end at up to 225 px a frame; a larger dot around a standing dot vanishes at frame 120.
@@ -227,7 +227,9 @@ test("the motion audit follows every mark and finds each motion a viewer sees as
   );
   // Each finding groups one mark's frames: the race is one finding with its peak speed.
   assert.deepEqual(
-    followed.findings.map((v) => [v.kind, v.scene, at(v.start), v.origin]),
+    followed.findings
+      .filter((v) => v.kind !== "pace")
+      .map((v) => [v.kind, v.scene, at(v.start), v.origin]),
     [
       ["halt", "01", 2.07, lineOf("dot(1000")],
       ["start", "01", 3.07, lineOf("dot(1000")],
@@ -242,6 +244,28 @@ test("the motion audit follows every mark and finds each motion a viewer sees as
   assert.equal(race.speed, Math.max(...followed.races.map((v) => v.speed)));
   assert.ok(race.speed > 2000 && race.frames === followed.races.length);
   assert.deepEqual([race.paints, race.texts], [["text"], ["Race"]]);
+  // Three stretches move over the pace line of 450 px/s: the name that eases 440 px in 0.8 s, 823 px/s at its fastest,
+  // the race, and the link's start, rising 16 px a frame, in the one frame its corner turns and the follower sees it
+  // travel; each is one finding from its first frame over the line to its last, with its fastest mark and when.
+  const paces = followed.findings.filter((v) => v.kind === "pace");
+  assert.deepEqual(
+    paces.map((v) => [v.scene, v.move, v.paints, v.texts, v.origin, v.marks, v.frames]),
+    [
+      ["01", "glide", ["text"], ["Ease"], lineOf('"Ease"'), 1, 16],
+      ["01", "glide", ["text"], ["Race"], lineOf('"Race"'), 1, 10],
+      ["01", "glide", ["stroke"], [], "film.js:106", 1, 1],
+    ],
+  );
+  const [eased, raced, turned] = paces;
+  assert.deepEqual([turned.speed, turned.start, turned.at, turned.end], [480, 5.5, 5.5, 5.5]);
+  assert.equal(eased.speed, 823);
+  assert.ok(1 < eased.start && eased.start < eased.at && eased.at < eased.end && eased.end < 1.8);
+  assert.equal(eased.frames, Math.round((eased.end - eased.start) * 30) + 1);
+  assert.deepEqual([raced.speed, raced.at], [race.speed, followed.speeds["01"].glide.t]);
+  assert.deepEqual(
+    followed.paces.map((v) => [v.text, v.speed, v.t]),
+    paces.map((v) => [v.texts[0] ?? "", v.speed, v.at]),
+  );
   // The speeds a viewer meets: the dot flows at 300 px/s, and the fastest glide is the race.
   assert.equal(followed.speeds["01"].flow.speed, 300);
   assert.equal(followed.speeds["01"].glide.speed, race.speed);
@@ -253,6 +277,7 @@ test("the motion audit follows every mark and finds each motion a viewer sees as
     pops: 4,
     jumps: 0,
     dash_snaps: 0,
+    paces: 3,
   });
 });
 

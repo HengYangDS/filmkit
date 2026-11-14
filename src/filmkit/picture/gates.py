@@ -26,9 +26,11 @@ written, and so does an audit that fails or a composition or timeline that chang
 checked.
 The motion audit follows every mark as a viewer sees it move, and each of its findings is gated
 by its time, scene, marks and the line that drew it: a halt, start, race, pop or dash snap outside
-a stage cut, a pop that a declared cut keeping its stage brings, and the jump of the marks a stage
-cut keeps but moves whole. One of the edition's `[[picture.motion.exceptions]]` that names its
-scene, its line or module and its kind records it with the exception's reason instead; an
+a stage cut, a pop that a declared cut keeping its stage brings, the jump of the marks a stage
+cut keeps but moves whole, and each stretch in which a scene's glides and flows move over the
+pace line of 450 px/s, named by its fastest mark, which is refused only over the pace limit the
+film declares. One of the edition's `[[picture.motion.exceptions]]` that names its scene, its
+line or module and its kind records it with the exception's reason instead; an
 exception that matches no finding of the edition is gated as stale.
 `render-picture` reads the record before it starts the renderer
 (`filmkit.picture.rendering.require_passing_gates`).
@@ -235,7 +237,13 @@ MOTION_GATES = {
     "pop": "motion_pops",
     "jump": "motion_jumps",
     "dash": "motion_dash_snaps",
+    "pace": "motion_paces",
 }
+# The pace line from which the motion audit records a stretch of glides and flows, in 1080p px/s
+# (motion-audit/pace.mjs): the reviews of a calm film pass a picture whose every glide and flow
+# is at or under it. A finding states it beside the peak it measured; whether a stretch is
+# refused is for the film's declared `picture.motion.pace_limit`.
+PACE = 450
 MOTION_WORDS = {
     "halt": "falls from {speed} px/s to rest",
     "start": "sets off from rest at {speed} px/s",
@@ -245,6 +253,10 @@ MOTION_WORDS = {
         "jump {distance} px ({shift[0]}, {shift[1]}) beyond their motion as {marks} marks at a cut"
     ),
     "dash": "turns from {gaps[0]:.0%} to {gaps[1]:.0%} gap in its dash pattern within one frame",
+    "pace": (
+        "{move}s at up to {speed} px/s at {at:.2f} s, over the pace of {pace} px/s with {marks}"
+        " marks for {frames} frames"
+    ),
 }
 # What a pop adds when a declared stage cut that keeps its stage brought it.
 DECLARED_CUT = " at a declared cut that keeps its stage"
@@ -307,7 +319,7 @@ def motion_finding(finding: dict) -> str:
     marks = "/".join(finding["paints"]) + (f" {texts}" if texts else "")
     way = finding.get("way")
     words = MOTION_WORDS[finding["kind"]].format(
-        **finding, appears="appears" if way == "in" else "vanishes"
+        **finding, appears="appears" if way == "in" else "vanishes", pace=PACE
     ) + (DECLARED_CUT if finding.get("declared_cut") else "")
     drawn = finding["origin"] + (f" ({finding['module']})" if finding["module"] else "")
     measure = MOTION_GATES[finding["kind"]]
@@ -318,8 +330,10 @@ def motion_findings(motion: dict, policy: Motion, code: str) -> tuple[list[str],
     """The gated and the recorded motion findings of an edition.
 
     Each finding is gated unless one of the edition's exceptions names its scene, its kind and
-    its line or module, which records it with the exception's reason. An exception of the
-    edition that matches no finding is gated as stale.
+    its line or module, which records it with the exception's reason. A stretch over the pace
+    line is gated only when the film declares a pace limit and the stretch's peak exceeds it;
+    otherwise it is recorded. An exception of the edition that matches no finding is gated as
+    stale.
     """
     exceptions = [e for e in policy.exceptions if e.edition == code]
     matched, gated, recorded = set(), [], []
@@ -334,7 +348,18 @@ def motion_findings(motion: dict, policy: Motion, code: str) -> tuple[list[str],
             ),
             None,
         )
-        if kept is None:
+        if kept is None and finding["kind"] == "pace":
+            # The pace is the film's to declare (`picture.motion.pace_limit`).
+            limit = policy.pace_limit
+            if limit is not None and finding["speed"] > limit:
+                gated.append(named)
+            elif limit is None:
+                recorded.append(f"{named}; recorded: the film declares no pace limit")
+            else:
+                recorded.append(
+                    f"{named}; recorded: within the film's pace limit of {limit:g} px/s"
+                )
+        elif kept is None:
             gated.append(named)
         else:
             matched.add(kept)

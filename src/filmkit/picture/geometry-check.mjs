@@ -9,13 +9,16 @@ import { launchBrowser } from "./headless-browser.mjs";
 import { analysis } from "./rules/frame.mjs";
 import { inkLevel, readingLoad } from "./rules/ink.mjs";
 import { faintLabels, listTracker, nameRules } from "./rules/names.mjs";
+import { rowGaps } from "./rules/rows.mjs";
 
-/** Page instrumentation: record every painted path and fill in logical frame coordinates. */
+/** Page instrumentation: record every painted path and fill in logical frame coordinates, and the size each text is
+ * painted at on the logical frame, its font's size under the transform it is drawn in. */
 export function instrument() {
   const proto = CanvasRenderingContext2D.prototype;
   const state = new WeakMap();
   const shapes = (window.__paintedShapes = []);
   window.__paintedText = [];
+  window.__paintedSize = [];
   let seq = 0;
   const scale = () => Number(document.getElementById("film").dataset.width) / 1920;
   const of = (ctx) => {
@@ -44,6 +47,7 @@ export function instrument() {
   window.__resetPaint = () => {
     shapes.length = 0;
     window.__paintedText.length = 0;
+    window.__paintedSize.length = 0;
     seq = 0;
   };
   wrap("beginPath", (ctx) => {
@@ -161,18 +165,25 @@ export function instrument() {
         scene: window.__sceneId ?? null,
       });
   });
-  wrap("fillText", () => {
+  wrap("fillText", (ctx) => {
     window.__paintedText.push(++seq);
+    const m = ctx.getTransform(),
+      px = Number(/(\d+(?:\.\d+)?)px/.exec(ctx.font)?.[1]);
+    window.__paintedSize.push(px ? (px * Math.hypot(m.a, m.b)) / scale() : null);
   });
 }
 
 /** The page program: render every `every`-th of `frames` frames at `rate` and collect each finding once, with the
  * first frame it was seen and how many frames show it. `rules` are the sources of the serialisable rules and
- * `palette` the film's colours, from which the page derives its measures. */
+ * `palette` the film's colours, from which the page derives its measures. The row gaps (rules/rows.mjs) are returned
+ * apart from the findings, each with its pair of names, its tightest gap in px of the logical frame and in em, and the
+ * floor it is under. */
 export function inspectFilm(rules, palette, frames, every, rate) {
   const make = (name) => new Function(`return (${rules[name]})`)();
   const contrast = make("readingLoad")(palette),
-    inspectFrame = make("analysis")(make("inkLevel")(palette)),
+    level = make("inkLevel")(palette),
+    inspectFrame = make("analysis")(level),
+    rows = make("rowGaps")(level),
     nameFindings = make("nameRules")(),
     lists = make("listTracker")(),
     faintSeen = make("faintLabels")();
@@ -199,9 +210,13 @@ export function inspectFilm(rules, palette, frames, every, rate) {
       continue;
     }
     checked++;
+    // Each text with its place in the paint order and, where the frame painted one text for each record, the size
+    // it was painted at.
+    const painted = window.__paintedSize.length === window.__filmLayout.texts.length;
     const texts = window.__filmLayout.texts.map((v, i) => ({
       ...v,
       seq: window.__paintedText[i],
+      ...(painted && window.__paintedSize[i] ? { shown: window.__paintedSize[i] } : {}),
     }));
     // A frame must paint while a voice speaks, and in a pause within a chapter once the next scene has begun.
     const segments = window.FILM.segments,
@@ -235,16 +250,33 @@ export function inspectFilm(rules, palette, frames, every, rate) {
     lists.see(words, t, contrast);
     for (const run of faintSeen(words, t, contrast))
       add({ kind: "faint_label", scene: run.scene, text: run.text }, run.start);
+    rows.see(texts, window.__paintedShapes, t, contrast);
   }
   for (const finding of lists.findings()) add(finding, 0);
+  // A row gap is recorded once for its pair, with its evidence, when it first stood and the frames that show it. It is
+  // kept apart from the findings: the check gates it only for a film that asks (--gate-row-gaps).
+  const rowGaps = rows.findings().map(({ at, frames: shown, ...gap }) => ({
+    ...gap,
+    first: at,
+    frames: shown,
+  }));
   return {
     checked,
     findings: [...seen.values()],
+    row_gaps: rowGaps,
     errors: [...errors].map(([message, t]) => ({ message, t })),
   };
 }
 
-const RULES = { inkLevel, readingLoad, analysis, nameRules, listTracker, faintLabels };
+const RULES = {
+  inkLevel,
+  readingLoad,
+  analysis,
+  nameRules,
+  listTracker,
+  faintLabels,
+  rowGaps,
+};
 
 export async function inspectWorkspace(workspace, { step = 2 } = {}) {
   const entry = resolve(workspace, "index.html");
@@ -286,17 +318,30 @@ export async function inspectWorkspace(workspace, { step = 2 } = {}) {
   }
 }
 
+/** A report's findings and verdict: the row gaps join the findings only when the film gates them. */
+export function judged(report, gateRowGaps) {
+  const findings = [...report.findings, ...(gateRowGaps ? report.row_gaps : [])];
+  return {
+    findings,
+    passed: report.errors.length === 0 && findings.length === 0,
+  };
+}
+
 if (import.meta.main) {
   const USAGE =
-    "Usage: python -m filmkit.tools geometry-check <workspace> <receipt.json> [step-frames]";
+    "Usage: python -m filmkit.tools geometry-check <workspace> <receipt.json> [step-frames] [--gate-row-gaps]";
   // A malformed invocation stops before the browser opens, so it can never write a passing receipt.
   const refuse = (problem) => {
     console.error(`${problem}\n${USAGE}`);
     process.exit(2);
   };
-  let positionals = [];
+  let positionals = [],
+    values = {};
   try {
-    ({ positionals } = parseArgs({ allowPositionals: true }));
+    ({ positionals, values } = parseArgs({
+      allowPositionals: true,
+      options: { "gate-row-gaps": { type: "boolean", default: false } },
+    }));
   } catch (error) {
     refuse(error.message);
   }
@@ -307,11 +352,21 @@ if (import.meta.main) {
   if (!Number.isInteger(step) || step < 1)
     refuse(`The step is not a positive whole number of frames: ${every}`);
   const report = await inspectWorkspace(workspace, { step });
-  const passed = report.errors.length === 0 && report.findings.length === 0;
+  // The row gaps are always recorded. A film whose reviews hold its rows to the floor gates them; reviews of other
+  // films have accepted closer names, such as the words of one spelled-out title, so the check does not gate them unasked.
+  const gated = values["gate-row-gaps"];
+  const { findings, passed } = judged(report, gated);
+  report.findings = findings;
   await writeFile(
     receipt,
     JSON.stringify(
-      { format: "picture-geometry", workspace: resolve(workspace), passed, ...report },
+      {
+        format: "picture-geometry",
+        workspace: resolve(workspace),
+        passed,
+        row_gaps_gated: gated,
+        ...report,
+      },
       null,
       2,
     ) + "\n",
@@ -321,6 +376,7 @@ if (import.meta.main) {
       passed,
       frames_checked: report.checked,
       findings: report.findings.length,
+      row_gaps: report.row_gaps.length,
       errors: report.errors.length,
     }),
   );

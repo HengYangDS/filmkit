@@ -1,7 +1,8 @@
 /* Motion and transition audit of the picture: ghosts and residue, double exposure, stalls, pops and jumps, type scale
  * and camera framing, measured headlessly from the composition, and in `followed` every mark followed as a viewer sees
- * it move (motion-audit/follow.mjs) with the halts, starts, races, pops, jumps at stage cuts and dash snaps it finds
- * and each scene's fastest glide and flow (motion-audit/followed.mjs).
+ * it move (motion-audit/follow.mjs) with the halts, starts, races, pops, jumps at stage cuts and dash snaps it finds,
+ * each stretch of a scene's glides and flows over the pace line of 450 px/s (motion-audit/pace.mjs), and each scene's
+ * fastest glide and flow (motion-audit/followed.mjs).
  * Usage: python -m filmkit.tools motion-audit <timeline.json> [fps] [--from s] [--to s] [--out report.json]
  * Every mark a scene paints is recorded with its ink level (opacity times its colour's rise above the ground), its
  * screen box, its box in its own drawing coordinates (its identity across frames), for words the size shown, and for a

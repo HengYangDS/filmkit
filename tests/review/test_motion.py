@@ -9,8 +9,8 @@ import filmkit.review.motion as review_motion
 from filmkit.production import Edition
 from filmkit.review import ReviewError
 
-# The followed motion of a report: two halts, a race, a pop and a jump, the pop and one halt
-# declared.
+# The followed motion of a report: two halts, a race, a pop, a jump and a stretch over the pace
+# line, the pop and one halt declared.
 FOLLOWED = {
     "halts": [{"t": 12.3, "scene": "02"}, {"t": 30.1, "scene": "03"}],
     "starts": [],
@@ -18,6 +18,7 @@ FOLLOWED = {
     "pops": [{"t": 51.0, "scene": "06", "way": "in"}],
     "jumps": [{"t": 60.2, "scene": "07", "shift": [-224, 0], "distance": 224, "marks": 4}],
     "dash_snaps": [],
+    "paces": [{"t": 70.5, "scene": "08", "speed": 520, "move": "glide"}],
     "findings": [
         {
             "kind": "halt",
@@ -70,6 +71,21 @@ FOLLOWED = {
             "paints": ["fill", "text"],
             "texts": ["目录"],
         },
+        {
+            "kind": "pace",
+            "scene": "08",
+            "start": 70.3,
+            "end": 70.7,
+            "origin": "film.js:610",
+            "module": None,
+            "at": 70.5,
+            "speed": 520,
+            "move": "glide",
+            "marks": 3,
+            "frames": 13,
+            "paints": ["text"],
+            "texts": ["目录"],
+        },
     ],
     "speeds": {
         "02": {"flow": {"speed": 240, "t": 12.2}},
@@ -117,8 +133,9 @@ def test_the_measurement_reports_each_edition_s_motion_from_its_gate(gated):
             "pops": 1,
             "jumps": 1,
             "dash_snaps": 0,
+            "paces": 1,
         },
-        "findings": 4,
+        "findings": 5,
         "declared": 2,
         "speeds": FOLLOWED["speeds"],
         "largest": {
@@ -153,6 +170,14 @@ def test_a_gate_record_or_report_bound_to_other_inputs_is_refused(gated, put, ro
     put(edition.picture_gates, record)
     with pytest.raises(
         ReviewError, match="zh: the motion report judges no jumps or dash snaps; run check-picture"
+    ):
+        review_motion.picture_motion(edition)
+    # A report of an engine before the pace gate judges no paces; check-picture judges them.
+    put(report, {"followed": {k: rows for k, rows in FOLLOWED.items() if k != "paces"}})
+    record["reports"]["motion"]["sha256"] = repository.sha(report)
+    put(edition.picture_gates, record)
+    with pytest.raises(
+        ReviewError, match="zh: the motion report judges no paces; run check-picture again"
     ):
         review_motion.picture_motion(edition)
     put(report, {"followed": {**FOLLOWED, "halts": []}})

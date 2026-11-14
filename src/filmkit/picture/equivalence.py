@@ -23,7 +23,10 @@ record (`require_equivalence`). It compares the pictures at two levels:
   the band the two pictures are compared sample by sample, and inside it each picture against its
   own neighbouring frames. A fault names the picture that holds it, and the refusal the command
   that renders that picture again; a refusal whose every finding `repair-pictures` can repair
-  (`faults.repairable`) names that command as its next step.
+  (`faults.repairable`) names that command as its next step. The same scan measures the edge
+  slivers (`filmkit.picture.slivers`): the samples more than 40 levels apart in each frame's
+  densest 32-pixel block outside the band. The record keeps the one-frame transients and the
+  slivers within the declared bound, and a frame beyond it is refused like a fault.
 
 The record, build/evidence/editions/<code>/caption-equivalence.json, binds the composition, the
 timeline, the engine version and both pictures' stage documents, files and receipts, and holds
