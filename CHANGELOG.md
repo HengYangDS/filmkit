@@ -4,6 +4,11 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Removed
+
+- The Prettier, Ruff and Taplo configuration files, which repeated settings that ETHOS ships and
+  always applies; formatting and linting are decided by the same settings as before.
+
 ## [0.21.3] - 2026-11-14
 
 ### Changed
