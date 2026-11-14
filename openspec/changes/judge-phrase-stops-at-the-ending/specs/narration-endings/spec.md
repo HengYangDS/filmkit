@@ -21,5 +21,5 @@ The measure of a stopped ending SHALL read the voicing where the judged fall beg
 
 #### Scenario: A click after a cut
 
-- **WHEN** a voiced syllable is cut in under 6 ms and a sound follows that itself falls in under 6 ms
+- **WHEN** a voiced syllable is cut in under 6 ms at the take's own level and a sound follows that is loud only at the delivered level and itself falls in under 6 ms
 - **THEN** the ending stops

@@ -4,6 +4,14 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.22.2] - 2026-11-15
+
+### Fixed
+
+- A stopped ending is judged where a listener hears the voice end, and alike wherever its recording or soundtrack starts. The fall of a take's last loud syllable was already the median over every phase of the 1 ms frame grid, but the voicing before it was read on one phase, and always where the fall at the take's own level begins, whichever gain gave the judged fall. One film's next edition, whose soundtrack begins 16 ms later than its delivered one, was refused by `check-sound` for a phrase whose take both hold unchanged: 37 of the grid's 48 phases read its ending voiced and 11 did not. The voicing is now read where the judged fall begins, at the gain that gives it, as the median over every phase.
+- A fall after which the sound rises again and dies away is a closure before its release, as of a stop consonant, and is no longer judged as the ending; the release is. A sound after a fall that itself stops within 6 ms, such as a click, excuses nothing. At that film's "overnight," the vowel closes into /t/ in 5 ms and the release follows and dies away over 19 ms, which a reviewer of its delivered round had found natural.
+- Of the 7,611 recorded takes behind the six delivered editions of the three films this engine builds, two change their verdict. One audition take that no film binds now ends naturally. One bound take that passed is now refused: its voice fades to −44 dBFS and is then cut to silence within 2 ms, which the old reading of the voicing missed. A film that binds such a take is refused by the assembly until the thought is auditioned again or its join declares a release. Of the two phrase ends that fall in under 6 ms in the six delivered soundtracks, the closure above now passes and the other, which its reviewers hold, stops on every phase; under 0.22.0 it stopped on some phases only.
+
 ## [0.22.1] - 2026-11-15
 
 ### Security
@@ -416,7 +424,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.22.1...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.22.2...HEAD
+[0.22.2]: https://github.com/HengYangDS/filmkit/compare/v0.22.1...v0.22.2
 [0.22.1]: https://github.com/HengYangDS/filmkit/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/HengYangDS/filmkit/compare/v0.21.3...v0.22.0
 [0.21.3]: https://github.com/HengYangDS/filmkit/compare/v0.21.2...v0.21.3
