@@ -19,8 +19,10 @@
 
 ## 2. Release
 
-- [ ] 2.1 Prepare 0.21.3 in `VERSION`, the Changelog and the README's install line; done when the
-      repository check passes.
+- [x] 2.1 Prepare 0.21.3 in `VERSION`, the Changelog and the README's install line; done when the
+      repository check passes. `VERSION` reads 0.21.3, the Changelog has the dated 0.21.3 section
+      with one bullet per move, and the README's install line names `v0.21.3`; after
+      `mise run bootstrap`, `mise run check` passes: 175 Node tests and 1102 Python tests.
 
 ## Deferred
 

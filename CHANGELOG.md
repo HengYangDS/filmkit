@@ -4,6 +4,19 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.21.3] - 2026-11-14
+
+### Changed
+
+- The supply moves to ETHOS 0.2.0-beta.10. Its Markdown list rule, canonical text layout, package
+  docstring rule and README index rule find nothing to repair in filmkit.
+- The release age is declared: `minimum_release_age = "0h"` in the Mise configuration, so a refresh
+  takes the latest stable releases without a waiting day.
+- The declared uv moves to 0.13.8.
+- The locks take coverage 7.17.3, Prettier 3.10.1, @hono/node-server 2.1.8 and ws 8.23.0.
+  transformers stays at 5.22.2 until a release that compares the sample film's takes.
+- The CI projection installs Mise 2026.11.8 in the GitHub jobs.
+
 ## [0.21.2] - 2026-11-13
 
 ### Security
