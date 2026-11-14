@@ -1,3 +1,7 @@
+## Purpose
+
+Judge an assembled soundtrack by the lines reviewers hold, before the picture is rendered on it, and let a film declare how closely each thought keeps its segment's level.
+
 ## ADDED Requirements
 
 ### Requirement: The assembled soundtrack is judged before the picture follows it
