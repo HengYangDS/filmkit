@@ -4,6 +4,21 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- `produce check-sound` judges an edition's assembled soundtrack before the picture follows it. It takes the review's own measures from the soundtrack and its timeline, writes them with their verdict to `build/evidence/editions/<edition>/sound-gates.json`, bound to both files' SHA-256, and refuses a soundtrack or a segment under the clarity floor the film declares, a thought that ends abruptly or is cut while voiced, and a phrase that stops without a heard fall. On the measurements of seven delivered rounds of three films it refuses two soundtracks, each for the one phrase its reviewers noted. A film adds the action to its sound stage after `refresh-captions`.
+- The geometry check records neighbouring names that stand at rest closer than 1.5 em of the smaller face on one row, each pair with its gap in px and em, under `row_gaps` in its receipt, and counts them as findings when it is run with `--gate-row-gaps`. On the delivered films the measure finds every pair two reviews named and eleven pairs that other reviews accepted, so the gate is the film's to switch on.
+- The motion audit records each stretch of a scene's glides and flows over 450 px/s at 1080p as one `motion_paces` finding, by its fastest mark, and the review's measurement counts them. A film may declare `pace_limit` under `[picture.motion]`, from 450 to under 900 px/s: `check-picture` then refuses a stretch whose peak exceeds it, and an exception of kind `pace` keeps one with its reason. A motion report from an earlier engine is refused until `check-picture` runs again.
+- The review's measurement records each thought's voice clarity as the median of its medians over the 16 phases of the frame grid, with its value on the soundtrack's grid, its lowest and highest phase and its kept frames, and marks a thought with fewer than 150 kept frames short. Thoughts are recorded and not gated.
+
+### Changed
+
+- **Breaking:** a segment's voice clarity is measured as the reviewers measure it: over the kept frames of the whole soundtrack, by its one energy threshold and on its one frame grid, whose centres lie from the segment's start to before its end. Before, the engine cut each segment out and kept frames by the segment's own threshold, which read a quiet segment higher. On three delivered soundtracks the segment figures now equal the reviewers' to 0.01 dB; before they stood up to 0.21 dB apart. A segment that passed its floor by the old rule may stand under it.
+- **Breaking:** a caption cue in `timeline.json` holds its typeset text (`’ “ ”`) in `text`, with no `display_text` beside it, and verification refuses a cue with a straight apostrophe or quote. Cue times, SRT, VTT, the transcript and the drawn captions are unchanged, and the segment's narration and aligned words stay as the script and the aligner wrote them. A film runs `produce refresh-captions` for its English edition before it stages a picture.
+- **Breaking:** `compare-pictures` measures the edge slivers of an edition's two pictures at every frame: the samples more than 40 levels apart in the densest 32-pixel block outside the caption band. It records the one-frame transients and each sliver from 33 samples with its frames, block and level, and refuses a block beyond 96 samples; a one-frame difference beyond the bound names its picture and stays repairable by `repair-pictures`. Before, a difference of 40 to 90 levels over a small area in a frame between the sampled ones passed unrecorded. On the delivered DDWG English masters the measure equals the reviewers' own at every frame of fifteen windows and peaks at 64.
+- A script may declare `thought_level_tolerance_db` from 0.25 dB (was 0.5 dB), so that two adjacent thoughts at opposite edges of the tolerance stand at most half a decibel apart.
+- `film:compare` no longer decodes a rebuilt film that holds its published film's size and SHA-256: it reports an identical file whose layers hold and whose PSNR is not measured. Without a recorded floor such a film still does not pass, and the report says that it calibrates none. A film that differs in any byte is compared as before.
+
 ## [0.21.3] - 2026-11-14
 
 ### Changed
