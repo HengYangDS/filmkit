@@ -464,7 +464,7 @@ test("the vendored timeline engine seeks a paused timeline as the composition dr
   vm.createContext(scope);
   vm.runInContext(await readFile(ENGINE, "utf8"), scope, { filename: ENGINE });
   const { gsap } = scope.window;
-  assert.equal(gsap.version, "3.15.0");
+  assert.equal(gsap.version, "3.15.1");
   const playhead = { time: 0 };
   const timeline = gsap.timeline({ paused: true });
   timeline.to(playhead, { time: 1500, duration: 1500, ease: "none" }, 0);
