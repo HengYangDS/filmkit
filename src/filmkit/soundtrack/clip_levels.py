@@ -1,4 +1,4 @@
-"""The level gains of an edition's clips: each segment within its chapter, each chapter within the film.
+"""The level gains of an edition's clips: segments within their chapter, chapters within the film.
 
 A clip is one segment's shaped recording with the loudness of its leveled thoughts. Its
 segment gain brings it within the declared tolerance of its chapter's median thought, and its
