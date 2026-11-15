@@ -9,16 +9,16 @@ What the engine holds today, read in 0.22.3 on 15 November 2026:
 
 What happened on that day, from the three films' own records (each film's Change design and its `build/evidence/retrospectives/2026-11-15.md`, local evidence written that day):
 
-| When | Film | What was spent | What a light check would have said |
-| --- | --- | --- | --- |
-| 09:33 | ETHOS film | one Chinese picture, 56 minutes | the geometry record listed four row pairs under 1.5 em, ungated without the flag |
-| 10:03 to 11:20 | ETHOS film | one English and two Chinese pictures, and a fourth interrupted | the motion audit recorded 35 and 37 stretches over 450 px/s with no limit declared, and a probe at 1.7 em listed five more row pairs |
-| morning | essentials film | one Chinese picture, about 70 minutes | the level tolerance changed after the render, and the timeline embeds it |
-| 11:00 to 13:00 | DDWG film | two narrations of one thought, three of another | the first recheck found four points a first hearing misreads |
-| 11:25 | DDWG film | three bound retakes | on the soundtrack they read 0.40 to 0.68 dB under the takes they replaced |
-| 13:11 | DDWG film | one audition ticket | its targets held a thought edited after the last narration |
-| 14:00 | ETHOS film | a 44-minute queue wait, refused as the ticket started | the stage bound an assembly record that a later sound stage rewrote |
-| 15:57 to 16:43 | DDWG film | five rounds of staged audits of both editions | picture cues named words the text no longer said; a longer name unseated a mark; two moves stood one frame over the pace |
+| When           | Film            | What was spent                                                 | What a light check would have said                                                                                                   |
+| -------------- | --------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 09:33          | ETHOS film      | one Chinese picture, 56 minutes                                | the geometry record listed four row pairs under 1.5 em, ungated without the flag                                                     |
+| 10:03 to 11:20 | ETHOS film      | one English and two Chinese pictures, and a fourth interrupted | the motion audit recorded 35 and 37 stretches over 450 px/s with no limit declared, and a probe at 1.7 em listed five more row pairs |
+| morning        | essentials film | one Chinese picture, about 70 minutes                          | the level tolerance changed after the render, and the timeline embeds it                                                             |
+| 11:00 to 13:00 | DDWG film       | two narrations of one thought, three of another                | the first recheck found four points a first hearing misreads                                                                         |
+| 11:25          | DDWG film       | three bound retakes                                            | on the soundtrack they read 0.40 to 0.68 dB under the takes they replaced                                                            |
+| 13:11          | DDWG film       | one audition ticket                                            | its targets held a thought edited after the last narration                                                                           |
+| 14:00          | ETHOS film      | a 44-minute queue wait, refused as the ticket started          | the stage bound an assembly record that a later sound stage rewrote                                                                  |
+| 15:57 to 16:43 | DDWG film       | five rounds of staged audits of both editions                  | picture cues named words the text no longer said; a longer name unseated a mark; two moves stood one frame over the pace             |
 
 Review round 20 of the ETHOS film, the same evening, added two things the motion audit does not see. In 03.2 a 55 px stretch of a line left within one frame at each of three stations: the audit counts a drawn piece that a mark gains or loses whole, and a line split in two loses none. A reviewer read it as material by the letter of a pattern the owner rejected, and the build was not released. A headless scan of each draw call's summed stroke length at 60 fps finds the three places on that build and none on the repaired one (the film's local evidence of that day). And each chapter title travels to the running head at about 1,200 to 1,300 px/s in two films, while the declared pace limit of 450 px/s covers the marks of scenes only; the films' notes said every glide keeps the limit.
 
