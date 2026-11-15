@@ -12,6 +12,7 @@ This draft holds the intent in the repository. It has no specs or tasks yet: the
 
 - **A passing gate leaves no finding undisposed.** Every class of finding a gate records is gated by a limit the film declares, declared by identity with a reason, or defined as informational in its spec. A declaration that matches no finding is refused as stale, as the wrapping and motion exceptions already are. This covers captions above the reading rate, thoughts under the clarity floor and row gaps. **BREAKING** for a film that holds such findings undeclared: its gate refuses until it declares or repairs them.
 - **The row gap is gated at a floor the film declares**, 1.5 em unless it declares more, without a command-line flag.
+- **The motion audit sees what a viewer sees leave.** A line that loses part of its ink within one frame while the rest stays is a pop, and a mark drawn outside a scene, such as a chapter title on its way to the running head, is either followed against the pace limit or named as outside it in the gate record.
 - **Caption breaks weigh the reading rate**, so a cue above the rate that another allowed break of its sentence brings under it is not produced.
 - **`preflight` judges what a film builds and writes a receipt.** It also requires the sound gate's record bound to the current timeline and engine, asks for a draft scan only from a film that declares drafts, and writes a readiness receipt that binds every input it judged by digest; a second mode reads a receipt and refuses once an input has moved.
 - **Text is reviewed before it is narrated.** A text review record binds a passing independent recheck to the scripts' digests; a film may declare that narration requires it. The script editor names the picture's cue phrases and labels that an edit leaves without their words.
@@ -38,3 +39,5 @@ This draft holds the intent in the repository. It has no specs or tasks yet: the
 - `src/filmkit/preflight.py`, `picture/gates.py`, `soundtrack/` gates, `captions/`, `narration/script_edits.py`, `film.py` (new declarations) and their tests; the sample film declares what it holds.
 - Each adopting film declares its accepted findings in `content/film.toml` and drops the scripts that counted them; its task list can call `preflight` before its first render ticket.
 - Out of scope: admitting a host ticket on a receipt, which is the host's owner's; the review round's changes note, dispositions and release documents, which a later Change takes; the values of the thresholds themselves.
+
+Owner: the engine's maintainer. Next action: admit the Change with its specs and tasks once the ETHOS film's edition 2.0.1 and the DDWG film's edition 1.3.1 are released. Read again: 2026-11-18.
