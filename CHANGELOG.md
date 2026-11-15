@@ -4,6 +4,12 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.22.3] - 2026-11-15
+
+### Added
+
+- A script's voice performance may declare `segment_level_tolerance_db`, from 0.1 to 3.0. The assembly then brings each segment whose leveled thoughts' median loudness stands farther than that from its chapter's median to the edge of the tolerance, by one static gain of at most 2 dB that keeps the segment's peak below −1 dBFS, before it levels the chapters, and the receipt records each segment's gain as `segment_gain_db`. Until now thoughts were leveled within their segment and chapters within the film, but nothing leveled a segment within its chapter, so the step between adjacent thoughts across a segment boundary had no bound a film could declare. On one film's English soundtrack, whose segments stood from 0.74 LU under to 0.58 LU over their chapters, the largest such step falls from 1.34 LU to 0.95 LU at a tolerance of 0.3 dB and to 0.92 LU at 0.2 dB, within its reviewers' 1.2 LU. A film that declares no segment tolerance assembles the same soundtrack and timeline bytes as under 0.22.2; its assembly receipt gains the policy key `segment_level_tolerance`, null, and a `segment_gain_db` of 0 in each record.
+
 ## [0.22.2] - 2026-11-15
 
 ### Fixed
@@ -424,7 +430,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.22.2...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.22.3...HEAD
+[0.22.3]: https://github.com/HengYangDS/filmkit/compare/v0.22.2...v0.22.3
 [0.22.2]: https://github.com/HengYangDS/filmkit/compare/v0.22.1...v0.22.2
 [0.22.1]: https://github.com/HengYangDS/filmkit/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/HengYangDS/filmkit/compare/v0.21.3...v0.22.0
