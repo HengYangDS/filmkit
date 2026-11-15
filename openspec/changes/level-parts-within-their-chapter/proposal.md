@@ -24,5 +24,5 @@ None.
 
 ## Impact
 
-- `src/filmkit/soundtrack/level.py`, `policy.py`, `assembly.py` and their tests; the README's list of what a script declares.
+- `src/filmkit/soundtrack/level.py`, `policy.py`, `assembly.py` and their tests, and the new module `clip_levels.py`, which takes the clips' segment and chapter gains out of the assembly module so that it keeps within the repository's 500 code lines; the README's list of what a script declares.
 - The assembly receipt's pause policy gains the key `segment_level_tolerance` and each record `segment_gain_db`; soundtracks and timelines of films that do not declare the tolerance keep their bytes.

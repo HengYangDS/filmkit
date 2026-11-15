@@ -9,4 +9,4 @@
 
 ## 3. Release
 
-- [ ] 3.1 State the key in the README, record the change in the Changelog and set the version to 0.22.3; done when `mise run check` passes.
+- [x] 3.1 State the key in the README, record the change in the Changelog and set the version to 0.22.3; done when `mise run check` passes. Every command of `mise run check` passed in the lane on 15 November on the tree that commit `997c974` records; the full proof runs on the archived head.
