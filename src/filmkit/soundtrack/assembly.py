@@ -36,9 +36,9 @@ from filmkit.narration.spoken_units import aligned_lookup
 from filmkit.narration.take_edges import ending
 from filmkit.narration.thought_groups import validate_group_inputs
 from filmkit.repository import read, run, sha, write
+from filmkit.soundtrack.clip_levels import chapter_gains, segment_gains
 from filmkit.soundtrack.level import (
     apply_gain,
-    chapter_level_gains,
     correct_narration_level,
     fade_narration_boundaries,
     level_thoughts,
@@ -109,6 +109,7 @@ class Clip:
     capped: list[dict]
     lengthened: list[dict]
     chapter_gain_db: float = 0.0
+    segment_gain_db: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -393,27 +394,6 @@ def gap_seconds(kinds: list[str], gaps: list[int]) -> list[dict]:
     return [{"kind": kind, "seconds": gap / RATE} for kind, gap in zip(kinds, gaps, strict=True)]
 
 
-def _chapter_gains(clips: list[Clip], tolerance_db: float | None) -> dict[str, float]:
-    """The static gain of each chapter, from its leveled thoughts and its peak.
-
-    Each chapter's leveled thoughts are brought within the declared tolerance of the
-    film's median thought by one static gain, so no chapter, the coda included, stands
-    louder or softer than the film.
-    """
-    levels: dict[str, list[float]] = {}
-    peaks: dict[str, float] = {}
-    for clip in clips:
-        chapter = clip.segment["chapter"]
-        levels.setdefault(chapter, []).extend(
-            level["loudness_lufs"] + level["gain_db"] + clip.level_gain_db
-            for level in clip.thought_levels
-            if level["loudness_lufs"] is not None
-        )
-        peak = float(np.abs(clip.samples.astype(np.int32)).max(initial=0)) / 32768
-        peaks[chapter] = max(peaks.get(chapter, 0.0), peak)
-    return chapter_level_gains(levels, peaks, tolerance_db)
-
-
 def _timed_segment(clip: Clip, gap: int, kind: str, begin: float, end: float) -> dict:
     """The timeline segment of a laid-out clip: its picture and voice times and its words.
 
@@ -454,6 +434,7 @@ def _assembly_record(clip: Clip, start_sample: int) -> dict:
         "boundary_fades": clip.fades,
         "thought_levels": clip.thought_levels,
         "level_gain_db": clip.level_gain_db,
+        "segment_gain_db": clip.segment_gain_db,
         "chapter_gain_db": clip.chapter_gain_db,
         "speech_tempo_ratio": 1.0,
         "pitch_shift": 0,
@@ -589,7 +570,18 @@ def assemble(edition: Edition) -> None:
     edition.artifacts.mkdir(parents=True, exist_ok=True)
     decoded = decode_recordings(edition, segments, records)
     clips = designed_clips(segments, records, alignments, decoded, policy, releases)
-    gains = _chapter_gains(clips, policy["chapter_level_tolerance"])
+    parts = segment_gains(clips, policy["segment_level_tolerance"])
+    clips = [
+        dataclasses.replace(
+            clip,
+            samples=correct_narration_level(clip.samples, parts[clip.segment["id"]]),
+            segment_gain_db=parts[clip.segment["id"]],
+        )
+        if parts[clip.segment["id"]]
+        else clip
+        for clip in clips
+    ]
+    gains = chapter_gains(clips, policy["chapter_level_tolerance"])
     clips = [
         dataclasses.replace(
             clip,

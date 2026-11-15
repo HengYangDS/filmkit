@@ -146,3 +146,36 @@ def test_a_chapter_away_from_the_film_level_is_brought_within_tolerance():
         )["card"]
         == 0.0
     )
+
+
+def test_a_segment_away_from_its_chapter_is_brought_within_tolerance():
+    # Three segments of one chapter and the one segment of another. The first chapter's
+    # median thought is -21.0 LUFS; segment 03 stands 0.8 dB under it.
+    levels = {
+        "01": [-20.9, -21.1],
+        "02": [-21.0, -20.8, -21.0],
+        "03": [-21.8, -21.8],
+        "04": [-19.0, -19.2],
+    }
+    chapters = {"01": "body", "02": "body", "03": "body", "04": "coda"}
+    peaks = dict.fromkeys(levels, 0.5)
+    assert soundtrack_level.segment_level_gains(levels, chapters, peaks, 0.2) == {
+        "01": 0.0,
+        "02": 0.0,
+        "03": 0.6,
+        "04": 0.0,
+    }
+    # Without a declared tolerance no segment moves.
+    assert soundtrack_level.segment_level_gains(levels, chapters, peaks, None) == dict.fromkeys(
+        levels, 0.0
+    )
+    # A raised segment keeps its peak below -1 dBFS, and a segment without a measured
+    # thought keeps its level.
+    held = soundtrack_level.segment_level_gains(
+        {**levels, "05": []},
+        {**chapters, "05": "body"},
+        {**peaks, "03": 0.88, "05": 0.1},
+        0.2,
+    )
+    assert held["03"] == 0.11
+    assert held["05"] == 0.0

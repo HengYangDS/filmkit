@@ -66,6 +66,9 @@ def test_assembly_lays_out_each_recording_with_its_own_level_and_exact_samples(t
     assert [record["level_gain_db"] for record in records] == [1.0, 0]
     # The quieter chapter is raised and the louder one lowered towards the film's level.
     assert records[0]["chapter_gain_db"] > 0 > records[1]["chapter_gain_db"]
+    # Without a declared segment tolerance no segment has a gain of its own.
+    assert receipt["designed_pause_policy"]["segment_level_tolerance"] is None
+    assert [record["segment_gain_db"] for record in records] == [0.0, 0.0]
     # The gaps, the speech and the closing quiet fill the runtime before the credits exactly.
     gaps = [round(gap["seconds"] * RATE) for gap in receipt["gaps"]]
     assert [gap["kind"] for gap in receipt["gaps"]] == ["opening", "chapter"]
@@ -165,6 +168,32 @@ def test_a_declared_release_lets_its_thought_take_end_abruptly(two_chapters, mon
     monkeypatch.setattr(soundtrack_assembly, "_decode", decoding)
     with pytest.raises(Decoded):
         soundtrack_assembly.assemble(two_chapters)
+
+
+@pytest.mark.ffmpeg
+def test_segments_of_one_chapter_are_leveled_within_the_declared_tolerance(two_chapters):
+    # Without the declaration the two recordings stand as far apart as they were recorded.
+    script = json.loads((repository.ROOT / two_chapters.script).read_text())
+    for segment in script["segments"]:
+        segment["chapter"], segment["chapter_title"] = "a", "A"
+    (repository.ROOT / two_chapters.script).write_text(json.dumps(script, ensure_ascii=False))
+    soundtrack_assembly.assemble(two_chapters)
+    undeclared = two_chapters.soundtrack.read_bytes()
+    records = json.loads(two_chapters.audio_assembly.read_text())["records"]
+    assert [record["segment_gain_db"] for record in records] == [0.0, 0.0]
+    # One chapter is the whole film here, so no chapter gain applies either.
+    assert [record["chapter_gain_db"] for record in records] == [0.0, 0.0]
+    # The tones stand 3.52 dB apart and the first declares 1 dB of gain: 1.26 dB to either
+    # side of the chapter's median. Declared, each segment moves to 0.3 dB from it.
+    script["voice_performance"]["segment_level_tolerance_db"] = 0.3
+    (repository.ROOT / two_chapters.script).write_text(json.dumps(script, ensure_ascii=False))
+    soundtrack_assembly.assemble(two_chapters)
+    receipt = json.loads(two_chapters.audio_assembly.read_text())
+    assert receipt["designed_pause_policy"]["segment_level_tolerance"] == 0.3
+    gains = [record["segment_gain_db"] for record in receipt["records"]]
+    assert gains == [pytest.approx(0.96, abs=0.02), pytest.approx(-0.96, abs=0.02)]
+    assert [record["chapter_gain_db"] for record in receipt["records"]] == [0.0, 0.0]
+    assert two_chapters.soundtrack.read_bytes() != undeclared
 
 
 @pytest.mark.ffmpeg

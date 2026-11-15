@@ -201,6 +201,9 @@ def designed_pause_policy(performance: dict) -> dict:
     level_tolerance = _optional(
         "thought_level_tolerance_db", performance.get("thought_level_tolerance_db"), 0.25, 6.0
     )
+    segment_tolerance = _optional(
+        "segment_level_tolerance_db", performance.get("segment_level_tolerance_db"), 0.1, 3.0
+    )
     chapter_tolerance = _optional(
         "chapter_level_tolerance_db", performance.get("chapter_level_tolerance_db"), 0.1, 3.0
     )
@@ -233,6 +236,7 @@ def designed_pause_policy(performance: dict) -> dict:
         "boundary_ratio": boundary_ratio,
         "boundary_margin": boundary_margin,
         "level_tolerance": level_tolerance,
+        "segment_level_tolerance": segment_tolerance,
         "chapter_level_tolerance": chapter_tolerance,
         "coda": coda,
         "inner_cap": inner_cap,

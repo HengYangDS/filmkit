@@ -21,6 +21,7 @@ PEAK_CEILING_DBFS = -1.0
 # The most a static gain moves a thought, and a chapter.
 THOUGHT_GAIN_LIMIT_DB = 3.0
 CHAPTER_GAIN_LIMIT_DB = 2.0
+SEGMENT_GAIN_LIMIT_DB = 2.0
 
 
 class LevelError(ValueError):
@@ -161,6 +162,37 @@ def chapter_level_gains(
         offset = reference - float(np.median(values)) if values else 0.0
         gains[chapter] = (
             _toleranced_gain(offset, tolerance_db, CHAPTER_GAIN_LIMIT_DB, peaks[chapter])
+            if tolerance_db is not None and abs(offset) > tolerance_db
+            else 0.0
+        )
+    return gains
+
+
+def segment_level_gains(
+    levels: dict[str, list[float]],
+    chapters: dict[str, str],
+    peaks: dict[str, float],
+    tolerance_db: float | None,
+) -> dict[str, float]:
+    """One static gain per segment that brings its level within tolerance of its chapter's.
+
+    A segment's level is the median loudness of its leveled thoughts, and its chapter's
+    level is the median over every leveled thought of the chapter's segments. A segment
+    beyond the tolerance moves to its edge, by at most 2 dB, and a raised segment keeps its
+    peak below -1 dBFS. A segment without a measured thought keeps its level, and so does
+    every segment when no tolerance is declared.
+    """
+    grouped: dict[str, list[float]] = {}
+    for segment, values in levels.items():
+        grouped.setdefault(chapters[segment], []).extend(values)
+    references = {
+        chapter: float(np.median(values)) for chapter, values in grouped.items() if values
+    }
+    gains = {}
+    for segment, values in levels.items():
+        offset = references[chapters[segment]] - float(np.median(values)) if values else 0.0
+        gains[segment] = (
+            _toleranced_gain(offset, tolerance_db, SEGMENT_GAIN_LIMIT_DB, peaks[segment])
             if tolerance_db is not None and abs(offset) > tolerance_db
             else 0.0
         )
