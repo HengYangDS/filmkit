@@ -3,8 +3,11 @@
 Each recording's unit error rate is the edit distance between the recognition units of its
 text and of its transcript over the text's unit count. Recognition is a proxy for
 pronunciation, not certification or listening. Each recording's transcript is cached under its
-waveform, the recognizer's revision and the language, as alignments are, and the recognizer is
-loaded when the first recording misses its cache; the error rate is taken anew from the text.
+waveform, the language and the recognizer's identity: its hub repository and revision, its
+weights' SHA-256 and the version of the speech library that runs it. Every run checks the
+supplied recognizer against its pins first, which reads the weights, so a run that reuses every
+transcript still proves that the recognizer its cache names is the one supplied; the model is
+loaded only when a recording misses its cache. The error rate is taken anew from the text.
 
 Usage: python -m filmkit.narration.transcription
     --receipt FILE --output FILE --language Chinese|English
@@ -14,6 +17,7 @@ SHA-256, text and language its receipt records.
 
 import argparse
 import json
+from importlib.metadata import version
 from pathlib import Path
 
 from mlx_audio.stt.utils import load_model
@@ -23,38 +27,60 @@ from filmkit.narration.receipts import bound_records
 from filmkit.narration.recognition import recognition_units, unit_distance
 from filmkit.narration.snapshots import RECOGNIZER
 
-# The pinned snapshot's identity, as transcripts record it.
-ASR_MODEL = RECOGNIZER.repo
-ASR_REVISION = RECOGNIZER.revision
+# The speech library that runs the recognizer, as a cached transcript records it: another
+# version may hear a recording otherwise.
+LIBRARY = f"mlx-audio {version('mlx-audio')}"
 SCOPE = "Automatic transcription proxy; not pronunciation certification or listening."
 # The cached transcripts, below the film's root, in a folder for each language.
 CACHE = "build/evidence/transcript-records"
 
 
-def transcript_record(language: str, record_id: str, wav_sha256: str) -> Path:
-    """Where one recording's transcript by the pinned recognizer is cached."""
-    name = f"{record_id}-{wav_sha256[:12]}-{ASR_REVISION[:12]}.json"
+def recognizer() -> dict:
+    """Check the supplied recognizer against its pins and return its identity: its hub
+    repository and revision, its weights' SHA-256 and the speech library's version.
+
+    The check reads the weights, and is made on every run, also on one that finds every
+    transcript cached and loads no model.
+    """
+    RECOGNIZER.verify()
+    return {
+        "repo": RECOGNIZER.repo,
+        "revision": RECOGNIZER.revision,
+        "weights_sha256": RECOGNIZER.weights["model.safetensors"],
+        "library": LIBRARY,
+    }
+
+
+def transcript_record(language: str, record_id: str, wav_sha256: str, identity: dict) -> Path:
+    """Where one recording's transcript by a recognizer of this identity is cached."""
+    key = repository.content_sha(json.dumps(identity, sort_keys=True))
+    name = f"{record_id}-{wav_sha256[:12]}-{key[:12]}.json"
     return repository.ROOT / CACHE / language.lower() / name
 
 
-def cached_transcript(record: dict, language: str) -> str | None:
+def cached_transcript(record: dict, language: str, identity: dict) -> str | None:
     """A recording's cached transcript, or None without one; a cache that binds another
     recording, recognizer or language than its place names is refused."""
-    path = transcript_record(language, record["id"], record["wav_sha256"])
+    path = transcript_record(language, record["id"], record["wav_sha256"], identity)
     if not path.exists():
         return None
     cached = repository.read(path)
-    bound = {"wav_sha256": record["wav_sha256"], "revision": ASR_REVISION, "language": language}
+    bound = {"wav_sha256": record["wav_sha256"], "recognizer": identity, "language": language}
     if any(cached.get(key) != value for key, value in bound.items()):
         msg = "Cached transcript binding differs"
         raise ValueError(msg)
     return cached["heard"]
 
 
+def load_recognizer():
+    """Load the supplied ASR snapshot, which the caller has checked, downloading nothing."""
+    return load_model(str(repository.ROOT / RECOGNIZER.folder))
+
+
 def load_asr():
     """Load the pinned ASR snapshot once it is checked, without downloading anything."""
     RECOGNIZER.verify()
-    return load_model(str(repository.ROOT / RECOGNIZER.folder))
+    return load_recognizer()
 
 
 def transcribe(model, path: Path, language: str) -> str:
@@ -69,20 +95,20 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--language", choices=("Chinese", "English"), required=True)
     options = parser.parse_args(argv)
     records = bound_records(options.receipt, options.language)
+    identity = recognizer()
     model = None
     results = []
     for record in records:
-        heard = cached_transcript(record, options.language)
+        heard = cached_transcript(record, options.language, identity)
         if heard is None:
-            model = model or load_asr()
+            model = model or load_recognizer()
             heard = transcribe(model, repository.ROOT / record["path"], options.language)
             repository.write(
-                transcript_record(options.language, record["id"], record["wav_sha256"]),
+                transcript_record(options.language, record["id"], record["wav_sha256"], identity),
                 {
                     "id": record["id"],
                     "wav_sha256": record["wav_sha256"],
-                    "model": ASR_MODEL,
-                    "revision": ASR_REVISION,
+                    "recognizer": identity,
                     "language": options.language,
                     "heard": heard,
                 },
@@ -102,8 +128,8 @@ def main(argv: list[str] | None = None) -> None:
     repository.write(
         options.output,
         {
-            "model": ASR_MODEL,
-            "revision": ASR_REVISION,
+            "model": identity["repo"],
+            "revision": identity["revision"],
             "language": options.language,
             "scope": SCOPE,
             "records": results,
