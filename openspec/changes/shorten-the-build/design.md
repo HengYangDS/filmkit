@@ -16,8 +16,10 @@ One small measurement of this Change is cited where it is used: a synthetic clip
 **Goals:**
 
 - A build's time is read from records, stage by stage, with one command.
-- The 25-minute film rebuilds in 90 minutes of compute or less. This Change removes one of an edition's two renders and its every-frame comparison, shortens the render that stays, and takes the 1080p encodes off the hardware encoder; each saving is to be measured on a film's build with the durations command before the budget is called met.
+- The 25-minute film rebuilds in 90 minutes of compute or less. This Change removes one of an edition's two renders and its every-frame comparison, renders the two editions' captioned pictures at once, narrates in two processes, and takes the 1080p encodes off the hardware encoder; each saving is to be measured on a film's build with the durations command before the budget is called met.
 - A film's task list does not change, and a film that needs the native pair can still have it.
+
+Projected for the 25-minute film, both editions, from the measured ratios and the receipts of 16 November: narration 20 to 28 min in two processes (37 to 50 today); sound and audits about 6; the two captioned renders at once about 19 to 20 (four renders, 61 today); the two derived UHD pictures about 9, the engine's form of the paint being untimed; the four 1080p films about 8 and the stream copies about 1 (packaging, 22 today); the comparison by record under 1 (30 today); verification 3 to 5 (8 today). That is 66 to 78 minutes against about 175 today, inside the budget of 90. It is a projection until a film is built with the engine, which task 7.5 asks for.
 
 **Non-Goals:**
 
@@ -73,7 +75,7 @@ Each decision states what it rests on, what was considered, why the option taken
    - **Rests on:** the static review's changes 9, 10 and 11: transcription has no cache and transcribed 30 recordings in 43 to 48 s when 3 were new; both phases of a still scan select the same frames of a draft and decode it twice; the reproduction compares its film pairs in sequence.
    - **Considered:** leaving them, as seconds against minutes.
    - **Chosen because:** each repeats on every iteration of a film's work, and each is exact: a transcript is a function of the recording and the pinned model, the scan's frames are the same frames, and a pair's comparison reads nothing another pair writes.
-   - **Applies to:** `narrate`, the still scan and the reproduction. The static review's changes 1, 2 and 8 speed up the every-frame comparison, which now runs on demand; they stay open.
+   - **Applies to:** `narrate`, the still scan and the reproduction. The static review's changes 1, 2 and 8 speed up the every-frame comparison, which a film's build no longer runs; they are named among the later slices.
 10. **Narration divides its segments among processes of the speech model.**
     - **Rests on:** the static review: synthesis is 558 to 787 s of a 30-segment narration, and every thought is generated from its own request and seed into files named by its own fingerprint. bench3, on four segments of a film's narration (209 s of Chinese speech): one process 99.8 s, two processes 55.3 s, four processes 55.2 s, the longest segment bounding that run at 48.5 s; both languages at once, one process each, 116.0 s against 190.2 s in sequence; 4.6 GB at the peak for each process, 3.8 GB with four. Every take of every run, 24 in all, has the SHA-256 of the take of its fingerprint that the film delivered.
     - **Considered:** (a) a pool of model workers with a protocol between them and the narration; (b) the vendor's batched generation, which changes what is sampled and so the takes; (c) children of the synthesis itself, each given its segments by the `--ids` the command already takes and a receipt of its own, after which the synthesis takes its ordinary path over retained recordings.
@@ -103,4 +105,4 @@ An adopting film bumps the engine, keeps its tasks and builds: its uncaptioned p
 
 - Narration in more than two processes on a whole narration, to be measured in a film's build.
 - Segmented capture (`HF_SEGMENTED_CAPTURE=true`) changed nothing in bench2 (118.0 s, identical frames, no segment named in the log); whether it serves one-scene changes is untested and belongs to that later slice.
-- Later slices: span renders and the segment cache; a verification that does not decode again what the build proved, which changes what the verifier claims and is the owner's decision; the reviewers' measuring tools shipped by the engine.
+- Later slices: span renders and the segment cache; a faster every-frame comparison for the pairs that still ask for it (parallel time segments, the sampled measures off the scan's decode, band differences in 8 bits), which serves a path now run on demand and in the sample build only; a verification that does not decode again what the build proved, which changes what the verifier claims and is the owner's decision; the reviewers' measuring tools shipped by the engine.
