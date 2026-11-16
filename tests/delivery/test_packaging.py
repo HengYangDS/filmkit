@@ -268,7 +268,7 @@ def test_the_commands_carry_the_release_metadata(packaging_root):
     hardware = []
     interval = str(2 * specification.FPS)
     scaled = ["-filter:v:0", "scale=w=1920:h=1080:flags=area", "-c:v:0", "libx264"]
-    scaled += ["-preset:v:0", "veryfast", "-crf:v:0", "12", "-pix_fmt:v:0", "yuv420p"]
+    scaled += ["-preset:v:0", "veryfast", "-crf:v:0", "10", "-pix_fmt:v:0", "yuv420p"]
     scaled += ["-g:v:0", interval, "-keyint_min:v:0", interval, "-sc_threshold:v:0", "0"]
     attach = ["-map", "0:v:0", "-map", "0:a:0", "-map", "1:v:0", "-map_metadata", "0"]
     attach += ["-map_chapters", "0", "-c", "copy", "-disposition:v:1", "attached_pic"]

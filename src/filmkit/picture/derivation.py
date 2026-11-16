@@ -81,18 +81,21 @@ EDGE_FRAMES = 2 * FPS // AUDIT_FPS
 # ripple in a flat band reached 2 levels below busy synthetic content and none on a film's span
 # of 7,200 frames (17 November 2026).
 GROUND_TOLERANCE = 3
-# The derived picture's encoder: x264 at the rate factor the renderer encodes the pictures at,
-# with a keyframe forced every KEYFRAME_SECONDS and none at a scene cut. On a span of 7,200 UHD
-# frames this encode took 17.8 s where the native render took 141.2 s, and stood 59.0 dB on
-# average from the native picture above the band (17 November 2026).
+# The derived picture's encoder: x264 with a keyframe forced every KEYFRAME_SECONDS and none at a
+# scene cut. On a span of 7,200 UHD frames, with the band painted by colour, the encode took 20.7
+# s at rate factor 14, 21.0 s at 12 and 22.8 s at 10, where the native render took 126 to 141 s,
+# and stood above the band 59.5, 60.7 and 61.7 dB on average from the native picture, 52.1, 53.5
+# and 52.6 dB at the lowest frame (17 November 2026). Rate factor 12 is a decibel closer than 14
+# in the same time.
 KEYFRAME_SECONDS = 2
+RATE_FACTOR = 12
 ENCODER = (
     "-c:v",
     "libx264",
     "-preset",
     "veryfast",
     "-crf",
-    "14",
+    str(RATE_FACTOR),
     "-g",
     str(KEYFRAME_SECONDS * FPS),
     "-keyint_min",

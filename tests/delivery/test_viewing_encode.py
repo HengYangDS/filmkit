@@ -6,6 +6,7 @@ import pytest
 
 import filmkit.delivery.packaging as delivery_packaging
 import filmkit.picture.derivation as derivation
+import filmkit.production as production
 import filmkit.repository as repository
 from filmkit.production import RENDITIONS, VIEWING, Edition
 from filmkit.specification import FPS
@@ -17,7 +18,8 @@ def test_a_1080p_film_is_encoded_by_x264_on_a_forced_grid_without_videotoolbox()
         options = [*rendition.decoding, *rendition.video]
         options += delivery_packaging.keyframe_options(rendition)
         assert options[options.index("-c:v:0") + 1] == "libx264"
-        assert "-crf:v:0" in options
+        assert options[options.index("-preset:v:0") + 1] == "veryfast"
+        assert options[options.index("-crf:v:0") + 1] == "10"
         interval = str(2 * FPS)
         assert options[-6:] == [
             "-g:v:0",
@@ -29,6 +31,11 @@ def test_a_1080p_film_is_encoded_by_x264_on_a_forced_grid_without_videotoolbox()
         ]
         assert not [option for option in options if "videotoolbox" in option]
         assert rendition.decoding == ()
+
+
+def test_the_1080p_settings_are_the_measured_constants():
+    assert (production.VIEWING_ENCODER, production.VIEWING_PRESET) == ("libx264", "veryfast")
+    assert production.VIEWING_RATE_FACTOR == 10
 
 
 def test_a_film_that_copies_its_picture_takes_no_keyframe_option():
