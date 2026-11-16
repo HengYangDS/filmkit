@@ -81,9 +81,10 @@ def test_an_edition_action_passes_its_options_to_its_owner(monkeypatch, tmp_path
     stage = ["--output", str(output), "--duration", "60", "--width", "1920", "--height", "1080"]
     produce.main(["stage-picture", "--language", "zh", *stage, "--start", "12.5"])
     produce.main(["render-picture", "--language", "en", "--deadline", "600"])
-    # The uncaptioned picture is staged, rendered and validated by the same owners.
+    # The uncaptioned picture is staged, rendered with --native and validated by the same owners.
     produce.main(["stage-picture", "--language", "en", "--uncaptioned"])
-    produce.main(["render-picture", "--language", "zh", "--uncaptioned", "--deadline", "600"])
+    native = ["--uncaptioned", "--native", "--deadline", "600"]
+    produce.main(["render-picture", "--language", "zh", *native])
     produce.main(["validate-picture", "--language", "zh", "--uncaptioned"])
     produce.main(["compare-pictures", "--language", "en"])
     zh, en = production.Edition("zh"), production.Edition("en")
@@ -230,3 +231,35 @@ def test_a_rebuild_over_a_reviewed_build_waits_for_its_set_aside(
     review_round.main(["set-aside", "--round", "7", "--purpose", "retakes", "--language", "zh"])
     produce.main([action, "--language", "zh"])
     assert calls == [production.Edition("en"), reviewed]
+
+
+def test_the_uncaptioned_picture_is_derived_unless_a_native_render_is_asked_for(monkeypatch):
+    derived, rendered = [], []
+    monkeypatch.setattr(
+        produce.derivation, "derive_uncaptioned", lambda *arguments: derived.append(arguments)
+    )
+    monkeypatch.setattr(
+        produce, "render_picture", lambda *arguments, **options: rendered.append(options)
+    )
+    produce.main(["render-picture", "--language", "zh", "--uncaptioned"])
+    produce.main(["render-picture", "--language", "en", "--uncaptioned", "--deadline", "900"])
+    zh, en = production.Edition("zh"), production.Edition("en")
+    assert derived == [(zh, produce.derivation.DEADLINE), (en, 900)]
+    produce.main(["render-picture", "--language", "zh", "--uncaptioned", "--native"])
+    produce.main(["render-picture", "--language", "zh"])
+    assert rendered == [{"captions": False}, {"captions": True}]
+    assert len(derived) == 2
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["render-picture", "--language", "zh", "--native"],
+        ["validate-picture", "--language", "zh", "--uncaptioned", "--native"],
+    ],
+)
+def test_native_applies_only_to_the_uncaptioned_render(arguments, capsys):
+    with pytest.raises(SystemExit) as refused:
+        produce.main(arguments)
+    assert refused.value.code == 2
+    assert "--native applies only to render-picture --uncaptioned" in capsys.readouterr().err

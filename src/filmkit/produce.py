@@ -6,8 +6,10 @@ action needs --language. `--deadline` bounds a render in seconds, by default its
 10800 for a picture, also each one that repair-pictures renders, and 3600 for a draft
 (`filmkit.picture.draft`). `--uncaptioned` makes stage-picture, render-picture and
 validate-picture act on the edition's uncaptioned picture instead of its captioned one, and
-every other action refuses it; compare-pictures proves that the two pictures differ only by the
-captions (`filmkit.picture.equivalence`). `--variants` names fit's pause-policy variants, a file
+every other action refuses it. render-picture --uncaptioned derives that picture from the
+captioned one (`filmkit.picture.derivation`) unless `--native` asks for a render of its own
+stage; compare-pictures proves that the two pictures differ only by the captions
+(`filmkit.picture.equivalence`). `--variants` names fit's pause-policy variants, a file
 below the film's root or an absolute one (`filmkit.soundtrack.fit`), and `--attempts` bounds
 repair-pictures (`filmkit.picture.repair`); every other action refuses them.
 A refusal by an action's owner exits with status 1 and "<action>: <reason>" on standard
@@ -20,7 +22,8 @@ Every action writes a duration record for its edition when it ends, named after 
 for the uncaptioned picture, with `-uncaptioned` after it (`filmkit.durations`).
 The command owns no goal, approval, repository lifecycle, service or task state.
 
-Usage: python -m filmkit.produce <edition action> --language zh|en [--uncaptioned] [options]
+Usage: python -m filmkit.produce <edition action> --language zh|en [--uncaptioned [--native]]
+           [options]
 """
 
 from __future__ import annotations
@@ -30,6 +33,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import filmkit.durations as durations
+import filmkit.picture.derivation as derivation
 import filmkit.picture.draft as draft
 import filmkit.picture.rendering as rendering
 from filmkit.captions import CaptionError
@@ -81,6 +85,16 @@ def after_set_aside(edition: Edition, owner: Callable[[Edition], object]) -> obj
     return owner(edition)
 
 
+def render(edition: Edition, options: argparse.Namespace) -> object:
+    """Render the captioned picture, or make the uncaptioned one: derived from the captioned
+    picture unless --native asks for a render of its own stage."""
+    if options.uncaptioned and not options.native:
+        return derivation.derive_uncaptioned(edition, deadline(options, derivation.DEADLINE))
+    return render_picture(
+        edition, deadline(options, rendering.DEADLINE), captions=not options.uncaptioned
+    )
+
+
 # Each edition action's adapter from the parsed options to its owner. The adapters name their
 # owners when they run, so a test can replace an owner.
 EDITION_ACTIONS: dict[str, Callable[[Edition, argparse.Namespace], object]] = {
@@ -106,9 +120,7 @@ EDITION_ACTIONS: dict[str, Callable[[Edition, argparse.Namespace], object]] = {
     ),
     "preflight": lambda edition, _: preflight(edition),
     "admitted": lambda edition, _: admitted(edition),
-    "render-picture": lambda edition, options: render_picture(
-        edition, deadline(options, rendering.DEADLINE), captions=not options.uncaptioned
-    ),
+    "render-picture": lambda edition, options: render(edition, options),
     "package-metadata": lambda edition, _: package_metadata(edition),
     "validate-picture": lambda edition, options: validate_picture(
         edition, captions=not options.uncaptioned
@@ -165,6 +177,11 @@ def arguments() -> argparse.ArgumentParser:
         action="store_true",
         help="act on the uncaptioned picture: " + ", ".join(PICTURE_ACTIONS),
     )
+    parser.add_argument(
+        "--native",
+        action="store_true",
+        help="render-picture --uncaptioned: render the uncaptioned stage instead of deriving",
+    )
     return parser
 
 
@@ -175,6 +192,8 @@ def main(argv: list[str] | None = None) -> None:
         parser.error("the following arguments are required: --language")
     if options.uncaptioned and options.action not in PICTURE_ACTIONS:
         parser.error(f"--uncaptioned applies only to {', '.join(PICTURE_ACTIONS)}")
+    if options.native and not (options.uncaptioned and options.action == "render-picture"):
+        parser.error("--native applies only to render-picture --uncaptioned")
     for option, action in (("variants", "fit"), ("attempts", "repair-pictures")):
         if getattr(options, option) is not None and options.action != action:
             parser.error(f"--{option} applies only to {action}")

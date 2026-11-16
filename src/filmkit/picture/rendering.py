@@ -14,8 +14,10 @@ contract raises `PictureError`, as does a film whose installed renderer is not t
 engine renders with.
 
 Each edition has two pictures (`production.Edition.rendered`): the captioned one, which draws
-the timeline's captions, and the uncaptioned one, whose document inlines the same timeline with
-no captions and which renders with the same settings to its own stage, file and receipt. Each
+the timeline's captions, and the uncaptioned one. The uncaptioned picture is derived from the
+captioned one (`filmkit.picture.derivation`) unless a native render is asked for; rendered, its
+document inlines the same timeline with no captions and it renders with the same settings to its
+own stage, file and receipt. Each
 stage record and receipt names its picture; one written before the uncaptioned picture existed
 names none, and its places bind it to the captioned picture.
 """
@@ -673,7 +675,12 @@ def require_receipt_capture(receipt: dict) -> None:
 
 def validate_picture_binding(edition: Edition, receipt: dict, *, captions: bool = True) -> None:
     """Bind one complete native render, of the captioned picture or with `captions` False of the
-    uncaptioned one, to the exact staged current inputs and the declared capture."""
+    uncaptioned one, to the exact staged current inputs and the declared capture; a derived
+    uncaptioned picture is bound by its derivation's receipt (`filmkit.picture.derivation`)."""
+    if not captions and isinstance(receipt.get("derived"), dict):
+        from filmkit.picture import derivation
+
+        return derivation.validate_binding(edition, receipt)
     rendered = edition.rendered(captions)
     require_receipt_picture(receipt, rendered)
     require_completed_receipt(receipt, rendered.stage)
@@ -684,9 +691,13 @@ def validate_picture_binding(edition: Edition, receipt: dict, *, captions: bool 
 
 def validate_picture(edition: Edition, *, captions: bool = True) -> dict:
     """Bind the complete native capture, captioned or with `captions` False uncaptioned, to its
-    current authored input."""
+    current authored input; a derived uncaptioned picture to its derivation's receipt."""
     rendered, frames = edition.rendered(captions), DURATION * FPS
     receipt = read(rendered.receipt)
+    if not captions and isinstance(receipt.get("derived"), dict):
+        from filmkit.picture import derivation
+
+        return derivation.validate(edition, receipt)
     validate_picture_binding(edition, receipt, captions=captions)
     media.require_video(
         media.probe(rendered.file), frames=frames, fps=FPS, size=PICTURE_SIZE, duration=DURATION

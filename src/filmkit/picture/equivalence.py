@@ -1,8 +1,10 @@
 """Prove that an edition's uncaptioned picture differs from its captioned one only by its captions.
 
-`compare_pictures` runs once both pictures are rendered and valid
+`compare_pictures` runs once both pictures are made and valid
 (`filmkit.picture.rendering.validate_picture`) and before packaging, which requires its passing
-record (`require_equivalence`). It compares the pictures at two levels:
+record (`require_equivalence`). A pair whose uncaptioned picture was derived from the captioned
+one is compared by the derivation's receipt, which holds its proofs, and no picture is decoded
+(`filmkit.picture.derivation`). A rendered pair is compared at two levels:
 
 - the composition: the caption-equivalence tool (`picture/caption-equivalence.mjs`) runs the
   composition headlessly on the edition's timeline and on the same timeline with no captions, at
@@ -95,13 +97,16 @@ DECODE_DEADLINE = 7200
 
 
 def picture_bindings(edition: Edition, captions: bool) -> dict:
-    """What a record binds of one picture: its stage document, its file and its receipt."""
+    """What a record binds of one picture: its file and its receipt, with its stage document when
+    it was rendered; a derived picture has no stage and is marked instead."""
     rendered = edition.rendered(captions)
-    return {
-        "stage_sha256": repository.sha(rendered.stage / "index.html"),
+    files = {
         "picture_sha256": repository.sha(rendered.file),
         "receipt_sha256": repository.sha(rendered.receipt),
     }
+    if not captions and isinstance(repository.read(rendered.receipt).get("derived"), dict):
+        return {"derived": True, **files}
+    return {"stage_sha256": repository.sha(rendered.stage / "index.html"), **files}
 
 
 def current_bindings(edition: Edition) -> dict:
@@ -348,10 +353,15 @@ def next_step(record: dict, code: str) -> str:
 
 
 def compare_pictures(edition: Edition) -> dict:
-    """Compare the edition's two pictures at both levels, write the record and refuse a finding."""
+    """Compare the edition's two pictures, write the record and refuse a finding: a rendered pair
+    at both levels, a pair whose uncaptioned picture is derived by its derivation's receipt
+    (`filmkit.picture.derivation.compare_derived`)."""
     with durations.phase("validation"):
-        for captions in (True, False):
-            validate_picture(edition, captions=captions)
+        receipts = [validate_picture(edition, captions=captions) for captions in (True, False)]
+    if isinstance(receipts[1].get("derived"), dict):
+        from filmkit.picture import derivation
+
+        return derivation.compare_derived(edition, receipts[1])
     work = repository.ROOT / WORK / edition.code
     work.mkdir(parents=True, exist_ok=True)
     bound = current_bindings(edition)

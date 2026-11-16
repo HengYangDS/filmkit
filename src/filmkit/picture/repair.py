@@ -169,6 +169,13 @@ def repair_pictures(
         msg = f"A repair makes at least one attempt, not {attempts}"
         raise PictureError(msg)
     record = current_record(edition)
+    if "derived" in record.get("encoded", {}) and record.get("verdict") != "pass":
+        msg = (
+            f"The {edition.code} pair is derived, which rendering a picture again does not repair: "
+            f"{'; '.join(record['findings'])}; run render-picture --uncaptioned, then "
+            "compare-pictures"
+        )
+        raise PictureError(msg)
     named = faults.repairable(record, edition.code)
     numbers: list[int] = []
     while named:

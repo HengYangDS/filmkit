@@ -165,8 +165,9 @@ def require_covering_geometry(edition: production.Edition) -> dict:
 
 
 def verify_picture(edition: production.Edition) -> dict:
-    """Bind both native renders and the captioned picture's whole-film geometry to their staged
-    pictures, and require the passing record that the two differ only by their captions."""
+    """Bind the captioned picture's render and whole-film geometry to its staged picture and the
+    uncaptioned picture to its render or its derivation, and require the passing record that the
+    two differ only by their captions."""
     render = repository.read(edition.render_receipt)
     picture_rendering.validate_picture_binding(edition, render)
     uncaptioned = repository.read(edition.rendered(captions=False).receipt)
@@ -181,12 +182,18 @@ def verify_picture(edition: production.Edition) -> dict:
         msg = "Shot plan differs from the current picture inputs"
         raise VerificationError(msg)
     equivalence = picture_equivalence.require_equivalence(edition)
+    encoded = equivalence["encoded"]
+    compared = (
+        {"derived": True, "ground_frames": encoded["derived"]["ground_check"]["frames"]}
+        if "derived" in encoded
+        else {"encoded_frames": encoded["frames"]}
+    )
     return {
         "picture_sha256": render["output_sha256"],
         "uncaptioned_picture_sha256": uncaptioned["output_sha256"],
         "caption_equivalence": {
             "composition_instants": equivalence["composition"]["instants"],
-            "encoded_frames": equivalence["encoded"]["frames"],
+            **compared,
         },
         "geometry_frames": geometry["checked"],
         "browser": geometry["browser"],
