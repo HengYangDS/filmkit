@@ -11,6 +11,9 @@ import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
 
+# The renderer version the fixture's film installs, which is the engine's.
+RENDERER = picture_rendering.RENDERER_VERSION
+
 
 @pytest.fixture
 def rendered(film_root, monkeypatch):
@@ -24,6 +27,11 @@ def rendered(film_root, monkeypatch):
     monkeypatch.setattr(media, "video_cadence", lambda *arguments: {"keyframes": []})
     digests = {}
     monkeypatch.setattr(qualification, "frame_digests", lambda path: digests[path.parent.name])
+    # The browser the renders run: a build of the test's own, named as a film names another.
+    browser = film_root.path.parent / "browser/chrome-headless-shell"
+    browser.parent.mkdir()
+    browser.write_text("a browser build")
+    monkeypatch.setenv("FILM_CHROMIUM_PATH", str(browser))
     return edition, film_root, digests
 
 
@@ -34,7 +42,7 @@ def test_two_renders_that_decode_alike_pass_and_the_second_is_removed(rendered):
     assert repository.read(edition.renderer_qualification) == record
     assert (record["verdict"], record["differing_frames"]) == ("pass", 0)
     assert record["first_differing_frame"] is None
-    assert record["renderer_version"] == picture_rendering.RENDERER_VERSION
+    assert record["renderer"] == {"package": "hyperframes", "version": RENDERER}
     # The record names the capture the two renders were made with, the sample film's own.
     assert record["capture"] == "software"
     first, second = record["first"], record["second"]
@@ -49,6 +57,40 @@ def test_two_renders_that_decode_alike_pass_and_the_second_is_removed(rendered):
     assert again[again.index("--output") + 1] == str(work / edition.picture.name)
     # The delivered picture and its receipt are as they were.
     picture_rendering.validate_picture(edition)
+
+
+def test_the_record_states_the_renderer_and_the_browser_that_ran(rendered, monkeypatch):
+    edition, film_root, digests = rendered
+    digests |= {"zh": ["a"]}
+    browser = film_root.path.parent / "browser/chrome-headless-shell"
+    # A browser named by the film, which is not the build the engine pins.
+    record = qualification.qualify_renderer(edition, 60)
+    assert record["browser"] == {
+        "executable": str(browser),
+        "sha256": repository.sha(browser),
+        "pinned_build": None,
+    }
+    # The pinned build is named when the executable that ran holds its bytes.
+    monkeypatch.setattr(picture_rendering, "BROWSER_SHA256", repository.sha(browser))
+    record = qualification.qualify_renderer(edition, 60)
+    product, version = picture_rendering.BROWSER
+    assert record["browser"]["pinned_build"] == f"{product}@{version}"
+    # The renderer's version is the installed package's, read when the qualification runs.
+    manifest = film_root.path / "node_modules" / picture_rendering.RENDERER_PACKAGE
+    manifest.write_text('{"name": "hyperframes", "version": "0.0.1"}')
+    runs = len(film_root.runs())
+    with pytest.raises(PictureError, match="The film installs HyperFrames 0.0.1"):
+        qualification.qualify_renderer(edition, 60)
+    assert len(film_root.runs()) == runs
+
+
+def test_a_qualification_without_a_browser_is_refused_before_it_renders(rendered, monkeypatch):
+    edition, film_root, _ = rendered
+    monkeypatch.delenv("FILM_CHROMIUM_PATH")
+    runs = len(film_root.runs())
+    with pytest.raises(PictureError, match="No browser at .*chrome-headless-shell; run .*supply"):
+        qualification.qualify_renderer(edition, 60)
+    assert len(film_root.runs()) == runs
 
 
 def test_a_frame_that_differs_is_refused_by_the_first_such_frame(rendered, monkeypatch):

@@ -10,10 +10,13 @@ that capture. The sample film declares software capture, the one under which unc
 are derived, and its build runs the qualification, so every engine release qualifies the renderer
 supply it pins for that capture.
 
-The record, build/evidence/editions/<code>/renderer-qualification.json, names the renderer's
-version, the capture, both renders' SHA-256 and worker counts, the frames compared and the first
-frame that differs, if any; a difference raises `PictureError` after it is written, and the
-second render is kept beside its receipt for inspection. A passing run removes it.
+The record, build/evidence/editions/<code>/renderer-qualification.json, states what ran, not
+what the engine pins: the renderer's version as the film's npm packages install it, the browser
+executable the renders ran with its SHA-256 and, when those are the pinned build's bytes, that
+build's name, and the capture. It names both renders' SHA-256 and worker counts, the frames
+compared and the first frame that differs, if any; a difference raises `PictureError` after it
+is written, and the second render is kept beside its receipt for inspection. A passing run
+removes it.
 
 Usage: python -m filmkit.produce qualify-renderer --language zh|en
 """
@@ -48,9 +51,34 @@ def frame_digests(path: Path) -> list[str]:
     return [row.rsplit(",", 1)[1].strip() for row in rows]
 
 
+def supply() -> dict:
+    """The renderer and the browser a render runs now: the installed package's version, and the
+    executable with its SHA-256 and the pinned build's name when it holds that build's bytes.
+    Refused for another renderer version than the engine's, or where no browser stands."""
+    rendering.require_renderer()
+    manifest = repository.node_modules() / rendering.RENDERER_PACKAGE
+    installed = json.loads(manifest.read_text())
+    browser = rendering.browser_path()
+    if not browser.is_file():
+        msg = f"No browser at {browser}; run python -m filmkit.supply"
+        raise PictureError(msg)
+    digest = repository.sha(browser)
+    product, version = rendering.BROWSER
+    pinned = f"{product}@{version}" if digest == rendering.BROWSER_SHA256 else None
+    return {
+        "renderer": {"package": installed["name"], "version": installed["version"]},
+        "browser": {
+            "executable": repository.relative(browser),
+            "sha256": digest,
+            "pinned_build": pinned,
+        },
+    }
+
+
 def qualify_renderer(edition: Edition, deadline: float = rendering.DEADLINE) -> dict:
     """Render the edition's captioned stage again and compare every decoded frame with the
     picture's; the record. The captioned picture must be valid as it stands."""
+    ran = supply()
     with durations.phase("validation"):
         first_receipt = rendering.validate_picture(edition)
     rendered = edition.rendered(True)
@@ -69,8 +97,7 @@ def qualify_renderer(edition: Edition, deadline: float = rendering.DEADLINE) -> 
     differing = [frame for frame, (ours, theirs) in pairs if ours != theirs]
     identical = not differing and len(first) == len(second) and bool(first)
     record = {
-        "renderer_version": rendering.RENDERER_VERSION,
-        "browser": list(rendering.BROWSER),
+        **ran,
         "capture": second_receipt.get("capture"),
         "stage_sha256": repository.sha(rendered.stage / "index.html"),
         "first": render_of(rendered.file, first_receipt, len(first)),

@@ -37,6 +37,7 @@
 
 - [x] 5.1 Add `qualify-renderer`: render the edition's captioned stage again to a work file, compare every decoded frame with the picture's, write the record and refuse a difference by its first frame; verify `tests/picture/test_qualification.py`.
 - [x] 5.2 Lay out the sample film's picture task as one list: both editions staged and checked, both captioned pictures rendered by `render-picture --language all`, the Chinese stage rendered a second time by `qualify-renderer` and its uncaptioned picture with `--native`, the English one derived; and add the task that prints the sample's durations. Verify that `mise tasks` lists `sample:picture` and `sample:durations` and no picture task of one language.
+- [x] 5.3 State in the record of `qualify-renderer` what ran: the renderer's version read from the film's installed package after the engine's own check of it, and the browser executable with its SHA-256 and the pinned build's name when it holds that build's bytes; refuse before rendering where no browser stands. Verify `tests/picture/test_qualification.py`.
 
 ## 6. Side by side and small savings
 

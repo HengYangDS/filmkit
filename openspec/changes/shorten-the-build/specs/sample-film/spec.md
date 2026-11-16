@@ -9,6 +9,11 @@ The sample film SHALL declare `software` capture, the capture under which pictur
 - **WHEN** `qualify-renderer` runs after the Chinese captioned picture is rendered and validated
 - **THEN** its record names both renders' SHA-256, the frames compared and `software` capture, and says that every decoded frame is identical
 
+#### Scenario: The supply that ran
+
+- **WHEN** `qualify-renderer` runs with a browser other than the build the engine pins
+- **THEN** its record states the renderer's version as the film's packages install it, that browser's executable and SHA-256, and that it is not the pinned build
+
 #### Scenario: A render that differs
 
 - **WHEN** the second render differs from the first at one decoded frame
