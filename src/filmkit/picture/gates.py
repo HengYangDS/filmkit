@@ -2,9 +2,10 @@
 
 `check_picture` runs, from the film's root, the frame audit over every frame of the edition's
 timeline at one thirtieth of a second with its label, text and mark traces, the sync audit on
-those traces, the text measures of `filmkit.picture.text_trace`, and the motion audit at 30
-frames per second, both audits measuring text by the advance widths of the film's declared faces
-(`filmkit.picture.metrics`). Their reports go to build/runtime/work/picture-gates/<code>/. The
+those traces, the text measures of `filmkit.picture.text_trace`, the motion audit at 30 frames
+per second and the detail audit at the film's 60, the audits measuring text by the advance
+widths of the film's declared faces (`filmkit.picture.metrics`). Their reports go to
+build/runtime/work/picture-gates/<code>/. The
 edition's gate record binds the SHA-256 of the composition, the timeline, the stylesheet and each
 declared font, the engine version and the frames the frame audit checked; it holds each report's
 SHA-256, every gated finding and every recorded finding, and passes only when there is no gated
@@ -32,6 +33,8 @@ pace line of 450 px/s, named by its fastest mark, which is refused only over the
 film declares. One of the edition's `[[picture.motion.exceptions]]` that names its scene, its
 line or module and its kind records it with the exception's reason instead; an
 exception that matches no finding of the edition is gated as stale.
+The detail audit's findings and the frame audit's runs far off centre are gated and declared as
+`filmkit.picture.detail_gates` states.
 `render-picture` reads the record before it starts the renderer
 (`filmkit.picture.rendering.require_passing_gates`).
 
@@ -49,6 +52,7 @@ import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.film import FILM
 from filmkit.picture import metrics, sync_audit, text_trace
+from filmkit.picture.detail_gates import detail_findings
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, PictureError, face_bindings
 
 if TYPE_CHECKING:
@@ -104,7 +108,8 @@ FRAME_GATES = (
 STILL_LIMIT = 3.5
 # Seconds of the frames before the first word that show every word of the declared title.
 TITLE_SECONDS = 1.0
-# The frame audit's sampling step and the motion audit's frame rate.
+# The frame audit's sampling step and the motion audit's frame rate. The detail audit follows
+# every frame of the film, at its own default of 60 frames per second.
 FRAME_STEP = 1 / 30
 MOTION_FPS = 30
 # The audits' reports, in a folder for each edition below the film's root.
@@ -400,6 +405,7 @@ def check_picture(edition: Edition) -> dict:
     timeline = str(edition.timeline)
     frame_path, trace, marks = work / "frame.json", work / "trace.tsv", work / "marks.tsv"
     sync_path, motion_path = work / "sync.json", work / "motion.json"
+    detail_path = work / "detail.json"
     texts_trace, texts_path = work / "texts.tsv", work / "texts.json"
     turns_path, painted_path = work / "turns.json", work / "whole-turns.json"
     faces = {metrics.VARIABLE: str(metrics.current_table())}
@@ -425,6 +431,9 @@ def check_picture(edition: Edition) -> dict:
         work / "motion-summary.json",
         faces,
     )
+    run_audit(
+        "detail-audit", [timeline, "--out", str(detail_path)], work / "detail-summary.json", faces
+    )
     sync = sync_audit.full_report(repository.read(edition.timeline), trace, marks, FRAME_STEP)
     repository.write(sync_path, sync)
     lines = sync_audit.read_trace(texts_trace)
@@ -437,13 +446,21 @@ def check_picture(edition: Edition) -> dict:
     wrapped, declared = wrapping_findings(frame, wrapping, edition.code)
     moved, kept = motion_findings(motion, FILM.picture.motion, edition.code)
     turned, painting = turn_findings(draws, repository.read(painted_path)) if draws else ([], [])
+    detailed, noted = detail_findings(
+        repository.read(detail_path),
+        frame,
+        FILM.picture.detail,
+        FILM.picture.motion.pace_limit,
+        edition.code,
+    )
     findings = gated_findings(frame, sync, motion) + turned + text_findings(texts)
-    findings += wrapped + moved
+    findings += wrapped + moved + detailed
     reports = [
         ("frame", frame_path),
         ("sync", sync_path),
         ("texts", texts_path),
         ("motion", motion_path),
+        ("detail", detail_path),
     ]
     reports += [("whole_turns", painted_path)] if draws else []
     record = {
@@ -454,7 +471,7 @@ def check_picture(edition: Edition) -> dict:
             for name, path in reports
         },
         "gated_findings": findings,
-        "recorded_findings": recorded_findings(sync) + painting + declared + kept,
+        "recorded_findings": recorded_findings(sync) + painting + declared + kept + noted,
         "verdict": "refuse" if findings else "pass",
     }
     repository.write(edition.picture_gates, record)

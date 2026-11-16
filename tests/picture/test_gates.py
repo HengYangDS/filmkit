@@ -28,8 +28,9 @@ def opening(title, seconds, *, contrast=15.6, step=1 / 30):
     )
 
 
-# Reports of a clean picture: no gated frame finding, every label in sync, no long still, and a
-# title card through the 2 s before the first word.
+# Reports of a clean picture: no gated frame finding, every label in sync, no long still, a
+# title card through the 2 s before the first word, and no finding of the detail audit on a
+# composition that publishes its drawn strokes.
 CLEAN = {
     "frame": {
         **dict.fromkeys(gates.FRAME_GATES, {}),
@@ -48,6 +49,15 @@ CLEAN = {
         "still": [{"start": 4.0, "end": 7.2, "seconds": 3.2}],
         "pops": [1],
         "followed": {"findings": []},
+    },
+    "detail": {
+        "lines": {"pace": 450, "race": 900, "rail_clear": 48},
+        "ink_drops": [],
+        "outside_runs": [],
+        "draws_published": True,
+        "part_drawn": [],
+        "racing_tips": [],
+        "rails": [],
     },
     "texts": opening("示例影片", 2.0),
 }
@@ -131,7 +141,8 @@ def audits(monkeypatch, reports, *, change=None):
             put(stdout, reports["painted"])
         else:
             put(stdout, {"summary": True})
-            put(Path(arguments[arguments.index("--out") + 1]), reports["motion"])
+            report = reports["detail" if tool == "detail-audit" else "motion"]
+            put(Path(arguments[arguments.index("--out") + 1]), report)
         return 0
 
     monkeypatch.setattr(gates.tools, "run", run)
@@ -155,12 +166,14 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
         font: repository.sha(film / font) for font in FILM.picture.fonts
     }
     assert record["frames_checked"] == 301
-    assert sorted(record["reports"]) == ["frame", "motion", "sync", "texts"]
+    assert sorted(record["reports"]) == ["detail", "frame", "motion", "sync", "texts"]
     for report in record["reports"].values():
         assert report["sha256"] == repository.sha(film / report["path"])
     # The frame audit runs at one thirtieth of a second with its traces, the motion audit at
-    # 30 frames per second, both on the edition's timeline.
-    (frame_tool, frame_args, frame_env), (motion_tool, motion_args, motion_env) = calls
+    # 30 frames per second and the detail audit at its own rate, each on the edition's timeline.
+    (frame_tool, frame_args, frame_env), (motion_tool, motion_args, motion_env), detail = calls
+    assert detail[:2] == ("detail-audit", [str(edition.timeline), "--out", detail[1][2]])
+    assert detail[2] == motion_env
     assert (frame_tool, frame_args) == ("frame-audit", [str(edition.timeline), "0.0333333"])
     traces = {"MARKS", "TEXTS", "TRACE", "TURNS"}
     assert set(frame_env) == {VARIABLE, gates.WRAPPING_VARIABLE, *traces}
@@ -531,5 +544,7 @@ def test_the_browser_draws_each_whole_turn_once_and_a_start_without_ink_refuses(
         " rad, drawn at film.js:1234 (picture/film/marks.js), paints no ink in the renderer's"
         " browser from 1 of its 1 starts; draw it as ellipse(x, y, r, r, start, 0, 2 * Math.PI)"
     ]
-    assert [call[0] for call in calls] == ["frame-audit", "whole-turns", "motion-audit"]
-    assert sorted(record["reports"]) == ["frame", "motion", "sync", "texts", "whole_turns"]
+    tools = ["frame-audit", "whole-turns", "motion-audit", "detail-audit"]
+    assert [call[0] for call in calls] == tools
+    reports = ["detail", "frame", "motion", "sync", "texts", "whole_turns"]
+    assert sorted(record["reports"]) == reports
