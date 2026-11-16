@@ -93,3 +93,33 @@ def test_the_recognizer_loads_from_its_checked_supplied_snapshot(tmp_path, monke
     narration_transcription.load_asr()
     assert checks == ["verified"]
     assert loads == [str(tmp_path / "recognizer")]
+
+
+def test_a_cached_transcript_is_reused_without_loading_the_recognizer(receipt, monkeypatch):
+    narration_transcription.main([*ARGUMENTS, "--language", "Chinese"])
+    first = (repository.ROOT / "asr.json").read_bytes()
+
+    def unloaded():
+        message = "the recognizer is not loaded when every transcript is cached"
+        raise AssertionError(message)
+
+    monkeypatch.setattr(narration_transcription, "load_asr", unloaded)
+    narration_transcription.main([*ARGUMENTS, "--language", "Chinese"])
+    assert len(receipt["calls"]) == 1
+    assert (repository.ROOT / "asr.json").read_bytes() == first
+    (cache,) = (repository.ROOT / narration_transcription.CACHE / "chinese").glob("*.json")
+    cached = repository.read(cache)
+    assert (cached["heard"], cached["revision"]) == ("数据的用处", ASR_REVISION)
+    # A cache that binds another recording than its place names is refused.
+    repository.write(cache, {**cached, "wav_sha256": "0" * 64})
+    with pytest.raises(ValueError, match="Cached transcript binding differs"):
+        narration_transcription.main([*ARGUMENTS, "--language", "Chinese"])
+
+
+def test_a_transcript_by_another_recognizer_revision_is_not_reused(receipt, monkeypatch):
+    narration_transcription.main([*ARGUMENTS, "--language", "Chinese"])
+    monkeypatch.setattr(narration_transcription, "ASR_REVISION", "f" * 40)
+    narration_transcription.main([*ARGUMENTS, "--language", "Chinese"])
+    assert len(receipt["calls"]) == 2
+    caches = (repository.ROOT / narration_transcription.CACHE / "chinese").glob("*.json")
+    assert len(list(caches)) == 2

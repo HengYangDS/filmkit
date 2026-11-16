@@ -80,6 +80,8 @@ def test_alignment_binds_waveform_and_reuses_exact_cache(tmp_path, aligner):
     assert aligner.calls == [(str(tmp_path / "record.wav"), "记录", "Chinese")]
     narration_alignment.main(aligner.arguments)
     assert len(aligner.calls) == 1
+    # The second run found its alignment cached and loaded no aligner.
+    assert aligner.loads == [str(aligner.folder)]
     cache = next((tmp_path / "build/evidence/alignment-records/chinese").glob("*.json"))
     original_cache = cache.read_bytes()
     original_result = (tmp_path / "result.json").read_bytes()

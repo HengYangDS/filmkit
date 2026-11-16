@@ -3,7 +3,8 @@
 The aligner is the pinned `snapshots.ALIGNER` snapshot. A model folder that is not that
 snapshot is refused before it loads, and every alignment records the aligner. Each
 recording's alignment is cached under its waveform and the aligner revision, and a cache is
-reused only while it still binds the recording, its text and the aligner.
+reused only while it still binds the recording, its text and the aligner. The aligner is loaded
+when the first recording misses its cache, so a run that finds every alignment cached loads none.
 
 Usage: python -m filmkit.narration.alignment --model DIR --receipt FILE --output FILE
     [--language Chinese|English]
@@ -52,7 +53,14 @@ def main(argv: list[str] | None = None) -> None:
         validate_group_inputs(record, root=repository.ROOT)
     folder = repository.ROOT / options.model
     aligner = verify_aligner(folder)
-    model = load_model(str(folder))
+    loaded: list = []
+
+    def model():
+        """The aligner, loaded when the first recording misses its cache."""
+        if not loaded:
+            loaded.append(load_model(str(folder)))
+        return loaded[0]
+
     results = []
     for record in records:
         aligned = _aligned(model, record, aligner, options.language)
@@ -71,7 +79,8 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def _aligned(model, record: dict, aligner: dict, language: str) -> dict:
-    """The record's alignment from its bound cache, or from the aligner and then cached."""
+    """The record's alignment from its bound cache, or from the aligner, which `model` loads,
+    and then cached."""
     path = repository.ROOT / alignment_record(
         language, record["id"], record["wav_sha256"], aligner["revision"]
     )
@@ -87,7 +96,7 @@ def _aligned(model, record: dict, aligner: dict, language: str) -> dict:
             msg = "Cached alignment aligner binding differs"
             raise ValueError(msg)
         return aligned
-    generated = model.generate(
+    generated = model().generate(
         str(repository.ROOT / record["path"]), text=record["text"], language=language
     )
     aligned = {

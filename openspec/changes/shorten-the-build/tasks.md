@@ -34,7 +34,7 @@
 - [x] 6.1 Run `check-picture`'s frame, motion and detail audits at the same time, the whole-turn check after the frame audit; verify `tests/picture/test_side_by_side.py` (all three started before any ends, the first failed audit named) and `tests/picture/test_gates.py` (the same record as in sequence).
 - [x] 6.2 Verify up to four films at the same time and print the reports in the films' order; verify `tests/delivery/test_verification_pool.py` and `tests/delivery/test_verification.py`.
 - [x] 6.3 Compare the reproduction's film pairs two at a time, the results in order; verify `tests/delivery/test_verification_pool.py` and `tests/delivery/test_reproduction.py`.
-- [ ] 6.4 Cache each recording's transcript by its SHA-256, the recognizer's revision and the language, and load a speech model only when a record misses its cache; verify `tests/narration/test_transcription.py` and `tests/narration/test_alignment.py`.
+- [x] 6.4 Cache each recording's transcript by its SHA-256, the recognizer's revision and the language, and load a speech model only when a record misses its cache; verify `tests/narration/test_transcription.py` and `tests/narration/test_alignment.py`.
 - [x] 6.5 Decode a draft once for both phases of its still scan; verify `tests/picture/test_still_scan.py`.
 - [ ] 6.6 Speed up the on-demand every-frame comparison (the static review's changes 1, 2 and 8: parallel time segments, the sampled measures off the scan's decode, band differences in 8 bits); verify that a delivered native pair's record is unchanged.
 
