@@ -252,7 +252,11 @@ def packages(inputs: Inputs) -> None:
     for film in edition.films:
         write_input(film, f"{film.name}\n")
     members = [
-        {"path": edition.film(kind).name, "picture": edition.rendered(rendition.captions).name}
+        {
+            "path": edition.film(kind).name,
+            "picture": edition.rendered(rendition.captions).name,
+            "source": edition.rendered(rendition.captions).file.name,
+        }
         for kind, rendition in production.RENDITIONS.items()
     ]
     write_input(

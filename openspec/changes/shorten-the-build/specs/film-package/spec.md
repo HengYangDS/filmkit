@@ -13,3 +13,24 @@ Packaging SHALL encode each 1080p film with the x264 encoder at a constant rate 
 
 - **WHEN** a film of four seconds at 60 frames per second is encoded with the 1080p options
 - **THEN** its keyframes stand at frames 0 and 120 and at no other frame
+
+## MODIFIED Requirements
+
+### Requirement: Each edition delivers its films with and without captions
+
+Each edition SHALL deliver four films: `uhd` and `1080p-captioned`, which show its captioned picture, and `uhd-uncaptioned` and `1080p-uncaptioned`, which show its uncaptioned one, with one soundtrack, chapters, release metadata and cover. The film package SHALL bind both pictures and their equivalence record, and each film SHALL name the picture it shows and the picture file its encode read: its own picture, but the captioned one, painted, for the `1080p-uncaptioned` film of a derived pair.
+
+#### Scenario: An edition packaged
+
+- **WHEN** an edition with both pictures compared is packaged
+- **THEN** its folder holds the four films, and its package names each film's picture
+
+#### Scenario: A derived pair packaged
+
+- **WHEN** an edition whose uncaptioned picture is derived is packaged
+- **THEN** its `1080p-uncaptioned` film is recorded as showing the uncaptioned picture and as read from the captioned picture's file, and every other film as read from the file of the picture it shows
+
+#### Scenario: A record that names another file
+
+- **WHEN** a film's record names another picture file than the one its encode reads as the pictures stand
+- **THEN** the verifier refuses the film package

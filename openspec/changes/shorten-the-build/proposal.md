@@ -27,7 +27,7 @@ Measured that night on a 120 s span of a film's UHD stages: the renderer's worke
 
 - `caption-equivalence`: the uncaptioned picture is derived unless a native render is asked for; what a derivation proves; how a derived pair is compared; what packaging's comparison record binds.
 - `film-engine`: a render's command differs from the earlier one by its worker count; one command may make both editions' pictures.
-- `film-package`: the 1080p films' encoder and how it holds the keyframe grid.
+- `film-package`: the 1080p films' encoder and how it holds the keyframe grid; each film's record names the picture file its encode read.
 - `sample-film`: the sample film declares `software` capture; its build renders both captioned pictures at once, qualifies the renderer and derives one edition's uncaptioned picture; a task prints its durations.
 
 ## Impact

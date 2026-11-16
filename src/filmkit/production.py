@@ -82,7 +82,9 @@ VIEWING = Rendition(
 # and one without them. The UHD films copy their picture's stream. The 1080p viewing films
 # re-encode it: decoded in software, averaged over each 2x2 block of pixels, which neither rings
 # nor lifts a white, and encoded by x264 with a keyframe forced every 2 s. The two films of a
-# size are made alike from their own pictures.
+# size are made alike, each from its own picture, but for the 1080p uncaptioned film of a pair
+# whose uncaptioned picture is derived: its encode reads the captioned picture and paints the
+# caption band as the derivation did (`filmkit.picture.derivation.film_source`).
 RENDITIONS = {
     "uhd": UHD,
     "1080p-captioned": VIEWING,

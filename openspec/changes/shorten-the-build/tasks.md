@@ -28,6 +28,7 @@
 - [x] 4.3 Decide from bench2 whether one decode of the captioned picture feeds the three derived encodes of an edition: it does not, being slower (43.6 s) than three separate passes (32.2 s); verify `fk/r35/bench2/result.txt` in the films' kit.
 - [x] 4.4 Encode the 1080p uncaptioned film of a derived pair from the captioned picture, painted as the derivation painted it and scaled in the same pass; verify `tests/delivery/test_viewing_encode.py`.
 - [x] 4.5 Decide from bench3 whether an edition's derived passes and the two editions' renders run at once: the derived passes stay in a row (51.8 s at once against about 36 s), and two renders at once take 172.3 s against 228 to 236 s in sequence, every frame identical, so task 2.2 builds them; verify `fk/r35/bench3/result.txt` in the films' kit and the design's decisions 7 and 8.
+- [x] 4.6 Record in each film's package member the picture file its encode read, and refuse in the verifier a member that names another; verify `tests/delivery/test_package_sources.py`.
 
 ## 5. Renderer qualification and the sample film
 

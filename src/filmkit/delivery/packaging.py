@@ -594,7 +594,8 @@ def package_rendition(
 ) -> dict:
     """Encode, finish and check one film in the work folder, then link it into place.
 
-    Returns the film's package member, which names the picture it carries. A film or work file
+    Returns the film's package member, which names the picture it carries and, as `source`, the
+    picture file its encode read (`filmkit.picture.derivation.film_source`). A film or work file
     already in place is preserved for inspection, as is the work of a failed step.
     """
     if target.exists():
@@ -614,8 +615,9 @@ def package_rendition(
     set_chapter_language(finished, ISO_LANGUAGES[edition.code])
     check_delivered_film(finished, edition, rendition)
     target.hardlink_to(finished)
-    picture = edition.rendered(rendition.captions).name
-    member = {"path": target.name, "sha256": sha(target), "picture": picture, "commands": commands}
+    picture, source = edition.rendered(rendition.captions).name, film_source(edition, rendition)[0]
+    member = {"path": target.name, "sha256": sha(target), "picture": picture}
+    member |= {"source": source.name, "commands": commands}
     finished.unlink()
     intermediate.unlink()
     return member

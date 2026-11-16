@@ -31,6 +31,7 @@ import filmkit.media as media
 import filmkit.narration.selection as narration_selection
 import filmkit.narration.spoken_units as narration_spoken_units
 import filmkit.narration.thought_groups as narration_thought_groups
+import filmkit.picture.derivation as picture_derivation
 import filmkit.picture.equivalence as picture_equivalence
 import filmkit.picture.rendering as picture_rendering
 import filmkit.production as production
@@ -218,21 +219,26 @@ def language_index() -> dict:
 
 
 def verify_package(edition: production.Edition) -> dict:
-    """Bind every delivered film, the picture each carries and the viewing package to their
-    inputs, the film's `VERSION` among them; the viewing package's pages must name its version."""
+    """Bind every delivered film, the picture each carries, the picture file each read and the
+    viewing package to their inputs, the film's `VERSION` among them; the viewing package's pages
+    must name its version."""
     output = edition.artifacts
     films = repository.read(edition.film_package)
     names = sorted(film.name for film in edition.films)
-    pictures = {
-        edition.film(kind).name: edition.rendered(rendition.captions).name
-        for kind, rendition in production.RENDITIONS.items()
-    }
+    pictures, sources = {}, {}
+    for kind, rendition in production.RENDITIONS.items():
+        own = edition.rendered(rendition.captions)
+        pictures[edition.film(kind).name] = own.name
+        # A member written before members named their source read its own picture.
+        read = picture_derivation.film_source(edition, rendition)[0].name
+        sources[edition.film(kind).name] = (own.file.name, read)
     if (
         packaging.stale_bindings(edition, films)
         or sorted(member["path"] for member in films["editions"]) != names
         or any(
             member["sha256"] != repository.sha(output / member["path"])
             or member.get("picture") != pictures[member["path"]]
+            or member.get("source", sources[member["path"]][0]) != sources[member["path"]][1]
             for member in films["editions"]
         )
     ):
