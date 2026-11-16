@@ -88,8 +88,11 @@ CAPTURE_FLAGS = {
 }
 # The renderer's worker count is the host's logical cores less WORKERS_SPARE, held within
 # WORKERS_RANGE, unless WORKERS_VARIABLE names a count for a measurement. On a host of 18 cores a
-# span of 7,200 UHD frames took 141.2 s with 8 workers, 127.5 s with 12, 114.1 s with 16 and
-# 124.8 s with the renderer's own choice, every frame identical (17 November 2026).
+# span of 7,200 UHD frames took 126.2 to 141.2 s with 8 warm workers and 114.1 and 118.0 s with
+# 16, and 184.2 against 143.6 s cold, every frame identical (17 November 2026): a tenth to a
+# fifth less time. The renderer runs one render at a time for a user account unless the caller
+# sets RENDER_LOCK to "off", which a receipt records.
+RENDER_LOCK = "HYPERFRAMES_RENDER_LOCK"
 WORKERS_VARIABLE = "FILMKIT_RENDER_WORKERS"
 WORKERS_RANGE = (8, 16)
 WORKERS_SPARE = 2
@@ -596,6 +599,7 @@ def record_render(
         "command": command,
         "capture": command_capture(command),
         "workers": command_workers(command),
+        "render_lock": os.environ.get(RENDER_LOCK, "on"),
         "exit": exit_code,
         "timed_out": timed_out,
         "deadline_seconds": deadline,

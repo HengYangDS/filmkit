@@ -53,3 +53,15 @@ def test_the_receipt_records_the_count_its_command_passes(film_root, monkeypatch
 
 def test_a_command_without_a_worker_count_records_none():
     assert picture_rendering.command_workers(["hyperframes", "render", "stage"]) is None
+
+
+@pytest.mark.parametrize(("named", "recorded"), [(None, "on"), ("off", "off")])
+def test_the_receipt_records_the_renderers_lock(film_root, monkeypatch, named, recorded):
+    if named is None:
+        monkeypatch.delenv(picture_rendering.RENDER_LOCK, raising=False)
+    else:
+        monkeypatch.setenv(picture_rendering.RENDER_LOCK, named)
+    edition = Edition("en")
+    film_root.staged(edition)
+    picture_rendering.render_picture(edition, 60)
+    assert repository.read(edition.render_receipt)["render_lock"] == recorded

@@ -46,11 +46,16 @@ class Rendition:
 # The 1080p viewing film's encoder and its settings: x264, whose keyframes stand where its
 # options put them. VideoToolbox, which encoded these films before, left the declared grid six
 # times between 13 and 17 November 2026 under this host's load, for a cause never found, each
-# time ending a build. The preset and the rate factor are the ones the measurement queued on
-# 17 November 2026 compares with that encoder, and stand to be confirmed by its result.
+# time ending a build. Measured on 17 November 2026 on a film's span against its area-scaled
+# source: VideoToolbox at 10 Mbit/s 23.7 s, 63.4 dB on average and 51.8 dB at the lowest frame;
+# x264 veryfast at rate factor 16, 7.2 s, 56.4 and 48.7 dB. On the span's first 30 s rate factor
+# 12 stood at 59.5 and 51.9 dB where VideoToolbox stood at 62.2 and 51.8 dB, in the same time as
+# 16. The rate factor is the lowest measured so far whose lowest frame is not under
+# VideoToolbox's; a measurement of the whole span at several rates and presets is still to
+# confirm or correct it.
 VIEWING_ENCODER = "libx264"
 VIEWING_PRESET = "veryfast"
-VIEWING_RATE_FACTOR = 16
+VIEWING_RATE_FACTOR = 12
 # The two sizes a film is delivered at: the UHD master and the 1080p viewing film.
 UHD = Rendition(3840, 2160, reencoded=False)
 VIEWING = Rendition(
