@@ -405,10 +405,12 @@ def keyed_as_declared(rendition: Rendition, keyframes: list[int]) -> bool:
 
 
 def keyframe_options(rendition: Rendition) -> tuple[str, ...]:
-    """The encoder option that sets a rendition's declared keyframe interval, if it declares one."""
+    """The encoder options that force a rendition's declared keyframe grid, if it declares one:
+    the interval, the same number as its minimum, and no keyframe at a scene cut."""
     if rendition.keyframe_seconds is None:
         return ()
-    return ("-g:v:0", str(rendition.keyframe_seconds * FPS))
+    interval = str(rendition.keyframe_seconds * FPS)
+    return ("-g:v:0", interval, "-keyint_min:v:0", interval, "-sc_threshold:v:0", "0")
 
 
 def encode_command(

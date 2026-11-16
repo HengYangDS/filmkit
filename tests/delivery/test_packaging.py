@@ -263,19 +263,13 @@ def test_the_commands_carry_the_release_metadata(packaging_root):
         "h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1"
         ":video_full_range_flag=0:level="
     )
-    # The 1080p film averages each 2x2 block of the UHD picture between the VideoToolbox decode
-    # and encode, and holds a keyframe every 2 s.
-    hardware = ["-hwaccel", "videotoolbox"]
-    scaled = [
-        "-filter:v:0",
-        "scale=w=1920:h=1080:flags=area",
-        "-c:v:0",
-        "h264_videotoolbox",
-        "-b:v:0",
-        "10M",
-        "-g:v:0",
-        str(2 * specification.FPS),
-    ]
+    # The 1080p film averages each 2x2 block of the UHD picture, decoded in software, and is
+    # encoded by x264 with a keyframe forced every 2 s and none at a scene cut.
+    hardware = []
+    interval = str(2 * specification.FPS)
+    scaled = ["-filter:v:0", "scale=w=1920:h=1080:flags=area", "-c:v:0", "libx264"]
+    scaled += ["-preset:v:0", "veryfast", "-crf:v:0", "16", "-pix_fmt:v:0", "yuv420p"]
+    scaled += ["-g:v:0", interval, "-keyint_min:v:0", interval, "-sc_threshold:v:0", "0"]
     attach = ["-map", "0:v:0", "-map", "0:a:0", "-map", "1:v:0", "-map_metadata", "0"]
     attach += ["-map_chapters", "0", "-c", "copy", "-disposition:v:1", "attached_pic"]
     keys = [

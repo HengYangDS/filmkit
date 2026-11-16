@@ -18,7 +18,7 @@
 
 ## 4. The 1080p films
 
-- [ ] 4.1 Encode the 1080p films with x264 at named settings and force the keyframe grid by the interval, its minimum and no scene cuts, with no VideoToolbox decoder; verify `tests/delivery/test_packaging.py` and `tests/test_production.py`, one case encoding four seconds with the host FFmpeg and reading keyframes at frames 0 and 120 alone.
+- [x] 4.1 Encode the 1080p films with x264 at named settings and force the keyframe grid by the interval, its minimum and no scene cuts, with no VideoToolbox decoder; verify `tests/delivery/test_packaging.py` and `tests/delivery/test_viewing_encode.py`, one case encoding four seconds that change whole at frame 50 with the host FFmpeg and reading keyframes at frames 0 and 120 alone.
 - [ ] 4.2 Fix the 1080p rate factor and preset from bench2 (`fk/r35/bench2/result.txt` in the films' kit: time, size and PSNR against the area-scaled source beside today's encoder), and state the figures in the design; verify that the design's decision 7 cites them. Pending: bench2 had not run.
 - [ ] 4.3 Decide from bench2 whether one decode of the captioned picture feeds the three derived encodes of an edition, and build that pass if it is not slower than separate passes; verify by the durations of a sample build before and after. Pending: bench2 had not run.
 
