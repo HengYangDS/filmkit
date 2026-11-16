@@ -10,7 +10,7 @@
 
 ## 3. The derived uncaptioned picture
 
-- [ ] 3.1 Add the tool `band-audit`: at every thirtieth of a second, each caption paint within the painted rows, no other paint reaching them, and the stretches without a caption; verify `tests/picture/band-audit.test.mjs` on a composition that passes, one whose scene draws into the band and one whose caption leaves it.
+- [x] 3.1 Add the tool `band-audit`: at every thirtieth of a second, each caption paint within the painted rows, no other paint reaching them, and the stretches without a caption; verify `tests/picture/band-audit.test.mjs` on a composition that passes, one whose scene draws into the band, one whose caption leaves it and the sample film.
 - [ ] 3.2 Add `filmkit.picture.derivation`: the ground read from a frame without a caption, the encode with the band painted and the captioned band measured in the same decode, the ground check on every frame without a caption, the receipt and its validation; verify `tests/picture/test_derivation.py`, which derives a short synthetic clip with the host FFmpeg and refuses one whose band is not the ground.
 - [ ] 3.3 Make `render-picture --uncaptioned` derive unless `--native` is given, and let `validate-picture --uncaptioned`, the verifier and packaging read either receipt; verify `tests/test_produce.py`, `tests/picture/test_uncaptioned.py` and `tests/delivery/test_verification_picture.py`.
 - [ ] 3.4 Make `compare-pictures` compare a derived pair by its derivation's receipt without decoding, and bind a derived picture without a stage document; verify `tests/picture/test_equivalence.py` (a current derived pair passes, a captioned picture rendered again is refused).

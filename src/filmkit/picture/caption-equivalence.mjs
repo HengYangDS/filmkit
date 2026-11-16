@@ -47,8 +47,9 @@ export function cuesInForce(captions, t) {
 const comparable = (paint) =>
   Object.fromEntries(Object.entries(paint).filter(([, value]) => typeof value !== "function"));
 
-/* Where a paint stands on the screen: a text's box, or the span of its subpaths. */
-function screenBox(paint) {
+/** Where a paint stands on the screen, as [left, top, right, bottom]: a text's box, or the span of its subpaths;
+ * null for a paint without a point. */
+export function screenBox(paint) {
   const points =
     paint.kind === "text" && paint.points?.length === 2
       ? paint.points.map(paint.toScreen)
