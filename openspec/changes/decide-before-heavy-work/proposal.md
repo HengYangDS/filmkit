@@ -6,7 +6,7 @@ On 15 November 2026 three films built their next editions on `filmkit` 0.22. Exp
 - **The order of cheap before expensive is not held across stages.** Narration ran on text that no independent recheck had passed; a sound stage run again voided the staged picture without any check saying so; a text edit left picture cues behind, which only the staged audit after narration reported; a retake that read clearer as a take read lower on the soundtrack than the take it replaced.
 - **The engine's owner of "ready to render" is not the one the films use.** `preflight` requires a draft scan that the films' task lists do not make, so no film calls it, and each film's readiness rested on a script outside its repository.
 
-This draft holds the intent in the repository. It has no specs or tasks yet: they are written when the Change is admitted, after the two editions still in build are released.
+This draft holds the intent in the repository. It has no specs or tasks: each slice of it is admitted as a Change of its own, with its specs and tasks. The first slice, the films' readiness checks, was admitted on 17 November 2026 as `readiness-in-preflight`; the design marks each decision that slice admits and says what it leaves.
 
 ## What Changes
 
