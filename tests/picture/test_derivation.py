@@ -89,6 +89,7 @@ def test_a_derived_picture_holds_the_ground_in_its_band_and_every_frame(root):
     assert derivation.RATE_FACTOR == 12
     assert command[command.index("-crf") + 1] == "12"
     assert command[command.index("-preset") + 1] == "veryfast"
+    assert command[command.index("-bf") + 1] == "0"
     assert "lutyuv=y={y}:u={u}:v={v}".format(**ground) in command[command.index("-i") + 3]
 
 

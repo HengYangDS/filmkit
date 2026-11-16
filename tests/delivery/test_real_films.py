@@ -20,6 +20,9 @@ import filmkit.picture.derivation as derivation
 import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.specification as specification
+from filmkit.delivery.packaging import PackagingError
+from filmkit.delivery.verification import VerificationError
+from filmkit.media import MediaError
 from filmkit.picture.rendering import PictureError
 
 pytestmark = [pytest.mark.ffmpeg, pytest.mark.exiftool]
@@ -128,7 +131,9 @@ def test_each_film_of_a_derived_pair_passes_packagings_check_and_the_verifiers(p
     assert report["dimensions"] == [rendition.width, rendition.height]
     assert report["video_frames"] == FRAMES
     assert abs(report["audio_sample_frames_decoded"] - SECONDS * specification.RATE) <= 1024
-    assert int(stream(film)["nb_frames"]) == FRAMES
+    # No film's picture holds B-frames, whether its stream is a copy or the engine's encode.
+    probed = stream(film)
+    assert (int(probed["nb_frames"]), probed["has_b_frames"]) == (FRAMES, 0)
 
 
 def test_the_painted_viewing_film_holds_the_ground_where_the_caption_stood(pair):
@@ -143,12 +148,37 @@ def test_the_painted_viewing_film_holds_the_ground_where_the_caption_stood(pair)
     assert brightest(shown) > 200 > 40 > brightest(film)
 
 
-def test_the_derived_picture_passes_its_own_media_check_and_another_grid_is_refused(pair):
+def test_a_film_whose_picture_holds_b_frames_is_refused_by_both_checks(pair):
+    viewing = RENDITIONS["1080p-captioned"]
+    at = viewing.video.index("-bf:v:0")
+    reordering = replace(viewing, video=(*viewing.video[:at], *viewing.video[at + 2 :]))
+    work = repository.ROOT / delivery_packaging.WORK / pair.code
+    name = pair.film("1080p-captioned").name
+    try:
+        with pytest.raises(PackagingError, match="differs from the delivery contract"):
+            packaged(pair, "1080p-captioned", reordering)
+        # Packaging keeps the refused film in its work folder, where the verifier reads it.
+        refused = work / "finished" / name
+        assert stream(refused)["has_b_frames"] > 0
+        with pytest.raises(VerificationError, match=f"delivery contract: {name}: .*: B-frames"):
+            delivery_verification.verify_media(pair, refused, viewing)
+    finally:
+        for left in (work / name, work / "finished" / name):
+            left.unlink(missing_ok=True)
+
+
+def test_the_derived_picture_passes_its_own_media_check_and_others_are_refused(pair):
     derived = pair.rendered(False).file
     derivation.require_derived_media(derived)
-    assert stream(derived)["nb_frames"] == str(FRAMES)
+    probed = stream(derived)
+    assert (probed["nb_frames"], probed["has_b_frames"]) == (str(FRAMES), 0)
     # The same frames with a keyframe every second.
     other = derived.with_name("another-grid.mp4")
     ffmpeg("-i", derived, "-c:v", "libx264", "-g", "60", "-keyint_min", "60", "-bf", "0", other)
     with pytest.raises(PictureError, match="keyframes leave the 2 s grid: another-grid.mp4"):
+        derivation.require_derived_media(other)
+    # The same frames on the grid, with x264's default B-frames.
+    grid = ["-g", "120", "-keyint_min", "120", "-sc_threshold", "0"]
+    ffmpeg("-i", derived, "-c:v", "libx264", *grid, other)
+    with pytest.raises(MediaError, match="another-grid.mp4: B-frames"):
         derivation.require_derived_media(other)

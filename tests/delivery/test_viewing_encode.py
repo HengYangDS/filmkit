@@ -20,6 +20,7 @@ def test_a_1080p_film_is_encoded_by_x264_on_a_forced_grid_without_videotoolbox()
         assert options[options.index("-c:v:0") + 1] == "libx264"
         assert options[options.index("-preset:v:0") + 1] == "veryfast"
         assert options[options.index("-crf:v:0") + 1] == "10"
+        assert options[options.index("-bf:v:0") + 1] == "0"
         interval = str(2 * FPS)
         assert options[-6:] == [
             "-g:v:0",

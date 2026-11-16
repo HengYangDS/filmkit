@@ -247,6 +247,7 @@ def probed(**video):
         "width": 64,
         "height": 36,
         "duration": "2.000000",
+        "has_b_frames": 0,
     }
     cover = {"codec_type": "video", "disposition": {"attached_pic": 1}}
     return {"streams": [cover, stream | video], "format": {"duration": "2.000000"}}
@@ -259,6 +260,8 @@ def test_the_video_contract_reads_the_film_stream_not_the_cover():
         ({"nb_frames": "119"}, "frame count"),
         ({"avg_frame_rate": "30/1"}, "frame rate"),
         ({"width": 32}, "frame size"),
+        ({"has_b_frames": 2}, "B-frames"),
+        ({"has_b_frames": None}, "B-frames"),
         ({"duration": "2.100000"}, "stream duration"),
         ({"duration": None}, "stream duration"),
     ]:

@@ -2,7 +2,7 @@
 
 ### Requirement: The uncaptioned picture is derived from the captioned one
 
-For a film that declares `software` capture, `render-picture --uncaptioned` SHALL, unless `--native` is given, derive the uncaptioned picture from the edition's valid captioned picture: every frame encoded again with the rows of the caption band painted in the ground that the captioned picture holds there. Its receipt SHALL say that the picture is derived and name the captioned picture's SHA-256, the painted rows, the ground and the command.
+For a film that declares `software` capture, `render-picture --uncaptioned` SHALL, unless `--native` is given, derive the uncaptioned picture from the edition's valid captioned picture: every frame encoded again, without B-frames, with the rows of the caption band painted in the ground the captioned picture holds there. Its receipt SHALL say that the picture is derived and name the captioned picture's SHA-256, the painted rows, the ground and the command.
 
 #### Scenario: A derived picture
 

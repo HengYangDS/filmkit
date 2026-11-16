@@ -544,7 +544,8 @@ def attach_cover_and_keys(
 
 
 def check_delivered_film(path: Path, edition: Edition, rendition: Rendition) -> None:
-    """Refuse a finished film without every frame, its duration, cover, release tags or tracks.
+    """Refuse a finished film without every frame, its duration, cover, release tags or tracks,
+    or one whose picture holds B-frames.
 
     Its release tags must be exactly the rendition's, so only the 1080p film is marked HD, it
     may carry no other QuickTime key than its release's and its creation date, its picture and
@@ -561,7 +562,7 @@ def check_delivered_film(path: Path, edition: Edition, rendition: Rendition) -> 
     if not (
         sounds
         and int(movie["nb_frames"]) == DURATION * FPS
-        and movie["avg_frame_rate"] == f"{FPS}/1"
+        and (movie["avg_frame_rate"], movie.get("has_b_frames")) == (f"{FPS}/1", 0)
         and float(info["format"]["duration"]) == float(sounds[0]["duration"]) == DURATION
         and any(stream.get("disposition", {}).get("attached_pic") for stream in streams)
         and all(tags.get(key) == expected.get(key) for key in {*expected, "hd_video"})

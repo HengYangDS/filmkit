@@ -23,7 +23,7 @@ the sample film. The tracked tree holds sources only.
 
 ## Host Tools
 
-A film's build needs Apple silicon, FFmpeg with VideoToolbox and ExifTool, and
+A film's build needs Apple silicon, FFmpeg with libx264 and ExifTool, and
 its delivery needs rsync 3; Homebrew owns all three
 (`brew install ffmpeg exiftool rsync`). The supply step is the only one that
 reaches the network. The proof sets hold the portable gates that hosted CI also

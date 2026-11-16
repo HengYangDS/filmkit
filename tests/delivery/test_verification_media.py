@@ -25,6 +25,7 @@ def probe(changes: dict) -> dict:
         "codec_type": "video",
         "avg_frame_rate": "60/1",
         "nb_frames": str(FRAMES),
+        "has_b_frames": 0,
         "duration": seconds,
         "field_order": "progressive",
         "color_primaries": "bt709",
@@ -119,6 +120,7 @@ def test_a_delivered_film_meeting_its_contract_is_decoded_completely(decoded):
     [
         {"streams/0/avg_frame_rate": "30/1"},
         {"streams/0/nb_frames": "89999"},
+        {"streams/0/has_b_frames": 2},
         {"streams/0/duration": "1499.900000"},
         {"format/duration": "1500.100000"},
         {"streams/0/field_order": "tt"},

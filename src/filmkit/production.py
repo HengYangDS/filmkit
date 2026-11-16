@@ -53,7 +53,11 @@ class Rendition:
 # 59.8 and 51.8 dB; at 10, 9.5 s, 7.8 MB, 61.4 and 53.3 dB; faster and medium at 14, 11.4 and
 # 11.9 s, 51.3 and 51.5 dB at the lowest frame. The rate factor is the highest whose lowest frame
 # stands clear of VideoToolbox's: 12 meets it by 0.01 dB on that one span, which is no margin,
-# and 10 stands 1.5 dB over it for 1.4 s more a span.
+# and 10 stands 1.5 dB over it for 1.4 s more a span. Those encodes held x264's default B-frames.
+# The films hold none, as every film delivered before held none and no player was tried on a
+# stream that reorders its frames: on the span's first 1,800 frames at rate factor 10 and two
+# threads, 5.1 s either way, 2.9 MB without them against 2.0 MB with them, 61.6 against 61.1 dB
+# on average and 56.7 against 53.4 dB at the lowest frame.
 VIEWING_ENCODER = "libx264"
 VIEWING_PRESET = "veryfast"
 VIEWING_RATE_FACTOR = 10
@@ -72,6 +76,8 @@ VIEWING = Rendition(
         VIEWING_PRESET,
         "-crf:v:0",
         str(VIEWING_RATE_FACTOR),
+        "-bf:v:0",
+        "0",
         "-pix_fmt:v:0",
         "yuv420p",
     ),

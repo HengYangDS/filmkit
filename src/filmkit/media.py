@@ -183,7 +183,8 @@ def require_video(
     """The probed file's video stream, refused unless it meets the video contract.
 
     The stream must hold `frames` frames at `fps` and `size`, and both the stream and the
-    container must last `duration` within `DURATION_TOLERANCE` seconds.
+    container must last `duration` within `DURATION_TOLERANCE` seconds. It must hold no B-frames:
+    every picture and film is stored in the order it is shown, as the renderer stores its own.
     """
     video, container = video_stream(info), info.get("format", {})
     seconds = {
@@ -194,6 +195,7 @@ def require_video(
         "frame count": _parsed(int, video.get("nb_frames")) == frames,
         "frame rate": _parsed(Fraction, video.get("avg_frame_rate")) == fps,
         "frame size": (video.get("width"), video.get("height")) == tuple(size),
+        "B-frames": video.get("has_b_frames") == 0,
     } | {
         name: value is not None and abs(value - duration) < DURATION_TOLERANCE
         for name, value in seconds.items()

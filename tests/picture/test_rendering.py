@@ -537,6 +537,7 @@ def test_the_rendered_picture_meets_the_shared_video_contract(staged, monkeypatc
         "disposition": {"attached_pic": 0},
         "nb_frames": str(DURATION * FPS),
         "avg_frame_rate": "60/1",
+        "has_b_frames": 0,
         "width": 3840,
         "height": 2160,
         "duration": f"{DURATION + 1e-7}",
@@ -548,7 +549,8 @@ def test_the_rendered_picture_meets_the_shared_video_contract(staged, monkeypatc
     # The video stream is found by type behind a cover, and durations agree within 1e-6 s.
     assert picture_rendering.validate_picture(edition)["exit"] == 0
     assert cadence == [(edition.picture, DURATION * FPS, FPS)]
-    for change in ({"nb_frames": str(DURATION * FPS - 1)}, {"avg_frame_rate": "30/1"}):
+    frames = str(DURATION * FPS - 1)
+    for change in ({"nb_frames": frames}, {"avg_frame_rate": "30/1"}, {"has_b_frames": 2}):
         probed["streams"] = [cover, {**video, **change}]
         with pytest.raises(media.MediaError, match="Video differs"):
             picture_rendering.validate_picture(edition)
