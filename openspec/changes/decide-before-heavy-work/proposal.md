@@ -45,4 +45,6 @@ This draft holds the intent in the repository. It has no specs or tasks yet: the
 - Each adopting film declares its accepted findings in `content/film.toml` and drops the scripts that counted them; its task list can call `preflight` before its first render ticket.
 - Out of scope: admitting a host ticket on a receipt, which is the host's owner's; the review round's changes note, dispositions and release documents, which a later Change takes; the values of the thresholds themselves.
 
+Deferred with this Change: `transformers` 5.23.0 and `mlx-audio` 0.6.5, which the archived Change `2026-11-14-declare-release-age-and-take-latest-supply` deferred to 16 November 2026. Read again on that day: the lock still holds `mlx-audio` 0.6.4, and the two film editions that were to be released first are not, since the DDWG film's review round 41 did not pass. `mlx-audio` 0.6.5 changes every take, so it moves in the release that admits this Change, accepted by comparing the sample film's takes and frames before and after, and a film adopts it with an edition it narrates anew. Owner: the engine's maintainer. Next action: the same release. Read again: 2026-11-18.
+
 Owner: the engine's maintainer. Next action: admit the Change with its specs and tasks once the ETHOS film's edition 2.0.1 and the DDWG film's edition 1.3.1 are released. Read again: 2026-11-18.
