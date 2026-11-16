@@ -147,7 +147,7 @@ def test_a_fault_that_remains_is_refused_after_the_last_attempt(pair, film_root,
         f"The zh pictures still hold one-frame faults after 2 attempts, kept in {REPAIRS} as "
         "attempts 1, 2: encoded frame 77 at 1.283 s: the uncaptioned picture holds a one-frame "
         f"fault of 150 levels in box [40, 10, 44, 14] outside the caption band; render it again "
-        f"with {RENDER} --uncaptioned"
+        f"with {RENDER} --uncaptioned --native"
     )
     assert outputs(film_root) == ["captioned", *["uncaptioned"] * 3]
     for number in (1, 2):
@@ -163,7 +163,7 @@ def test_a_fault_that_remains_is_refused_after_the_last_attempt(pair, film_root,
         (
             moving_bar(50),
             "frame 70 differs by 150 levels in box [30, 10, 31, 11] and no one picture holds it; "
-            f"render both pictures again with {RENDER} and with --uncaptioned",
+            f"render both pictures again with {RENDER} and with --uncaptioned --native",
         ),
         # A difference over frames 10 to 12, which no sampled frame sees.
         (
@@ -382,7 +382,7 @@ def test_a_render_that_fails_in_an_attempt_is_recorded_with_the_way_back(pair, f
     assert str(refusal.value) == (
         f"Attempt 1 of the zh repair stopped, with the faulty pictures kept in {folder}: Native "
         f"picture render did not complete from the current stage; render again with {RENDER} "
-        f"--uncaptioned, then run {COMPARE}"
+        f"--uncaptioned --native, then run {COMPARE}"
     )
     attempt = repository.read(repository.ROOT / folder / "attempt.json")
     assert attempt["error"] == "Native picture render did not complete from the current stage"

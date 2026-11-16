@@ -34,6 +34,7 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ### Fixed
 
+- A refusal of a rendered pair names `render-picture --uncaptioned --native` as the command that renders the uncaptioned picture again; without `--native` the command it named before would have derived the picture and replaced the rendered one.
 - A 1080p film's keyframes are forced onto the 2 s grid by the encoder's interval, the interval's minimum and no keyframe at a scene cut. Under VideoToolbox the keyframes left the grid six times between 13 and 17 November 2026 under the host's load, for a cause never found, and each refusal ended a film's build.
 
 ## [0.22.3] - 2026-11-15

@@ -80,10 +80,18 @@ GREY = "scale=out_range=full,format=gray"
 # How every decode starts, and how it writes its frames: raw grey, one plane per frame.
 DECODE = ["ffmpeg", "-v", "error", "-nostdin"]
 RAW = ["-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "gray", "pipe:1"]
-# The command that renders the captioned picture again; with --uncaptioned, the other one. And the
-# command that renders again each picture that holds a fault, and compares the two again.
+# The command that renders the captioned picture again, what it takes to render the other one,
+# and the command that renders again each picture that holds a fault and compares the two again.
+# Only a rendered pair is scanned here, and without --native the uncaptioned picture's command
+# may derive it (`filmkit.picture.derivation`), which would replace the rendered picture.
 RENDER = "python -m filmkit.produce render-picture --language {code}"
+UNCAPTIONED = "--uncaptioned --native"
 REPAIR = "python -m filmkit.produce repair-pictures --language {code}"
+
+
+def render_again(code: str, picture: str) -> str:
+    """The command that renders one picture of a rendered pair again."""
+    return RENDER.format(code=code) + ("" if picture == "captioned" else f" {UNCAPTIONED}")
 
 
 def apart(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -407,12 +415,10 @@ def findings(report: dict, code: str) -> list[str]:
                 "neighbouring frames"
             )
             continue
-        command = RENDER.format(code=code) + (
-            " --uncaptioned" if row["picture"] == "uncaptioned" else ""
-        )
         found.append(
             f"{at}: the {row['picture']} picture holds a one-frame fault of {row['peak']} levels "
-            f"in box {row['box']} {where}; render it again with {command}"
+            f"in box {row['box']} {where}; render it again with "
+            f"{render_again(code, row['picture'])}"
         )
     hidden = report["fault_frames"] - len(faults)
     found += [f"encoded: {hidden} more one-frame differences"] if hidden > 0 else []
@@ -470,7 +476,7 @@ def repairable(record: dict, code: str) -> dict[str, list[dict]]:
             reasons.append(
                 f"frame {row['frame']} differs by {row['peak']} levels in box {row['box']} and "
                 f"no one picture holds it; render both pictures again with "
-                f"{RENDER.format(code=code)} and with --uncaptioned"
+                f"{RENDER.format(code=code)} and with {UNCAPTIONED}"
             )
         else:
             named.setdefault(row["picture"], []).append(row)

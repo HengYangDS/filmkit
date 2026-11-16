@@ -122,7 +122,7 @@ def stopped(edition: Edition, folder: Path, attempt: dict, error: BaseException)
     failure and the commands that bring the edition back."""
     code, rendered = edition.code, attempt["rendered"]
     renders = [
-        faults.RENDER.format(code=code) + ("" if name == "captioned" else " --uncaptioned")
+        faults.render_again(code, name)
         for name in attempt["faults"]
         if not completed(rendered.get(name))
     ]

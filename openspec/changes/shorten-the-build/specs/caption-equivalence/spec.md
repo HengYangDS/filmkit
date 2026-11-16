@@ -73,6 +73,15 @@ For a pair whose uncaptioned picture is derived, `compare-pictures` SHALL decode
 
 ## MODIFIED Requirements
 
+### Requirement: A refusal names the picture to render again
+
+When `compare-pictures` refuses a one-frame difference, or passes as residue one within 120 levels that no one picture holds alone, its record SHALL list each such frame with its time, box, peak and the picture whose frame departs from its own neighbouring frames, and a refusal SHALL name the command that renders that picture again.
+
+#### Scenario: A fault in the uncaptioned picture
+
+- **WHEN** the uncaptioned picture holds a one-frame fragment that the captioned picture does not
+- **THEN** the record names the uncaptioned picture and the refusal names `render-picture --uncaptioned --native` for its edition, the command that renders that picture and never derives it
+
 ### Requirement: Each edition renders a picture without its captions
 
 `stage-picture --uncaptioned` SHALL stage the composition and timeline of the captioned picture with the timeline's captions replaced by none, in a stage of its own, and `render-picture --uncaptioned --native` SHALL render it with the captioned picture's renderer settings to its own picture file and receipt. Each stage record and receipt SHALL name its picture, and validation SHALL refuse a receipt read for the other picture.

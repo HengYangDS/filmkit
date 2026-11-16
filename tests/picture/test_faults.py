@@ -223,7 +223,7 @@ def test_a_caption_that_appears_and_leaves_passes(edition):
 def test_a_fault_in_the_uncaptioned_picture_names_its_render_command(edition):
     draw(edition, uncaptioned=[FRAGMENT])
     message, record = refusal(edition)
-    command = f"{RENDER} --uncaptioned"
+    command = f"{RENDER} --uncaptioned --native"
     assert message.endswith(
         "encoded frame 77 at 1.283 s: the uncaptioned picture holds a one-frame fault of 150 "
         f"levels in box [40, 10, 44, 14] outside the caption band; render it again with {command}"
@@ -311,7 +311,7 @@ def test_without_a_caption_band_every_row_is_compared(edition, monkeypatch):
     assert message.endswith(
         "encoded frame 50 at 0.833 s: the uncaptioned picture holds a one-frame fault of 150 "
         f"levels in box [40, 44, 44, 48] outside the caption band; render it again with {RENDER} "
-        f"--uncaptioned{NEXT}"
+        f"--uncaptioned --native{NEXT}"
     )
     encoded = record["encoded"]
     assert (encoded["excluded_rows"], encoded["every_frame"]["band_changes"]) == ([0, 0], {})
