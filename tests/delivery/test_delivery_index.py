@@ -1,5 +1,6 @@
 """The delivery index, the runtime label, the film's version and the viewing members."""
 
+import os
 import re
 
 import pytest
@@ -99,6 +100,13 @@ def test_delivery_index_uses_sibling_languages_and_preserves_language_players(
     }
     for code in ("zh", "en"):
         assert (root / code / "index.html").read_text() == f"Existing {code} player"
+    # The page is replaced whole: while it is written again, a reader, such as the other
+    # edition's packaging hashing it, finds the complete earlier page.
+    seen, flush = [], os.fsync
+    monkeypatch.setattr(os, "fsync", lambda file: seen.append((root / "index.html").read_text()))
+    assert delivery_packaging.package_language_index("1.3.1")["sha256"] != observed["sha256"]
+    assert seen == [output]
+    monkeypatch.setattr(os, "fsync", flush)
     source.write_bytes(template.replace(b'href="en/index.html"', b'href="en.html"'))
     with pytest.raises(PackagingError, match="both sibling language links"):
         delivery_packaging.package_language_index("1.3.0")

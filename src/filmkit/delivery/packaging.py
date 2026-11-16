@@ -158,8 +158,9 @@ def package_language_index(version: str) -> dict:
         msg = "Delivery entry must not select a language through base"
         raise PackagingError(msg)
     page = template.replace("/*RUNTIME*/", runtime_label())
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(page.replace("<nav", f"{entry_version(version)}\n<nav", 1))
+    # Both editions' packages write this one page; each replaces it whole.
+    page = page.replace("<nav", f"{entry_version(version)}\n<nav", 1)
+    repository.write_text(LANGUAGE_INDEX, page)
     return {
         "source": str(INDEX),
         "source_sha256": sha(source),

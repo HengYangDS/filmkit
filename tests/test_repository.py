@@ -10,6 +10,8 @@ import sys
 
 import pytest
 
+import filmkit.repository as repository
+
 DECLARATION = "content/film.toml"
 
 
@@ -94,3 +96,26 @@ def test_a_film_without_npm_packages_refuses_naming_the_film(tmp_path):
     refused = engine("r.node_modules()", root)
     assert refused.returncode != 0
     assert f"No node_modules folder at or above the film {root}" in refused.stderr
+
+
+def test_a_text_is_written_beside_its_target_and_then_replaces_it(tmp_path, monkeypatch):
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    page = tmp_path / "build/page.html"
+    repository.write_text("build/page.html", "the first page\n")
+    assert page.read_text() == "the first page\n"
+    seen = []
+    flush = os.fsync
+
+    def reading(descriptor):
+        # While the new text is on its way to the disk, a reader finds the whole earlier page.
+        seen.append((page.read_text(), len(list(page.parent.iterdir()))))
+        flush(descriptor)
+
+    monkeypatch.setattr(os, "fsync", reading)
+    repository.write_text("build/page.html", "the second page\n")
+    assert seen == [("the first page\n", 2)]
+    assert page.read_text() == "the second page\n"
+    assert [path.name for path in page.parent.iterdir()] == ["page.html"]
+    # A record is written the same way.
+    repository.write("build/record.json", {"verdict": "pass"})
+    assert len(seen) == 2 and repository.read("build/record.json") == {"verdict": "pass"}

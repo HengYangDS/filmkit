@@ -67,11 +67,11 @@ def read(path: str | Path) -> dict:
     return json.loads((ROOT / path).read_text())
 
 
-def write(path: str | Path, value: dict) -> None:
-    """Write a JSON object with an indent of two and a final newline, creating its folder.
+def write_text(path: str | Path, text: str) -> None:
+    """Write a text file whole, creating its folder.
 
     The text goes to a new sibling file that then replaces the target, so a reader never sees
-    a partial record and an interrupted write leaves the previous one in place. The file is
+    a partial file and an interrupted write leaves the previous one in place. The file is
     created like `Path.write_text` creates one, so its mode follows the umask.
     """
     target = ROOT / path
@@ -80,13 +80,19 @@ def write(path: str | Path, value: dict) -> None:
     descriptor = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-            stream.write(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
+            stream.write(text)
             stream.flush()
             os.fsync(stream.fileno())
         partial.replace(target)
     except BaseException:
         partial.unlink(missing_ok=True)
         raise
+
+
+def write(path: str | Path, value: dict) -> None:
+    """Write a JSON object with an indent of two and a final newline, creating its folder, as
+    `write_text` writes a text: whole, by replacing the record that stood."""
+    write_text(path, json.dumps(value, ensure_ascii=False, indent=2) + "\n")
 
 
 def sha(path: str | Path) -> str:
