@@ -23,6 +23,14 @@ from filmkit.specification import DURATION
 EARLIER = {"over_limit": [], "limit_seconds": 3.5, "movie": {"path": "earlier.mp4"}}
 
 
+@pytest.fixture(autouse=True)
+def no_declared_capture(monkeypatch):
+    """The film of these tests declares no capture, so it captures `fast`, the default; a test of
+    another capture declares it."""
+    picture = FILM.picture.model_copy(update={"capture": "fast"})
+    monkeypatch.setattr(picture_rendering, "FILM", FILM.model_copy(update={"picture": picture}))
+
+
 def lanes_command(stage, draft, capture="--experimental-fast-capture", browser="--browser-gpu"):
     """The film lanes' draft.py command after the renderer's path, with the host's worker count."""
     return [

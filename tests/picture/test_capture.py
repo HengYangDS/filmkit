@@ -10,6 +10,14 @@ from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
 
 
+@pytest.fixture(autouse=True)
+def no_declared_capture(monkeypatch):
+    """The film of these tests declares no capture, so it captures `fast`, the default; a test of
+    another capture declares it."""
+    picture = FILM.picture.model_copy(update={"capture": "fast"})
+    monkeypatch.setattr(picture_rendering, "FILM", FILM.model_copy(update={"picture": picture}))
+
+
 def declaring(monkeypatch, capture: str) -> None:
     """Declare the film's capture as `[picture] capture` would."""
     picture = FILM.picture.model_copy(update={"capture": capture})

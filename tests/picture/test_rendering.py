@@ -117,6 +117,14 @@ def renderer(folder, body):
     return path
 
 
+@pytest.fixture(autouse=True)
+def no_declared_capture(monkeypatch):
+    """The film of these tests declares no capture, so it captures `fast`, the default; a test of
+    another capture declares it."""
+    picture = FILM.picture.model_copy(update={"capture": "fast"})
+    monkeypatch.setattr(picture_rendering, "FILM", FILM.model_copy(update={"picture": picture}))
+
+
 def render(monkeypatch, edition, fake, deadline):
     """Render an edition with a stand-in in place of the locked renderer."""
     monkeypatch.setattr(picture_rendering, "RENDERER", fake)

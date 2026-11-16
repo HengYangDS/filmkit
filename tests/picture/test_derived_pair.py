@@ -85,6 +85,10 @@ def test_a_derivation_writes_the_picture_and_a_receipt_that_binds_its_source(pai
     receipt = derivation.derive_uncaptioned(edition, 600)
     assert repository.read(uncaptioned.receipt) == receipt
     assert (receipt["picture"], receipt["exit"], receipt["timed_out"]) == ("uncaptioned", 0, False)
+    assert receipt["uncaptioned"] == {
+        "way": "derived",
+        "reason": "the film declares software capture, which the engine's release qualifies",
+    }
     derived = receipt["derived"]
     assert derived["from"] == "captioned"
     assert derived["source_sha256"] == repository.sha(captioned.file)
@@ -184,6 +188,7 @@ def test_a_derived_pair_is_compared_by_its_record_without_decoding(compared):
     record = equivalence.compare_pictures(edition)
     assert record["verdict"] == "pass"
     assert record["findings"] == []
+    assert record["uncaptioned"]["way"] == "derived"
     uncaptioned = record["pictures"]["uncaptioned"]
     assert uncaptioned["derived"] is True and "stage_sha256" not in uncaptioned
     assert "stage_sha256" in record["pictures"]["captioned"]

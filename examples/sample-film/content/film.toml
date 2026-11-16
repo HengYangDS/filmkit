@@ -35,6 +35,9 @@ caption_terms = ["reference recording", "build folder"]
 # audits of every frame declares no drafts.
 [picture]
 drafts = true
+# The sample draws in the browser's software rasterizer, as the films this engine builds do: it is
+# the capture under which an uncaptioned picture is derived, so the sample's build qualifies it.
+capture = "software"
 fonts = [
   "assets/fonts/noto-sans-cjk-sc-subset-regular.otf",
   "assets/fonts/noto-sans-cjk-sc-subset-bold.otf",

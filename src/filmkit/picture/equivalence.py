@@ -383,6 +383,8 @@ def compare_pictures(edition: Edition) -> dict:
     report = work / "composition.json"
     record = {
         **bound,
+        # Why the uncaptioned picture was rendered and not derived, where its receipt says so.
+        **({"uncaptioned": receipts[1]["uncaptioned"]} if "uncaptioned" in receipts[1] else {}),
         "composition": {
             "report": {"path": repository.relative(report), "sha256": repository.sha(report)},
             **{key: value for key, value in composition.items() if key != "findings"},

@@ -212,19 +212,28 @@ def test_two_exceptions_of_one_motion_finding_refuse(declared):
         film.load(declared)
 
 
+# The sample film's own capture, as its declaration writes it.
+SAMPLE_CAPTURE = 'capture = "software"\n'
+
+
 def test_a_film_without_a_capture_captures_fast(declared):
-    assert film.FILM.picture.capture == "fast"
+    rewrite(declared, SAMPLE_CAPTURE, "")
     assert film.load(declared).picture.capture == "fast"
 
 
-@pytest.mark.parametrize("capture", ["screenshot", "software"])
-def test_a_film_may_declare_screenshot_or_software_capture(declared, capture):
-    rewrite(declared, "[picture]\n", f'[picture]\ncapture = "{capture}"\n')
+def test_the_sample_film_declares_the_capture_under_which_pictures_are_derived(declared):
+    assert film.FILM.picture.capture == "software"
+    assert film.load(declared).picture.capture == "software"
+
+
+@pytest.mark.parametrize("capture", ["fast", "screenshot", "software"])
+def test_a_film_may_declare_its_capture(declared, capture):
+    rewrite(declared, SAMPLE_CAPTURE, f'capture = "{capture}"\n')
     assert film.load(declared).picture.capture == capture
 
 
 def test_another_capture_is_refused_naming_its_field(declared):
-    rewrite(declared, "[picture]\n", '[picture]\ncapture = "drawelement"\n')
+    rewrite(declared, SAMPLE_CAPTURE, 'capture = "drawelement"\n')
     named = r"picture\.capture\s+Input should be 'fast', 'screenshot' or 'software'"
     with pytest.raises(FilmError, match=named):
         film.load(declared)

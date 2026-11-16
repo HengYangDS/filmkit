@@ -15,6 +15,7 @@
 - [x] 3.3 Make `render-picture --uncaptioned` derive unless `--native` is given, and let `validate-picture --uncaptioned`, the verifier and packaging read either receipt; verify `tests/test_produce.py`, `tests/picture/test_derived_pair.py` and `tests/delivery/test_derived_verification.py`.
 - [x] 3.4 Make `compare-pictures` compare a derived pair by its derivation's receipt without decoding, and bind a derived picture without a stage document; verify `tests/picture/test_derived_pair.py` (a current derived pair passes without a decode, a captioned picture rendered again is refused, a derived pair is no case for `repair-pictures`).
 - [x] 3.5 Run the band audit read-only on the three films' current compositions; verify that each of the six editions passes and lists stretches without a caption (`fk/r36/films.log` in the films' kit).
+- [x] 3.6 Derive only for a film that declares `software` capture and render the uncaptioned stage for a film of any other, each receipt and the comparison record saying which way was taken and why; name the capture of its renders in the record of `qualify-renderer`; declare `software` capture in the sample film. Verify `tests/picture/test_uncaptioned_way.py`, `tests/picture/test_qualification.py` and `tests/test_film.py`.
 
 ## 4. The 1080p films
 

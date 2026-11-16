@@ -2,12 +2,12 @@
 
 ### Requirement: The sample build qualifies the renderer
 
-The sample film's picture task SHALL render the Chinese captioned stage a second time with `qualify-renderer` and refuse unless every decoded frame equals the first render's, and SHALL render the Chinese uncaptioned picture with `--native` and compare that pair at every frame, so that each build of the sample proves, for the renderer it installs, what a derived picture relies on.
+The sample film SHALL declare `software` capture, the capture under which pictures are derived. Its picture task SHALL render the Chinese captioned stage a second time with `qualify-renderer` and refuse unless every decoded frame equals the first render's, and SHALL render the Chinese uncaptioned picture with `--native` and compare that pair at every frame. A release of the engine requires this qualification to pass under `software` capture.
 
 #### Scenario: Two renders of one stage
 
 - **WHEN** `qualify-renderer` runs after the Chinese captioned picture is rendered and validated
-- **THEN** its record names both renders' SHA-256 and the frames compared, and says that every decoded frame is identical
+- **THEN** its record names both renders' SHA-256, the frames compared and `software` capture, and says that every decoded frame is identical
 
 #### Scenario: A render that differs
 

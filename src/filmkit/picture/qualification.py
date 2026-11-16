@@ -5,8 +5,10 @@ stage the same way every time, which a film's build no longer proves by renderin
 twice. `qualify_renderer` proves it for the renderer, the browser and the capture a film
 installs: it renders the edition's current captioned stage a second time, with the pictures'
 settings, to a work file, decodes both renders completely and requires every frame of the second
-to equal the first's. The sample film's build runs it, so every engine release qualifies the
-renderer supply it pins.
+to equal the first's. It runs under whatever capture the film declares, and its record names
+that capture. The sample film declares software capture, the one under which uncaptioned pictures
+are derived, and its build runs the qualification, so every engine release qualifies the renderer
+supply it pins for that capture.
 
 The record, build/evidence/editions/<code>/renderer-qualification.json, names the renderer's
 version, the capture, both renders' SHA-256 and worker counts, the frames compared and the first
@@ -26,7 +28,6 @@ from typing import TYPE_CHECKING
 import filmkit.durations as durations
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
-from filmkit.film import FILM
 from filmkit.picture.rendering import PictureError
 from filmkit.specification import FPS
 
@@ -70,7 +71,7 @@ def qualify_renderer(edition: Edition, deadline: float = rendering.DEADLINE) -> 
     record = {
         "renderer_version": rendering.RENDERER_VERSION,
         "browser": list(rendering.BROWSER),
-        "capture": FILM.picture.capture,
+        "capture": second_receipt.get("capture"),
         "stage_sha256": repository.sha(rendered.stage / "index.html"),
         "first": render_of(rendered.file, first_receipt, len(first)),
         "second": render_of(again, second_receipt, len(second)),

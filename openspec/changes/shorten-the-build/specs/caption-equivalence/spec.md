@@ -2,7 +2,7 @@
 
 ### Requirement: The uncaptioned picture is derived from the captioned one
 
-`render-picture --uncaptioned` SHALL, unless `--native` is given, derive the uncaptioned picture from the edition's valid captioned picture: every frame encoded again with the rows of the caption band painted in the ground that the captioned picture holds there. Its receipt SHALL say that the picture is derived and name the captioned picture's SHA-256, the painted rows, the ground and the command.
+For a film that declares `software` capture, `render-picture --uncaptioned` SHALL, unless `--native` is given, derive the uncaptioned picture from the edition's valid captioned picture: every frame encoded again with the rows of the caption band painted in the ground that the captioned picture holds there. Its receipt SHALL say that the picture is derived and name the captioned picture's SHA-256, the painted rows, the ground and the command.
 
 #### Scenario: A derived picture
 
@@ -13,6 +13,30 @@
 
 - **WHEN** the captioned picture's receipt binds another stage than the current one
 - **THEN** the derivation refuses before it encodes anything
+
+### Requirement: A picture is derived only under software capture
+
+For a film that declares any other capture than `software`, and with `--native` for every film, `render-picture --uncaptioned` SHALL render the uncaptioned stage, and `compare-pictures` SHALL then compare the pair at every frame. The receipt of an uncaptioned picture and the edition's comparison record SHALL each say whether the picture was derived or rendered, and why: the film's declared capture, or a render asked for.
+
+#### Scenario: A film that declares no capture
+
+- **WHEN** a film that declares no capture, and so captures `fast`, runs `render-picture --uncaptioned`
+- **THEN** its uncaptioned stage is rendered, and the receipt says that the picture was rendered because the film declares `fast` capture
+
+#### Scenario: A native render asked for under software capture
+
+- **WHEN** a film that declares `software` capture runs `render-picture --uncaptioned --native`
+- **THEN** its uncaptioned stage is rendered, and the receipt says that a render was asked for
+
+#### Scenario: A derived picture under another capture
+
+- **WHEN** a film changes its declared capture from `software` to `screenshot` after its uncaptioned picture was derived
+- **THEN** validation refuses the derived picture and asks for `render-picture --uncaptioned`
+
+#### Scenario: The comparison record of a rendered pair
+
+- **WHEN** `compare-pictures` passes a pair whose uncaptioned picture was rendered under `fast` capture
+- **THEN** its record holds every level's measures and says that the picture was rendered because the film declares `fast` capture
 
 ### Requirement: A derivation proves that the band holds only captions on the ground
 

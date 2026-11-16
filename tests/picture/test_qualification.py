@@ -35,6 +35,8 @@ def test_two_renders_that_decode_alike_pass_and_the_second_is_removed(rendered):
     assert (record["verdict"], record["differing_frames"]) == ("pass", 0)
     assert record["first_differing_frame"] is None
     assert record["renderer_version"] == picture_rendering.RENDERER_VERSION
+    # The record names the capture the two renders were made with, the sample film's own.
+    assert record["capture"] == "software"
     first, second = record["first"], record["second"]
     assert first["sha256"] == repository.sha(edition.picture)
     assert (first["frames"], second["frames"]) == (3, 3)

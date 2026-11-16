@@ -78,6 +78,10 @@ def test_an_edition_action_passes_its_options_to_its_owner(monkeypatch, tmp_path
 
     for name in ("stage_picture", "render_picture", "validate_picture", "compare_pictures"):
         monkeypatch.setattr(produce, name, owner)
+    noted = []
+    monkeypatch.setattr(
+        produce.derivation, "note_rendered", lambda edition, way: noted.append((edition, way))
+    )
     output = tmp_path / "stage"
     stage = ["--output", str(output), "--duration", "60", "--width", "1920", "--height", "1080"]
     produce.main(["stage-picture", "--language", "zh", *stage, "--start", "12.5"])
@@ -97,6 +101,8 @@ def test_an_edition_action_passes_its_options_to_its_owner(monkeypatch, tmp_path
         (zh, {"captions": False}),
         (en, {}),
     ]
+    # The receipt of the uncaptioned picture rendered with --native says why it was rendered.
+    assert [(edition, way["way"]) for edition, way in noted] == [(zh, "rendered")]
 
 
 def test_each_owner_keeps_its_own_deadline_default(monkeypatch):
@@ -242,6 +248,7 @@ def test_the_uncaptioned_picture_is_derived_unless_a_native_render_is_asked_for(
     monkeypatch.setattr(
         produce, "render_picture", lambda *arguments, **options: rendered.append(options)
     )
+    monkeypatch.setattr(produce.derivation, "note_rendered", lambda edition, way: way)
     produce.main(["render-picture", "--language", "zh", "--uncaptioned"])
     produce.main(["render-picture", "--language", "en", "--uncaptioned", "--deadline", "900"])
     zh, en = production.Edition("zh"), production.Edition("en")

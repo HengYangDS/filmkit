@@ -1,5 +1,14 @@
 """Derive an edition's uncaptioned picture from its captioned one, and prove what that relies on.
 
+A picture is derived only for a film that declares `DERIVING_CAPTURE`, the software capture: a
+derived picture relies on the renderer drawing a stage the same way every time, which the engine
+qualifies for that capture at each release (`filmkit.picture.qualification`) and has seen fail
+in another: two renders of one stage drawn in the host's GPU with fast capture differed in 171
+of 3,600 frames (17 November 2026). `uncaptioned_way` says which way an edition's uncaptioned
+picture is made and why: derived under the software capture, and rendered from its own stage,
+as before derivation existed, under any other capture or when `--native` asks for it. Each
+receipt carries that answer as `uncaptioned`, and the comparison record repeats it.
+
 The uncaptioned picture is the captioned picture with the rows of its caption band painted in the
 ground: `derive_uncaptioned` encodes every frame of the valid captioned picture once more with
 x264, the band's rows replaced by the ground as the captioned picture itself holds it, read from
@@ -43,6 +52,7 @@ import numpy as np
 import filmkit.durations as durations
 import filmkit.media as media
 import filmkit.picture.equivalence as equivalence
+import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.picture.rendering import (
@@ -57,6 +67,9 @@ from filmkit.specification import DURATION, FPS
 if TYPE_CHECKING:
     from filmkit.production import Edition, Rendition
 
+# The capture under which the uncaptioned picture is derived: the one the engine's release
+# qualifies by rendering the sample film's stage twice.
+DERIVING_CAPTURE = "software"
 # The work of a derivation, below the film's root, in a folder for each edition.
 WORK = Path("build/runtime/work/derivation")
 # The frames a second at which the band audit runs the composition: the frame audit's own step.
@@ -93,6 +106,27 @@ ENCODER = (
 DEADLINE = 7200
 NATIVE = "render-picture --language {code} --uncaptioned --native"
 PLANES = ("y", "u", "v")
+
+
+def uncaptioned_way(*, native: bool = False) -> dict:
+    """How the film's uncaptioned pictures are made, `derived` or `rendered`, and why."""
+    declared = rendering.FILM.picture.capture
+    qualified = f"{DERIVING_CAPTURE} capture, which the engine's release qualifies"
+    if native:
+        return {"way": "rendered", "reason": "a render of its own stage was asked for"}
+    if declared != DERIVING_CAPTURE:
+        reason = f"the film declares {declared} capture, and a picture is derived only under "
+        return {"way": "rendered", "reason": reason + qualified}
+    return {"way": "derived", "reason": f"the film declares {qualified}"}
+
+
+def note_rendered(edition: Edition, way: dict) -> dict:
+    """Write into the receipt of an uncaptioned picture that was just rendered why it was
+    rendered and not derived; the receipt."""
+    path = edition.rendered(False).receipt
+    receipt = {**repository.read(path), "uncaptioned": way}
+    repository.write(path, receipt)
+    return receipt
 
 
 def source_bindings(edition: Edition) -> dict:
@@ -352,7 +386,11 @@ def require_derived_media(path: Path) -> None:
 def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
     """Derive the edition's uncaptioned picture from its valid captioned picture and write its
     receipt; an earlier uncaptioned picture and receipt are removed first, so a refusal leaves
-    none in place."""
+    none in place. Refused for a film whose declared capture is not the deriving one."""
+    way = uncaptioned_way()
+    if way["way"] != "derived":
+        msg = f"The {edition.code} uncaptioned picture is not derived: {way['reason']}"
+        raise PictureError(msg)
     with durations.phase("validation"):
         validate_picture(edition)
     captioned, rendered = edition.rendered(True), edition.rendered(False)
@@ -396,6 +434,7 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
     report = work / "band-audit.json"
     receipt = {
         "picture": rendered.name,
+        "uncaptioned": way,
         "derived": {
             "from": captioned.name,
             **bound,
@@ -460,6 +499,13 @@ def validate_binding(edition: Edition, receipt: dict) -> None:
     require_receipt_picture(receipt, rendered)
     derived = receipt["derived"]
     again = f"run render-picture --language {edition.code} --uncaptioned"
+    declared = rendering.FILM.picture.capture
+    if declared != DERIVING_CAPTURE:
+        msg = (
+            f"The {edition.code} uncaptioned picture is derived, and the film declares {declared} "
+            f"capture, under which it is rendered; {again}"
+        )
+        raise PictureError(msg)
     stale = [key for key, value in source_bindings(edition).items() if derived.get(key) != value]
     if stale:
         msg = f"The derived picture's receipt binds another {', '.join(stale)}; {again}"
@@ -506,6 +552,7 @@ def compare_derived(edition: Edition, receipt: dict) -> dict:
     report = work / "composition.json"
     record = {
         **bound,
+        "uncaptioned": receipt.get("uncaptioned", {"way": "derived"}),
         "composition": {
             "report": {"path": repository.relative(report), "sha256": repository.sha(report)},
             **{key: value for key, value in composition.items() if key != "findings"},

@@ -7,10 +7,11 @@ action needs --language. `--deadline` bounds a render in seconds, by default its
 (`filmkit.picture.draft`). `--uncaptioned` makes stage-picture, render-picture and
 validate-picture act on the edition's uncaptioned picture instead of its captioned one, and
 every other action refuses it. render-picture --uncaptioned derives that picture from the
-captioned one (`filmkit.picture.derivation`) unless `--native` asks for a render of its own
-stage; compare-pictures proves that the two pictures differ only by the captions
-(`filmkit.picture.equivalence`), and qualify-renderer that two renders of the captioned stage
-decode to the same frames (`filmkit.picture.qualification`). `--variants` names fit's
+captioned one (`filmkit.picture.derivation`) for a film that declares software capture, and
+renders its own stage for any other film or when `--native` asks for it; compare-pictures proves
+that the two pictures differ only by the captions (`filmkit.picture.equivalence`), and
+qualify-renderer that two renders of the captioned stage decode to the same frames
+(`filmkit.picture.qualification`). `--variants` names fit's
 pause-policy variants, a file below the film's root or an absolute one
 (`filmkit.soundtrack.fit`), and `--attempts` bounds repair-pictures (`filmkit.picture.repair`);
 every other action refuses them.
@@ -90,12 +91,15 @@ def after_set_aside(edition: Edition, owner: Callable[[Edition], object]) -> obj
 
 def render(edition: Edition, options: argparse.Namespace) -> object:
     """Render the captioned picture, or make the uncaptioned one: derived from the captioned
-    picture unless --native asks for a render of its own stage."""
-    if options.uncaptioned and not options.native:
+    picture for a film of the deriving capture, unless --native asks for a render of its own
+    stage; rendered from that stage otherwise, its receipt saying why."""
+    if not options.uncaptioned:
+        return render_picture(edition, deadline(options, rendering.DEADLINE), captions=True)
+    way = derivation.uncaptioned_way(native=options.native)
+    if way["way"] == "derived":
         return derivation.derive_uncaptioned(edition, deadline(options, derivation.DEADLINE))
-    return render_picture(
-        edition, deadline(options, rendering.DEADLINE), captions=not options.uncaptioned
-    )
+    render_picture(edition, deadline(options, rendering.DEADLINE), captions=False)
+    return derivation.note_rendered(edition, way)
 
 
 # Each edition action's adapter from the parsed options to its owner. The adapters name their
