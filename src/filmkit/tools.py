@@ -5,10 +5,10 @@ folder, into build/runtime/tool-cache/filmkit/<version>/ below the film, replaci
 bytes differ from the package's, and runs the named tool from that copy with Node at the film's
 root: its imports resolve from the film's npm packages and its paths from the film. The tools
 check the film's picture and players, so each first refuses a renderer version other than the one
-the engine renders with, and a browser check runs the browser that the renderer uses. The frame
-and motion audits and the caption equivalence measure text by the advance widths of the film's
-declared faces (`filmkit.picture.metrics`), which a run names to them in `FILMKIT_TEXT_METRICS`
-unless the caller names its own table.
+the engine renders with, and a browser check runs the browser that the renderer uses. The frame,
+motion and detail audits and the caption equivalence measure text by the advance widths of the
+film's declared faces (`filmkit.picture.metrics`), which a run names to them in
+`FILMKIT_TEXT_METRICS` unless the caller names its own table.
 
 A refusal exits with status 1 and "<tool>: <reason>" on standard error; otherwise the command
 exits with the tool's own status.
@@ -40,6 +40,7 @@ TOOLS = {
     "geometry-check": "picture/geometry-check.mjs",
     "frame-audit": "picture/frame-audit.mjs",
     "motion-audit": "picture/motion-audit.mjs",
+    "detail-audit": "picture/detail-audit.mjs",
     "caption-equivalence": "picture/caption-equivalence.mjs",
     "player-check": "delivery/player-check.mjs",
     "whole-turns": "picture/whole-turns.mjs",
@@ -47,7 +48,7 @@ TOOLS = {
 # The copies, below the film's root, in a folder for each engine version.
 CACHE = picture_rendering.TOOL_CACHE / "filmkit"
 # The tools that run the composition headlessly, which measure text by the film's declared faces.
-MEASURING = ("frame-audit", "motion-audit", "caption-equivalence")
+MEASURING = ("frame-audit", "motion-audit", "detail-audit", "caption-equivalence")
 
 
 class ToolError(RuntimeError):

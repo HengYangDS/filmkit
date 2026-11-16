@@ -105,13 +105,14 @@ def test_the_headless_audits_measure_text_by_the_films_faces(film, tmp_path, mon
     package = tmp_path / "package"
     (package / "picture").mkdir(parents=True)
     probe = f"console.log(JSON.stringify({{table: process.env.{VARIABLE} ?? null}}));"
-    for tool in ("frame-audit", "motion-audit", "caption-equivalence", "geometry-check"):
+    headless = ("frame-audit", "motion-audit", "detail-audit", "caption-equivalence")
+    for tool in (*headless, "geometry-check"):
         (package / tools.TOOLS[tool]).write_text(probe)
     monkeypatch.setattr(tools, "PACKAGE", package)
     monkeypatch.delenv(VARIABLE, raising=False)
     # Each tool that runs the composition headlessly is given the table of the film's declared
     # faces.
-    for tool in ("frame-audit", "motion-audit", "caption-equivalence"):
+    for tool in headless:
         assert tools.run(tool, []) == 0
         assert json.loads(capfd.readouterr().out) == {"table": str(film / TABLE)}
     assert sorted(repository.read(film / TABLE)["faces"]) == [
@@ -157,6 +158,7 @@ def test_the_command_names_each_tool_and_refuses_another(capsys):
     assert "invalid choice: 'render'" in capsys.readouterr().err
     assert sorted(tools.TOOLS) == [
         "caption-equivalence",
+        "detail-audit",
         "frame-audit",
         "geometry-check",
         "motion-audit",
