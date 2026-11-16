@@ -39,6 +39,7 @@ RECEIPT_KEYS = [
     "picture",
     "command",
     "capture",
+    "workers",
     "exit",
     "timed_out",
     "deadline_seconds",

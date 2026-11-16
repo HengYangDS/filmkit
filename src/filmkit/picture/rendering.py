@@ -8,9 +8,10 @@ update checks and self-installs off, and records a receipt; validation binds the
 picture to that receipt, the stage and the current inputs. Every render passes the browser and
 capture flags of the film's declared capture (`film.Picture.capture`) and its receipt records
 that mode; validation refuses a picture rendered in another mode, reading a receipt that records
-none by its command. A stage, render or receipt that differs from this contract raises
-`PictureError`, as does a film whose installed renderer is not the version the engine renders
-with.
+none by its command. Every render passes the renderer a worker count taken from the host
+(`render_workers`), which its receipt records. A stage, render or receipt that differs from this
+contract raises `PictureError`, as does a film whose installed renderer is not the version the
+engine renders with.
 
 Each edition has two pictures (`production.Edition.rendered`): the captioned one, which draws
 the timeline's captions, and the uncaptioned one, whose document inlines the same timeline with
@@ -83,6 +84,13 @@ CAPTURE_FLAGS = {
     "screenshot": ("--browser-gpu", "--experimental-fast-capture=false"),
     "software": ("--no-browser-gpu", "--experimental-fast-capture=false"),
 }
+# The renderer's worker count is the host's logical cores less WORKERS_SPARE, held within
+# WORKERS_RANGE, unless WORKERS_VARIABLE names a count for a measurement. On a host of 18 cores a
+# span of 7,200 UHD frames took 141.2 s with 8 workers, 127.5 s with 12, 114.1 s with 16 and
+# 124.8 s with the renderer's own choice, every frame identical (17 November 2026).
+WORKERS_VARIABLE = "FILMKIT_RENDER_WORKERS"
+WORKERS_RANGE = (8, 16)
+WORKERS_SPARE = 2
 # The renderer's encoding by quality: the delivered pictures' at CRF 14, and the draft's at the
 # rate its quality sets.
 QUALITIES = {"looks": ("--quality", "looks", "--crf", "14"), "draft": ("--quality", "draft")}
@@ -516,6 +524,26 @@ def require_passing_gates(edition: Edition) -> None:
         raise PictureError(msg)
 
 
+def render_workers() -> int:
+    """The worker count a render passes: what `WORKERS_VARIABLE` names, a positive whole number,
+    or else the host's logical cores less `WORKERS_SPARE`, held within `WORKERS_RANGE`."""
+    named = os.environ.get(WORKERS_VARIABLE)
+    if not named:
+        low, high = WORKERS_RANGE
+        return max(low, min(high, (os.cpu_count() or low) - WORKERS_SPARE))
+    if not (named.isascii() and named.isdigit() and int(named) > 0):
+        msg = f"{WORKERS_VARIABLE} names {named!r}, which is no positive whole number of workers"
+        raise PictureError(msg)
+    return int(named)
+
+
+def command_workers(command: list[str]) -> int | None:
+    """The worker count a renderer command passes, or None when it passes none."""
+    if "--workers" not in command[:-1]:
+        return None
+    return int(command[command.index("--workers") + 1])
+
+
 def renderer_command(stage: Path, output: Path, fps: int, quality: str) -> list[str]:
     """The locked renderer's command for a stage: the pictures' settings at a frame rate and a
     quality of `QUALITIES`, with the browser and capture flags of the film's declared capture."""
@@ -530,7 +558,7 @@ def renderer_command(stage: Path, output: Path, fps: int, quality: str) -> list[
         str(fps),
         *QUALITIES[quality],
         "--workers",
-        "8",
+        str(render_workers()),
         "--gpu",
         browser,
         "--no-low-memory-mode",
@@ -554,9 +582,9 @@ def record_render(
 ) -> dict:
     """Run a renderer command on a stage to its exit or deadline and write its receipt.
 
-    The receipt names the picture, the command and the capture it passes. A render that does
-    not exit 0 within its deadline, or whose stage changed meanwhile, raises `PictureError`
-    after its receipt is written.
+    The receipt names the picture, the command and the capture and worker count it passes. A
+    render that does not exit 0 within its deadline, or whose stage changed meanwhile, raises
+    `PictureError` after its receipt is written.
     """
     source = sha(stage / "index.html")
     started = datetime.now(UTC)
@@ -565,6 +593,7 @@ def record_render(
         "picture": picture,
         "command": command,
         "capture": command_capture(command),
+        "workers": command_workers(command),
         "exit": exit_code,
         "timed_out": timed_out,
         "deadline_seconds": deadline,

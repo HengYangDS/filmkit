@@ -24,7 +24,7 @@ EARLIER = {"over_limit": [], "limit_seconds": 3.5, "movie": {"path": "earlier.mp
 
 
 def lanes_command(stage, draft, capture="--experimental-fast-capture", browser="--browser-gpu"):
-    """The film lanes' draft.py command after the renderer's path."""
+    """The film lanes' draft.py command after the renderer's path, with the host's worker count."""
     return [
         "render",
         str(stage),
@@ -35,7 +35,7 @@ def lanes_command(stage, draft, capture="--experimental-fast-capture", browser="
         "--quality",
         "draft",
         "--workers",
-        "8",
+        str(picture_rendering.render_workers()),
         "--gpu",
         browser,
         "--no-low-memory-mode",

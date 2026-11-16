@@ -1,12 +1,12 @@
 ## 1. Durations
 
-- [ ] 1.1 Add `filmkit.durations`: a run for a command and an edition, phases named by the code that does the work, one record written when the run ends whether it completed or not, and the command that prints an edition's records with their sum; verify `tests/test_durations.py`.
-- [ ] 1.2 Start a run for every action of `filmkit.produce` and for `narrate`, each step a phase, and name the phases of `compare-pictures`, `package-film` and `check-picture`; verify `tests/test_durations.py` (an action's record, a refused action's record) and `tests/narration/test_narrate.py` (a run's record, none for a dry run).
+- [x] 1.1 Add `filmkit.durations`: a run for a command and an edition, phases named by the code that does the work, one record written when the run ends whether it completed or not, and the command that prints an edition's records with their sum; verify `tests/test_durations.py`.
+- [x] 1.2 Start a run for every action of `filmkit.produce` and for `narrate`, each step a phase, and name the phases of `compare-pictures`, `package-film` and `check-picture`; verify `tests/test_durations.py` (an action's record, a refused action's record) and `tests/narration/test_narrate.py` (a run's record, none for a dry run).
 - [ ] 1.3 State each film's seconds in the verifier's report, which writes nothing, and in the reproduction's report; verify `tests/delivery/test_verification.py` and `tests/delivery/test_reproduction.py`.
 
 ## 2. Render settings
 
-- [ ] 2.1 Take the render's worker count from the host or from `FILMKIT_RENDER_WORKERS`, for the pictures and the draft, and record it in the receipt; verify `tests/picture/test_capture.py` and `tests/picture/test_rendering.py` (18 cores give 16, 10 give 8, a named count is passed, a value that is no count is refused).
+- [x] 2.1 Take the render's worker count from the host or from `FILMKIT_RENDER_WORKERS`, for the pictures and the draft, and record it in the receipt; verify `tests/picture/test_workers.py` (18 cores give 16, 10 give 8, a named count is passed and recorded, a value that is no count is refused) and `tests/picture/test_capture.py`.
 
 ## 3. The derived uncaptioned picture
 

@@ -11,6 +11,9 @@ import filmkit.repository as repository
 import filmkit.review.round as review_round
 from filmkit.picture.rendering import PictureError
 
+# Every action writes a duration record below the film's root, so each test runs below its own.
+pytestmark = pytest.mark.usefixtures("root")
+
 
 @pytest.fixture
 def root(tmp_path, monkeypatch):
