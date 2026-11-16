@@ -5,7 +5,9 @@ import subprocess
 import pytest
 
 import filmkit.delivery.packaging as delivery_packaging
-from filmkit.production import RENDITIONS, VIEWING
+import filmkit.picture.derivation as derivation
+import filmkit.repository as repository
+from filmkit.production import RENDITIONS, VIEWING, Edition
 from filmkit.specification import FPS
 
 
@@ -63,3 +65,56 @@ def test_four_seconds_encoded_with_the_1080p_options_hold_keyframes_at_0_and_120
         timeout=60,
     ).stdout.decode()
     assert size.strip() == "1920,1080"
+
+
+def test_each_film_reads_its_own_picture_unless_the_pair_is_derived(tmp_path, monkeypatch):
+    monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
+    edition = Edition("zh")
+    captioned, uncaptioned = edition.rendered(True), edition.rendered(False)
+    # Without a receipt, and with a render's receipt, every film reads its own picture.
+    for kind, rendition in RENDITIONS.items():
+        own = edition.rendered(rendition.captions).file
+        assert derivation.film_source(edition, rendition) == (own, "0:v:0", rendition.video), kind
+    repository.write(uncaptioned.receipt, {"picture": "uncaptioned", "command": ["hyperframes"]})
+    viewing = RENDITIONS["1080p-uncaptioned"]
+    assert derivation.film_source(edition, viewing) == (uncaptioned.file, "0:v:0", viewing.video)
+    # Of a derived pair, the 1080p uncaptioned film is painted and scaled from the captioned one.
+    derived = {"rows": [1872, 2048], "ground": {"y": 21, "u": 129, "v": 125}}
+    repository.write(uncaptioned.receipt, {"picture": "uncaptioned", "derived": derived})
+    source, mapped, video = derivation.film_source(edition, viewing)
+    assert (source, mapped) == (captioned.file, "[viewing]")
+    assert video[0] == "-filter_complex"
+    assert video[1] == (
+        "[0:v:0]split=2[main][strip];"
+        "[strip]crop=3840:176:0:1872,lutyuv=y=21:u=129:v=125[paint];"
+        "[main][paint]overlay=x=0:y=1872:format=yuv420[painted];"
+        "[painted]scale=w=1920:h=1080:flags=area[viewing]"
+    )
+    assert video[2:] == viewing.video[2:]
+    # The UHD uncaptioned film copies the derived picture, and the captioned films their own.
+    master = RENDITIONS["uhd-uncaptioned"]
+    assert derivation.film_source(edition, master) == (uncaptioned.file, "0:v:0", master.video)
+    shown = RENDITIONS["1080p-captioned"]
+    assert derivation.film_source(edition, shown) == (captioned.file, "0:v:0", shown.video)
+
+
+@pytest.mark.ffmpeg
+def test_a_painted_and_scaled_film_holds_the_ground_where_the_caption_stood(tmp_path):
+    source, film = tmp_path / "captioned.mp4", tmp_path / "viewing.mp4"
+    caption = "drawbox=x=100:y=152:w=120:h=8:color=white:t=fill"
+    picture = f"color=c=0x0F1519:s=320x180:r={FPS}:d=1,{caption}"
+    command = ["ffmpeg", "-v", "error", "-nostdin", "-y", "-threads", "2", "-f", "lavfi"]
+    command += ["-i", picture, "-c:v", "libx264", "-qp", "0", "-pix_fmt", "yuv420p", str(source)]
+    subprocess.run(command, check=True, capture_output=True, timeout=60)
+    ground = {"y": 33, "u": 130, "v": 126}
+    paint = derivation.painted("0:v:0", (320, 180), (144, 176), ground, "painted")
+    graph = f"{paint};[painted]scale=w=160:h=90:flags=area[viewing]"
+    command = ["ffmpeg", "-v", "error", "-nostdin", "-y", "-threads", "2", "-i", str(source)]
+    command += ["-filter_complex", graph, "-map", "[viewing]", "-c:v", "libx264", "-qp", "0"]
+    command += ["-pix_fmt", "yuv420p", "-threads", "2", str(film)]
+    subprocess.run(command, check=True, capture_output=True, timeout=60)
+    raw = ["ffmpeg", "-v", "error", "-nostdin", "-i", str(film), "-vf", "crop=160:16:0:72"]
+    raw += ["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "yuv420p", "pipe:1"]
+    band = subprocess.run(raw, check=True, capture_output=True, timeout=60).stdout
+    luma = 160 * 16
+    assert (set(band[:luma]), set(band[luma : luma * 5 // 4])) == ({33}, {130})

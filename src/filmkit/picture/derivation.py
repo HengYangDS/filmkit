@@ -20,7 +20,9 @@ the uncaptioned stage instead (`filmkit.picture.rendering.render_picture`). The 
 uncaptioned picture's own place, says `derived` and binds the captioned picture, its receipt, the
 composition, the timeline and the engine, with the rows, the ground and both proofs; validation
 reads either kind of receipt (`validate`, `validate_binding`), and `compare_derived` writes the
-comparison record of a derived pair from the receipt, decoding no picture.
+comparison record of a derived pair from the receipt, decoding no picture. Packaging asks
+`film_source` which picture each film reads: the 1080p uncaptioned film of a derived pair is
+painted and scaled from the captioned picture in one pass.
 
 Usage: python -m filmkit.produce render-picture --language zh|en --uncaptioned [--native]
 """
@@ -53,7 +55,7 @@ from filmkit.picture.rendering import (
 from filmkit.specification import DURATION, FPS
 
 if TYPE_CHECKING:
-    from filmkit.production import Edition
+    from filmkit.production import Edition, Rendition
 
 # The work of a derivation, below the film's root, in a folder for each edition.
 WORK = Path("build/runtime/work/derivation")
@@ -198,6 +200,24 @@ def read_ground(source: Path, rows: tuple[int, int], size: tuple[int, int], fram
     return {name: int(np.median(plane)) for name, plane in zip(PLANES, planes, strict=True)}
 
 
+def band_crop(size: tuple[int, int], rows: tuple[int, int]) -> str:
+    """The filter that keeps the band's rows of a picture of `size`."""
+    return f"crop={size[0]}:{rows[1] - rows[0]}:0:{rows[0]}"
+
+
+def painted(
+    source: str, size: tuple[int, int], rows: tuple[int, int], ground: dict, out: str
+) -> str:
+    """The filter graph from the stream `source` to `out` that sets the band's rows to the ground:
+    the rows are cropped, every sample of each plane set to the ground's, and laid back over."""
+    paint = "lutyuv=" + ":".join(f"{name}={ground[name]}" for name in PLANES)
+    return (
+        f"[{source}]split=2[main][strip];"
+        f"[strip]{band_crop(size, rows)},{paint}[paint];"
+        f"[main][paint]overlay=x=0:y={rows[0]}:format=yuv420[{out}]"
+    )
+
+
 def derive_command(
     source: Path,
     target: Path,
@@ -210,13 +230,10 @@ def derive_command(
     """The FFmpeg command of a derivation: one decode of the captioned picture feeds the encode,
     with the band's rows set to the ground, and the measure of the band at the frames given,
     whose lowest and highest samples go to `stats`, a path without a colon or a quote."""
-    band = f"crop={size[0]}:{rows[1] - rows[0]}:0:{rows[0]}"
-    paint = "lutyuv=" + ":".join(f"{name}={ground[name]}" for name in PLANES)
     graph = (
-        "[0:v:0]split=3[main][strip][measure];"
-        f"[strip]{band},{paint}[paint];"
-        f"[main][paint]overlay=x=0:y={rows[0]}:format=yuv420[derived];"
-        f"[measure]select='{selection(frames)}',{band},signalstats,"
+        "[0:v:0]split=2[picture][measure];"
+        f"{painted('picture', size, rows, ground, 'derived')};"
+        f"[measure]select='{selection(frames)}',{band_crop(size, rows)},signalstats,"
         f"metadata=mode=print:file={stats}[measured]"
     )
     return [
@@ -412,6 +429,28 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
 def is_derived(receipt: dict) -> bool:
     """Whether a receipt of the uncaptioned picture is a derivation's."""
     return isinstance(receipt.get("derived"), dict)
+
+
+def film_source(edition: Edition, rendition: Rendition) -> tuple[Path, str, tuple[str, ...]]:
+    """The picture a delivered film reads, the stream it maps and its video options.
+
+    A film copies or scales its own picture. The uncaptioned film that re-encodes, of a pair
+    whose uncaptioned picture is derived, reads the captioned picture instead, painted as the
+    derivation painted it and scaled in the same pass: one encode from the render, where scaling
+    the derived picture would be two.
+    """
+    own = edition.rendered(rendition.captions)
+    scaled = rendition.reencoded and "-filter:v:0" in rendition.video
+    if rendition.captions or not scaled or not own.receipt.is_file():
+        return own.file, "0:v:0", rendition.video
+    receipt = repository.read(own.receipt)
+    if not is_derived(receipt):
+        return own.file, "0:v:0", rendition.video
+    derived, at = receipt["derived"], rendition.video.index("-filter:v:0")
+    paint = painted("0:v:0", PICTURE_SIZE, tuple(derived["rows"]), derived["ground"], "painted")
+    graph = f"{paint};[painted]{rendition.video[at + 1]}[viewing]"
+    rest = (*rendition.video[:at], *rendition.video[at + 2 :])
+    return edition.rendered(True).file, "[viewing]", ("-filter_complex", graph, *rest)
 
 
 def validate_binding(edition: Edition, receipt: dict) -> None:

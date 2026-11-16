@@ -57,6 +57,7 @@ from filmkit.delivery.player import (
 )
 from filmkit.delivery.track_language import set_chapter_language
 from filmkit.film import FILM, copied_players
+from filmkit.picture.derivation import film_source
 from filmkit.picture.equivalence import require_equivalence
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, validate_picture
 from filmkit.production import CODES, RENDITIONS
@@ -417,8 +418,9 @@ def encode_command(
     edition: Edition, rendition: Rendition, intermediate: Path, created_at: str
 ) -> list[str]:
     """The FFmpeg command that muxes the rendition's picture, the soundtrack and the chapters
-    into one film."""
+    into one film; the picture it reads is `filmkit.picture.derivation.film_source`'s."""
     language, names = ISO_LANGUAGES[edition.code], track_names(edition)
+    picture, mapped, video = film_source(edition, rendition)
     tags = [
         *(f"{key}={value}" for key, value in release_tags(edition, rendition)),
         f"creation_time={created_at}",
@@ -430,7 +432,7 @@ def encode_command(
         "-nostdin",
         *rendition.decoding,
         "-i",
-        str(edition.rendered(rendition.captions).file),
+        str(picture),
         "-i",
         str(edition.soundtrack),
         "-f",
@@ -438,14 +440,14 @@ def encode_command(
         "-i",
         str(edition.artifacts / "chapters.ffmeta"),
         "-map",
-        "0:v:0",
+        mapped,
         "-map",
         "1:a:0",
         "-map_metadata",
         "2",
         "-map_chapters",
         "2",
-        *rendition.video,
+        *video,
         *keyframe_options(rendition),
         "-bsf:v:0",
         video_tags(rendition),
