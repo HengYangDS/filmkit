@@ -232,6 +232,12 @@ class Edition:
         return self.evidence / "caption-equivalence.json"
 
     @property
+    def renderer_qualification(self) -> Path:
+        """The record that two renders of the captioned stage decode to the same frames
+        (`filmkit.picture.qualification`)."""
+        return self.evidence / "renderer-qualification.json"
+
+    @property
     def picture_geometry(self) -> Path:
         return self.evidence / "picture-geometry.json"
 

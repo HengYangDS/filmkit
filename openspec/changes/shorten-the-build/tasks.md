@@ -26,8 +26,8 @@
 
 ## 5. Renderer qualification and the sample film
 
-- [ ] 5.1 Add `qualify-renderer`: render the edition's captioned stage again to a work file, compare every decoded frame with the picture's, write the record and refuse a difference by its first frame; verify `tests/picture/test_qualification.py`.
-- [ ] 5.2 Give the sample film one picture task for each language, the Chinese one qualifying the renderer and rendering its uncaptioned picture with `--native`, the English one deriving it, and add the task that prints the sample's durations; verify `mise tasks` lists them and the Markdown check passes on the README.
+- [x] 5.1 Add `qualify-renderer`: render the edition's captioned stage again to a work file, compare every decoded frame with the picture's, write the record and refuse a difference by its first frame; verify `tests/picture/test_qualification.py`.
+- [x] 5.2 Give the sample film one picture task for each language, the Chinese one qualifying the renderer and rendering its uncaptioned picture with `--native`, the English one deriving it, and add the task that prints the sample's durations; verify that `mise tasks` lists `sample:picture:zh`, `sample:picture:en`, `sample:admitted` and `sample:durations`.
 
 ## 6. Side by side and small savings
 

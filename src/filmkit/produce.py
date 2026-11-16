@@ -9,9 +9,11 @@ validate-picture act on the edition's uncaptioned picture instead of its caption
 every other action refuses it. render-picture --uncaptioned derives that picture from the
 captioned one (`filmkit.picture.derivation`) unless `--native` asks for a render of its own
 stage; compare-pictures proves that the two pictures differ only by the captions
-(`filmkit.picture.equivalence`). `--variants` names fit's pause-policy variants, a file
-below the film's root or an absolute one (`filmkit.soundtrack.fit`), and `--attempts` bounds
-repair-pictures (`filmkit.picture.repair`); every other action refuses them.
+(`filmkit.picture.equivalence`), and qualify-renderer that two renders of the captioned stage
+decode to the same frames (`filmkit.picture.qualification`). `--variants` names fit's
+pause-policy variants, a file below the film's root or an absolute one
+(`filmkit.soundtrack.fit`), and `--attempts` bounds repair-pictures (`filmkit.picture.repair`);
+every other action refuses them.
 A refusal by an action's owner exits with status 1 and "<action>: <reason>" on standard
 error. check-sound measures the assembled soundtrack with its refreshed captions and refuses a
 segment under the film's clarity floor, an abrupt or cut ending and a stopped phrase
@@ -46,6 +48,7 @@ from filmkit.narration.thought_groups import RetainedUtteranceError
 from filmkit.picture.draft import render_draft
 from filmkit.picture.equivalence import compare_pictures
 from filmkit.picture.gates import check_picture
+from filmkit.picture.qualification import qualify_renderer
 from filmkit.picture.rendering import (
     PictureError,
     render_picture,
@@ -124,6 +127,9 @@ EDITION_ACTIONS: dict[str, Callable[[Edition, argparse.Namespace], object]] = {
     "package-metadata": lambda edition, _: package_metadata(edition),
     "validate-picture": lambda edition, options: validate_picture(
         edition, captions=not options.uncaptioned
+    ),
+    "qualify-renderer": lambda edition, options: qualify_renderer(
+        edition, deadline(options, rendering.DEADLINE)
     ),
     "compare-pictures": lambda edition, _: compare_pictures(edition),
     "repair-pictures": lambda edition, options: repair_pictures(
