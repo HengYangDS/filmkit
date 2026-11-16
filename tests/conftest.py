@@ -72,7 +72,8 @@ def rsync_3() -> bool:
 
 
 # Production runs host tools that Homebrew installs and the locked toolchain does not supply:
-# FFmpeg with VideoToolbox, and rsync 3 for delivery, since macOS's own rsync is openrsync. Tests
+# FFmpeg with libx264, ExifTool for the films' QuickTime keys, and rsync 3 for delivery, since
+# macOS's own rsync is openrsync. Tests
 # marked with a tool's marker run it and are skipped where it is not on PATH; the header and the
 # summary of every run name the tests it skips.
 HOST_TOOLS = {
@@ -81,6 +82,7 @@ HOST_TOOLS = {
         "the host FFmpeg and FFprobe",
         all(shutil.which(tool) for tool in ("ffmpeg", "ffprobe")),
     ),
+    "exiftool": HostTool("host ExifTool", "the host ExifTool", bool(shutil.which("exiftool"))),
     "rsync": HostTool("host rsync 3", "the host rsync 3", rsync_3()),
 }
 host_skipped: dict[str, list[str]] = {marker: [] for marker in HOST_TOOLS}
