@@ -2,7 +2,7 @@
 
 ### Requirement: Each heavy command records how long it took
 
-Each action of `filmkit.produce` and `narrate` SHALL write, when it ends, a duration record for its edition: the command, when it started, its seconds, whether it completed, and the seconds of each phase it names. The record SHALL stand beside the edition's evidence, and no duration SHALL be written into a record that another record binds by SHA-256. The verifier, which writes nothing, and the reproduction SHALL state each film's seconds in their reports.
+Each action of `filmkit.produce` and `narrate` SHALL write, when it ends, a duration record for its edition: the command, when it started, its seconds, whether it completed, the seconds of each phase it names and the settings it names. The record SHALL stand beside the edition's evidence, and no duration SHALL be written into a record that another record binds by SHA-256. The verifier, which writes nothing, and the reproduction SHALL state each film's seconds in their reports.
 
 #### Scenario: A comparison's phases
 
@@ -75,3 +75,32 @@ Every render SHALL pass the renderer a worker count of the host's logical cores 
 
 - **WHEN** the verifier verifies an edition's four films
 - **THEN** its report lists them in the films' declared order whichever decode ends first
+
+### Requirement: Narration divides its segments among processes
+
+When more than one segment is to be generated, the narration SHALL generate them in several processes at the same time, each segment in one: two processes, or the count `FILMKIT_NARRATION_PROCESSES` names, where 1 keeps a single process. It SHALL then write one receipt in segment order, as a single process writes it. A value that is no positive whole number SHALL be refused before any step, and the narration's duration record SHALL state the count.
+
+#### Scenario: Four segments and two processes
+
+- **WHEN** four segments are to be generated and the variable is unset
+- **THEN** two processes narrate at the same time, each segment in one of them and the longest spoken text alone or with the shortest, and the receipt lists the four segments in their order
+
+#### Scenario: One segment to generate
+
+- **WHEN** one segment is to be generated and the others are retained
+- **THEN** it is generated in the narration's own process, and no other process starts
+
+#### Scenario: A process that fails
+
+- **WHEN** one of two processes fails
+- **THEN** the other narrates its segments to the end, the narration is then refused, naming the failed process's segments, its exit status and its log, and the edition's receipt stays as it was
+
+#### Scenario: A value that is no count
+
+- **WHEN** `FILMKIT_NARRATION_PROCESSES` is `many`
+- **THEN** the narration is refused before any segment is generated, naming the variable
+
+#### Scenario: The narration's duration record
+
+- **WHEN** an edition is narrated with the variable unset
+- **THEN** its duration record states a count of 2 narration processes

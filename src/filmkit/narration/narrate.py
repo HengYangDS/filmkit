@@ -14,7 +14,9 @@ Usage: python -m filmkit.narration.narrate
 --dry-run prints the narration plan without writing; --skip-generation aligns and
 transcribes the existing receipt. Each step runs under this tool's interpreter. A run that is
 not a dry run writes its duration record, each step a phase (`filmkit.durations`), named
-`narrate` and, with --ids, after the segments as the receipt is.
+`narrate` and, with --ids, after the segments as the receipt is. The record of a run that
+narrates states how many processes the synthesis may use (`filmkit.narration.processes`), which
+`FILMKIT_NARRATION_PROCESSES` names; a value that is no count is refused before any step.
 """
 
 import argparse
@@ -27,7 +29,7 @@ import time
 import filmkit.concepts as concepts
 import filmkit.durations as durations
 import filmkit.repository as repository
-from filmkit.narration import readings
+from filmkit.narration import processes, readings
 from filmkit.narration.snapshots import ALIGNER as ALIGNER_SNAPSHOT
 from filmkit.production import CODES, Edition
 
@@ -146,8 +148,14 @@ def main(argv: list[str] | None = None) -> None:
     if scope is Scope.PLAN:
         run_steps(options.language, options.ids, scope)
         return
+    try:
+        count = processes.count()
+    except processes.ProcessesError as error:
+        raise SystemExit(str(error)) from None
     suffix = f"-{options.ids.replace(',', '-')}" if options.ids else ""
-    with durations.run(options.language, f"narrate{suffix}"):
+    with durations.run(options.language, f"narrate{suffix}") as run:
+        if scope is Scope.ALL:
+            run.settings["narration_processes"] = count
         run_steps(options.language, options.ids, scope)
 
 

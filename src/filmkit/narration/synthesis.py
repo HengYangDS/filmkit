@@ -4,7 +4,10 @@ Each segment is narrated as its authored thoughts under the cast's narrator, see
 and retakes. Its recording and receipt are named by the fingerprint of its request, so a
 segment whose recording and receipt still match the request is reused. A recording that an
 interrupted run left unresolved is refused, except an attempt that started and wrote nothing,
-which is generated again. Every segment is checked before the model loads.
+which is generated again. Every segment is checked before the model loads. When more than one
+segment is to be generated, they are narrated in several processes at once, two unless
+`FILMKIT_NARRATION_PROCESSES` names another count (`filmkit.narration.processes`), and the
+receipt is then written from the retained recordings as after any other run.
 
 Usage: python -m filmkit.narration.synthesis --script FILE --cast FILE --folder DIR
     --receipt FILE [--ids 06,07] [--dry-run]
@@ -25,6 +28,7 @@ import numpy as np
 from mlx_audio.audio_io import write
 
 import filmkit.repository as repository
+from filmkit.narration import processes
 from filmkit.narration.group_generation import generate_native_groups, load_voice_model
 from filmkit.narration.pronunciation import (
     native_utterance_plan,
@@ -66,6 +70,8 @@ class Request:
     receipt: Path
     merge: bool
     dry_run: bool
+    # The script, the cast and the recordings' folder as the command named them.
+    sources: tuple[str, str, str] = ("", "", "")
 
 
 @dataclass(frozen=True)
@@ -96,9 +102,28 @@ def main(argv: list[str] | None = None) -> None:
             print(json.dumps(_planned(job, request), ensure_ascii=False))
         return
     retained = [reuse_or_refuse(job) for job in jobs]
+    pending = [job for job, record in zip(jobs, retained, strict=True) if record is None]
+    if len(pending) > 1 and processes.count() > 1:
+        retained = narrated_in_processes(request, jobs, pending)
     model = load_voice_model() if any(record is None for record in retained) else None
     records = [_narrated(model, job, record) for job, record in zip(jobs, retained, strict=True)]
     write_receipt(request.receipt, records, merge=request.merge)
+
+
+def narrated_in_processes(request: Request, jobs: list[Job], pending: list[Job]) -> list[dict]:
+    """Narrate the segments still to generate in several processes at once
+    (`filmkit.narration.processes`) and return every job's retained record, which each must then
+    have: a process that ended well without its segment's recording is refused."""
+    lengths = [(job.segment["id"], len(job.segment["spoken_text"])) for job in pending]
+    shares = processes.divide(lengths, processes.count())
+    for child in processes.narrate(request.sources, shares, request.receipt):
+        print(json.dumps({"process": child}), flush=True)
+    retained = [reuse_or_refuse(job) for job in jobs]
+    missing = [job.segment["id"] for job, record in zip(jobs, retained, strict=True) if not record]
+    if missing:
+        msg = f"The narration processes ended without the recordings of {', '.join(missing)}"
+        raise RetainedUtteranceError(msg)
+    return retained
 
 
 def load_request(argv: list[str] | None = None) -> Request:
@@ -133,6 +158,7 @@ def load_request(argv: list[str] | None = None) -> Request:
         receipt=repository.ROOT / options.receipt,
         merge=bool(options.ids),
         dry_run=options.dry_run,
+        sources=(options.script, options.cast, options.folder),
     )
 
 

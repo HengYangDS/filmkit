@@ -35,7 +35,9 @@ def test_a_run_writes_its_command_its_seconds_and_each_phase(root):
             pass
         assert durations.current() is run
     record = record_of(root, "zh", "compare-pictures")
-    assert [*record] == ["command", "edition", "started_at", "seconds", "completed", "phases"]
+    keys = ["command", "edition", "started_at", "seconds", "completed", "phases", "settings"]
+    assert [*record] == keys
+    assert record["settings"] == {}
     assert (record["command"], record["edition"], record["completed"]) == (
         "compare-pictures",
         "zh",

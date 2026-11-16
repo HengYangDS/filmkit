@@ -14,13 +14,14 @@ Measured that night on a 120 s span of a film's UHD stages: the renderer's worke
 - **The 1080p films are encoded by x264 with a keyframe forced at every 120th frame** and scene-cut keyframes off, not by VideoToolbox. The 1080p uncaptioned film of a derived pair is painted and scaled from the captioned picture in one pass, so it is one encode from the render. **BREAKING** for a rebuild of an earlier release: its 1080p films are other encodes of the same pictures, compared by measure as a rebuilt film already is.
 - **Independent checks run side by side**: `check-picture`'s frame, motion and detail audits, and the verifier's films, up to four at once. Each reports and refuses what it does in sequence.
 - **`render-picture --language all` makes both editions' pictures with one command**: two rendered pictures at the same time, the renderer's own lock off for those two renders alone, two derived pictures in a row. Each edition keeps its own receipt and duration record. A film's task list may use it and need not.
+- **Narration divides the segments it has to generate among processes of the speech model**, two unless `FILMKIT_NARRATION_PROCESSES` names another count, and writes the one receipt as before. Every take keeps its bytes.
 - **Exact small savings**: transcripts cached as alignments are, one decode for both phases of a still scan, the reproduction's film pairs side by side.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `build-time`: the duration records and the command that prints them, the render's worker count, and the checks that run side by side.
+- `build-time`: the duration records and the command that prints them, the render's worker count, the checks that run side by side, and narration in several processes.
 
 ### Modified Capabilities
 
@@ -34,4 +35,4 @@ Measured that night on a 120 s span of a film's UHD stages: the renderer's worke
 - `src/filmkit/durations.py` (new), `produce.py`, `narration/narrate.py`, `picture/rendering.py`, `picture/derivation.py` and `picture/band-audit.mjs` (new), `picture/qualification.py` (new), `picture/equivalence.py`, `picture/gates.py`, `production.py`, `delivery/packaging.py`, `delivery/verification.py`, `delivery/reproduction.py`, `tools.py` and their tests; the sample film's tasks; the README and the Changelog.
 - The budget this Change works towards, each figure to be measured on a film's build before and after with the durations command: a 25-minute film rebuilt in 90 minutes of compute or less. A change to one scene in 20 minutes or less needs span renders and is a later slice.
 - An adopting film keeps its task list: `render-picture --uncaptioned`, `validate-picture --uncaptioned` and `compare-pictures` keep their names and decide by the receipt. Its 1080p films change bytes; its UHD uncaptioned film becomes an encode of the captioned picture.
-- Out of scope, each named in the design with its reason: span renders and a segment cache for one-scene changes; narration over several model processes, which waits for a measurement; a verification that does not decode again what was proven, which changes what the verifier claims and is the owner's decision; the reviewers' measuring tools shipped by the engine.
+- Out of scope, each named in the design with its reason: span renders and a segment cache for one-scene changes; narration in more than two processes by default, which waits for a measurement on a whole narration; a verification that does not decode again what was proven, which changes what the verifier claims and is the owner's decision; the reviewers' measuring tools shipped by the engine.

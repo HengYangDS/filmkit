@@ -2,7 +2,8 @@
 
 A run measures one command on one edition. `run` opens it and writes its record when it ends,
 whether the command completed or was refused or failed: the command, when it started, its
-seconds, whether it completed, and the seconds of each phase. The code that does the work names
+seconds, whether it completed, the seconds of each phase, and any setting that bears on its time,
+such as the count of narration processes. The code that does the work names
 a phase with `phase`, wherever it runs; outside a run a phase measures nothing. Work on another
 thread adds its seconds to the run it was given (`current`, `Run.add`).
 
@@ -39,12 +40,14 @@ FOLDER = "durations"
 
 
 class Run:
-    """One command's run on one edition: when it started and the seconds of its phases."""
+    """One command's run on one edition: when it started, the seconds of its phases, and the
+    settings its owner names as bearing on its time."""
 
     def __init__(self, code: str, command: str) -> None:
         self.code, self.command = code, command
         self.started_at = datetime.now(UTC)
         self.phases: dict[str, float] = {}
+        self.settings: dict[str, object] = {}
         self._started = time.monotonic()
         self._lock = threading.Lock()
 
@@ -76,6 +79,7 @@ class Run:
             "seconds": round(time.monotonic() - self._started, 3),
             "completed": completed,
             "phases": {name: round(seconds, 3) for name, seconds in self.phases.items()},
+            "settings": dict(self.settings),
         }
 
 
@@ -131,10 +135,13 @@ def lines(code: str, found: list[dict]) -> list[str]:
     listed = [f"{code}:"]
     for record in found:
         phases = ", ".join(f"{name} {seconds:.1f}" for name, seconds in record["phases"].items())
+        named = record.get("settings", {}).items()
+        settings = ", ".join(f"{name} {value}" for name, value in named)
         state = "" if record["completed"] else "  not completed"
         listed.append(
             f"  {record['started_at']}  {record['command']:<{width}}  "
             f"{record['seconds']:>9.1f} s{state}{'  (' + phases + ')' if phases else ''}"
+            f"{'  [' + settings + ']' if settings else ''}"
         )
     total = sum(record["seconds"] for record in found if record["completed"])
     return [*listed, f"  sum of the completed commands: {total:.1f} s"]

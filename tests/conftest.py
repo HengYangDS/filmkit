@@ -1,7 +1,8 @@
 """Fixtures shared by the narration tests, and the speech runtime and host tool gates.
 
 The engine's tests build the sample film: FILMKIT_ROOT names it here, before any engine module
-loads the declaration of the film it builds, so no test reads another film's sources.
+loads the declaration of the film it builds, so no test reads another film's sources. They narrate
+in one process (FILMKIT_NARRATION_PROCESSES).
 """
 
 import hashlib
@@ -18,6 +19,10 @@ import numpy as np
 import pytest
 
 os.environ["FILMKIT_ROOT"] = str(Path(__file__).resolve().parents[1] / "examples/sample-film")
+# The tests narrate with a model double in this process. A narration that divided its segments
+# among processes would start the real speech model in each, so the count is 1 unless a test of
+# the processes names another.
+os.environ["FILMKIT_NARRATION_PROCESSES"] = "1"
 
 import filmkit.delivery.documents_folder as delivery_documents_folder
 from filmkit.narration.thought_groups import join_quiet
@@ -29,6 +34,7 @@ SPEECH_RUNTIME_MODULES = [
     "narration/test_audition.py",
     "narration/test_group_generation.py",
     "narration/test_synthesis.py",
+    "narration/test_synthesis_processes.py",
     "narration/test_transcription.py",
 ]
 
