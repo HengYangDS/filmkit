@@ -12,7 +12,9 @@ stops the run and names every failure.
 Usage: python -m filmkit.narration.narrate
     --language zh|en [--ids 06,07] [--dry-run | --skip-generation]
 --dry-run prints the narration plan without writing; --skip-generation aligns and
-transcribes the existing receipt. Each step runs under this tool's interpreter.
+transcribes the existing receipt. Each step runs under this tool's interpreter. A run that is
+not a dry run writes its duration record, each step a phase (`filmkit.durations`), named
+`narrate` and, with --ids, after the segments as the receipt is.
 """
 
 import argparse
@@ -23,6 +25,7 @@ import sys
 import time
 
 import filmkit.concepts as concepts
+import filmkit.durations as durations
 import filmkit.repository as repository
 from filmkit.narration import readings
 from filmkit.narration.snapshots import ALIGNER as ALIGNER_SNAPSHOT
@@ -140,14 +143,22 @@ def main(argv: list[str] | None = None) -> None:
         scope = Scope.CHECKS
     if scope is not Scope.CHECKS:
         print(json.dumps({"edition": options.language, "gate": gate(options.language)}), flush=True)
-    for name, command in steps(options.language, options.ids, scope):
+    if scope is Scope.PLAN:
+        run_steps(options.language, options.ids, scope)
+        return
+    suffix = f"-{options.ids.replace(',', '-')}" if options.ids else ""
+    with durations.run(options.language, f"narrate{suffix}"):
+        run_steps(options.language, options.ids, scope)
+
+
+def run_steps(code: str, ids: str, scope: Scope) -> None:
+    """Run the scope's steps in order, each a phase of the current run, and print its seconds."""
+    for name, command in steps(code, ids, scope):
         started = time.monotonic()
-        subprocess.run(command, cwd=repository.ROOT, check=True)
+        with durations.phase(name):
+            subprocess.run(command, cwd=repository.ROOT, check=True)
         seconds = round(time.monotonic() - started, 1)
-        print(
-            json.dumps({"edition": options.language, "step": name, "seconds": seconds}),
-            flush=True,
-        )
+        print(json.dumps({"edition": code, "step": name, "seconds": seconds}), flush=True)
 
 
 if __name__ == "__main__":

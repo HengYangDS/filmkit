@@ -2,7 +2,7 @@
 
 ### Requirement: Each heavy command records how long it took
 
-Each action of `filmkit.produce`, `narrate`, the verifier and the reproduction SHALL write, when it ends, a duration record for each edition it worked on: the command, when it started, its seconds, whether it completed, and the seconds of each phase it names. The record SHALL stand beside the edition's evidence, and no duration SHALL be written into a record that another record binds by SHA-256.
+Each action of `filmkit.produce` and `narrate` SHALL write, when it ends, a duration record for its edition: the command, when it started, its seconds, whether it completed, and the seconds of each phase it names. The record SHALL stand beside the edition's evidence, and no duration SHALL be written into a record that another record binds by SHA-256. The verifier, which writes nothing, and the reproduction SHALL state each film's seconds in their reports.
 
 #### Scenario: A comparison's phases
 
@@ -18,6 +18,11 @@ Each action of `filmkit.produce`, `narrate`, the verifier and the reproduction S
 
 - **WHEN** `check-picture` passes an edition
 - **THEN** the gate record holds no duration, and the duration record beside it holds the seconds of each audit
+
+#### Scenario: The verifier's report
+
+- **WHEN** the verifier verifies an edition's four films
+- **THEN** its report states the seconds of each film's verification, and the verifier writes no file
 
 ### Requirement: One command prints a build's durations
 

@@ -48,6 +48,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+import filmkit.durations as durations
 import filmkit.picture.faults as faults
 import filmkit.repository as repository
 import filmkit.tools as tools
@@ -348,19 +349,23 @@ def next_step(record: dict, code: str) -> str:
 
 def compare_pictures(edition: Edition) -> dict:
     """Compare the edition's two pictures at both levels, write the record and refuse a finding."""
-    for captions in (True, False):
-        validate_picture(edition, captions=captions)
+    with durations.phase("validation"):
+        for captions in (True, False):
+            validate_picture(edition, captions=captions)
     work = repository.ROOT / WORK / edition.code
     work.mkdir(parents=True, exist_ok=True)
     bound = current_bindings(edition)
     timeline = repository.read(edition.timeline)
-    composition = composition_report(edition, work)
+    with durations.phase("composition"):
+        composition = composition_report(edition, work)
     encoded = None
     if composition["differing_instants"] == 0:
-        encoded = encoded_report(edition, timeline, composition["band"], work)
+        with durations.phase("sampled-frames"):
+            encoded = encoded_report(edition, timeline, composition["band"], work)
         files = {r.name: r.file for r in (edition.rendered(True), edition.rendered(False))}
         rows, frames = tuple(encoded["excluded_rows"]), DURATION * FPS
-        encoded["every_frame"] = faults.scan(files, PICTURE_SIZE, rows, frames, FPS, work)
+        with durations.phase("every-frame-scan"):
+            encoded["every_frame"] = faults.scan(files, PICTURE_SIZE, rows, frames, FPS, work)
     if current_bindings(edition) != bound:
         msg = "A picture, the composition or the timeline changed while they were compared"
         raise PictureError(msg)

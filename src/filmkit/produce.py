@@ -16,6 +16,8 @@ segment under the film's clarity floor, an abrupt or cut ending and a stopped ph
 (`filmkit.soundtrack.gates`). Assembling a soundtrack and refreshing captions first refuse while
 a review round binds the edition's films and has not set them aside
 (`filmkit.review.set_aside.require_set_aside`).
+Every action writes a duration record for its edition when it ends, named after the action and,
+for the uncaptioned picture, with `-uncaptioned` after it (`filmkit.durations`).
 The command owns no goal, approval, repository lifecycle, service or task state.
 
 Usage: python -m filmkit.produce <edition action> --language zh|en [--uncaptioned] [options]
@@ -27,6 +29,7 @@ import argparse
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import filmkit.durations as durations
 import filmkit.picture.draft as draft
 import filmkit.picture.rendering as rendering
 from filmkit.captions import CaptionError
@@ -175,8 +178,10 @@ def main(argv: list[str] | None = None) -> None:
     for option, action in (("variants", "fit"), ("attempts", "repair-pictures")):
         if getattr(options, option) is not None and options.action != action:
             parser.error(f"--{option} applies only to {action}")
+    command = options.action + ("-uncaptioned" if options.uncaptioned else "")
     try:
-        EDITION_ACTIONS[options.action](Edition(options.language), options)
+        with durations.run(options.language, command):
+            EDITION_ACTIONS[options.action](Edition(options.language), options)
     except REFUSALS as error:
         msg = f"{options.action}: {error}"
         raise SystemExit(msg) from None

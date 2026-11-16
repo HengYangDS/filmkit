@@ -82,7 +82,9 @@ def gates(monkeypatch) -> list:
 
 
 @pytest.fixture
-def commands(monkeypatch, gates) -> list:
+def commands(monkeypatch, gates, tmp_path) -> list:
+    """The commands a run starts, below a root of its own, where the run's duration record goes."""
+    monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
     calls = []
     monkeypatch.setattr(
         narration_narrate.subprocess,
@@ -157,3 +159,17 @@ def test_a_refused_gate_stops_narration_before_any_step(commands, monkeypatch):
     with pytest.raises(SystemExit, match="declares rebuild but says none of"):
         narration_narrate.main(["--language", "en"])
     assert commands == []
+
+
+def test_a_run_records_its_duration_with_each_step_as_a_phase(commands):
+    narration_narrate.main(["--language", "zh", "--ids", "06,07"])
+    record = repository.read("build/evidence/editions/zh/durations/narrate-06-07.json")
+    assert (record["command"], record["completed"]) == ("narrate-06-07", True)
+    assert [*record["phases"]] == ["narration", "alignment", "transcription"]
+    assert len(commands) == 3
+
+
+def test_a_dry_run_writes_no_duration_record(commands):
+    narration_narrate.main(["--language", "zh", "--dry-run"])
+    assert not (repository.ROOT / "build/evidence/editions/zh/durations").exists()
+    assert len(commands) == 1

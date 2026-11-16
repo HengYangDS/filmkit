@@ -1,7 +1,8 @@
 ## 1. Durations
 
 - [ ] 1.1 Add `filmkit.durations`: a run for a command and an edition, phases named by the code that does the work, one record written when the run ends whether it completed or not, and the command that prints an edition's records with their sum; verify `tests/test_durations.py`.
-- [ ] 1.2 Start a run for every action of `filmkit.produce`, each step of `narrate`, each edition and film of the verifier and each edition of the reproduction, and name the phases of `compare-pictures`, `package-film` and `check-picture`; verify `tests/test_produce.py`, `tests/picture/test_gates.py`, `tests/picture/test_equivalence.py` and `tests/delivery/test_packaging.py`, in which each record a command binds holds no duration.
+- [ ] 1.2 Start a run for every action of `filmkit.produce` and for `narrate`, each step a phase, and name the phases of `compare-pictures`, `package-film` and `check-picture`; verify `tests/test_durations.py` (an action's record, a refused action's record) and `tests/narration/test_narrate.py` (a run's record, none for a dry run).
+- [ ] 1.3 State each film's seconds in the verifier's report, which writes nothing, and in the reproduction's report; verify `tests/delivery/test_verification.py` and `tests/delivery/test_reproduction.py`.
 
 ## 2. Render settings
 

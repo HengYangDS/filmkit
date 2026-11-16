@@ -48,6 +48,7 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import filmkit.durations as durations
 import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.film import FILM
@@ -391,7 +392,8 @@ def current_bindings(edition: Edition) -> dict:
 
 def run_audit(tool: str, arguments: list[str], out: Path, environment: dict | None = None) -> None:
     """Run one of the engine's Node audits, its standard output written to `out`."""
-    status = tools.run(tool, arguments, environment=environment, stdout=out)
+    with durations.phase(tool):
+        status = tools.run(tool, arguments, environment=environment, stdout=out)
     if status != 0:
         msg = f"The {tool} exited with status {status}; its report is {repository.relative(out)}"
         raise PictureError(msg)
