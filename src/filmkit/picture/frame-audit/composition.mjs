@@ -176,7 +176,8 @@ export function compositionMeasures({ film, step, thoughts }) {
     offCentreBuilds = [],
     offCentreHeld = [],
     offCentreSettled = [],
-    offCentreFinished = [];
+    offCentreFinished = [],
+    offCentreFar = [];
   function reviewedBalance(f) {
     const box = emptyBox();
     for (const p of f.paints) {
@@ -288,7 +289,8 @@ export function compositionMeasures({ film, step, thoughts }) {
     const { off, thin } = runs.finish();
     offCentreRuns.push(...off);
     thinRuns.push(...thin);
-    const { builds, held, settled, finished } = reviewed.finish();
+    const { builds, held, settled, finished, far } = reviewed.finish();
+    offCentreFar.push(...far);
     offCentreBuilds.push(...builds);
     offCentreHeld.push(...held);
     offCentreSettled.push(...settled);
@@ -312,6 +314,7 @@ export function compositionMeasures({ film, step, thoughts }) {
     offCentreHeld,
     offCentreSettled,
     offCentreFinished,
+    offCentreFar,
     thinRuns,
     underfilled,
   };

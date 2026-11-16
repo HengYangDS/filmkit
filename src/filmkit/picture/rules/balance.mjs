@@ -71,10 +71,13 @@ export function balanceRuns(step) {
  * more than 90 px off for less than 1.5 s; a still state, its box's left and right edges steady within 4 px, may stand
  * more than 50 px off for less than 2 s, counted from where the glide that settles into it, at 15 px/s or more, passed
  * 50 px, whether it is a settled composition or held while the next parts that grow from it are still to come. A lone
- * mark centred where it stands is within both. */
+ * mark centred where it stands is within both. Since DDWG rounds 41 and 42 the reviews also read every run, however
+ * it moves, that stands more than 400 px off on one side: round 41 (note Z41-5) asked that none last a second, and
+ * round 42 (note Z42-5) half a second, after listing four openings of 0.55 to 0.98 s at up to 688 px. */
 export const REVIEWED_BAND = [120, 919],
   REVIEWED_BUILD = { px: 90, seconds: 1.5 },
-  REVIEWED_SETTLED = { px: 50, seconds: 2, steady: 4, glide: 15 };
+  REVIEWED_SETTLED = { px: 50, seconds: 2, steady: 4, glide: 15 },
+  REVIEWED_FAR = { px: 400, seconds: 0.5 };
 
 /** Joins frames sampled every `step` seconds into the reviewers' off-centre runs. `frame(t, scene, box, cut)` takes
  * the scene the frame falls in, the frame's lit box in the band, or null when nothing is lit, and whether a stage cut
@@ -87,11 +90,16 @@ export const REVIEWED_BAND = [120, 919],
  * frames just before it, after its scene's last stage cut, that stand more than 50 px off on its side, each moving
  * toward its offset at 15 px/s or more without reversing; slower, the picture creeps as a build-up does. `finish()`
  * returns `builds`, `held`, `settled` and `finished`, each run with its scene, start, end and largest offset in px,
- * signed; a still run's offset is its still frames'. */
+ * signed; a still run's offset is its still frames'. It also returns `far`: each run of 0.5 s or more of one scene
+ * through which the box stands more than 400 px off on one side. */
 export function reviewedRuns(step) {
-  const runs = { builds: [], held: [], settled: [], finished: [] },
-    open = { builds: null, settled: null },
-    least = { builds: REVIEWED_BUILD.seconds, settled: REVIEWED_SETTLED.seconds },
+  const runs = { builds: [], held: [], settled: [], finished: [], far: [] },
+    open = { builds: null, settled: null, far: null },
+    least = {
+      builds: REVIEWED_BUILD.seconds,
+      settled: REVIEWED_SETTLED.seconds,
+      far: REVIEWED_FAR.seconds,
+    },
     { steady: STEADY, glide: GLIDE } = REVIEWED_SETTLED;
   // Close the open run of a kind into its list when it lasted long enough, and say whether it did.
   const close = (kind, into = kind) => {
@@ -150,6 +158,16 @@ export function reviewedRuns(step) {
           open.builds = { scene, start: t, end: t + step, worst: dx };
         }
       } else close("builds");
+      if (box && Math.abs(dx) > REVIEWED_FAR.px) {
+        const run = open.far;
+        if (follows(run, t, scene) && Math.sign(run.worst) === Math.sign(dx)) {
+          run.end = t + step;
+          if (Math.abs(dx) > Math.abs(run.worst)) run.worst = dx;
+        } else {
+          close("far");
+          open.far = { scene, start: t, end: t + step, worst: dx };
+        }
+      } else close("far");
       // A stage cut, a frame not far off, a gap in the samples or another scene ends the trail.
       const joined = last?.scene === scene && Math.abs(last.t + step - t) < step * 1.5;
       if (cut || !far || !joined) trail = [];
@@ -175,6 +193,7 @@ export function reviewedRuns(step) {
     finish() {
       close("builds");
       close("settled");
+      close("far");
       return runs;
     },
   };

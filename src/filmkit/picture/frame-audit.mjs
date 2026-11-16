@@ -483,6 +483,7 @@ const report = frameReport({
   offCentreHeld: composition.offCentreHeld,
   offCentreSettled: composition.offCentreSettled,
   offCentreFinished: composition.offCentreFinished,
+  offCentreFar: composition.offCentreFar,
   thinRuns: composition.thinRuns,
   underfilled: composition.underfilled,
   textLayout: typography.finish(),

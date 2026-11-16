@@ -72,6 +72,7 @@ export function frameReport({
   offCentreHeld,
   offCentreSettled,
   offCentreFinished,
+  offCentreFar,
   thinRuns,
   underfilled,
   textLayout,
@@ -219,6 +220,8 @@ export function frameReport({
     off_centre_held: pxRunsByScene(offCentreHeld),
     off_centre_settled: pxRunsByScene(offCentreSettled),
     off_centre_finished: pxRunsByScene(offCentreFinished),
+    /* Runs of 0.5 s or more whose full-size lit box stands more than 400 px off x 960 on one side, per scene. */
+    off_centre_far: pxRunsByScene(offCentreFar),
     thin_runs: runsByScene(thinRuns),
     /* Thoughts whose lit picture covers less than the reviewers' share of the band at one of their instants, with the
      * instant and the share. */

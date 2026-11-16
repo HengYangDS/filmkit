@@ -177,7 +177,7 @@ test("a settled composition off centre for 2 s or more is a reviewers' run; a gr
       return [x0, y0, x1 + (40 * t) / 3, y1];
     },
   );
-  assert.deepEqual(growing, { builds: [], held: [], settled: [], finished: [] });
+  assert.deepEqual(growing, { builds: [], held: [], settled: [], finished: [], far: [] });
   // The same still state followed by another picture of its scene, or by nothing lit, is a settled composition.
   const replaced = sampled(
     reviewedRuns(1 / 30),
@@ -203,7 +203,7 @@ test("a settled composition off centre for 2 s or more is a reviewers' run; a gr
     () => "09",
     () => offBy(0, 60),
   );
-  assert.deepEqual(lone, { builds: [], held: [], settled: [], finished: [] });
+  assert.deepEqual(lone, { builds: [], held: [], settled: [], finished: [], far: [] });
 });
 
 test("a still state that the next part grows from is held, with its span and offset", () => {
@@ -223,7 +223,7 @@ test("a still state that the next part grows from is held, with its span and off
     () => "09",
     (t) => waiting(t + 0.6),
   );
-  assert.deepEqual(brief, { builds: [], held: [], settled: [], finished: [] });
+  assert.deepEqual(brief, { builds: [], held: [], settled: [], finished: [], far: [] });
 });
 
 test("a still state that a stage cut or the next scene replaces is finished, not held", () => {
@@ -303,7 +303,7 @@ test("a still state is timed from the frame where the glide that settles into it
 test("a glide counts toward a still state only on its side, moving toward it, after the last stage cut", () => {
   // Each still state stands 87 px left for under 2 s; the frames each case names would bring it to 2 s or more if they
   // counted.
-  const none = { builds: [], held: [], settled: [], finished: [] };
+  const none = { builds: [], held: [], settled: [], finished: [], far: [] };
   // Moving left from 95 px right, it steps across the centre at 0.45 s: the 0.25 s on the right side do not count.
   const across = [95, 85, 75, 65, 55, -60, -70, -80];
   assert.deepEqual(
@@ -333,4 +333,49 @@ test("a glide counts toward a still state only on its side, moving toward it, af
     runs.frame(t, "29", offBy(dx), Math.abs(t - cutAt) < 1e-9);
   }
   assert.deepEqual(runs.finish(), none);
+});
+
+test("a run more than 400 px off on one side for half a second or more is a far run", () => {
+  // 624 px left for one second while the first mark stands alone, then centred (DDWG round 42, 27.5).
+  const alone = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    3,
+    () => "27",
+    (t) => (t >= 1 - 1e-9 && t < 2 - 1e-9 ? offBy(-624, 200) : offBy(0)),
+  );
+  assert.deepEqual(
+    alone.far.map((v) => [v.scene, near(v.start, 1), near(v.end, 2), v.worst]),
+    [["27", true, true, -624]],
+  );
+  // 0.4 s beyond 400 px, and a longer stretch at exactly 400 px, are no far runs.
+  const brief = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    3,
+    () => "27",
+    (t) => (t >= 1 - 1e-9 && t < 1.4 - 1e-9 ? offBy(-624, 200) : offBy(400, 200)),
+  );
+  assert.deepEqual(brief.far, []);
+  // A picture that swings from far left to far right is one run on each side, each judged by its own length.
+  const swing = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    3,
+    () => "27",
+    (t) => (t < 1 - 1e-9 ? offBy(-500, 200) : t < 1.3 - 1e-9 ? offBy(500, 200) : offBy(0)),
+  );
+  assert.deepEqual(
+    swing.far.map((v) => [near(v.start, 0), near(v.end, 1), v.worst]),
+    [[true, true, -500]],
+  );
+  // Another scene ends a run: two scenes of 0.4 s each hold none.
+  const scenes = sampled(
+    reviewedRuns(1 / 30),
+    0,
+    0.8,
+    (t) => (t < 0.4 - 1e-9 ? "27" : "28"),
+    () => offBy(-500, 200),
+  );
+  assert.deepEqual(scenes.far, []);
 });
