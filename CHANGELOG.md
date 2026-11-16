@@ -4,6 +4,20 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- `check-picture` runs a fourth audit, the detail audit (`filmkit.tools detail-audit`), through every frame at 60 frames per second, and its record binds the audit's report. The gate refuses a firm solid stroke of a scene that loses 30 px or more of its ink within one frame outside a declared stage cut (`ink_drop`), a text outside every scene that moves at 900 px/s or more, or over the film's `pace_limit` (`outside_pace`), a stroke drawn by its tip that stands part-drawn at the middle of the quiet between two thoughts (`part_drawn`) or whose tip draws at 900 px/s or more (`racing_tip`), and the names of one list on two alternate baselines less than 48 px apart at the rest of a thought (`rail`). The strokes are read from a `draws` list the composition publishes with each frame's layout; a composition that publishes none is recorded as not judged.
+- The frame audit reports `off_centre_far`, each run of 0.5 s or more within one scene in which the full-size lit box stands more than 400 px off centre on one side, and the gate refuses it.
+- A film keeps a finding of the detail audit or a far run by declaring its `edition`, `kind`, `scene`, an optional `source` and a `reason` in `[[picture.detail.exceptions]]`; the gate record lists it with the reason and refuses an exception that matches no finding.
+- `preflight` also asks for a sound gate record that passed on the current soundtrack, timeline and engine, and for a geometry record that passed on the whole current staged film, as the delivery's verification requires it. It refuses a caption cue above its edition's reading rate that the film does not declare by its text in `[[captions.rate_exceptions]]`, and, for a film that declares `clarity_thought_margin_db` under `[review]`, a thought under its clarity floor less that margin and a thought between the two lines that the film does not declare in `[[review.clarity_exceptions]]`. A stale declaration is refused.
+- `preflight` writes the edition's readiness receipt, `build/evidence/editions/<edition>/readiness.json`, with the SHA-256 of every input it judged, and `produce admitted --language zh|en` checks the receipts without repeating the work: the edition's own on every input, the other edition's on the composition, stylesheet, fonts and declaration both share.
+
+### Changed
+
+- `preflight` asks for the draft still scan only of a film that declares `drafts = true` under `[picture]`. A film that keeps `render-draft` in its picture task declares it, as the sample film does; a film that relies on the every-frame audits of `check-picture` declares nothing and is no longer asked for a draft.
+- A film's `check-picture` takes 22 to 54 s longer on the three films this engine builds, the detail audit's pass over every frame at 60 frames per second (40 s for the 90,001 frames of a 25-minute edition, at niceness 15). A film that holds one of the new findings is refused until it repairs or declares it: on their current compositions the far-run line lists seven runs in the DDWG film's two editions and three in the ETHOS film's, and the DDWG film's English edition holds three rails under 48 px that it keeps by declaration.
+- `preflight` refuses an edition it is asked about before `check-sound` or the geometry check has passed on the current inputs.
+
 ## [0.22.3] - 2026-11-15
 
 ### Added
