@@ -19,6 +19,7 @@
 - [x] 3.6 Derive only for a film that declares `software` capture and render the uncaptioned stage for a film of any other, each receipt and the comparison record saying which way was taken and why; name the capture of its renders in the record of `qualify-renderer`; declare `software` capture in the sample film. Verify `tests/picture/test_uncaptioned_way.py`, `tests/picture/test_qualification.py` and `tests/test_film.py`.
 - [x] 3.7 Name `render-picture --uncaptioned --native` wherever a refusal of a rendered pair names the command that renders the uncaptioned picture again (a fault of one picture, a difference no picture holds, a stopped repair, the README); verify `tests/picture/test_native_commands.py`, `tests/picture/test_faults.py` and `tests/picture/test_repair.py`.
 - [x] 3.8 Measure the edge rows of the painted rows, which no caption reaches, against the ground at every frame in the derivation's decode, refuse a departure with the frame and `--native`, and record the check beside the others; verify `tests/picture/test_derivation.py` (a ground that changes on the frames under a caption is refused), `tests/picture/test_ground.py` and `tests/picture/test_derived_pair.py`.
+- [x] 3.9 Validate the captioned picture's binding to its current stage before a derived picture's own, so a changed stylesheet, font, template, script or soundtrack refuses both; verify `tests/picture/test_derived_pair.py`.
 
 ## 4. The 1080p films
 

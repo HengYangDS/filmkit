@@ -275,3 +275,28 @@ def test_edge_rows_measured_at_fewer_frames_than_the_film_holds_are_refused(pair
     with pytest.raises(PictureError, match="edge rows were measured at 100 frames"):
         derivation.derive_uncaptioned(edition)
     assert not edition.rendered(False).file.exists()
+
+
+@pytest.mark.parametrize(
+    ("change", "reason"),
+    [
+        (lambda root: (root / picture_rendering.STYLE).write_text("/* another style */"), "stage"),
+        (lambda root: (root / picture_rendering.TEMPLATE).write_text("<html>"), "stage"),
+        (lambda root: Edition("zh").soundtrack.write_text("another narration"), "soundtrack"),
+    ],
+    ids=["stylesheet", "template", "soundtrack"],
+)
+def test_a_derived_picture_does_not_validate_once_its_captioned_picture_is_stale(
+    pair, change, reason
+):
+    edition, _, _ = pair
+    receipt = derivation.derive_uncaptioned(edition)
+    change(repository.ROOT)
+    # The captioned picture is refused, and so is the picture derived from it, as a rendered
+    # uncaptioned picture would be.
+    with pytest.raises(PictureError):
+        picture_rendering.validate_picture(edition)
+    with pytest.raises(PictureError, match=reason):
+        picture_rendering.validate_picture(edition, captions=False)
+    with pytest.raises(PictureError, match=reason):
+        picture_rendering.validate_picture_binding(edition, receipt, captions=False)

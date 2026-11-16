@@ -14,6 +14,11 @@ For a film that declares `software` capture, `render-picture --uncaptioned` SHAL
 - **WHEN** the captioned picture's receipt binds another stage than the current one
 - **THEN** the derivation refuses before it encodes anything
 
+#### Scenario: A stylesheet changed after the derivation
+
+- **WHEN** the stylesheet, a font, the template, the script or the soundtrack changes after an uncaptioned picture was derived
+- **THEN** `validate-picture --uncaptioned` refuses the derived picture as it refuses the captioned one
+
 ### Requirement: A picture is derived only under software capture
 
 For a film that declares any other capture than `software`, and with `--native` for every film, `render-picture --uncaptioned` SHALL render the uncaptioned stage, and `compare-pictures` SHALL then compare the pair at every frame. The receipt of an uncaptioned picture and the edition's comparison record SHALL each say whether the picture was derived or rendered, and why: the film's declared capture, or a render asked for.

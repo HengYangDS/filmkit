@@ -436,7 +436,8 @@ def film_source(edition: Edition, rendition: Rendition) -> tuple[Path, str, tupl
 
 def validate_binding(edition: Edition, receipt: dict) -> None:
     """Bind a derived uncaptioned picture to its receipt and the receipt to the current captioned
-    picture, composition, timeline and engine, with its proofs passed."""
+    picture, composition, timeline and engine, with its proofs passed; the captioned picture
+    must itself be bound to its current stage."""
     rendered = edition.rendered(False)
     require_receipt_picture(receipt, rendered)
     derived = receipt["derived"]
@@ -448,6 +449,10 @@ def validate_binding(edition: Edition, receipt: dict) -> None:
             f"capture, under which it is rendered; {again}"
         )
         raise PictureError(msg)
+    # The picture it was derived from must itself stand: its stage, with the stylesheet, fonts,
+    # template, script and soundtrack that stage binds, as a rendered uncaptioned picture's must.
+    captioned = repository.read(edition.rendered(True).receipt)
+    rendering.validate_picture_binding(edition, captioned)
     stale = [key for key, value in source_bindings(edition).items() if derived.get(key) != value]
     if stale:
         msg = f"The derived picture's receipt binds another {', '.join(stale)}; {again}"
