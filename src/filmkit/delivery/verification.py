@@ -145,13 +145,8 @@ def verify_narration(edition: production.Edition) -> dict:
     }
 
 
-def verify_picture(edition: production.Edition) -> dict:
-    """Bind both native renders and the captioned picture's whole-film geometry to their staged
-    pictures, and require the passing record that the two differ only by their captions."""
-    render = repository.read(edition.render_receipt)
-    picture_rendering.validate_picture_binding(edition, render)
-    uncaptioned = repository.read(edition.rendered(captions=False).receipt)
-    picture_rendering.validate_picture_binding(edition, uncaptioned, captions=False)
+def require_covering_geometry(edition: production.Edition) -> dict:
+    """The geometry record, refused unless it passed on the whole current staged film."""
     geometry = repository.read(edition.picture_geometry)
     step = geometry.get("step_frames")
     if not (
@@ -166,6 +161,17 @@ def verify_picture(edition: production.Edition) -> dict:
     ):
         msg = "Picture geometry does not cover the current staged film"
         raise VerificationError(msg)
+    return geometry
+
+
+def verify_picture(edition: production.Edition) -> dict:
+    """Bind both native renders and the captioned picture's whole-film geometry to their staged
+    pictures, and require the passing record that the two differ only by their captions."""
+    render = repository.read(edition.render_receipt)
+    picture_rendering.validate_picture_binding(edition, render)
+    uncaptioned = repository.read(edition.rendered(captions=False).receipt)
+    picture_rendering.validate_picture_binding(edition, uncaptioned, captions=False)
+    geometry = require_covering_geometry(edition)
     plan = repository.read(edition.shot_plan)
     if (
         plan["script_sha256"] != repository.sha(repository.ROOT / edition.script)

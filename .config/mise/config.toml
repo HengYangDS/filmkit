@@ -63,7 +63,7 @@ run = [
 ]
 
 [tasks."sample:picture"]
-description = "Stage both of each sample edition's pictures, check the geometry, the cover and the audits, render and scan its draft and pass the pre-render check, then render and validate both pictures and compare them"
+description = "Stage both of each sample edition's pictures, check the geometry, the cover and the audits, render and scan its draft and pass the pre-render check, then render and validate both pictures and compare them, and check that both readiness receipts still admit their editions"
 dir = "{{config_root}}/examples/sample-film"
 run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language zh",
@@ -90,6 +90,8 @@ run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language en --uncaptioned",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language en --uncaptioned",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce compare-pictures --language en",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce admitted --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce admitted --language en",
 ]
 
 [tasks."sample:package"]

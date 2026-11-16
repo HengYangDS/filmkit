@@ -46,7 +46,7 @@ from filmkit.picture.rendering import (
     validate_picture,
 )
 from filmkit.picture.repair import ATTEMPTS, repair_pictures
-from filmkit.preflight import PreflightError, preflight
+from filmkit.preflight import PreflightError, admitted, preflight
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
 from filmkit.review.set_aside import require_set_aside
@@ -102,6 +102,7 @@ EDITION_ACTIONS: dict[str, Callable[[Edition, argparse.Namespace], object]] = {
         edition, deadline(options, draft.DEADLINE)
     ),
     "preflight": lambda edition, _: preflight(edition),
+    "admitted": lambda edition, _: admitted(edition),
     "render-picture": lambda edition, options: render_picture(
         edition, deadline(options, rendering.DEADLINE), captions=not options.uncaptioned
     ),

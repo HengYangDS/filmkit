@@ -1,4 +1,5 @@
-"""The pre-render check: every stale or missing input of an edition's render, reported at once."""
+"""The pre-render check: every stale or missing input of an edition's render, reported at once,
+and the readiness receipt it writes."""
 
 import json
 import shutil
@@ -11,8 +12,9 @@ import filmkit.picture.rendering as picture_rendering
 import filmkit.preflight as preflight
 import filmkit.produce as produce
 import filmkit.repository as repository
+from filmkit.film import FILM
 from filmkit.production import Edition
-from filmkit.specification import DURATION
+from filmkit.specification import DURATION, FPS
 
 # The sample film's composition, found before a test rebinds the repository root.
 COMPOSITION = repository.ROOT / picture_rendering.COMPOSITION
@@ -43,7 +45,8 @@ def painted(identical=True, cover_sha256="0" * 64, differing=0):
 @pytest.fixture
 def edition(tmp_path, monkeypatch):
     """The Chinese edition with every input of its render current: a stage of each of its current
-    pictures, a passing gate record, a passing draft scan and no earlier package."""
+    pictures, passing gate records of its picture and its sound, a geometry record of its stage,
+    a passing draft scan and no earlier package."""
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
     supported = {"name": "hyperframes", "version": picture_rendering.RENDERER_VERSION}
@@ -53,10 +56,12 @@ def edition(tmp_path, monkeypatch):
         if not (root / source).exists():
             put(root / source, f"fixture {path}")
     put(root / "content/source-manifest.json", {"members": []})
+    put(root / repository.DECLARATION, 'slug = "sample-reel"\n')
     put(root / "VERSION", "1.3.0\n")
     edition = Edition("zh")
     script = {"duration": DURATION, "segments": [{"id": "01", "text": "先看数据。"}]}
     put(root / edition.script, script)
+    put(root / edition.cast, {"voice": "narrator"})
     segment = {"id": "01", "text": "先看数据。", "words": []}
     put(edition.timeline, {**script, "segments": [segment], "captions": []})
     put(edition.soundtrack, "zh narration")
@@ -87,26 +92,69 @@ def edition(tmp_path, monkeypatch):
             "over_limit": [],
         },
     )
+    put(
+        edition.sound_gates,
+        {
+            "soundtrack_sha256": repository.sha(edition.soundtrack),
+            "timeline_sha256": repository.sha(edition.timeline),
+            "engine_version": version("filmkit"),
+            "clarity": {"floor_db": 18.0, "thoughts": []},
+            "verdict": "pass",
+        },
+    )
+    put(
+        edition.picture_geometry,
+        {
+            "format": "picture-geometry",
+            "passed": True,
+            "findings": [],
+            "errors": [],
+            "index_sha256": repository.sha(edition.picture_stage / "index.html"),
+            "width": 3840,
+            "height": 2160,
+            "duration": DURATION,
+            "fps": FPS,
+            "step_frames": 2,
+            "checked": -(-DURATION * FPS // 2),
+        },
+    )
     monkeypatch.setattr(preflight.concepts, "check", lambda: {"status": "not_declared"})
     return edition
+
+
+def declaring(monkeypatch, **fields):
+    """The film with `fields` of its picture, review or captions replaced."""
+    updates = {}
+    for table, values in fields.items():
+        updates[table] = getattr(FILM, table).model_copy(update=values)
+    monkeypatch.setattr(preflight, "FILM", FILM.model_copy(update=updates))
+
+
+# Every question of the check, in the order it reports them.
+# The questions a test stands in for when it only needs a receipt.
+ASKED = ("stage", "gates", "sound", "caption_rate", "geometry", "draft", "package", "cover")
+QUESTIONS = [
+    "stage",
+    "uncaptioned_stage",
+    "picture_gate",
+    "sound_gate",
+    "thought_clarity",
+    "caption_rate",
+    "geometry",
+    "draft_stills",
+    "concepts",
+    "film_package",
+    "cover",
+]
 
 
 def test_an_edition_whose_inputs_are_current_passes(edition, monkeypatch, capsys):
     run, calls = painted()
     monkeypatch.setattr(preflight.tools, "run", run)
     report = preflight.preflight(edition)
-    assert report == dict.fromkeys(
-        [
-            "stage",
-            "uncaptioned_stage",
-            "picture_gate",
-            "draft_stills",
-            "concepts",
-            "film_package",
-            "cover",
-        ],
-        "current",
-    )
+    # The sample film declares no line for a single thought.
+    expected = {**dict.fromkeys(QUESTIONS, "current"), "thought_clarity": preflight.NO_THOUGHT_LINE}
+    assert report == expected and list(report) == QUESTIONS
     assert json.loads(capsys.readouterr().out) == {"language": "zh", "inputs": report}
     # The cover is painted from the stage with the edition's tracked cover beside it.
     ((tool, arguments),) = calls
@@ -152,7 +200,11 @@ def test_every_stale_input_is_named_at_once_and_refuses(edition, monkeypatch, ca
     # A stale stage paints no cover.
     assert calls == []
     printed = json.loads(capsys.readouterr().out)["inputs"]
-    assert all(value != "current" for value in printed.values())
+    stale = ("sound_gate", "caption_rate", "geometry", "thought_clarity")
+    assert all(value != "current" for name, value in printed.items() if name not in stale)
+    # The receipt holds the refusal and what it was judged on.
+    receipt = repository.read(edition.readiness)
+    assert receipt["verdict"] == "refuse" and receipt["inputs"] == printed
 
 
 def test_a_package_of_the_current_inputs_is_named_for_the_picture_the_render_replaces(
@@ -199,6 +251,16 @@ def test_a_cover_other_than_the_composition_paints_is_named(edition, monkeypatch
     assert preflight.cover(edition) == named
 
 
+def test_a_film_that_declares_no_drafts_is_not_asked_for_a_draft_scan(edition, monkeypatch):
+    monkeypatch.setattr(preflight.tools, "run", painted()[0])
+    edition.draft_stills.unlink()
+    declaring(monkeypatch, picture={"drafts": False})
+    assert preflight.preflight(edition)["draft_stills"] == preflight.NO_DRAFTS
+    declaring(monkeypatch, picture={"drafts": True})
+    with pytest.raises(preflight.PreflightError, match="1 stale or missing inputs.*draft_stills"):
+        preflight.preflight(edition)
+
+
 def test_the_draft_scan_must_exist_and_pass(edition):
     record = repository.read(edition.draft_stills)
     put(edition.draft_stills, {**record, "over_limit": [{"start": 1, "end": 5, "speech": 3.9}]})
@@ -223,3 +285,219 @@ def test_a_missing_input_is_named_rather_than_raised(edition, monkeypatch):
         )
     }
     assert found == dict.fromkeys(found, "missing build/artifacts/film/zh/timeline.json")
+
+
+def test_the_sound_gate_must_have_passed_the_current_soundtrack_and_timeline(edition):
+    record, named = repository.read(edition.sound_gates), "build/evidence/editions/zh"
+    assert preflight.sound(edition) is None
+    put(edition.sound_gates, {**record, "verdict": "refuse"})
+    assert preflight.sound(edition) == f"{named}/sound-gates.json did not pass; run check-sound"
+    put(edition.sound_gates, {**record, "timeline_sha256": "0" * 64, "engine_version": "0.1.0"})
+    assert preflight.sound(edition) == (
+        f"{named}/sound-gates.json binds another timeline_sha256, engine_version; run check-sound"
+    )
+    edition.sound_gates.unlink()
+    assert preflight.sound(edition) == (
+        f"no sound gate record at {named}/sound-gates.json; run check-sound"
+    )
+
+
+def thoughts(edition, **values):
+    """Give the sound gate record these thoughts' clarity, against the floor of 18 dB."""
+    rows = [
+        {"id": name, "cpp_db": value, "below_floor": value < 18} for name, value in values.items()
+    ]
+    record = repository.read(edition.sound_gates)
+    put(edition.sound_gates, {**record, "clarity": {"floor_db": 18.0, "thoughts": rows}})
+
+
+def test_a_thought_under_the_floor_is_declared_and_none_stands_under_the_thought_line(
+    edition, monkeypatch
+):
+    thoughts(edition, **{"01.1": 18.4, "01.2": 17.62, "02.1": 16.9})
+    # A film that declares no line for a single thought is not judged.
+    assert preflight.clarity(edition) == preflight.NO_THOUGHT_LINE
+    kept = [
+        {"edition": "zh", "thought": "01.2", "reason": "thirty-two takes"},
+        {"edition": "zh", "thought": "03.1", "reason": "an earlier build"},
+        {"edition": "en", "thought": "02.1", "reason": "the other edition's"},
+    ]
+    review = type(FILM.review)(
+        **{
+            **FILM.review.model_dump(),
+            "clarity_thought_margin_db": 1.0,
+            "clarity_exceptions": kept,
+        }
+    )
+    monkeypatch.setattr(preflight, "FILM", FILM.model_copy(update={"review": review}))
+    assert preflight.clarity(edition) == (
+        "thought 02.1 reads 16.9 dB, under the thought line of 17.0 dB; "
+        "the declared thought 03.1 is stale: it does not read under the floor"
+    )
+    thoughts(edition, **{"01.1": 18.4, "01.2": 17.62, "02.1": 17.0, "03.1": 17.99})
+    assert preflight.clarity(edition) == (
+        "thought 02.1 reads 17.0 dB, under the floor of 18.0 dB, and is not declared in"
+        " review.clarity_exceptions"
+    )
+    thoughts(edition, **{"01.2": 17.62, "03.1": 17.99})
+    assert preflight.clarity(edition) is None
+    # A declaration keeps no thought under the thought line.
+    thoughts(edition, **{"01.2": 16.4, "03.1": 17.99})
+    assert preflight.clarity(edition) == (
+        "thought 01.2 reads 16.4 dB, under the thought line of 17.0 dB"
+    )
+
+
+def test_a_cue_above_the_reading_rate_is_declared_by_its_text(tmp_path, monkeypatch):
+    monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
+    edition = Edition("en")
+    fast = "The people watching the pipeline."
+    cues = [
+        {"segment": "01", "text": "Read the data first.", "start": 1.0, "end": 3.0},
+        {"segment": "01", "text": fast, "start": 3.0, "end": 4.2},
+    ]
+    put(edition.timeline, {"captions": cues})
+    assert preflight.caption_rate(edition) == (
+        f"the cue {fast!r} reads at 27.5 characters per second, above 25, and is not declared in"
+        " captions.rate_exceptions"
+    )
+    kept = [
+        {"edition": "en", "text": fast, "reason": "a quoted line kept whole"},
+        {"edition": "en", "text": "Read the data first.", "reason": "an earlier build"},
+    ]
+    captions = type(FILM.captions)(rate_exceptions=kept)
+    monkeypatch.setattr(preflight, "FILM", FILM.model_copy(update={"captions": captions}))
+    assert preflight.caption_rate(edition) == (
+        "the declared cue 'Read the data first.' is stale: no cue with that text reads above the"
+        " rate"
+    )
+    captions = type(FILM.captions)(rate_exceptions=kept[:1])
+    monkeypatch.setattr(preflight, "FILM", FILM.model_copy(update={"captions": captions}))
+    assert preflight.caption_rate(edition) is None
+    # A Chinese cue has no reading rate, so none is above it, and a declared one is stale.
+    put(Edition("zh").timeline, {"captions": [{**cues[1], "text": "先看数据，再看流水线。"}]})
+    assert preflight.caption_rate(Edition("zh")) is None
+    kept = [{"edition": "zh", "text": "先看数据，再看流水线。", "reason": "kept whole"}]
+    captions = type(FILM.captions)(rate_exceptions=kept)
+    monkeypatch.setattr(preflight, "FILM", FILM.model_copy(update={"captions": captions}))
+    assert preflight.caption_rate(Edition("zh")) == (
+        "the declared cue '先看数据，再看流水线。' is stale: no cue with that text reads above the"
+        " rate"
+    )
+
+
+def test_the_geometry_record_must_cover_the_current_staged_film(edition):
+    record, named = repository.read(edition.picture_geometry), "build/evidence/editions/zh"
+    assert preflight.geometry(edition) is None
+    refusal = (
+        f"Picture geometry does not cover the current staged film ({named}/picture-geometry.json);"
+        " run filmkit.tools geometry-check on the stage"
+    )
+    for changed in ({"passed": False}, {"index_sha256": "0" * 64}, {"step_frames": 4}):
+        put(edition.picture_geometry, {**record, **changed})
+        assert preflight.geometry(edition) == refusal
+    edition.picture_geometry.unlink()
+    assert preflight.geometry(edition) == f"missing {named}/picture-geometry.json"
+
+
+def ready(code, monkeypatch):
+    """Write the edition's passing receipt on the inputs as they stand, its questions stood in."""
+    judged = Edition(code)
+    for question in ASKED:
+        monkeypatch.setattr(preflight, question, lambda *_, **__: None)
+    preflight.preflight(judged)
+    return judged
+
+
+def test_the_receipt_binds_what_the_answer_was_judged_on(edition, monkeypatch):
+    monkeypatch.setattr(preflight.tools, "run", painted()[0])
+    preflight.preflight(edition)
+    receipt = repository.read(edition.readiness)
+    assert receipt["edition"] == "zh" and receipt["verdict"] == "pass"
+    assert receipt["engine_version"] == version("filmkit")
+    assert receipt["inputs"]["stage"] == "current"
+    root, faces = repository.ROOT, picture_rendering.face_bindings()
+    assert receipt["bound"] == {
+        "composition": repository.sha(root / picture_rendering.COMPOSITION_SCRIPT),
+        "stylesheet": faces["stylesheet_sha256"],
+        "fonts": faces["fonts_sha256"],
+        "declaration": repository.sha(root / repository.DECLARATION),
+        "script": repository.sha(root / edition.script),
+        "cast": repository.sha(root / edition.cast),
+        "timeline": repository.sha(edition.timeline),
+        "assembly": repository.sha(edition.audio_assembly),
+        "soundtrack": repository.sha(edition.soundtrack),
+    }
+    # A missing input refuses by name and leaves the receipt without digests.
+    (root / edition.cast).unlink()
+    with pytest.raises(preflight.PreflightError, match="receipt: missing content/voice-"):
+        preflight.preflight(edition)
+    receipt = repository.read(edition.readiness)
+    assert receipt["verdict"] == "refuse" and receipt["bound"] is None
+
+
+def test_an_edition_is_admitted_on_both_receipts_without_repeating_the_checks(
+    edition, monkeypatch, capsys
+):
+    root = repository.ROOT
+    english = Edition("en")
+    for path, text in (
+        (root / english.script, "{}"),
+        (root / english.cast, "{}"),
+        (english.timeline, "{}"),
+        (english.audio_assembly, "{}"),
+        (english.soundtrack, "en narration"),
+    ):
+        put(path, text)
+    with pytest.raises(preflight.PreflightError) as refusal:
+        preflight.admitted(edition)
+    assert str(refusal.value) == (
+        "The zh edition is not admitted: no readiness receipt at"
+        " build/evidence/editions/zh/readiness.json; run preflight --language zh | no readiness"
+        " receipt at build/evidence/editions/en/readiness.json; run preflight --language en"
+    )
+    ready("zh", monkeypatch)
+    ready("en", monkeypatch)
+    capsys.readouterr()
+    # The check reads the receipts and the inputs' bytes: no question is asked again.
+    for question in ASKED:
+        monkeypatch.setattr(preflight, question, None)
+    assert preflight.admitted(edition) == {"language": "zh", "admitted": True}
+    assert json.loads(capsys.readouterr().out) == {"language": "zh", "admitted": True}
+    produce.main(["admitted", "--language", "en"])
+    # The other edition's own inputs may move: its English retake refuses no Chinese render.
+    put(english.timeline, '{"captions": []}')
+    assert preflight.admitted(edition)["admitted"] is True
+    with pytest.raises(SystemExit) as refusal:
+        produce.main(["admitted", "--language", "en"])
+    assert str(refusal.value) == (
+        "admitted: The en edition is not admitted: build/evidence/editions/en/readiness.json"
+        " binds another timeline; run preflight --language en"
+    )
+    # A change of the composition, which both editions render, refuses both.
+    put(root / picture_rendering.COMPOSITION_SCRIPT, "scenes = {};\n")
+    with pytest.raises(preflight.PreflightError) as refusal:
+        preflight.admitted(edition)
+    assert str(refusal.value) == (
+        "The zh edition is not admitted: build/evidence/editions/zh/readiness.json binds another"
+        " composition; run preflight --language zh | build/evidence/editions/en/readiness.json"
+        " binds another composition; run preflight --language en"
+    )
+
+
+def test_a_receipt_that_refused_or_another_engine_wrote_admits_nothing(edition, monkeypatch):
+    ready("zh", monkeypatch)
+    receipt = repository.read(edition.readiness)
+    put(Edition("en").readiness, {**receipt, "edition": "en"})
+    assert preflight.admitted(edition)["admitted"] is True
+    put(edition.readiness, {**receipt, "engine_version": "0.1.0"})
+    with pytest.raises(preflight.PreflightError, match=r"zh/readiness\.json binds another engine_"):
+        preflight.admitted(edition)
+    put(edition.readiness, {**receipt, "verdict": "refuse"})
+    with pytest.raises(preflight.PreflightError, match=r"zh/readiness\.json did not pass; run"):
+        preflight.admitted(edition)
+    # The other edition's refused receipt refuses this one too.
+    put(edition.readiness, receipt)
+    put(Edition("en").readiness, {**receipt, "edition": "en", "verdict": "refuse"})
+    with pytest.raises(preflight.PreflightError, match=r"en/readiness\.json did not pass; run"):
+        preflight.admitted(edition)
