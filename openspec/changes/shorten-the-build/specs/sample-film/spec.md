@@ -16,12 +16,12 @@ The sample film SHALL declare `software` capture, the capture under which pictur
 
 ### Requirement: The sample film prints its build's durations
 
-The repository SHALL carry a task that prints the duration records of the sample film's build with their sum.
+The repository SHALL carry a task that prints the duration records of the sample film's build with each edition's sum and the time of the build.
 
 #### Scenario: After a sample build
 
 - **WHEN** the durations task runs after the sample film was built
-- **THEN** it lists each edition's commands from narration to verification with their seconds
+- **THEN** it lists each edition's commands from narration to verification with their seconds, the geometry check and the cover check among them, and prints the time of the build
 
 ## MODIFIED Requirements
 

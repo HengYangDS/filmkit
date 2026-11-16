@@ -12,9 +12,24 @@ command. It binds nothing and no record binds it: a duration differs from run to
 stands in a record whose SHA-256 another record holds, and running a check again on unchanged
 inputs leaves that check's own record byte for byte as it was.
 
-Usage: python -m filmkit.durations [--language zh|en|all] [--json]
+A folder keeps the latest run of every command ever run there, so the sum the command prints is
+a build's only once it says which records it covers. An edition's build begins with its latest
+whole narration: the sum covers the commands that completed and started at or after that, and
+`--since` names another start, such as a build that keeps its narration. Records that started
+earlier are listed, marked as earlier and left out, and the last line says what was summed.
+A command run twice in a build counts once, by its latest run. A sum adds each command's
+seconds, so two commands that ran at the same time, such as two editions' renders, count in full.
+The time of the build is therefore the last line's first figure: the seconds during which at
+least one counted command of the selected editions was running, which counts such commands once
+and the waits between commands not at all. For commands run in a row the two figures are equal.
+
+The tools a film runs from the command line for one edition (`filmkit.tools`), the verifier and
+the reproduction write records too, the last two unless they are asked to be read-only.
+
+Usage: python -m filmkit.durations [--language zh|en|all] [--since <time>] [--json]
 Prints each selected edition's records in the order their commands started, each with its
-phases, and the sum of the seconds of the commands that completed.
+phases and settings, the sum of the seconds of the completed commands of its build, and last the
+time of the build.
 """
 
 from __future__ import annotations
@@ -37,6 +52,9 @@ if TYPE_CHECKING:
 
 # The folder of an edition's duration records, below its evidence.
 FOLDER = "durations"
+# The command whose latest record marks where an edition's build began: its whole narration, not
+# a narration of chosen segments, which is a retake within some build.
+BUILD_START = "narrate"
 
 
 class Run:
@@ -71,11 +89,11 @@ class Run:
             self.add(name, time.monotonic() - started)
 
     def record(self, *, completed: bool) -> dict:
-        """The run as its record states it, seconds to the millisecond."""
+        """The run as its record states it, its start and its seconds to the millisecond."""
         return {
             "command": self.command,
             "edition": self.code,
-            "started_at": self.started_at.isoformat(timespec="seconds"),
+            "started_at": self.started_at.isoformat(timespec="milliseconds"),
             "seconds": round(time.monotonic() - self._started, 3),
             "completed": completed,
             "phases": {name: round(seconds, 3) for name, seconds in self.phases.items()},
@@ -92,11 +110,12 @@ def current() -> Run | None:
 
 
 @contextlib.contextmanager
-def run(code: str, command: str) -> Iterator[Run]:
+def run(code: str, command: str, *, record: bool = True) -> Iterator[Run]:
     """Measure the block as one command's run on an edition and write its record at the end.
 
     The record says that the command completed only when the block ends without raising; the
-    exception of one that does not propagates after the record is written.
+    exception of one that does not propagates after the record is written. With `record` False
+    the run is measured and nothing is written, for a command asked to write nothing.
     """
     opened = Run(code, command)
     token = _RUN.set(opened)
@@ -106,7 +125,8 @@ def run(code: str, command: str) -> Iterator[Run]:
         completed = True
     finally:
         _RUN.reset(token)
-        repository.write(opened.path, opened.record(completed=completed))
+        if record:
+            repository.write(opened.path, opened.record(completed=completed))
 
 
 @contextlib.contextmanager
@@ -120,31 +140,105 @@ def phase(name: str) -> Iterator[None]:
         yield
 
 
+def since(text: str) -> str:
+    """A `--since` value, refused unless it is an ISO 8601 time with its offset."""
+    try:
+        aware = datetime.fromisoformat(text).tzinfo is not None
+    except ValueError:
+        aware = False
+    if not aware:
+        message = f"{text!r} is no ISO 8601 time with its offset, such as 2026-11-17T01:00:00+00:00"
+        raise argparse.ArgumentTypeError(message)
+    return text
+
+
 def records(code: str) -> list[dict]:
     """An edition's duration records in the order their commands started."""
     folder = Edition(code).evidence / FOLDER
     found = [repository.read(path) for path in sorted(folder.glob("*.json"))]
-    return sorted(found, key=lambda record: (record["started_at"], record["command"]))
+    return sorted(
+        found,
+        key=lambda record: (datetime.fromisoformat(record["started_at"]), record["command"]),
+    )
 
 
-def lines(code: str, found: list[dict]) -> list[str]:
-    """An edition's records as the command prints them, with the sum of the completed ones."""
+def build_start(found: list[dict]) -> str | None:
+    """When an edition's build began: the start of its latest whole narration, the command
+    `BUILD_START`; None where no such record stands."""
+    starts = [record["started_at"] for record in found if record["command"] == BUILD_START]
+    return max(starts, key=datetime.fromisoformat, default=None)
+
+
+def earlier(found: list[dict], start: str | None) -> list[bool]:
+    """For each record, whether it started before the build did and so is no part of it."""
+    if start is None:
+        return [False] * len(found)
+    began = datetime.fromisoformat(start)
+    return [datetime.fromisoformat(record["started_at"]) < began for record in found]
+
+
+def counted(found: list[dict], since: str | None = None) -> list[dict]:
+    """The records an edition's sum covers: the completed commands of its build, which began at
+    `since` or else at its latest whole narration."""
+    old = earlier(found, since or build_start(found))
+    kept = zip(found, old, strict=True)
+    return [record for record, before in kept if record["completed"] and not before]
+
+
+def running(found: list[dict]) -> float:
+    """The seconds during which at least one of the commands ran, so that commands that ran at
+    the same time count once."""
+    spans = sorted(
+        (datetime.fromisoformat(record["started_at"]).timestamp(), record["seconds"])
+        for record in found
+    )
+    total, end = 0.0, float("-inf")
+    for start, seconds in spans:
+        total += max(0.0, start + seconds - max(start, end))
+        end = max(end, start + seconds)
+    return total
+
+
+def lines(code: str, found: list[dict], since: str | None = None) -> list[str]:
+    """An edition's records as the command prints them, in the order they started, with the sum
+    of the completed commands of its build: those that started at or after `since`, or else at or
+    after its latest whole narration. A record that started earlier is marked and left out, and
+    the last line says what the sum covers."""
     if not found:
         return [f"{code}: no duration record"]
+    start = since or build_start(found)
+    old = earlier(found, start)
     width = max(len(record["command"]) for record in found)
     listed = [f"{code}:"]
-    for record in found:
+    for record, before in zip(found, old, strict=True):
         phases = ", ".join(f"{name} {seconds:.1f}" for name, seconds in record["phases"].items())
         named = record.get("settings", {}).items()
         settings = ", ".join(f"{name} {value}" for name, value in named)
-        state = "" if record["completed"] else "  not completed"
+        state = "  earlier" if before else "" if record["completed"] else "  not completed"
         listed.append(
             f"  {record['started_at']}  {record['command']:<{width}}  "
             f"{record['seconds']:>9.1f} s{state}{'  (' + phases + ')' if phases else ''}"
             f"{'  [' + settings + ']' if settings else ''}"
         )
-    total = sum(record["seconds"] for record in found if record["completed"])
-    return [*listed, f"  sum of the completed commands: {total:.1f} s"]
+    if start is None:
+        covered = "(no whole narration is recorded, so every record counts)"
+    else:
+        covered = f"since {'' if since else 'the narration started at '}{start}"
+    left_out = f"; {sum(old)} earlier records are not counted" if any(old) else ""
+    summed = [record["seconds"] for record in counted(found, since)]
+    total = f"  sum of the {len(summed)} commands completed {covered}: {sum(summed):.1f} s"
+    return [*listed, total + left_out]
+
+
+def build_time(found: list[dict]) -> str:
+    """The last line: the time of the build, which is the seconds during which one of the counted
+    commands was running, beside the sum of their seconds, which is more where two ran at once."""
+    added = sum(record["seconds"] for record in found)
+    return (
+        f"build: one of the {len(found)} counted commands was running for {running(found):.1f} s; "
+        f"their seconds add up to {added:.1f} s (commands that ran at the same time count once "
+        "in the first figure)"
+    )
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -153,6 +247,11 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--language", choices=(*CODES, "all"), default="all")
     parser.add_argument("--json", action="store_true", help="print the records themselves")
+    parser.add_argument(
+        "--since",
+        type=since,
+        help="sum what started at or after this time, an ISO 8601 time with its offset",
+    )
     options = parser.parse_args(argv)
     codes = CODES if options.language == "all" else (options.language,)
     found = {code: records(code) for code in codes}
@@ -160,7 +259,10 @@ def main(argv: list[str] | None = None) -> None:
         print(json.dumps(found, ensure_ascii=False, indent=2))
         return
     for code in codes:
-        print("\n".join(lines(code, found[code])))
+        print("\n".join(lines(code, found[code], options.since)))
+    together = [record for code in codes for record in counted(found[code], options.since)]
+    if together:
+        print(build_time(together))
 
 
 if __name__ == "__main__":

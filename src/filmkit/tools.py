@@ -11,7 +11,9 @@ widths of the film's declared faces (`filmkit.picture.metrics`), which a run nam
 `FILMKIT_TEXT_METRICS` unless the caller names its own table.
 
 A refusal exits with status 1 and "<tool>: <reason>" on standard error; otherwise the command
-exits with the tool's own status.
+exits with the tool's own status. A run whose arguments name one edition, by its stage or its
+folder of evidence or artifacts, writes that edition's duration record under the tool's name
+(`filmkit.durations`), so the checks a film's task list runs this way count in its build's time.
 
 Usage: python -m filmkit.tools <tool> [arguments]
 """
@@ -21,16 +23,19 @@ from __future__ import annotations
 import argparse
 import contextlib
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 from importlib.metadata import version
 from pathlib import Path
 
+import filmkit.durations as durations
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 from filmkit.picture import metrics
 from filmkit.picture.rendering import PictureError
+from filmkit.production import CODES
 
 # The engine's Node modules, which the package carries below this module's folder.
 PACKAGE = Path(__file__).resolve().parent
@@ -48,12 +53,26 @@ TOOLS = {
 }
 # The copies, below the film's root, in a folder for each engine version.
 CACHE = picture_rendering.TOOL_CACHE / "filmkit"
+# Where a tool's argument names an edition: its stage, or its folder of evidence or artifacts.
+EDITION = "|".join(CODES)
+EDITION_PLACE = re.compile(
+    rf"(?:^|/)(?:final-delivery-(?P<stage>{EDITION})-uhd[^/]*|(?:editions|film)/(?P<folder>{EDITION}))(?=/|$)"
+)
 # The tools that run the composition headlessly, which measure text by the film's declared faces.
 MEASURING = ("frame-audit", "motion-audit", "detail-audit", "caption-equivalence", "band-audit")
 
 
 class ToolError(RuntimeError):
     """The film's tools cannot run."""
+
+
+class ToolFailed(Exception):
+    """A tool exited with another status than 0, which its run's duration record states as not
+    completed and the command passes on."""
+
+    def __init__(self, status: int) -> None:
+        super().__init__(status)
+        self.status = status
 
 
 def stage_tools() -> Path:
@@ -113,6 +132,14 @@ def run(
     return completed.returncode
 
 
+def edition_of(arguments: list[str]) -> str | None:
+    """The edition a tool's arguments name: the one whose stage, evidence or artifacts folder
+    their paths lie in, or None when they name none or both."""
+    places = (place for argument in arguments for place in EDITION_PLACE.finditer(argument))
+    named = {place["stage"] or place["folder"] for place in places}
+    return named.pop() if len(named) == 1 else None
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="python -m filmkit.tools", description=__doc__.splitlines()[0]
@@ -120,8 +147,15 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("tool", choices=sorted(TOOLS))
     parser.add_argument("arguments", nargs=argparse.REMAINDER, help="the tool's own arguments")
     options = parser.parse_args(argv)
+    code = edition_of(options.arguments)
     try:
-        status = run(options.tool, options.arguments)
+        # A run for one edition is part of that edition's build, and is recorded as such.
+        with durations.run(code or CODES[0], options.tool, record=code is not None):
+            status = run(options.tool, options.arguments)
+            if status != 0:
+                raise ToolFailed(status)
+    except ToolFailed as failed:
+        raise SystemExit(failed.status) from None
     except (PictureError, ToolError) as error:
         msg = f"{options.tool}: {error}"
         raise SystemExit(msg) from None

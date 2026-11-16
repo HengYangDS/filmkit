@@ -19,7 +19,8 @@ document recorded beside the captioned one's, or, published before the films wit
 existed, only each edition's two films with captions; the comparison then lists the rebuilt
 uncaptioned films as unpublished and compares the rest.
 
-The report goes to build/evidence/reproduction/report.json unless --read-only is given; a
+The report goes to build/evidence/reproduction/report.json, and each edition's duration record
+of the comparison beside its evidence (`filmkit.durations`), unless --read-only is given; a
 comparison that does not pass exits with "<edition>: <asset>: <layer>" for each failing layer.
 
 Usage: python -m filmkit.delivery.reproduction [--read-only]
@@ -40,6 +41,7 @@ from pydantic import Field, NonNegativeInt, PositiveFloat, StringConstraints, Va
 
 import filmkit.delivery.packaging as packaging
 import filmkit.delivery.verification as verification
+import filmkit.durations as durations
 import filmkit.media as media
 import filmkit.production as production
 import filmkit.repository as repository
@@ -456,8 +458,20 @@ def failures(report: dict) -> list[str]:
     return found
 
 
-def compare() -> dict:
-    """The comparison of the rebuild with the published release, every layer reported."""
+def compare_editions(records: dict, assets: dict, listed: dict, *, record: bool) -> dict:
+    """Each edition's comparison in the editions' order, as a run of its own whose duration is
+    recorded when `record` says so (`filmkit.durations`)."""
+    compared = {}
+    for code in production.CODES:
+        with durations.run(code, "reproduce", record=record):
+            edition = production.Edition(code)
+            compared[code] = compare_edition(edition, records[code], assets, listed)
+    return compared
+
+
+def compare(*, record: bool = False) -> dict:
+    """The comparison of the rebuild with the published release, every layer reported; with
+    `record` each edition's duration record is written."""
     release = load()
     changed = changed_sources(release)
     if changed:
@@ -468,10 +482,7 @@ def compare() -> dict:
     report = {
         "release": release.version,
         "ffmpeg": repository.run(["ffmpeg", "-version"]).stdout.decode().splitlines()[0],
-        "editions": {
-            code: compare_edition(production.Edition(code), release.editions[code], assets, listed)
-            for code in production.CODES
-        },
+        "editions": compare_editions(release.editions, assets, listed, record=record),
     }
     verdicts = [
         result["verdict"] for edition in report["editions"].values() for result in edition["films"]
@@ -487,7 +498,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--read-only", action="store_true", help="print the report only")
     options = parser.parse_args(argv)
     try:
-        report = compare()
+        report = compare(record=not options.read_only)
     except ReproductionError as error:
         raise SystemExit(str(error)) from None
     if not options.read_only:

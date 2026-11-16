@@ -68,7 +68,7 @@ def test_an_edition_is_qualified_as_its_four_current_films():
 
 
 @pytest.mark.usefixtures("qualified")
-def test_the_command_prints_each_editions_report_and_writes_nothing(tmp_path, capsys):
+def test_the_command_prints_each_editions_report_and_writes_only_its_duration(tmp_path, capsys):
     films = [str(film) for code in production.CODES for film in production.Edition(code).films]
     delivery_verification.main(["--read-only", "--technical-only", "--language", "all", *films])
     reports = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
@@ -79,7 +79,9 @@ def test_the_command_prints_each_editions_report_and_writes_nothing(tmp_path, ca
     delivery_verification.main(["--language", "en", *films[4:]])
     (report,) = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     assert (report["language"], report["scope"]) == ("en", "acceptance")
-    assert list(tmp_path.rglob("*")) == []
+    # With --read-only nothing was written; without it, the edition's duration record alone.
+    written = sorted(str(path.relative_to(tmp_path)) for path in tmp_path.rglob("*.*"))
+    assert written == ["build/evidence/editions/en/durations/verify.json"]
     # Without named films, each selected edition's current delivered films are verified.
     delivery_verification.main(["--technical-only", "--language", "all"])
     reports = [json.loads(line) for line in capsys.readouterr().out.splitlines()]

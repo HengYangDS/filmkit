@@ -2,7 +2,7 @@
 
 ### Requirement: Each heavy command records how long it took
 
-Each action of `filmkit.produce` and `narrate` SHALL write, when it ends, a duration record for its edition: the command, when it started, its seconds, whether it completed, the seconds of each phase it names and the settings it names. The record SHALL stand beside the edition's evidence, and no duration SHALL be written into a record that another record binds by SHA-256. The verifier, which writes nothing, and the reproduction SHALL state each film's seconds in their reports.
+Each action of `filmkit.produce`, each narration, each tool run from the command line for one edition, the verifier and the reproduction SHALL write, when it ends, a duration record for its edition: the command, when it started, its seconds, whether it completed, its phases' seconds and the settings it names. The record SHALL stand beside the edition's evidence and inside no record that another binds by SHA-256. With `--read-only` the verifier and the reproduction SHALL write none.
 
 #### Scenario: A comparison's phases
 
@@ -19,24 +19,68 @@ Each action of `filmkit.produce` and `narrate` SHALL write, when it ends, a dura
 - **WHEN** `check-picture` passes an edition
 - **THEN** the gate record holds no duration, and the duration record beside it holds the seconds of each audit
 
-#### Scenario: The verifier's report
+#### Scenario: The verifier's record
 
 - **WHEN** the verifier verifies an edition's four films
-- **THEN** its report states the seconds of each film's verification, and the verifier writes no file
+- **THEN** its report states the seconds of each film's verification, and the one file it writes is the edition's duration record of the run, which no check reads and no record binds
+
+#### Scenario: A read-only verification
+
+- **WHEN** the verifier or the reproduction runs with `--read-only`
+- **THEN** it writes no duration record
+
+#### Scenario: A tool run for one edition
+
+- **WHEN** the geometry check is run from the command line on the Chinese edition's stage
+- **THEN** the Chinese edition's duration record of the geometry check states the run, as not completed when the tool exits with a failure
+
+#### Scenario: A tool run for no single edition
+
+- **WHEN** a tool is run from the command line with arguments that name no edition, or both
+- **THEN** it writes no duration record
 
 ### Requirement: One command prints a build's durations
 
-`python -m filmkit.durations` SHALL print, for each selected edition, every duration record in the order the commands started, each with its phases, and the sum of the seconds of the commands that completed; with `--json` it SHALL print the records themselves. An edition without a record SHALL be named as having none.
+`python -m filmkit.durations` SHALL print each selected edition's duration records in the order the commands started and the sum of its build: the seconds of the commands that completed and started at or after its latest whole narration, or at or after the time `--since` names. It SHALL mark an earlier record, leave it out, and say what the sum covers. With `--json` it SHALL print the records. An edition without a record SHALL be named as having none.
 
 #### Scenario: Two recorded commands
 
-- **WHEN** an edition holds the duration records of `check-picture` and `render-picture`
-- **THEN** the command lists both, the earlier first, with their seconds and phases, and prints their sum
+- **WHEN** an edition holds the duration records of `check-picture` and `render-picture` and none of a whole narration
+- **THEN** the command lists both, the earlier first, with their seconds and phases, prints their sum, and says that every record counts because no whole narration is recorded
+
+#### Scenario: A record of earlier work
+
+- **WHEN** an edition holds a `repair-pictures` record that started before its latest whole narration
+- **THEN** the record is listed as earlier, the sum leaves it out, and the sum's line says since when it counts and how many earlier records it leaves out
+
+#### Scenario: A build that keeps its narration
+
+- **WHEN** `--since` names the time a picture-only rebuild began
+- **THEN** each edition's sum covers the commands that started at or after that time
+
+#### Scenario: A value that is no time
+
+- **WHEN** `--since` is `yesterday`
+- **THEN** the command is refused, asking for an ISO 8601 time with its offset
 
 #### Scenario: An edition that was never built
 
 - **WHEN** an edition holds no duration record
 - **THEN** the command says so for that edition and exits 0
+
+### Requirement: A build's time counts commands that ran together once
+
+After the editions, `python -m filmkit.durations` SHALL print the time of the build: the seconds during which at least one counted command of the selected editions was running, beside the sum of those commands' seconds. Commands that ran at the same time SHALL count once in the build's time, and the time between commands not at all. A budget stated for a build SHALL be judged by the build's time.
+
+#### Scenario: Two renders at once
+
+- **WHEN** the two editions' renders, of 170 s and 172 s, started half a second apart
+- **THEN** the build's time holds 172.5 s for them, where the sum of their seconds holds 342 s
+
+#### Scenario: Commands in a row
+
+- **WHEN** every counted command ended before the next started
+- **THEN** the build's time equals the sum of their seconds, whatever time passed between them
 
 ### Requirement: The render's worker count comes from the host
 

@@ -104,7 +104,10 @@ def test_the_command_lists_the_records_in_starting_order_with_the_sum_of_the_com
     ]
     assert printed[1].endswith("139.2 s  (frame-audit 46.1)")
     assert printed[3].endswith("12.0 s  not completed")
-    assert printed[4] == "  sum of the completed commands: 1039.2 s"
+    assert printed[4] == (
+        "  sum of the 2 commands completed (no whole narration is recorded, so every record "
+        "counts): 1039.2 s"
+    )
     assert printed[5] == "en: no duration record"
     durations.main(["--language", "zh", "--json"])
     assert [r["command"] for r in json.loads(capsys.readouterr().out)["zh"]] == [
