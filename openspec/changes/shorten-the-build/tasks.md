@@ -45,4 +45,4 @@
 - [ ] 7.3 Run `mise run check` and the proof's static lint on the lane's head; verify that the Node suite, the Markdown check, the Python suite and the lint pass.
 - [ ] 7.4 Build the sample film with `mise run sample:build`; verify that the Chinese pair passes `qualify-renderer` and the every-frame comparison, the English pair is derived and compared by its record, all eight films verify, and `mise run sample:durations` lists every stage.
 - [ ] 7.5 Build one film's edition with the engine before and after this Change and print both builds' durations; verify the sum against the budget of 90 minutes for both editions of the 25-minute film, and state the measured figures in the Changelog.
-- [ ] 7.6 State the duration records, the worker count, the derived picture with `--native`, `qualify-renderer` and the 1080p encoder in the README and the Changelog; verify the repository's Markdown check on both files.
+- [x] 7.6 State the duration records, the worker count, the derived picture with `--native`, `qualify-renderer` and the 1080p encoder in the README and the Changelog; verify the repository's Markdown check on both files.
