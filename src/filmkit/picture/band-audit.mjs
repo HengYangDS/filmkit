@@ -8,9 +8,10 @@
  * nothing. A caption that leaves the rows is an escape and another paint that reaches them an intrusion; either makes
  * the verdict `refuse`, since painting the rows would then cut a caption or cover a mark.
  *
- * The report, printed as JSON, gives the instants, the count of instants that paint a caption, the stretches without
- * one as [first instant, last instant] in seconds, in which the captioned picture's band must show the ground, and
- * the escapes and intrusions, the first FINDINGS of each in full. The stand-in reports no fillRect, so a rectangle
+ * The report, printed as JSON, gives the instants, the count of instants that paint a caption, the first and the last
+ * row any caption paint reached (`caption_rows`), the stretches without a caption as [first instant, last instant] in
+ * seconds, in which the captioned picture's band must show the ground, and the escapes and intrusions, the first
+ * FINDINGS of each in full. The stand-in reports no fillRect, so a rectangle
  * filled that way in the rows is not seen here.
  * Usage: python -m filmkit.tools band-audit <timeline.json> <top> <bottom> [<fps>] */
 import { parseArgs } from "node:util";
@@ -50,6 +51,7 @@ export function bandAudit(timeline, [top, bottom], { fps = FPS, faces = null } =
     escaping = 0,
     intruding = 0,
     paints = 0,
+    captionRows = null,
     open = null;
   for (let k = 0; k < count; k++) {
     const t = k / fps,
@@ -63,6 +65,10 @@ export function bandAudit(timeline, [top, bottom], { fps = FPS, faces = null } =
       const box = screenBox(paint);
       if (isCaptionPaint(paint, t, captions, layout)) {
         captioned = true;
+        if (box)
+          captionRows = captionRows
+            ? [Math.min(captionRows[0], box[1]), Math.max(captionRows[1], box[3])]
+            : [box[1], box[3]];
         if (box && (box[1] < top || box[3] > bottom)) {
           escaped = true;
           if (escapes.length < FINDINGS) escapes.push(described(paint, box, t));
@@ -92,6 +98,7 @@ export function bandAudit(timeline, [top, bottom], { fps = FPS, faces = null } =
     rows: [top, bottom],
     paints,
     caption_instants: captionInstants,
+    caption_rows: captionRows && [Math.floor(captionRows[0]), Math.ceil(captionRows[1])],
     free,
     escaping_instants: escaping,
     intruding_instants: intruding,

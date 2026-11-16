@@ -66,6 +66,9 @@ test("captions inside the rows and nothing else there pass, with the stretches t
   assert.equal(report.verdict, "pass");
   assert.deepEqual([report.instants, report.fps], [120, 30]);
   assert.equal(report.caption_instants, 45);
+  // The caption line at y 1000 in a 30 px face: its box, as the headless stand-in estimates it.
+  const [first, last] = report.caption_rows;
+  assert.ok(first > 960 && first < 1000 && last > 1000 && last < 1020, `${first}-${last}`);
   assert.deepEqual([report.escaping_instants, report.intruding_instants], [0, 0]);
   const stretches = report.free.map(([a, b]) => [Math.round(a * 30), Math.round(b * 30)]);
   assert.deepEqual(stretches, [

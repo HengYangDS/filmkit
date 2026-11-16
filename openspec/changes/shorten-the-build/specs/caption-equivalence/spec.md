@@ -40,7 +40,7 @@ For a film that declares any other capture than `software`, and with `--native` 
 
 ### Requirement: A derivation proves that the band holds only captions on the ground
 
-Before it encodes, a derivation SHALL run the composition headlessly at every thirtieth of a second and refuse unless every caption paint lies within the painted rows and no other paint reaches them. After it encodes, it SHALL refuse, and leave no uncaptioned picture in place, unless the captioned picture's band stood within 3 levels of the ground in every frame at which the composition painted no caption.
+Before it encodes, a derivation SHALL run the composition headlessly at every thirtieth of a second and refuse unless every caption paint lies within the painted rows and no other paint reaches them. It SHALL then refuse, leaving no uncaptioned picture in place and naming `--native`, unless the captioned picture stood within 3 levels of the ground in its band at every frame without a caption, and in the painted rows' edge rows, which no caption reaches, at every frame.
 
 #### Scenario: A mark that reaches the band
 
@@ -52,6 +52,11 @@ Before it encodes, a derivation SHALL run the composition headlessly at every th
 - **WHEN** a caption is painted partly above the rows the derivation would paint
 - **THEN** the derivation refuses before it encodes, naming the instant and the caption
 
+#### Scenario: A ground that changes while a caption shows
+
+- **WHEN** the captioned picture's whole ground is another colour on exactly the frames that show a caption
+- **THEN** the derivation refuses on the edge rows, naming the first such frame and `--native`, though every frame without a caption holds the ground
+
 #### Scenario: A band that is not the ground
 
 - **WHEN** the captioned picture's band holds, at a frame without a caption, samples 10 levels from the ground
@@ -59,7 +64,7 @@ Before it encodes, a derivation SHALL run the composition headlessly at every th
 
 ### Requirement: A derived pair is compared by its derivation's record
 
-For a pair whose uncaptioned picture is derived, `compare-pictures` SHALL decode no picture. It SHALL pass only when the composition report finds no difference beyond the captions and the derivation's receipt binds the current captioned picture, composition, timeline and engine, names the report's band and records both proofs as passed; its record SHALL say that the pair is derived. The requirements on two rendered pictures hold for a `--native` pair.
+For a pair whose uncaptioned picture is derived, `compare-pictures` SHALL decode no picture. It SHALL pass only when the composition report finds no difference beyond the captions and the derivation's receipt binds the current captioned picture, composition, timeline and engine, names the report's band and records its proofs as passed; its record SHALL say that the pair is derived. The requirements on two rendered pictures hold for a `--native` pair.
 
 #### Scenario: A current derived pair
 

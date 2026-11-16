@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 import filmkit.picture.derivation as derivation
+import filmkit.picture.ground as ground_rows
 import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
 
@@ -49,13 +50,13 @@ def root(tmp_path, monkeypatch):
 
 def test_the_frames_checked_leave_out_the_edges_of_each_stretch():
     stretches = [[0.0, 29 / 30], [2.0, 2.1], [3.0, 3.1 + 1 / 30], [5.0, 5.0]]
-    assert derivation.free_frames(stretches) == [(4, 54), (184, 184)]
-    assert derivation.EDGE_FRAMES == 4
+    assert ground_rows.free_frames(stretches) == [(4, 54), (184, 184)]
+    assert ground_rows.EDGE_FRAMES == 4
 
 
 def test_the_selection_is_true_inside_each_run_of_frames():
-    assert derivation.selection([(2, 25)]) == "between(n,2,25)"
-    assert derivation.selection([(2, 25), (96, 117), (130, 131)]) == (
+    assert ground_rows.selection([(2, 25)]) == "between(n,2,25)"
+    assert ground_rows.selection([(2, 25), (96, 117), (130, 131)]) == (
         "((between(n,2,25)+between(n,96,117))+between(n,130,131))"
     )
 
@@ -65,8 +66,11 @@ def test_a_derived_picture_holds_the_ground_in_its_band_and_every_frame(root):
     source, target = root / "captioned.mp4", root / "artifacts/uncaptioned.mp4"
     encode(source, LABEL, CAPTION)
     assert band(source).max() > 200
-    made = derivation.derive(source, target, SIZE, ROWS, FREE, root / "work")
+    made = derivation.derive(source, target, SIZE, ROWS, FREE, root / "work", edges=(8, 8))
     ground = made["ground"]
+    edge = made["edge_check"]
+    assert (edge["rows"], edge["frames"], edge["verdict"]) == ([8, 8], FRAMES, "pass")
+    assert edge["largest_departure"] <= 1
     assert sorted(ground) == ["u", "v", "y"]
     check = made["check"]
     assert (check["frames"], check["verdict"]) == (46, "pass")
@@ -130,17 +134,31 @@ def test_the_ground_check_reads_every_frame_and_the_largest_departure(tmp_path):
     ground = {"y": 21, "u": 129, "v": 125}
     stats = tmp_path / "stats.txt"
     stats.write_text(measured(range(2, 6)).replace("UMAX=129", "UMAX=132", 1))
-    assert derivation.ground_check(stats, [(2, 5)], ground) == {
+    assert ground_rows.ground_check(stats, [(2, 5)], ground) == {
         "frames": 4,
         "largest_departure": 3,
         "verdict": "pass",
     }
     stats.write_text(measured(range(2, 6)).replace("YMAX=21", "YMAX=235", 1))
     with pytest.raises(PictureError, match="frame 2, a frame without a caption: .* 214 levels"):
-        derivation.ground_check(stats, [(2, 5)], ground)
+        ground_rows.ground_check(stats, [(2, 5)], ground)
     stats.write_text(measured(range(2, 5)))
     with pytest.raises(PictureError, match="measured at 3 of its 4 frames"):
-        derivation.ground_check(stats, [(2, 5)], ground)
+        ground_rows.ground_check(stats, [(2, 5)], ground)
     stats.write_text(measured([2, 3, 4, 9]))
     with pytest.raises(PictureError, match="frame 5 is not readable"):
-        derivation.ground_check(stats, [(2, 5)], ground)
+        ground_rows.ground_check(stats, [(2, 5)], ground)
+
+
+@pytest.mark.ffmpeg
+def test_a_ground_that_changes_while_a_caption_shows_is_refused_by_the_edge_rows(root):
+    # The whole frame's ground is another colour on exactly the frames that show the caption, so
+    # every frame without a caption holds the ground and the band's own check passes.
+    other = "drawbox=x=0:y=0:w=iw:h=ih:color=0x2A3238:t=fill:enable='between(n,30,90)'"
+    source, target = root / "captioned.mp4", root / "uncaptioned.mp4"
+    encode(source, other, LABEL, CAPTION)
+    with pytest.raises(PictureError, match=r"edge of the painted rows.* at frame (29|30|31)"):
+        derivation.derive(source, target, SIZE, ROWS, FREE, root / "work", edges=(8, 8))
+    assert not target.exists()
+    assert not (root / "work/derived.mp4").exists()
+    assert not (root / "work/edge-stats.txt").exists()
