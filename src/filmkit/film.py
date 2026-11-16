@@ -160,9 +160,61 @@ class Motion(Declared):
         return exceptions
 
 
+class DetailException(Declared):
+    """One finding of the detail audit an edition keeps: its kind, its scene, optionally the
+    `source` that names it within the scene, and why it stays.
+
+    The source is a rail's list for `rail`, the line that drew the call as `film.js:<line>` or
+    its module for `ink_drop`, the text for `outside_pace`, the thought whose quiet holds the
+    stroke for `part_drawn` and the side, `left` or `right`, for `off_centre_far`; without one
+    the exception names every finding of its kind in the scene. A `racing_tip` is named by its
+    scene alone, since the cue that keys a stroke moves with every fit of the runtime.
+    """
+
+    edition: Literal["zh", "en"]
+    kind: Literal["ink_drop", "outside_pace", "part_drawn", "racing_tip", "rail", "off_centre_far"]
+    scene: Stated
+    source: Stated | None = None
+    reason: Stated
+
+    @model_validator(mode="after")
+    def source_of_its_kind(self) -> DetailException:
+        """Refuse a source that no finding of the kind can carry."""
+        allowed = {"racing_tip": (None,), "off_centre_far": (None, "left", "right")}
+        if self.source not in allowed.get(self.kind, (self.source,)):
+            message = f"a {self.kind} exception cannot name the source {self.source!r}"
+            raise ValueError(message)
+        return self
+
+
+class Detail(Declared):
+    """The detail audit's findings the film keeps (`filmkit.picture.detail_gates`): a finding
+    that an exception of its edition names is recorded with the reason instead of refused, and
+    an exception that no finding of its edition matches is refused."""
+
+    exceptions: tuple[DetailException, ...] = ()
+
+    @field_validator("exceptions")
+    @classmethod
+    def distinct_findings(
+        cls, exceptions: tuple[DetailException, ...]
+    ) -> tuple[DetailException, ...]:
+        """Refuse two exceptions of one finding."""
+        keys = [(e.edition, e.kind, e.scene, e.source) for e in exceptions]
+        if len(set(keys)) != len(keys):
+            message = "two exceptions name the same detail finding of one edition"
+            raise ValueError(message)
+        return exceptions
+
+
 class Picture(Declared):
     """The font files the picture stages below fonts/, in their order, how its wrapped labels
-    break, the motion it keeps, and how the renderer captures its frames.
+    break, the motion and the detail findings it keeps, whether it makes drafts, and how the
+    renderer captures its frames.
+
+    `drafts` says whether the film renders a 10 fps draft of each edition and scans it for still
+    pictures (`filmkit.picture.draft`): `preflight` asks for that scan only of a film that
+    declares them, since `check-picture` audits every frame.
 
     `capture` is `fast`, the default, which turns the renderer's fast capture on as earlier
     releases did; `screenshot`, which turns it off; or `software`, which draws the frames in the
@@ -173,6 +225,8 @@ class Picture(Declared):
     fonts: tuple[str, ...] = Field(min_length=1)
     wrapping: Wrapping = Field(default_factory=Wrapping)
     motion: Motion = Field(default_factory=Motion)
+    detail: Detail = Field(default_factory=Detail)
+    drafts: bool = False
     capture: Literal["fast", "screenshot", "software"] = "fast"
 
     @field_validator("fonts")
@@ -199,12 +253,28 @@ LEVELS = ("信", "达", "雅")
 LevelName = Literal["信", "达", "雅"]
 
 
+# A thought by its segment and its number from 1, as "05.4".
+ThoughtName = Annotated[str, StringConstraints(pattern=r"^[^.\s]+\.[1-9][0-9]*$")]
+
+
+class ClarityException(Declared):
+    """One thought of an edition that the film keeps under its clarity floor, and why."""
+
+    edition: Literal["zh", "en"]
+    thought: ThoughtName
+    reason: Stated
+
+
 class Review(Declared):
     """The reviewer prompt, the verifier's floors, the scored dimensions and the plan readings.
 
     The dimensions keep their record order. The readings file holds the listening plan's
     analyst readings; without one the plan adds none. The clarity floors, one for each edition,
     are what the review's measurement records each voice's clarity against (`review.clarity`).
+    The floor holds for a soundtrack and its segments. A single thought varies about its segment,
+    so a film may keep a thought under the floor by a `clarity_exceptions` entry, and with
+    `clarity_thought_margin_db` states the line no kept thought may read under, the floor less
+    that margin (`filmkit.preflight`).
     The levels, 信, 达 and 雅 when the film declares them, each hold some of the dimensions,
     every dimension in exactly one; a review then passes level by level (`review.record`).
     """
@@ -215,7 +285,25 @@ class Review(Declared):
     dimensions: dict[str, str] = Field(min_length=1)
     readings: str | None = None
     clarity_minimum_db: ClarityFloors | None = None
+    clarity_thought_margin_db: Annotated[float, Field(gt=0, le=6)] | None = None
+    clarity_exceptions: tuple[ClarityException, ...] = ()
     levels: dict[LevelName, Level] | None = None
+
+    @model_validator(mode="after")
+    def thoughts_judged_against_a_declared_line(self) -> Review:
+        """Refuse a thought line without the floors it is taken from, declared thoughts without
+        that line, and a thought declared twice in one edition."""
+        if self.clarity_thought_margin_db is not None and self.clarity_minimum_db is None:
+            message = "review.clarity_thought_margin_db needs review.clarity_minimum_db"
+            raise ValueError(message)
+        if self.clarity_exceptions and self.clarity_thought_margin_db is None:
+            message = "review.clarity_exceptions needs review.clarity_thought_margin_db"
+            raise ValueError(message)
+        names = [(e.edition, e.thought) for e in self.clarity_exceptions]
+        if len(set(names)) != len(names):
+            message = "review.clarity_exceptions names a thought of one edition twice"
+            raise ValueError(message)
+        return self
 
     @model_validator(mode="after")
     def every_dimension_in_one_level(self) -> Review:
@@ -243,8 +331,6 @@ class Review(Declared):
 PauseLimit = Annotated[float, Field(gt=0, le=2)]
 # A declared word or reason: text that holds more than whitespace.
 FlowText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-# A thought by its segment and its number from 1, as "05.4".
-ThoughtName = Annotated[str, StringConstraints(pattern=r"^[^.\s]+\.[1-9][0-9]*$")]
 # A Latin-script word, which may hold an apostrophe, a period or a hyphen inside.
 LatinWord = Annotated[
     str, StringConstraints(pattern=r"^[A-Za-z][A-Za-z0-9]*(?:['’.-][A-Za-z0-9]+)*$")
@@ -336,6 +422,31 @@ class Narration(Declared):
         return terms
 
 
+class RateException(Declared):
+    """One caption cue of an edition that the film keeps above the reading rate: its text as the
+    assembly record states it, and why."""
+
+    edition: Literal["zh", "en"]
+    text: Stated
+    reason: Stated
+
+
+class Captions(Declared):
+    """The caption cues above the reading rate that the film keeps (`filmkit.preflight`)."""
+
+    rate_exceptions: tuple[RateException, ...] = ()
+
+    @field_validator("rate_exceptions")
+    @classmethod
+    def distinct_cues(cls, cues: tuple[RateException, ...]) -> tuple[RateException, ...]:
+        """Refuse two exceptions of one cue."""
+        names = [(e.edition, e.text) for e in cues]
+        if len(set(names)) != len(names):
+            message = "captions.rate_exceptions names a cue of one edition twice"
+            raise ValueError(message)
+        return cues
+
+
 class Film(Declared):
     """A bilingual film: its file prefix, delivery folder, entry page, sources, fonts, player
     colours and review.
@@ -353,6 +464,7 @@ class Film(Declared):
     player: Player
     review: Review
     narration: Narration = Field(default_factory=Narration)
+    captions: Captions = Field(default_factory=Captions)
 
 
 def named_files(film: Film) -> list[tuple[str, str]]:

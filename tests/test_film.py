@@ -458,3 +458,99 @@ def test_a_narration_term_declaration_refuses_naming_its_field(declared, old, ne
     declare_flow(declared, TERMS.replace(old, new))
     with pytest.raises(FilmError, match=field):
         film.load(declared)
+
+
+# A detail declaration that keeps one rail of one edition at its narrow row.
+DETAIL = """[[picture.detail.exceptions]]
+edition = "zh"
+kind = "rail"
+scene = "13"
+source = "duties"
+reason = "a lower second row would unseat the names from their marks"
+
+"""
+
+
+def test_detail_exceptions_default_and_are_declared(declared):
+    assert film.FILM.picture.detail == film.Detail()
+    rewrite(declared, "[review]\n", DETAIL + "[review]\n")
+    kept = film.load(declared).picture.detail.exceptions
+    assert kept == (
+        film.DetailException(
+            edition="zh",
+            kind="rail",
+            scene="13",
+            source="duties",
+            reason="a lower second row would unseat the names from their marks",
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "refusal"),
+    [
+        ('kind = "rail"', 'kind = "gap"', "picture.detail.exceptions.0.kind"),
+        ('kind = "rail"', 'kind = "racing_tip"', "a racing_tip exception cannot name the source"),
+        ('kind = "rail"', 'kind = "off_centre_far"', "cannot name the source 'duties'"),
+        ('reason = "a lower second row would unseat the names from their marks"', "", "0.reason"),
+        ("[review]\n", DETAIL + "[review]\n", "two exceptions name the same detail finding"),
+    ],
+)
+def test_a_detail_declaration_refuses_naming_its_fault(declared, old, new, refusal):
+    rewrite(declared, "[review]\n", DETAIL + "[review]\n")
+    rewrite(declared, old, new)
+    with pytest.raises(FilmError, match=re.escape(refusal)):
+        film.load(declared)
+
+
+def test_a_film_makes_drafts_only_when_it_declares_them(declared):
+    # The sample film declares its drafts.
+    assert film.load(declared).picture.drafts is True
+    rewrite(declared, "drafts = true\n", "")
+    assert film.load(declared).picture.drafts is False
+
+
+# The line a single thought is judged against, one thought kept under the floor and one cue kept
+# above the reading rate.
+KEPT = """clarity_thought_margin_db = 1.0
+
+[[review.clarity_exceptions]]
+edition = "en"
+thought = "05.3"
+reason = "thirty-two takes read under the floor; its reviewers accepted it"
+
+[[captions.rate_exceptions]]
+edition = "en"
+text = "The people watching the pipeline report this back,"
+reason = "a quoted line kept whole"
+
+"""
+
+
+def test_thoughts_under_the_floor_and_fast_cues_are_declared_by_identity(declared):
+    review, captions = film.FILM.review, film.FILM.captions
+    assert review.clarity_thought_margin_db is None and review.clarity_exceptions == ()
+    assert captions == film.Captions()
+    rewrite(declared, "# The scored dimensions", KEPT + "# The scored dimensions")
+    loaded = film.load(declared)
+    assert loaded.review.clarity_thought_margin_db == 1.0
+    assert [(e.edition, e.thought) for e in loaded.review.clarity_exceptions] == [("en", "05.3")]
+    (cue,) = loaded.captions.rate_exceptions
+    assert (cue.edition, cue.reason) == ("en", "a quoted line kept whole")
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "refusal"),
+    [
+        ("clarity_thought_margin_db = 1.0\n", "", "needs review.clarity_thought_margin_db"),
+        ("clarity_minimum_db = { zh = 18.0, en = 16.0 }\n", "", "needs review.clarity_minimum_db"),
+        ("clarity_thought_margin_db = 1.0", "clarity_thought_margin_db = 0", "margin_db"),
+        ('thought = "05.3"', 'thought = "5"', "review.clarity_exceptions.0.thought"),
+        ('reason = "a quoted line kept whole"', 'reason = ""', "captions.rate_exceptions.0.reason"),
+    ],
+)
+def test_a_declared_thought_or_cue_refuses_naming_its_fault(declared, old, new, refusal):
+    rewrite(declared, "# The scored dimensions", KEPT + "# The scored dimensions")
+    rewrite(declared, old, new)
+    with pytest.raises(FilmError, match=re.escape(refusal)):
+        film.load(declared)
