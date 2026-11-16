@@ -203,7 +203,7 @@ def test_a_dim_mark_missing_for_one_frame_is_refused_and_names_its_picture(editi
     fault = (
         "encoded frame 77 at 1.283 s: the uncaptioned picture holds a one-frame fault of 60 levels "
         f"in box [8, 6, 32, 14] outside the caption band{DENSE}; render it again with {RENDER} "
-        "--uncaptioned"
+        "--uncaptioned --native"
     )
     assert message == f"The zh pictures differ beyond their captions: {fault}{NEXT}"
     every = record["encoded"]["every_frame"]
