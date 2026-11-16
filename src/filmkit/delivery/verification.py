@@ -6,7 +6,8 @@ the films and pages name, complete media decoding of all four films, the keyword
 Spotlight imports from each film where the host has `mdimport`, and the recorded review
 thresholds.
 Aesthetic judgment belongs to the review record; human listening stays separate.
-The verifier reads and decodes; it writes nothing and prints each edition's report.
+The verifier reads and decodes; it writes nothing and prints each edition's report, which states
+the seconds each film's media took. Up to four films' media are verified at the same time.
 
 Usage: python -m filmkit.delivery.verification [--technical-only] --language zh|en|all
            [<films>]
@@ -17,7 +18,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 import wave
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import filmkit.captions.timing as captions_timing
@@ -42,6 +45,9 @@ class VerificationError(ValueError):
     """A delivered edition or one of its bound inputs differs from what acceptance requires."""
 
 
+# How many films' media are verified at the same time: each is one complete decode, which uses a
+# few of the host's cores.
+MEDIA_POOL = 4
 CREDITS_DURATION, DURATION, FPS, RATE = (
     specification.CREDITS_DURATION,
     specification.DURATION,
@@ -421,6 +427,26 @@ def verify_review(
     }
 
 
+def verify_films(edition: production.Edition, files: list[Path], renditions: dict) -> dict:
+    """Verify the films' media, up to `MEDIA_POOL` at the same time: each film's report in the
+    order given, and the seconds each took. The first film in that order that is refused
+    refuses, as it does in sequence."""
+
+    def timed(path: Path) -> tuple[dict, float]:
+        started = time.monotonic()
+        report = verify_media(edition, path, renditions[path.name])
+        return report, round(time.monotonic() - started, 1)
+
+    with ThreadPoolExecutor(max_workers=MEDIA_POOL) as pool:
+        verified = list(pool.map(timed, files))
+    return {
+        "media": [report for report, _ in verified],
+        "media_seconds": {
+            path.name: seconds for path, (_, seconds) in zip(files, verified, strict=True)
+        },
+    }
+
+
 def qualify(
     edition: production.Edition, files: list[Path], *, technical_only: bool = False
 ) -> dict:
@@ -441,7 +467,7 @@ def qualify(
         "narration": verify_narration(edition),
         "picture": verify_picture(edition),
         "package": verify_package(edition),
-        "media": [verify_media(edition, path, renditions[path.name]) for path in sorted(files)],
+        **verify_films(edition, sorted(files), renditions),
         "spotlight": verify_spotlight(edition, sorted(files)),
     }
     report["review"] = (

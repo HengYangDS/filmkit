@@ -113,8 +113,14 @@ def test_the_scan_record_names_the_film_timeline_and_composition_it_judged(tmp_p
     (tmp_path / "picture").mkdir()
     (tmp_path / "picture/film.js").write_text("scenes = {};\n")
     repository.write("timeline.json", timeline((1.0, 1.5)))
-    monkeypatch.setattr(still_scan, "decode", lambda _movie, _phase: iter(frames(40, 0)))
+    monkeypatch.setattr(still_scan, "frame_rate", lambda _movie: 60)
+    decoded = []
+    monkeypatch.setattr(
+        still_scan, "decode", lambda _movie, phase: decoded.append(phase) or iter(frames(40, 0))
+    )
     still_scan.main(["film.mp4", "timeline.json", "--out", "scan.json"])
+    # A 60 fps film has frames between its samples, so each phase is decoded.
+    assert decoded == [0, 3]
     record = json.loads((tmp_path / "scan.json").read_text())
     assert record["movie"] == {
         "path": "film.mp4",
@@ -135,9 +141,15 @@ def test_an_edition_draft_is_scanned_against_its_timeline_into_its_record(tmp_pa
     (tmp_path / "picture/film.js").write_text("scenes = {};\n")
     edition = Edition("en")
     repository.write(edition.timeline, timeline((1.0, 1.5)))
-    monkeypatch.setattr(still_scan, "decode", lambda _movie, _phase: iter(frames(40, 0)))
+    monkeypatch.setattr(still_scan, "frame_rate", lambda _movie: 10)
+    decoded = []
+    monkeypatch.setattr(
+        still_scan, "decode", lambda _movie, phase: decoded.append(phase) or iter(frames(40, 0))
+    )
     still_scan.main(["draft.mp4", "--language", "en"])
     record = json.loads(edition.draft_stills.read_text())
+    # A draft at the scan's own rate is decoded once for both phases, which the record still names.
+    assert (decoded, record["phases"]) == ([0], 2)
     assert record["timeline"] == {
         "path": "build/artifacts/film/en/timeline.json",
         "sha256": repository.sha(edition.timeline),

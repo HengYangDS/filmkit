@@ -43,7 +43,9 @@ Usage: python -m filmkit.produce check-picture --language zh|en
 
 from __future__ import annotations
 
+import contextvars
 import json
+from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -390,6 +392,15 @@ def current_bindings(edition: Edition) -> dict:
     }
 
 
+def run_audits(audits: list[tuple[str, list[str], Path, dict | None]]) -> None:
+    """Run audits that share no file at the same time, each in a process of its own; once all
+    have ended, the first in the order given whose tool failed refuses."""
+    with ThreadPoolExecutor(max_workers=len(audits)) as pool:
+        ended = [pool.submit(contextvars.copy_context().run, run_audit, *audit) for audit in audits]
+    for audit in ended:
+        audit.result()
+
+
 def run_audit(tool: str, arguments: list[str], out: Path, environment: dict | None = None) -> None:
     """Run one of the engine's Node audits, its standard output written to `out`."""
     with durations.phase(tool):
@@ -416,26 +427,22 @@ def check_picture(edition: Edition) -> dict:
     repository.write(rules, wrapping_rules(wrapping))
     traces = {"TRACE": str(trace), "TEXTS": str(texts_trace), "MARKS": str(marks)}
     traces["TURNS"] = str(turns_path)
-    run_audit(
-        "frame-audit",
-        [timeline, f"{FRAME_STEP:.7f}"],
-        frame_path,
-        {**traces, WRAPPING_VARIABLE: str(rules), **faces},
+    frame_faces = {**traces, WRAPPING_VARIABLE: str(rules), **faces}
+    motion = [timeline, str(MOTION_FPS), "--out", str(motion_path)]
+    detail = [timeline, "--out", str(detail_path)]
+    # The three audits read the composition and the timeline and write files of their own.
+    run_audits(
+        [
+            ("frame-audit", [timeline, f"{FRAME_STEP:.7f}"], frame_path, frame_faces),
+            ("motion-audit", motion, work / "motion-summary.json", faces),
+            ("detail-audit", detail, work / "detail-summary.json", faces),
+        ]
     )
     # The browser draws each start and end of the whole turns once; a picture without one starts
     # no browser.
     draws = repository.read(turns_path)["draws"]
     if draws:
         run_audit("whole-turns", [str(turns_path)], painted_path)
-    run_audit(
-        "motion-audit",
-        [timeline, str(MOTION_FPS), "--out", str(motion_path)],
-        work / "motion-summary.json",
-        faces,
-    )
-    run_audit(
-        "detail-audit", [timeline, "--out", str(detail_path)], work / "detail-summary.json", faces
-    )
     sync = sync_audit.full_report(repository.read(edition.timeline), trace, marks, FRAME_STEP)
     repository.write(sync_path, sync)
     lines = sync_audit.read_trace(texts_trace)

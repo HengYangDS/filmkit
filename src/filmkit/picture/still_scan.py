@@ -195,6 +195,14 @@ def decode(movie: Path, phase: int = 0) -> Iterator[np.ndarray]:
         raise StillScanError(msg)
 
 
+def phase_reports(film: Path, words: dict) -> list[dict]:
+    """Each phase's scan of a film. A movie at the scan's own rate holds no frame between its
+    samples, so both phases select the same frames and one decode serves both."""
+    if frame_rate(film) == FPS:
+        return [scan(decode(film, PHASES[0]), words)] * len(PHASES)
+    return [scan(decode(film, phase), words) for phase in PHASES]
+
+
 def record_scan(movie: Path, timeline: Path, out: Path, limit: float = LIMIT_SECONDS) -> dict:
     """Scan a film against a timeline at both phases and write the record at `out`.
 
@@ -204,7 +212,7 @@ def record_scan(movie: Path, timeline: Path, out: Path, limit: float = LIMIT_SEC
     """
     film, judged = repository.ROOT / movie, repository.ROOT / timeline
     words = repository.read(judged)
-    report = worst([scan(decode(film, phase), words) for phase in PHASES])
+    report = worst(phase_reports(film, words))
     subjects = {
         "movie": {"path": repository.relative(film), "sha256": repository.sha(film)},
         "timeline": {"path": repository.relative(judged), "sha256": repository.sha(judged)},

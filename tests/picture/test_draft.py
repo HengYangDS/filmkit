@@ -58,6 +58,7 @@ def frames(moving, still):
 
 def scanning(monkeypatch, moving, still):
     """Have the scan read these frames from any draft at either phase."""
+    monkeypatch.setattr(still_scan, "frame_rate", lambda _movie: picture_draft.DRAFT_FPS)
     monkeypatch.setattr(still_scan, "decode", lambda _movie, _phase: iter(frames(moving, still)))
 
 

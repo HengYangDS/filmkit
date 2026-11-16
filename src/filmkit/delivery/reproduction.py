@@ -31,6 +31,8 @@ import argparse
 import json
 import math
 import re
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Annotated
 
@@ -51,6 +53,8 @@ CHECKSUMS = "SHA256SUMS"
 DECODE_DEADLINE = 7200
 # How many of the lowest frames a film's comparison reports.
 LOWEST = 10
+# How many film pairs are compared at the same time: each pair is two complete decodes.
+PAIR_POOL = 2
 # The container tags that name the encoder or the time a film was packaged, not the film.
 PACKAGING_TAGS = ("encoder", "creation_time", "com.apple.quicktime.creationdate")
 
@@ -379,6 +383,24 @@ def film(asset: Asset, rebuilt: Path, published: Path, floor: float | None) -> d
     return result
 
 
+def compare_films(pairs: list[tuple[Asset, Path, Path, float | None]]) -> dict:
+    """Compare each rebuilt film with its published film, up to `PAIR_POOL` pairs at the same
+    time: the results in the order given, and the seconds each pair took."""
+
+    def timed(pair: tuple[Asset, Path, Path, float | None]) -> tuple[dict, float]:
+        started = time.monotonic()
+        result = film(*pair)
+        return result, round(time.monotonic() - started, 1)
+
+    with ThreadPoolExecutor(max_workers=PAIR_POOL) as pool:
+        compared = list(pool.map(timed, pairs))
+    names = [asset.name for asset, *_ in pairs]
+    return {
+        "films": [result for result, _ in compared],
+        "film_seconds": {name: seconds for name, (_, seconds) in zip(names, compared, strict=True)},
+    }
+
+
 def compare_edition(
     edition: production.Edition, record: EditionRecord, assets: dict, listed: dict[str, Asset]
 ) -> dict:
@@ -402,11 +424,13 @@ def compare_edition(
             for name, (layer, source) in layers.items()
             if layer == "document"
         ],
-        "films": [
-            film(listed[name], source, assets[name], record.picture_floor_db.get(name))
-            for name, (layer, source) in layers.items()
-            if layer == "film" and name in assets
-        ],
+        **compare_films(
+            [
+                (listed[name], source, assets[name], record.picture_floor_db.get(name))
+                for name, (layer, source) in layers.items()
+                if layer == "film" and name in assets
+            ]
+        ),
         "unpublished": [
             name for name, (layer, _) in layers.items() if layer == "film" and name not in assets
         ],

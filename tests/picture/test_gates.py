@@ -171,7 +171,12 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
         assert report["sha256"] == repository.sha(film / report["path"])
     # The frame audit runs at one thirtieth of a second with its traces, the motion audit at
     # 30 frames per second and the detail audit at its own rate, each on the edition's timeline.
-    (frame_tool, frame_args, frame_env), (motion_tool, motion_args, motion_env), detail = calls
+    # The three audits run at the same time, so their calls arrive in any order.
+    by_tool = {call[0]: call for call in calls}
+    assert sorted(by_tool) == ["detail-audit", "frame-audit", "motion-audit"]
+    (frame_tool, frame_args, frame_env), (motion_tool, motion_args, motion_env), detail = (
+        by_tool[tool] for tool in ("frame-audit", "motion-audit", "detail-audit")
+    )
     assert detail[:2] == ("detail-audit", [str(edition.timeline), "--out", detail[1][2]])
     assert detail[2] == motion_env
     assert (frame_tool, frame_args) == ("frame-audit", [str(edition.timeline), "0.0333333"])
@@ -386,7 +391,8 @@ def test_wrapped_labels_are_judged_by_the_declared_rules_and_refused_by_name(fil
         'frame wrapped label 11 "Rollback or" / "degradation" at rest 30.50 s: '
         'line 1 ends on the lead word "or"',
     ]
-    rules = repository.read(Path(calls[0][2][gates.WRAPPING_VARIABLE]))
+    frame_call = next(call for call in calls if call[0] == "frame-audit")
+    rules = repository.read(Path(frame_call[2][gates.WRAPPING_VARIABLE]))
     assert rules == {"line_share": 0.75, "last_share": 0.5, "lead_words": ["versus"]}
 
 
@@ -544,7 +550,8 @@ def test_the_browser_draws_each_whole_turn_once_and_a_start_without_ink_refuses(
         " rad, drawn at film.js:1234 (picture/film/marks.js), paints no ink in the renderer's"
         " browser from 1 of its 1 starts; draw it as ellipse(x, y, r, r, start, 0, 2 * Math.PI)"
     ]
-    tools = ["frame-audit", "whole-turns", "motion-audit", "detail-audit"]
-    assert [call[0] for call in calls] == tools
+    # The browser draws the whole turns once the frame audit, which lists them, has ended.
+    assert sorted(call[0] for call in calls[:3]) == ["detail-audit", "frame-audit", "motion-audit"]
+    assert calls[3][0] == "whole-turns"
     reports = ["detail", "frame", "motion", "sync", "texts", "whole_turns"]
     assert sorted(record["reports"]) == reports

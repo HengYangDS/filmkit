@@ -2,7 +2,7 @@
 
 - [x] 1.1 Add `filmkit.durations`: a run for a command and an edition, phases named by the code that does the work, one record written when the run ends whether it completed or not, and the command that prints an edition's records with their sum; verify `tests/test_durations.py`.
 - [x] 1.2 Start a run for every action of `filmkit.produce` and for `narrate`, each step a phase, and name the phases of `compare-pictures`, `package-film` and `check-picture`; verify `tests/test_durations.py` (an action's record, a refused action's record) and `tests/narration/test_narrate.py` (a run's record, none for a dry run).
-- [ ] 1.3 State each film's seconds in the verifier's report, which writes nothing, and in the reproduction's report; verify `tests/delivery/test_verification.py` and `tests/delivery/test_reproduction.py`.
+- [x] 1.3 State each film's seconds in the verifier's report, which writes nothing, and in the reproduction's report; verify `tests/delivery/test_verification_pool.py` and `tests/delivery/test_verification.py`.
 
 ## 2. Render settings
 
@@ -31,11 +31,11 @@
 
 ## 6. Side by side and small savings
 
-- [ ] 6.1 Run `check-picture`'s frame, motion and detail audits at the same time, the whole-turn check after the frame audit; verify `tests/picture/test_gates.py` (the same record as in sequence, and a failing audit named).
-- [ ] 6.2 Verify up to four films at the same time and print the reports in the films' order; verify `tests/delivery/test_verification_media.py` and `tests/delivery/test_verification.py`.
-- [ ] 6.3 Compare the reproduction's film pairs side by side; verify `tests/delivery/test_reproduction.py`.
+- [x] 6.1 Run `check-picture`'s frame, motion and detail audits at the same time, the whole-turn check after the frame audit; verify `tests/picture/test_side_by_side.py` (all three started before any ends, the first failed audit named) and `tests/picture/test_gates.py` (the same record as in sequence).
+- [x] 6.2 Verify up to four films at the same time and print the reports in the films' order; verify `tests/delivery/test_verification_pool.py` and `tests/delivery/test_verification.py`.
+- [x] 6.3 Compare the reproduction's film pairs two at a time, the results in order; verify `tests/delivery/test_verification_pool.py` and `tests/delivery/test_reproduction.py`.
 - [ ] 6.4 Cache each recording's transcript by its SHA-256, the recognizer's revision and the language, and load a speech model only when a record misses its cache; verify `tests/narration/test_transcription.py` and `tests/narration/test_alignment.py`.
-- [ ] 6.5 Decode a draft once for both phases of its still scan; verify `tests/picture/test_still_scan.py`.
+- [x] 6.5 Decode a draft once for both phases of its still scan; verify `tests/picture/test_still_scan.py`.
 - [ ] 6.6 Speed up the on-demand every-frame comparison (the static review's changes 1, 2 and 8: parallel time segments, the sampled measures off the scan's decode, band differences in 8 bits); verify that a delivered native pair's record is unchanged.
 
 ## 7. Measurements and acceptance

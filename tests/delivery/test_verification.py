@@ -42,6 +42,7 @@ def test_an_edition_is_qualified_as_its_four_current_films():
         "picture",
         "package",
         "media",
+        "media_seconds",
         "spotlight",
         "review",
         "limits",
