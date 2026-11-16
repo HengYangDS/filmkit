@@ -8,10 +8,11 @@ action needs --language. `--deadline` bounds a render in seconds, by default its
 validate-picture act on the edition's uncaptioned picture instead of its captioned one, and
 every other action refuses it. render-picture --uncaptioned derives that picture from the
 captioned one (`filmkit.picture.derivation`) for a film that declares software capture, and
-renders its own stage for any other film or when `--native` asks for it; compare-pictures proves
-that the two pictures differ only by the captions (`filmkit.picture.equivalence`), and
-qualify-renderer that two renders of the captioned stage decode to the same frames
-(`filmkit.picture.qualification`). `--variants` names fit's
+renders its own stage for any other film or when `--native` asks for it. render-picture
+--language all makes both editions' pictures with one command, the rendered ones side by side
+(`filmkit.picture.together`); compare-pictures proves that the two pictures differ only by the
+captions (`filmkit.picture.equivalence`), and qualify-renderer that two renders of the captioned
+stage decode to the same frames (`filmkit.picture.qualification`). `--variants` names fit's
 pause-policy variants, a file below the film's root or an absolute one
 (`filmkit.soundtrack.fit`), and `--attempts` bounds repair-pictures (`filmkit.picture.repair`);
 every other action refuses them.
@@ -27,6 +28,7 @@ The command owns no goal, approval, repository lifecycle, service or task state.
 
 Usage: python -m filmkit.produce <edition action> --language zh|en [--uncaptioned [--native]]
            [options]
+       python -m filmkit.produce render-picture --language all [--uncaptioned [--native]]
 """
 
 from __future__ import annotations
@@ -57,6 +59,7 @@ from filmkit.picture.rendering import (
     validate_picture,
 )
 from filmkit.picture.repair import ATTEMPTS, repair_pictures
+from filmkit.picture.together import render_all
 from filmkit.preflight import PreflightError, admitted, preflight
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
@@ -174,7 +177,11 @@ def arguments() -> argparse.ArgumentParser:
     parser.add_argument("--width", type=int, default=3840)
     parser.add_argument("--height", type=int, default=2160)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--language", choices=CODES, help="the edition of an edition action")
+    parser.add_argument(
+        "--language",
+        choices=(*CODES, "all"),
+        help="the edition of an edition action; all, for render-picture, makes both editions'",
+    )
     parser.add_argument("--deadline", type=int, help="seconds a render may take")
     parser.add_argument(
         "--variants",
@@ -207,8 +214,16 @@ def main(argv: list[str] | None = None) -> None:
     for option, action in (("variants", "fit"), ("attempts", "repair-pictures")):
         if getattr(options, option) is not None and options.action != action:
             parser.error(f"--{option} applies only to {action}")
+    if options.language == "all" and options.action != "render-picture":
+        parser.error("--language all applies only to render-picture")
     command = options.action + ("-uncaptioned" if options.uncaptioned else "")
     try:
+        if options.language == "all":
+            # Each edition's child writes its own duration record.
+            render_all(
+                uncaptioned=options.uncaptioned, native=options.native, deadline=options.deadline
+            )
+            return
         with durations.run(options.language, command):
             EDITION_ACTIONS[options.action](Edition(options.language), options)
     except REFUSALS as error:

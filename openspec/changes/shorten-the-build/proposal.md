@@ -13,6 +13,7 @@ Measured that night on a 120 s span of a film's UHD stages: the renderer's worke
 - **The renderer's determinism is qualified once for each renderer supply, in the sample build**: the sample renders one stage twice and requires every decoded frame identical, and compares a natively rendered pair at every frame. A film no longer pays for that proof in every build, and can still ask for it.
 - **The 1080p films are encoded by x264 with a keyframe forced at every 120th frame** and scene-cut keyframes off, not by VideoToolbox. The 1080p uncaptioned film of a derived pair is painted and scaled from the captioned picture in one pass, so it is one encode from the render. **BREAKING** for a rebuild of an earlier release: its 1080p films are other encodes of the same pictures, compared by measure as a rebuilt film already is.
 - **Independent checks run side by side**: `check-picture`'s frame, motion and detail audits, and the verifier's films, up to four at once. Each reports and refuses what it does in sequence.
+- **`render-picture --language all` makes both editions' pictures with one command**: two rendered pictures at the same time, the renderer's own lock off for those two renders alone, two derived pictures in a row. Each edition keeps its own receipt and duration record. A film's task list may use it and need not.
 - **Exact small savings**: transcripts cached as alignments are, one decode for both phases of a still scan, the reproduction's film pairs side by side.
 
 ## Capabilities
@@ -24,9 +25,9 @@ Measured that night on a 120 s span of a film's UHD stages: the renderer's worke
 ### Modified Capabilities
 
 - `caption-equivalence`: the uncaptioned picture is derived unless a native render is asked for; what a derivation proves; how a derived pair is compared; what packaging's comparison record binds.
-- `film-engine`: a render's command differs from the earlier one by its worker count.
+- `film-engine`: a render's command differs from the earlier one by its worker count; one command may make both editions' pictures.
 - `film-package`: the 1080p films' encoder and how it holds the keyframe grid.
-- `sample-film`: the sample film declares `software` capture; its build qualifies the renderer and derives one edition's uncaptioned picture; a task prints its durations.
+- `sample-film`: the sample film declares `software` capture; its build renders both captioned pictures at once, qualifies the renderer and derives one edition's uncaptioned picture; a task prints its durations.
 
 ## Impact
 

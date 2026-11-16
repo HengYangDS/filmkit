@@ -7,6 +7,7 @@
 ## 2. Render settings
 
 - [x] 2.1 Take the render's worker count from the host or from `FILMKIT_RENDER_WORKERS`, for the pictures and the draft, and record it in the receipt; verify `tests/picture/test_workers.py` (18 cores give 16, 10 give 8, a named count is passed and recorded, a value that is no count is refused) and `tests/picture/test_capture.py`.
+- [x] 2.2 Make both editions' pictures with one command, `render-picture --language all`: a child of the single-edition command for each edition, the rendered pictures at the same time with the renderer's own lock off for those children, two derivations in a row, and a failing edition named once both have ended; verify `tests/picture/test_together.py`.
 
 ## 3. The derived uncaptioned picture
 
@@ -23,12 +24,12 @@
 - [x] 4.2 Fix the rate factors and the preset from bench3 (`fk/r35/bench3/result.txt` in the films' kit): the 1080p films `veryfast` at rate factor 10, whose lowest frame stands 1.5 dB over VideoToolbox's 51.8 dB, and the derived UHD picture `veryfast` at 12; verify `tests/delivery/test_viewing_encode.py` and `tests/picture/test_derivation.py`, which name the constants, and that the design's decisions 4 and 7 cite the figures.
 - [x] 4.3 Decide from bench2 whether one decode of the captioned picture feeds the three derived encodes of an edition: it does not, being slower (43.6 s) than three separate passes (32.2 s); verify `fk/r35/bench2/result.txt` in the films' kit.
 - [x] 4.4 Encode the 1080p uncaptioned film of a derived pair from the captioned picture, painted as the derivation painted it and scaled in the same pass; verify `tests/delivery/test_viewing_encode.py`.
-- [ ] 4.5 Decide from bench3 whether an edition's derived passes and the two editions' renders run at once, the renders with the renderer's own switch `HYPERFRAMES_RENDER_LOCK=off` set by the caller and recorded in the receipt; verify by the durations of a sample build before and after.
+- [x] 4.5 Decide from bench3 whether an edition's derived passes and the two editions' renders run at once: the derived passes stay in a row (51.8 s at once against about 36 s), and two renders at once take 172.3 s against 228 to 236 s in sequence, every frame identical, so task 2.2 builds them; verify `fk/r35/bench3/result.txt` in the films' kit and the design's decisions 7 and 8.
 
 ## 5. Renderer qualification and the sample film
 
 - [x] 5.1 Add `qualify-renderer`: render the edition's captioned stage again to a work file, compare every decoded frame with the picture's, write the record and refuse a difference by its first frame; verify `tests/picture/test_qualification.py`.
-- [x] 5.2 Give the sample film one picture task for each language, the Chinese one qualifying the renderer and rendering its uncaptioned picture with `--native`, the English one deriving it, and add the task that prints the sample's durations; verify that `mise tasks` lists `sample:picture:zh`, `sample:picture:en`, `sample:admitted` and `sample:durations`.
+- [x] 5.2 Lay out the sample film's picture task as one list: both editions staged and checked, both captioned pictures rendered by `render-picture --language all`, the Chinese stage rendered a second time by `qualify-renderer` and its uncaptioned picture with `--native`, the English one derived; and add the task that prints the sample's durations. Verify that `mise tasks` lists `sample:picture` and `sample:durations` and no picture task of one language.
 
 ## 6. Side by side and small savings
 

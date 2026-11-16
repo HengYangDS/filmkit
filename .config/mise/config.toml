@@ -34,8 +34,8 @@ run = "npm run format:markdown"
 
 # The sample film's pipeline, run in its folder, where the engine finds the film; its npm packages
 # are this repository's. Only sample:supply reaches the network; HF_ENDPOINT names a Hugging Face
-# mirror where the hub is unreachable. sample:build runs every stage in order; the two languages'
-# picture tasks share no file, and sample:durations prints what each command took.
+# mirror where the hub is unreachable. sample:build runs every stage in order, and
+# sample:durations prints what each command took.
 [tasks."sample:supply"]
 description = "Install the pinned browser build and speech models below the sample film's tool cache"
 dir = "{{config_root}}/examples/sample-film"
@@ -63,8 +63,8 @@ run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce check-sound --language en",
 ]
 
-[tasks."sample:picture:zh"]
-description = "Stage both of the Chinese sample edition's pictures, check the geometry, the cover and the audits, render and scan its draft and pass the pre-render check, then render and validate the captioned picture, render it a second time and require the same frames, render the uncaptioned picture natively and compare the pair at every frame"
+[tasks."sample:picture"]
+description = "Stage both of each sample edition's pictures, check the geometry, the cover and the audits, render and scan its draft and pass the pre-render check; render both captioned pictures at once and validate them; render the Chinese captioned stage a second time and require the same frames, render its uncaptioned picture natively and compare the pair at every frame; derive the English uncaptioned picture and compare the pair by the derivation's record; and check that both readiness receipts still admit their editions"
 dir = "{{config_root}}/examples/sample-film"
 run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language zh",
@@ -74,18 +74,6 @@ run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce check-picture --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-draft --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce preflight --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce qualify-renderer --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language zh --uncaptioned --native",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language zh --uncaptioned",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce compare-pictures --language zh",
-]
-
-[tasks."sample:picture:en"]
-description = "Stage both of the English sample edition's pictures, check the geometry, the cover and the audits, render and scan its draft and pass the pre-render check, then render and validate the captioned picture, derive the uncaptioned picture from it and compare the pair by the derivation's record"
-dir = "{{config_root}}/examples/sample-film"
-run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language en",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language en --uncaptioned",
   "uv run --python 3.12 --frozen --offline python -m filmkit.tools geometry-check build/runtime/work/final-delivery-en-uhd build/evidence/editions/en/picture-geometry.json 2",
@@ -93,27 +81,18 @@ run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce check-picture --language en",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-draft --language en",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce preflight --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language en",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language all",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language en",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce qualify-renderer --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language zh --uncaptioned --native",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language zh --uncaptioned",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce compare-pictures --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language en --uncaptioned",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language en --uncaptioned",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce compare-pictures --language en",
-]
-
-[tasks."sample:admitted"]
-description = "Check that both sample editions' readiness receipts still admit them"
-dir = "{{config_root}}/examples/sample-film"
-run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce admitted --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce admitted --language en",
-]
-
-[tasks."sample:picture"]
-description = "Make and compare each sample edition's two pictures, the Chinese pair rendered twice over to qualify the renderer and the English uncaptioned picture derived, and check that both readiness receipts still admit their editions"
-run = [
-  { task = "sample:picture:zh" },
-  { task = "sample:picture:en" },
-  { task = "sample:admitted" },
 ]
 
 [tasks."sample:package"]
