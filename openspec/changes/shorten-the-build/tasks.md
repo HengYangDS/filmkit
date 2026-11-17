@@ -56,6 +56,7 @@
 - [x] 6.10 Stamp each narration process with its own seconds, when it is found ended, whichever ends first; verify `tests/narration/test_real_processes.py` (real stand-in children of two seconds and of none).
 - [x] 6.11 Clear the work folder of a receipt's narration processes at the start of every synthesis for that receipt and keep it after the run, and report a segment a process generated in the run as `generated` with the process's number; verify `tests/narration/test_synthesis_processes.py` (a second run that fails too starts from an empty folder; a run of one segment clears it; a dry run does not) and `tests/narration/test_processes.py`.
 - [x] 6.12 Run the narration's processes as real child processes of a real parent, with a stand-in for the child's command that loads no model: a division that passes, a child that fails while the other runs to its end, a child killed by a signal, and a parent sent SIGTERM. Verify `tests/narration/test_real_processes.py`, and that the two tests the review found unable to fail now fail on a mutation of what they name (`tests/test_build_durations.py`: a run by hand that records; `tests/narration/test_synthesis_processes.py`: no clearing at the start of a run).
+- [x] 6.13 Quote in a failed narration process's refusal the last five lines of its log that are not empty; verify `tests/narration/test_processes.py` (an exception followed by a library's line at exit) and `tests/narration/test_real_processes.py`.
 
 ## 7. Measurements and acceptance
 

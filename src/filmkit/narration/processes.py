@@ -15,8 +15,9 @@ children's logs can be read after a run that passed as after one that failed.
 The count is `DEFAULT` unless `VARIABLE` names another; 1 keeps the single process. A child is
 given the count 1, so it never divides again. A child that fails does not stop the others; once
 all have ended the narration is refused, naming each failed child, its segments, its exit status,
-its log and the last line it wrote, which holds the refusal an unresolved take raises. What a
-failed child left behind is then judged by the next run as an interrupted run's always was.
+its log and the last five lines it wrote, among which the refusal an unresolved take raises
+stands. What a failed child left behind is then judged by the next run as an interrupted run's
+always was.
 
 No child outlives the narration. Each leads a session of its own, and when the narration's wait
 is cut short, by an interrupt, by a request to end (SIGTERM) or by a failure of its own, such as
@@ -50,6 +51,8 @@ DEFAULT = 2
 WORK = Path("build/runtime/work/narration-processes")
 # Seconds between two looks at the children that still run.
 POLL_SECONDS = 0.1
+# How many of a failed child's last lines its refusal quotes.
+QUOTED_LINES = 5
 
 
 class ProcessesError(ValueError):
@@ -125,10 +128,13 @@ def start(command: list[str], log: Path) -> subprocess.Popen:
         )
 
 
-def last_line(log: Path) -> str:
-    """The last line a child wrote, or nothing when it wrote none."""
+def last_lines(log: Path) -> str:
+    """The last `QUOTED_LINES` lines a child wrote that are not empty, in their order and joined
+    by bars, or nothing when it wrote none. The exception that ended a child is seldom its very
+    last line: what a library prints as the process ends stands after it."""
     lines = log.read_text(errors="replace").splitlines() if log.is_file() else []
-    return next((line.strip()[:300] for line in reversed(lines) if line.strip()), "")
+    written = [line.strip()[:300] for line in lines if line.strip()]
+    return " | ".join(written[-QUOTED_LINES:])
 
 
 def wait_for_all(
@@ -188,7 +194,7 @@ def narrate(sources: tuple[str, str, str], shares: list[list[str]], receipt: Pat
         raise ProcessesError(msg) from error
     failed = [
         f"segments {', '.join(child['ids'])} exited {child['exit']} "
-        f"({repository.relative(child['log'])}: {last_line(child['log'])})"
+        f"({repository.relative(child['log'])}: {last_lines(child['log'])})"
         for child in ended
         if child["exit"] != 0
     ]

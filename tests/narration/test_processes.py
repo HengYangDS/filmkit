@@ -116,15 +116,21 @@ def test_the_work_folder_is_named_after_the_receipts_whole_path_from_the_root(ro
         processes.work_folder(root.parent / "receipt.json")
 
 
-def test_a_failed_child_is_named_with_its_segments_its_log_and_its_last_line(root, monkeypatch):
+def test_a_failed_child_is_named_with_its_segments_its_log_and_its_last_lines(root, monkeypatch):
     refusal = "RetainedUtteranceError: Unresolved native utterance; inspect before replay"
-    logs = ['{"id": "01"}\n', f"Traceback (most recent call last):\n  ...\n{refusal}\n\n"]
-    started = starting(monkeypatch, statuses=(0, 1), written=logs)
+    # What a library prints as the process ends stands after the exception.
+    warning = "resource_tracker: There appear to be 1 leaked semaphore objects to clean up"
+    trace = ["Traceback (most recent call last):", '  File "synthesis.py", line 1, in <module>']
+    trace += ["    main()", '  File "synthesis.py", line 2, in main', "    raise error"]
+    failed = "\n".join(['{"id": "02"}', *trace, "", refusal, "", warning, "", ""])
+    started = starting(monkeypatch, statuses=(0, 1), written=['{"id": "01"}\n', failed])
     with pytest.raises(ProcessesError) as refused:
         processes.narrate(SOURCES, [["01"], ["02", "03"]], root / RECEIPT)
     message = str(refused.value)
     assert message.startswith("A narration process failed: segments 02, 03 exited 1 (build/")
-    assert message.endswith(f"process-2.log: {refusal})")
+    # The last five lines that are not empty, in their order.
+    quoted = [trace[2].strip(), trace[3].strip(), trace[4].strip(), refusal, warning]
+    assert message.endswith("process-2.log: " + " | ".join(quoted) + ")")
     # Both children were started and waited for, and their logs stay for inspection.
     assert len(started) == 2
     assert all(log.is_file() for _, log in started)

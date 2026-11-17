@@ -166,7 +166,7 @@ When more than one segment is to be generated, the narration SHALL generate them
 #### Scenario: A process that fails
 
 - **WHEN** one of two processes fails
-- **THEN** the other narrates its segments to the end, the narration is then refused, naming the failed process's segments, its exit status and its log, and the edition's receipt stays as it was
+- **THEN** the other narrates its segments to the end, the narration is then refused, naming the failed process's segments, its exit status, its log and the last five lines the process wrote that are not empty, and the edition's receipt stays as it was
 
 #### Scenario: A value that is no count
 

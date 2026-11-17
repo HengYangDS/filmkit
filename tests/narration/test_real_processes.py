@@ -127,7 +127,7 @@ def test_a_failing_child_is_named_once_the_other_has_run_to_its_end(narration):
     work = "build/runtime/work/narration-processes/build-evidence-narration-receipt"
     assert refusal.strip() == (
         f"A narration process failed: segments 01, 04 exited 3 ({work}/process-1.log: "
-        "RuntimeError: no take)"
+        "Traceback (most recent call last): | RuntimeError: no take)"
     )
     # The other child was not stopped: it wrote its line and ended by itself, and both logs stay.
     assert (narration.root / work / "process-2.log").read_text() == '{"id": "02"}\n'
