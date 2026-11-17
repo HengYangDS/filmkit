@@ -124,7 +124,9 @@ def run(
     receives the tool's standard output instead of the caller's. A tool that runs the
     composition headlessly is given the table of the film's declared faces unless the caller
     names one. A wait that is cut short asks the tool to end and waits for it, at most
-    `STOP_SECONDS`, before what cut it short goes on; the run itself takes no request to end.
+    `STOP_SECONDS`, before what cut it short goes on. The run takes no request to end while it
+    waits for its tool; while the tool starts and while it is being ended, a further request
+    is deferred until the tool is held or has ended or been killed (`child_processes.held`).
     """
     picture_rendering.require_renderer()
     node = shutil.which("node")

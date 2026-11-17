@@ -22,13 +22,15 @@ it had started runs on, a check's audits to their end, and what it would have wr
 end, its duration record among it, is not written. A wait for a tool that an interrupt cuts
 short asks the tool to end and waits for it before the interrupt goes on (`filmkit.tools.run`,
 by `stop`), so that the tool ends what it started, a browser among it, whether or not the
-interrupt reached the tool itself. The audits that a check runs side by side are waited for in
+interrupt reached the tool itself; a further request in that time is deferred, as in any stop,
+until the tool has ended or been killed. The audits that a check runs side by side are waited for in
 threads of their own, which no interrupt reaches: one that reached the command alone leaves
 them running to their end.
 
-`ending`, around the whole run of `filmkit.produce`, of `narrate` and of the synthesis, sets no
-handler. It words the exit of a command that was asked to end where it stood in such a block,
-or that was interrupted anywhere: one line
+`ending`, around the whole run of `filmkit.produce` and of the synthesis and around the steps of
+`narrate`, whose concept and readings checks run before it, sets no handler. It words the exit
+of a command that was asked to end where it stood in such a block, or that was interrupted
+anywhere inside it: one line
 that says what stopped it, then, after SIGTERM or a hang-up, the exit status 128 and the
 signal's number, and after an interrupt the interrupt itself, by which the process then dies,
 so that a shell that ran the command in a script ends the script and reports 130. A line that

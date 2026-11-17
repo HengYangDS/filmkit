@@ -292,8 +292,8 @@ From a first request to end that arrives while its narration processes, its rend
 
 #### Scenario: A line that no stream takes
 
-- **WHEN** a command that acted on a request has standard error on a full pipe that nobody reads, or was started without standard error or standard output
-- **THEN** it drops the line after at most a second, waits for no reader, and ends with the status of its request
+- **WHEN** a command that acted on a request has standard error on a pipe that, as `select` answers, takes no write within a second, as a full one that nobody reads, or was started without standard error
+- **THEN** it writes no line, at once where it has no standard error and after at most a second otherwise, waits for no reader, and ends with the status of its request
 
 #### Scenario: Requests while the command unwinds
 
@@ -311,12 +311,16 @@ A command that SIGTERM or a hang-up ends by its default action, since it holds n
 
 ### Requirement: Outside those waits a request to end has its usual effect
 
-While a command holds no narration process, no renderer and no step of `narrate`, it SHALL take no request to end: SIGTERM and a hang-up SHALL end it by their default action, and an interrupt SHALL end `filmkit.produce`, `narrate` and the synthesis with one line that names it, by the interrupt itself. A tool whose wait an interrupt cuts short SHALL be asked to end and waited for, and killed only when it has not ended after 20 s.
+While a command holds no narration process, no renderer and no step of `narrate`, it SHALL take no request to end: SIGTERM and a hang-up SHALL end it by their default action, and an interrupt SHALL end `filmkit.produce`, the steps of `narrate` and the synthesis with one line that names it, by the interrupt itself.
 
 #### Scenario: SIGTERM during a check that runs tools
 
 - **WHEN** a command that holds no child of the kinds above is sent SIGTERM or SIGHUP
 - **THEN** it ends at once by that signal, with no line, as a command before this Change did, and the tools it had started run on to their own end
+
+### Requirement: A tool that a command waits for is asked to end before it is killed
+
+A tool whose wait an interrupt cuts short SHALL be asked to end and waited for, and killed only when it has not ended after 20 s. While the tool is being ended, a further request to end SHALL be deferred until the tool has ended or been killed.
 
 #### Scenario: An interrupt during a check that runs a tool
 
@@ -327,6 +331,11 @@ While a command holds no narration process, no renderer and no step of `narrate`
 
 - **WHEN** an interrupt reaches a command and not the tool it waits for
 - **THEN** the command asks the tool to end, the tool closes what it started and is not killed, and the command then writes its one line and dies by the interrupt
+
+#### Scenario: A further request while a tool is being ended
+
+- **WHEN** a command is interrupted while it waits for a tool that takes a second to close what it started, and is sent SIGTERM, a hang-up or a second interrupt in that second
+- **THEN** the tool closes what it started, and only then does the command end: by the signal itself after SIGTERM or a hang-up, and with its one line after a second interrupt
 
 #### Scenario: An interrupt of the command alone during audits that run side by side
 
