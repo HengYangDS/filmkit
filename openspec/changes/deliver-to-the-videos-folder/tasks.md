@@ -12,4 +12,4 @@
 
 ## 3. Acceptance
 
-- [ ] 3.1 Run every command of `mise run check` on the lane's head; verify that the dependency checks, the Node suite, the Markdown check, the Python suite and the lint pass.
+- [x] 3.1 Run every command of `mise run check` on the lane's head; verify that the dependency checks, the Node suite, the Markdown check, the Python suite and the lint pass. Every command of `mise run check`, run one process at a time with the proof's static lint, passed in the lane on 18 November 2026 on the tree that commit `cfee1ff` records (1609 passed); the full proof runs on the archived head.
