@@ -90,6 +90,18 @@ import filmkit.produce as produce
 produce.EDITION_ACTIONS["render-picture"] = render.render
 produce.main(["render-picture", "--language", "zh"])
 """
+# The production command itself in an action that holds no child, as a check that runs tools.
+CHECKING = """
+import pathlib, sys, time
+import filmkit.produce as produce
+import filmkit.repository as repository
+repository.ROOT = pathlib.Path(sys.argv[1])
+def checking(edition, options):
+    note("checking")
+    time.sleep(30)
+produce.EDITION_ACTIONS["check-picture"] = checking
+produce.main(["check-picture", "--language", "zh"])
+"""
 # A command that holds no child while it runs: it takes no request.
 IDLE = """
 import time
@@ -107,6 +119,23 @@ with child_processes.ending("holding: stopped by {request}"):
     with child_processes.terminable():
         note("holding")
         time.sleep(30)
+"""
+# A check that runs one audit as `check-picture` runs its three, in a pool's thread, by the
+# engine's own `run_audits` over the same stand-in tool.
+AUDITS = """
+import pathlib, sys
+import filmkit.child_processes as child_processes
+import filmkit.picture.gates as gates
+import filmkit.tools as tools
+tool = pathlib.Path(sys.argv[1])
+tools.repository.ROOT = tool.parent
+tools.picture_rendering.require_renderer = lambda: None
+tools.picture_rendering.browser_path = lambda: "no-browser"
+tools.shutil.which = lambda name: sys.executable
+tools.stage_tools = lambda: tool.parent
+tools.TOOLS = {"standin": tool.name}
+with child_processes.ending("check: stopped by {request}"):
+    gates.run_audits([("standin", [], tool.parent / "report.json", None)])
 """
 # A command that goes on unwinding after the block that took the request, until it is told to.
 BETWEEN = """
@@ -223,6 +252,26 @@ def test_where_a_command_holds_no_child_a_request_to_end_has_its_usual_effect(pr
     assert ended(processes, command) == (-number, [])
 
 
+def test_an_action_that_a_signal_ends_where_it_holds_no_child_writes_no_duration_record(
+    processes,
+):
+    record = processes.folder / "build/evidence/editions/zh/durations/check-picture.json"
+    script = processes.script("checking", CHECKING)
+    # An interrupt unwinds the action: its record is written and says it did not complete.
+    command = processes.python(script, str(processes.folder))
+    processes.noted("checking")
+    command.send_signal(signal.SIGINT)
+    assert ended(processes, command) == (-signal.SIGINT, ["check-picture: stopped by an interrupt"])
+    earlier = record.read_bytes()
+    assert json.loads(earlier)["completed"] is False
+    # SIGTERM ends the command where it stands: no record is written, and the earlier one stands.
+    command = processes.python(script, str(processes.folder))
+    processes.noted("checking")
+    command.send_signal(signal.SIGTERM)
+    assert ended(processes, command) == (-signal.SIGTERM, [])
+    assert record.read_bytes() == earlier
+
+
 def test_an_interrupt_anywhere_ends_the_command_with_its_line_and_by_the_interrupt(processes):
     command = processes.python(processes.script("idle", IDLE))
     processes.noted("idle")
@@ -281,6 +330,22 @@ def test_an_interrupt_of_the_command_alone_has_its_tool_asked_to_end_and_waited_
     processes.noted("tool-closed-its-browser", 10)
     assert ended(processes, command) == (-signal.SIGINT, ["check: stopped by an interrupt"])
     assert gone([asked])
+
+
+def test_an_interrupt_of_the_command_alone_leaves_audits_that_run_side_by_side(processes):
+    """The cost that is stated: the audits are waited for in threads, which no interrupt
+    reaches, so the command ends and the audits run on to their own end."""
+    tool = processes.script("tool", TOOL)
+    command = processes.python(processes.script("audits", AUDITS), str(tool))
+    audit = processes.noted("tool")["pid"]
+    command.send_signal(signal.SIGINT)
+    assert command.wait(timeout=20) == -signal.SIGINT
+    # The audit was neither asked to end nor killed. It holds the command's standard error
+    # still, so what the command said is read once the audit has ended.
+    assert alive(audit)
+    assert not (processes.notes / "tool-asked.json").exists()
+    processes.kill(audit)
+    assert ended(processes, command) == (-signal.SIGINT, ["check: stopped by an interrupt"])
 
 
 def test_a_tool_that_does_not_end_when_asked_is_killed_after_the_grace(processes):
