@@ -41,7 +41,7 @@ The delivery SHALL fill, in this order: the folder `--destination` names; the fi
 
 ### Requirement: A delivery refuses a destination that is not its own to empty
 
-Before it reads a player or changes anything, and in a dry run too, the delivery SHALL refuse: a `--destination` whose value is empty; a destination that, on resolved paths, is the film's root, holds it or lies inside it, whichever rule gave it; and one that is no folder, or that holds entries other than `.DS_Store` and `.claude` and no entry page of an earlier delivery. The refusal SHALL name the folder, the rule that gave it and what was found.
+Before it reads a player or changes anything, and in a dry run too, the delivery SHALL refuse: an empty `--destination`; a `FILMKIT_DELIVERY_ROOT` that is no absolute path; a destination that is the film's root, holds it or lies inside it, however its path is spelled and whichever rule gave it; and one that is no folder, or holds entries other than `.DS_Store` and `.claude` and no entry page of an earlier delivery. The refusal SHALL name the folder, the rule that gave it and what was found.
 
 #### Scenario: An empty destination
 
@@ -57,6 +57,16 @@ Before it reads a player or changes anything, and in a dry run too, the delivery
 
 - **WHEN** the destination is a folder above the film's root, or a folder below it
 - **THEN** the delivery refuses, naming the film's root
+
+#### Scenario: The film's own tree under another spelling
+
+- **WHEN** the destination names the film's root, a folder above it or a folder below it, one that does not exist yet among them, in another letter case on a volume that folds case, through a symbolic link above it, or by a second path to the same volume
+- **THEN** the delivery refuses as it does for the spelling the root has, and no file of the film is moved
+
+#### Scenario: A host's root that is no absolute path
+
+- **WHEN** `FILMKIT_DELIVERY_ROOT` is a relative path or holds only blanks
+- **THEN** the delivery refuses, naming the variable and its value, and fills no folder below the working directory
 
 #### Scenario: A populated folder that no delivery filled
 

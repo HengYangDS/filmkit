@@ -32,8 +32,11 @@ SHA-256. A dry run reads no player.
 A delivery empties its destination of whatever is no member, so it refuses, before anything is
 read back or changed and in a dry run too, a destination it must not fill (`refuse_unfit`): an
 empty `--destination`, which an unset variable in a script leaves; the film's root, a folder
-that holds it or one inside it, judged on resolved paths and whichever rule gave the folder; and
-a folder that holds entries and no entry page of an earlier delivery.
+that holds it or one inside it, whichever rule gave the folder and however its path is spelled,
+since the folders are compared by what they are (`same_folder`); one that is no folder; and a
+folder that holds entries and no entry page of an earlier delivery. A `FILMKIT_DELIVERY_ROOT`
+that is no absolute path is refused too: joined as it stands it would name a folder below the
+working directory.
 
 The film verifier binds every member to its package records; the delivery task runs it first.
 A refusal before rsync leaves the destination unchanged and exits with status 1.
@@ -156,10 +159,33 @@ def delivery_destination(named: str | Path | None = None) -> tuple[Path, str]:
             raise DeliveryRefusedError(msg)
         return Path(named).expanduser().resolve(), "--destination"
     name = FILM.delivery_folder
-    if os.environ.get(ROOT_VARIABLE):
-        return (Path(os.environ[ROOT_VARIABLE]).expanduser() / name).resolve(), ROOT_VARIABLE
+    named_root = os.environ.get(ROOT_VARIABLE)
+    if named_root:
+        # An empty value is an unset variable. Any other names the host's root, which lies
+        # where the host says and never below wherever the command happens to run.
+        host = Path(named_root).expanduser() if named_root.strip() else None
+        if host is None or not host.is_absolute():
+            msg = (
+                f"{ROOT_VARIABLE} names no absolute path ({named_root!r}): joined as it stands "
+                "it would be a folder below the working directory, and nothing is delivered"
+            )
+            raise DeliveryRefusedError(msg)
+        return (host / name).resolve(), ROOT_VARIABLE
     folder, rule = videos_folder()
     return (folder.expanduser() / name).resolve(), rule
+
+
+def same_folder(one: Path, other: Path) -> bool:
+    """Whether two paths name one folder, however each is spelled: the same spelling, or the
+    same file to the operating system, which sees through another letter case on a volume that
+    folds case, through links, and through a second path to one volume, as macOS's
+    /System/Volumes/Data. A path that does not exist is no folder but by its spelling."""
+    if one == other:
+        return True
+    try:
+        return os.path.samefile(one, other)
+    except OSError:
+        return False
 
 
 def refuse_unfit(root: Path, destination: Path, rule: str) -> None:
@@ -167,17 +193,20 @@ def refuse_unfit(root: Path, destination: Path, rule: str) -> None:
     it and what was found there.
 
     A delivery moves every entry of its destination that is no member into the predecessors. So
-    the destination is not the film's root, a folder that holds it or one inside it, on resolved
-    paths; and a folder that exists holds nothing but the preserved entries, or the entry page
-    of an earlier delivery.
+    the destination is not the film's root, a folder that holds it or one inside it; and a
+    folder that exists holds nothing but the preserved entries, or the entry page of an earlier
+    delivery. The root and the destination are compared by what they are, not by how their
+    paths are spelled (`same_folder`): the destination and each folder above it against the
+    root, and each folder above the root against the destination. The destination itself need
+    not exist; the folders above it that do are compared.
     """
     place, film = destination.resolve(), root.resolve()
     found = None
-    if place == film:
+    if same_folder(place, film):
         found = "it is the film's root"
-    elif film.is_relative_to(place):
+    elif any(same_folder(place, above) for above in film.parents):
         found = f"it holds the film's root, {film}"
-    elif place.is_relative_to(film):
+    elif any(same_folder(above, film) for above in place.parents):
         found = f"it lies inside the film's root, {film}"
     elif place.exists() and not place.is_dir():
         found = "it is no folder"

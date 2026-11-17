@@ -1,6 +1,7 @@
 """The destinations a delivery refuses before it reads a player or runs rsync: an empty name, the
-film's root, a folder that holds it or lies inside it, and a populated folder that no delivery
-filled. Every film and every folder lies below the test's own folder."""
+film's root, a folder that holds it or lies inside it, however the path is spelled, a root of
+the host's that is no absolute path, and a populated folder that no delivery filled. Every film
+and every folder lies below the test's own folder."""
 
 from pathlib import Path
 
@@ -83,6 +84,113 @@ def test_the_films_root_what_holds_it_and_what_lies_inside_it_are_refused(
     assert f"is refused: {found}" in said
     # Nothing was read back, run or written, the delivery's own filter and sums included.
     assert tree(tmp_path) == before
+
+
+@pytest.fixture
+def folds_case(tmp_path):
+    """Skip where the test's volume keeps letter case apart, so no folder has two spellings."""
+    (tmp_path / "probe").write_text("a probe\n")
+    if not (tmp_path / "PROBE").exists():
+        pytest.skip("the volume does not fold case")
+    (tmp_path / "probe").unlink()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+@pytest.mark.parametrize(
+    ("destination", "found"),
+    [
+        ("films/FILM", "it is the film's root"),
+        ("FILMS/Film/build/..", "it is the film's root"),
+        ("FILMS", "it holds the film's root, "),
+        ("films/FILM/build/delivered", "it lies inside the film's root, "),
+        ("films/Film/Build/Artifacts/Film", "it lies inside the film's root, "),
+        ("films/FILM/not yet/there", "it lies inside the film's root, "),
+    ],
+)
+def test_the_films_own_tree_in_another_letter_case_is_refused(
+    placed, folds_case, tmp_path, destination, found, dry_run
+):
+    # The members' own source folder holds an index.html, so in another case only the rule of
+    # the root keeps a delivery from emptying it.
+    root = placed(tmp_path / "films/film")
+    assert (root / "build/artifacts/film/index.html").is_file()
+    before = tree(tmp_path)
+    with pytest.raises(DeliveryRefusedError) as refused:
+        delivery_folder.deliver(root, tmp_path / destination, dry_run=dry_run, rule="a test")
+    assert f"is refused: {found}" in str(refused.value)
+    assert tree(tmp_path) == before
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+@pytest.mark.parametrize(
+    ("destination", "found"),
+    [
+        ("link to the films", "it holds the film's root, "),
+        ("link to the films/film", "it is the film's root"),
+        ("link to the films/film/build/delivered", "it lies inside the film's root, "),
+        ("link to the build/delivered", "it lies inside the film's root, "),
+    ],
+)
+def test_the_films_own_tree_through_a_link_above_it_is_refused(
+    placed, tmp_path, destination, found, dry_run
+):
+    root = placed(tmp_path / "films/film")
+    (tmp_path / "link to the films").symlink_to(tmp_path / "films")
+    (tmp_path / "link to the build").symlink_to(root / "build")
+    before = tree(tmp_path)
+    with pytest.raises(DeliveryRefusedError) as refused:
+        delivery_folder.deliver(root, tmp_path / destination, dry_run=dry_run, rule="a test")
+    assert f"is refused: {found}" in str(refused.value)
+    assert tree(tmp_path) == before
+
+
+def test_one_folder_is_one_folder_however_its_path_is_spelled(tmp_path, monkeypatch):
+    folder = tmp_path / "films/film"
+    folder.mkdir(parents=True)
+    (tmp_path / "link").symlink_to(folder)
+    assert delivery_folder.same_folder(folder, tmp_path / "link")
+    assert delivery_folder.same_folder(tmp_path / "absent", tmp_path / "absent")
+    assert not delivery_folder.same_folder(tmp_path / "absent", tmp_path / "other")
+    assert not delivery_folder.same_folder(folder, tmp_path / "films")
+    # A second path to one volume, as macOS's data volume gives every folder: the operating
+    # system's answer is taken, whatever the two spellings are.
+    asked = []
+    monkeypatch.setattr(
+        delivery_folder.os.path, "samefile", lambda one, other: asked.append((one, other)) or True
+    )
+    data = Path("/System/Volumes/Data") / folder.relative_to("/")
+    assert delivery_folder.same_folder(data, folder)
+    assert asked == [(data, folder)]
+
+
+@pytest.mark.parametrize("arguments", [[], ["--dry-run"]])
+@pytest.mark.parametrize("named", ["deliveries", "./deliveries", "  ", "\t"])
+def test_a_hosts_root_that_is_no_absolute_path_is_refused_by_its_name(
+    placed, home, tmp_path, monkeypatch, named, arguments
+):
+    placed(tmp_path / "films/film")
+    (tmp_path / "elsewhere").mkdir()
+    monkeypatch.chdir(tmp_path / "elsewhere")
+    monkeypatch.setenv(delivery_folder.ROOT_VARIABLE, named)
+    before = tree(tmp_path)
+    with pytest.raises(SystemExit) as refused:
+        delivery_folder.main(arguments)
+    assert str(refused.value).startswith(
+        f"FILMKIT_DELIVERY_ROOT names no absolute path ({named!r}): "
+    )
+    assert tree(tmp_path) == before
+
+
+def test_a_hosts_root_below_the_home_folder_and_an_empty_one_are_read_as_before(home, monkeypatch):
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv(delivery_folder.ROOT_VARIABLE, "~/films")
+    folder, rule = delivery_folder.delivery_destination()
+    assert (folder, rule) == ((home / "films" / NAME).resolve(), "FILMKIT_DELIVERY_ROOT")
+    # An empty value is an unset variable: the platform's videos folder.
+    monkeypatch.setenv(delivery_folder.ROOT_VARIABLE, "")
+    folder, rule = delivery_folder.delivery_destination()
+    assert folder == (home / "Movies" / NAME).resolve()
+    assert rule == "the macOS videos folder ~/Movies"
 
 
 @pytest.mark.parametrize("arguments", [[], ["--dry-run"]])
