@@ -10,9 +10,9 @@
   "devDependencies": {
     "@puppeteer/browsers": "3.2.7",
     "gsap": "3.15.1",
-    "hyperframes": "0.9.46",
+    "hyperframes": "0.9.64",
     "prettier": "3.10.1",
-    "puppeteer-core": "25.17.0"
+    "puppeteer-core": "25.18.1"
   },
   "overrides": {
     "undici": "7.30.2"

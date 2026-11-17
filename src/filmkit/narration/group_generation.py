@@ -80,7 +80,7 @@ def synthesize(
 def _native_results(model, text: str, reference: Path, reference_text: str, settings: dict):
     """Yield native ICL results under the cast's declared sampling.
 
-    mlx-audio 0.6.4 generate() raises any ICL repetition penalty below 1.5. A
+    mlx-audio's generate() raises any ICL repetition penalty below 1.5 (read in 0.6.6). A
     cast that declares the model's own default calls the same unmodified vendor
     ICL generator with that penalty.
     """

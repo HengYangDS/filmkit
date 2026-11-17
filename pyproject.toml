@@ -6,8 +6,8 @@ requires-python = ">=3.12,<3.15"
 license = "MIT"
 license-files = ["LICENSE"]
 dependencies = [
-  "mlx-audio==0.6.4",
-  "numpy==2.5.4",
+  "mlx-audio==0.6.6",
+  "numpy==2.5.5",
   "pillow==13.0.0",
   "pydantic==2.14.3",
   "pypinyin==0.55.0",

@@ -131,7 +131,7 @@ run = [
 [tools]
 node = "26.13.1"
 python = "3.12.16"
-uv = "0.13.8"
+uv = "0.13.9"
 
 # The ETHOS release declaration as published with v0.2.0-beta.10.
 [tools."http:ethos"]
