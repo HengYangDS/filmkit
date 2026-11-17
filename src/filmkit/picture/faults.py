@@ -397,35 +397,38 @@ def scan(
     }
 
 
-def findings(report: dict, code: str) -> list[str]:
+def findings(report: dict, code: str | None) -> list[str]:
     """A report's findings: each one-frame fault that is no residue, with the command that renders
     its picture again, and each difference that lasts; one beyond the bound for edge slivers
-    names its samples and the bound."""
+    names its samples and the bound. `code` names the edition whose pair was compared. Two
+    renders of one stage are no edition's pair and are compared with no row left out: with
+    `code` None a fault names its picture and no command, and no finding speaks of a caption
+    band."""
     found = []
     faults = [row for row in report["faults"] if not row["residue"]]
+    outside = " outside the caption band" if code else ""
     for row in faults:
         at = f"encoded frame {row['frame']} at {row['time']:.3f} s"
-        where = "in the caption band" if row["caption_band"] else "outside the caption band"
-        where += slivers.beyond(row)
+        where = (" in the caption band" if row["caption_band"] else outside) + slivers.beyond(row)
         if row["picture"] is None:
             above = "" if "samples" in row else f", above a residue's ceiling of {NOISE_CEILING}"
             found.append(
                 f"{at}: the pictures differ for one frame by {row['peak']} levels in box "
-                f"{row['box']} {where}{above}, and no one picture alone departs from its "
+                f"{row['box']}{where}{above}, and no one picture alone departs from its "
                 "neighbouring frames"
             )
             continue
+        again = f"; render it again with {render_again(code, row['picture'])}" if code else ""
         found.append(
             f"{at}: the {row['picture']} picture holds a one-frame fault of {row['peak']} levels "
-            f"in box {row['box']} {where}; render it again with "
-            f"{render_again(code, row['picture'])}"
+            f"in box {row['box']}{where}{again}"
         )
     hidden = report["fault_frames"] - len(faults)
     found += [f"encoded: {hidden} more one-frame differences"] if hidden > 0 else []
     found += [
         f"encoded frames {run['first']}-{run['last']}: the pictures differ by more than "
-        f"{run.get('level', report['threshold'])} levels in box {run['box']} outside the caption "
-        f"band{slivers.beyond(run)}"
+        f"{run.get('level', report['threshold'])} levels in box {run['box']}{outside}"
+        f"{slivers.beyond(run)}"
         for run in report["lasting"]
     ]
     hidden = report["lasting_runs"] - len(report["lasting"])

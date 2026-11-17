@@ -2,22 +2,32 @@
 
 ### Requirement: The sample build qualifies the renderer
 
-The sample film SHALL declare `software` capture, the capture under which pictures are derived. Its picture task SHALL render the Chinese captioned stage a second time with `qualify-renderer` and refuse unless every decoded frame equals the first render's, and SHALL render the Chinese uncaptioned picture with `--native` and compare that pair at every frame. A release of the engine requires this qualification to pass under `software` capture.
+The sample film SHALL declare `software` capture, the capture under which pictures are derived. Its picture task SHALL render the Chinese captioned stage a second time with `qualify-renderer` and refuse unless the two renders pass the comparison of a rendered pair with no row left out, and SHALL render the Chinese uncaptioned picture with `--native` and compare that pair at every frame. A release of the engine requires this qualification to pass under `software` capture.
 
 #### Scenario: Two renders of one stage
 
 - **WHEN** `qualify-renderer` runs after the Chinese captioned picture is rendered and validated
-- **THEN** its record names both renders' SHA-256, the frames compared and `software` capture, and says that every decoded frame is identical
+- **THEN** its record names both renders' SHA-256 and frames and `software` capture, holds the comparison's report without a finding, and states how many frames decode identically
 
 #### Scenario: The supply that ran
 
 - **WHEN** `qualify-renderer` runs with a browser other than the build the engine pins
 - **THEN** its record states the renderer's version as the film's packages install it, that browser's executable and SHA-256, and that it is not the pinned build
 
-#### Scenario: A render that differs
+#### Scenario: Renders that differ by the encoder alone
 
-- **WHEN** the second render differs from the first at one decoded frame
-- **THEN** `qualify-renderer` refuses, naming the first frame that differs
+- **WHEN** the second render differs from the first in every decoded frame, within the encoders' noise
+- **THEN** `qualify-renderer` passes, and its record states that no frame decodes identically
+
+#### Scenario: A one-frame fault in one render
+
+- **WHEN** the second render holds a fragment for one frame that the first does not
+- **THEN** `qualify-renderer` refuses, naming the frame, its time, its box and the render that holds it, and keeps the second render
+
+#### Scenario: A difference that lasts, or another length
+
+- **WHEN** the renders differ beyond the encoders' noise for two frames or more, or hold different counts of frames
+- **THEN** `qualify-renderer` refuses, naming the frames or both counts
 
 ### Requirement: The sample film prints its build's durations
 

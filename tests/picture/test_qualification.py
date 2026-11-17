@@ -1,54 +1,95 @@
-"""Qualifying the renderer: a second render of the captioned stage, compared frame by frame."""
+"""Qualifying the renderer: a second render of the captioned stage, compared with the first by the
+measure of a rendered pair, on small real clips that the stand-in renderer writes."""
 
-import subprocess
+import json
 
 import pytest
+from test_faults import CAPTION, FRAGMENT, LABEL, SECONDS, encode
 
-import filmkit.media as media
 import filmkit.picture.qualification as qualification
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
 
+pytestmark = pytest.mark.ffmpeg
+
 # The renderer version the fixture's film installs, which is the engine's.
 RENDERER = picture_rendering.RENDERER_VERSION
+FRAMES = SECONDS * 60
 
 
 @pytest.fixture
-def rendered(film_root, monkeypatch):
-    """The Chinese edition with its captioned picture rendered by the stand-in and media checks
-    that pass; each render's frames are read from the digests set for its file."""
+def rendered(film_root, tmp_path, monkeypatch):
+    """The Chinese edition staged and checked, with a renderer that writes the clips queued for
+    it: `renders(first, second)` queues the picture's render and the qualification's and renders
+    the picture. A picture's binding is validated as it is; its media, which are a film's size
+    and length, are not."""
     edition = Edition("zh")
     film_root.staged(edition)
-    picture_rendering.render_picture(edition, 60)
-    monkeypatch.setattr(media, "probe", lambda path: {})
-    monkeypatch.setattr(media, "require_video", lambda *arguments, **options: {})
-    monkeypatch.setattr(media, "video_cadence", lambda *arguments: {"keyframes": []})
-    digests = {}
-    monkeypatch.setattr(qualification, "frame_digests", lambda path: digests[path.parent.name])
+
+    def bound(edition, captions=True):
+        receipt = repository.read(edition.rendered(captions).receipt)
+        picture_rendering.validate_picture_binding(edition, receipt, captions=captions)
+        return receipt
+
+    monkeypatch.setattr(picture_rendering, "validate_picture", bound)
+
+    def renders(*clips):
+        files = []
+        for number, boxes in enumerate(clips):
+            files.append(tmp_path / f"render-{number}.mp4")
+            encode(files[-1], *boxes)
+        film_root.queue(edition.picture, *files)
+        picture_rendering.render_picture(edition, 60)
+
     # The browser the renders run: a build of the test's own, named as a film names another.
     browser = film_root.path.parent / "browser/chrome-headless-shell"
     browser.parent.mkdir()
     browser.write_text("a browser build")
     monkeypatch.setenv("FILM_CHROMIUM_PATH", str(browser))
-    return edition, film_root, digests
+    return edition, film_root, renders
 
 
-def test_two_renders_that_decode_alike_pass_and_the_second_is_removed(rendered):
-    edition, film_root, digests = rendered
-    digests |= {"zh": ["a", "b", "c"]}
+def test_two_renders_that_show_the_same_pass_and_the_second_is_removed(rendered, capsys):
+    edition, film_root, renders = rendered
+    renders([CAPTION, LABEL], [CAPTION, LABEL])
+    capsys.readouterr()
     record = qualification.qualify_renderer(edition, 60)
     assert repository.read(edition.renderer_qualification) == record
-    assert (record["verdict"], record["differing_frames"]) == ("pass", 0)
-    assert record["first_differing_frame"] is None
+    assert [*record] == [
+        "renderer",
+        "browser",
+        "capture",
+        "stage_sha256",
+        "first",
+        "second",
+        "comparison",
+        "identical_frames",
+        "first_differing_frame",
+        "findings",
+        "verdict",
+    ]
+    assert (record["verdict"], record["findings"]) == ("pass", [])
+    assert (record["identical_frames"], record["first_differing_frame"]) == (FRAMES, None)
     assert record["renderer"] == {"package": "hyperframes", "version": RENDERER}
     # The record names the capture the two renders were made with, the sample film's own.
     assert record["capture"] == "software"
     first, second = record["first"], record["second"]
     assert first["sha256"] == repository.sha(edition.picture)
-    assert (first["frames"], second["frames"]) == (3, 3)
+    assert (first["frames"], second["frames"]) == (FRAMES, FRAMES)
     assert first["workers"] == second["workers"] == 8
+    # The comparison's report: the sampled frames against their floor, and every frame's scan.
+    comparison = record["comparison"]
+    assert (comparison["frames"], comparison["failing_frames"]) == (4, 0)
+    assert comparison["psnr_floor_db"] == 45.0 and comparison["lowest_psnr_db"] is None
+    every = comparison["every_frame"]
+    assert (every["frames"], every["differing_frames"], every["fault_frames"]) == (FRAMES, 0, 0)
+    assert (every["lasting_runs"], every["residue_frames"]) == (0, 0)
+    assert every["slivers"]["frames_beyond_the_bound"] == 0
+    # The printed line names the verdict, the findings and the frames that decode identically.
+    printed = json.loads(capsys.readouterr().out.splitlines()[-1])
+    assert printed == {"verdict": "pass", "findings": [], "identical_frames": FRAMES}
     work = repository.ROOT / qualification.WORK / "zh"
     assert not (work / edition.picture.name).exists()
     # The second render ran the pictures' command on the same stage, to the work file.
@@ -60,8 +101,8 @@ def test_two_renders_that_decode_alike_pass_and_the_second_is_removed(rendered):
 
 
 def test_the_record_states_the_renderer_and_the_browser_that_ran(rendered, monkeypatch):
-    edition, film_root, digests = rendered
-    digests |= {"zh": ["a"]}
+    edition, film_root, renders = rendered
+    renders([CAPTION], [CAPTION], [CAPTION])
     browser = film_root.path.parent / "browser/chrome-headless-shell"
     # A browser named by the film, which is not the build the engine pins.
     record = qualification.qualify_renderer(edition, 60)
@@ -85,7 +126,8 @@ def test_the_record_states_the_renderer_and_the_browser_that_ran(rendered, monke
 
 
 def test_a_qualification_without_a_browser_is_refused_before_it_renders(rendered, monkeypatch):
-    edition, film_root, _ = rendered
+    edition, film_root, renders = rendered
+    renders([CAPTION])
     # No browser is named, and the supply has installed none.
     monkeypatch.delenv("FILM_CHROMIUM_PATH")
     picture_rendering.supplied_browser().unlink()
@@ -95,47 +137,50 @@ def test_a_qualification_without_a_browser_is_refused_before_it_renders(rendered
     assert len(film_root.runs()) == runs
 
 
-def test_a_frame_that_differs_is_refused_by_the_first_such_frame(rendered, monkeypatch):
-    edition, _, _ = rendered
-    by_file = {edition.picture: ["a", "b", "c", "d"]}
-    monkeypatch.setattr(
-        qualification, "frame_digests", lambda path: by_file.get(path, ["a", "x", "c", "y"])
+def test_a_one_frame_fault_of_the_second_render_is_refused_by_its_frame(rendered, capsys):
+    edition, _, renders = rendered
+    renders([CAPTION], [CAPTION, FRAGMENT])
+    fault = (
+        "encoded frame 77 at 1.283 s: the second picture holds a one-frame fault of 150 levels "
+        "in box [40, 10, 44, 14]"
     )
-    with pytest.raises(PictureError, match="frame 1 is the first of 2 that differ"):
+    kept = "build/runtime/work/renderer-qualification/zh"
+    with pytest.raises(PictureError) as refused:
+        qualification.qualify_renderer(edition, 60)
+    assert str(refused.value) == (
+        f"Two renders of the zh captioned stage do not show the same: {fault}; the second "
+        f"render is kept in {kept}"
+    )
+    record = repository.read(edition.renderer_qualification)
+    assert (record["verdict"], record["findings"]) == ("refuse", [fault])
+    assert record["comparison"]["every_frame"]["fault_frames"] == 1
+    # One frame of 120 does not decode identically; that is recorded and decides nothing.
+    assert (record["identical_frames"], record["first_differing_frame"]) == (FRAMES - 1, 77)
+    printed = json.loads(capsys.readouterr().out.splitlines()[-1])
+    assert printed == {"verdict": "refuse", "findings": [fault], "identical_frames": FRAMES - 1}
+    # The second render is kept for inspection.
+    assert (repository.ROOT / kept / edition.picture.name).is_file()
+
+
+def test_renders_of_other_lengths_are_refused(rendered, tmp_path, monkeypatch):
+    edition, film_root, renders = rendered
+    renders([CAPTION])
+    # The picture holds two seconds; the render queued for the qualification holds one.
+    monkeypatch.setattr("test_faults.SECONDS", 1)
+    encode(tmp_path / "short.mp4", CAPTION)
+    film_root.queue(edition.picture, tmp_path / "short.mp4")
+    with pytest.raises(PictureError, match="the renders hold 120 and 60 frames; the second"):
         qualification.qualify_renderer(edition, 60)
     record = repository.read(edition.renderer_qualification)
-    assert (record["verdict"], record["differing_frames"]) == ("refuse", 2)
-    assert record["first_differing_frame"] == 1
-    # The second render is kept for inspection.
-    assert (repository.ROOT / qualification.WORK / "zh" / edition.picture.name).is_file()
-
-
-def test_renders_of_other_lengths_are_refused(rendered, monkeypatch):
-    edition, _, _ = rendered
-    by_file = {edition.picture: ["a", "b", "c"]}
-    monkeypatch.setattr(qualification, "frame_digests", lambda path: by_file.get(path, ["a", "b"]))
-    with pytest.raises(PictureError, match="the renders hold 3 and 2 frames"):
-        qualification.qualify_renderer(edition, 60)
+    assert (record["first"]["frames"], record["second"]["frames"]) == (120, 60)
+    assert (record["comparison"], record["verdict"]) == (None, "refuse")
 
 
 def test_a_picture_that_is_not_valid_is_not_rendered_again(rendered):
-    edition, film_root, _ = rendered
+    edition, film_root, renders = rendered
+    renders([CAPTION])
     edition.picture.write_text("another picture")
     runs = len(film_root.runs())
     with pytest.raises(PictureError, match="rendered picture differs from its receipt"):
         qualification.qualify_renderer(edition, 60)
     assert len(film_root.runs()) == runs
-
-
-@pytest.mark.ffmpeg
-def test_the_digests_are_one_for_each_decoded_frame(tmp_path, monkeypatch):
-    monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
-    clips = []
-    for name, colour in (("a", "0x0F1519"), ("b", "0x0F1519"), ("c", "0x101519")):
-        clip = tmp_path / f"{name}.mp4"
-        command = ["ffmpeg", "-v", "error", "-nostdin", "-y", "-threads", "2", "-f", "lavfi"]
-        command += ["-i", f"color=c={colour}:s=64x36:r=60:d=0.5", "-c:v", "libx264", "-qp", "0"]
-        subprocess.run([*command, "-pix_fmt", "yuv420p", str(clip)], check=True, timeout=60)
-        clips.append(qualification.frame_digests(clip))
-    assert [len(digests) for digests in clips] == [30, 30, 30]
-    assert clips[0] == clips[1] != clips[2]

@@ -2,7 +2,7 @@
 
 The engine pins one browser build, which the supply task installs and whose executable it
 checks by SHA-256 (`filmkit.picture.rendering.BROWSER`), and each release qualifies that build:
-two renders of one stage decode alike under software capture (`filmkit.picture.qualification`).
+two renders of one stage show the same under software capture (`filmkit.picture.qualification`).
 A film may name another browser in `FILM_CHROMIUM_PATH`. A record that rests on which browser
 drew a picture therefore states the browser that ran, read when it runs, and never the engine's
 constants: every render receipt and the qualification record carry `identity`.

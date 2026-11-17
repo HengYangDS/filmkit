@@ -4,7 +4,9 @@
 (`filmkit.picture.rendering.validate_picture`) and before packaging, which requires its passing
 record (`require_equivalence`). A pair whose uncaptioned picture was derived from the captioned
 one is compared by the derivation's receipt, which holds its proofs, and no picture is decoded
-(`filmkit.picture.derivation`). A rendered pair is compared at two levels:
+(`filmkit.picture.derivation`). Two renders of one stage, which should show the same frames, are
+compared by `compare_renders`, the second level alone with no row left out, for the renderer's
+qualification (`filmkit.picture.qualification`). A rendered pair is compared at two levels:
 
 - the composition: the caption-equivalence tool (`picture/caption-equivalence.mjs`) runs the
   composition headlessly on the edition's timeline and on the same timeline with no captions, at
@@ -44,6 +46,7 @@ import json
 import math
 import subprocess
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -51,6 +54,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 import filmkit.durations as durations
+import filmkit.media as media
 import filmkit.picture.faults as faults
 import filmkit.repository as repository
 import filmkit.tools as tools
@@ -190,14 +194,17 @@ def decode_command(path: Path, frames: list[int]) -> list[str]:
 
 
 def compare_decoded(
-    edition: Edition, frames: list[int], rows: tuple[int, int], work: Path
+    pictures: dict[str, Path],
+    size: tuple[int, int],
+    frames: list[int],
+    rows: tuple[int, int],
+    work: Path,
 ) -> list[dict]:
     """Decode both pictures' sampled frames side by side and measure each pair; refused unless
     both decodes yield exactly the sampled frames without a message within the deadline."""
-    size = PICTURE_SIZE
     length = size[0] * size[1] * 3 // 2
-    paths = [edition.rendered(captions).file for captions in (True, False)]
-    logs = [work / f"decode-{name}.log" for name in ("captioned", "uncaptioned")]
+    paths = list(pictures.values())
+    logs = [work / f"decode-{name}.log" for name in pictures]
     measured = []
     with contextlib.ExitStack() as stack:
         errors = [stack.enter_context(log.open("wb")) for log in logs]
@@ -294,18 +301,29 @@ def differs(measures: dict) -> bool:
     return measures["largest_tile"] > TILE_LIMIT or (psnr is not None and psnr < PSNR_FLOOR_DB)
 
 
-def encoded_report(edition: Edition, timeline: dict, band: dict | None, work: Path) -> dict:
-    """Compare both rendered pictures, decoded at the sampled frames, outside the caption band."""
-    frames = sampled_frames(timeline)
-    rows = excluded_rows(band, PICTURE_SIZE[1])
-    measured = compare_decoded(edition, frames, rows, work)
+def encoded_comparison(
+    pictures: dict[str, Path],
+    size: tuple[int, int],
+    count: int,
+    sampled: list[int],
+    rows: tuple[int, int],
+    work: Path,
+) -> dict:
+    """Compare two pictures of one stage as they are encoded, outside the rows given: decoded at
+    the sampled frames and measured against the tile limit and the PSNR floor, then scanned at
+    every one of their `count` frames for one-frame faults, lasting differences and edge slivers
+    (`filmkit.picture.faults`). The one owner of this comparison and of its thresholds: an
+    edition's rendered pair is compared with its caption band left out (`compare_pictures`),
+    and two renders of one stage with no row left out (`compare_renders`)."""
+    with durations.phase("sampled-frames"):
+        measured = compare_decoded(pictures, size, sampled, rows, work)
     failing = [m for m in measured if differs(m)]
     worst = sorted(measured, key=lambda m: (-m["largest_tile"], m["psnr_db"] or math.inf))[:WORST]
     finite = [m["psnr_db"] for m in measured if m["psnr_db"] is not None]
-    return {
+    report = {
         "frames": len(measured),
         "excluded_rows": list(rows),
-        "tile_pixels": round(TILE * PICTURE_SIZE[1] / COMPOSITION_HEIGHT),
+        "tile_pixels": round(TILE * size[1] / COMPOSITION_HEIGHT),
         "tile_limit": TILE_LIMIT,
         "psnr_floor_db": PSNR_FLOOR_DB,
         "largest_tile": max((m["largest_tile"] for m in measured), default=0.0),
@@ -316,12 +334,30 @@ def encoded_report(edition: Edition, timeline: dict, band: dict | None, work: Pa
         "failing": failing[:WORST],
         "failing_frames": len(failing),
     }
+    with durations.phase("every-frame-scan"):
+        report["every_frame"] = faults.scan(pictures, size, rows, count, FPS, work)
+    return report
+
+
+def encoded_findings(encoded: dict, code: str | None) -> list[str]:
+    """An encoded comparison's findings: the sampled frames that differ beyond the encoders'
+    noise, then the one-frame faults and lasting differences that the scan of every frame found
+    (`faults.findings`). `code` names the edition whose pair it is; two renders of one stage
+    have none, and no finding of theirs speaks of a caption band."""
+    outside = " outside the caption band" if code else ""
+    found = [
+        f"encoded frame {row['frame']}: tile difference {row['largest_tile']} levels, "
+        f"PSNR {row['psnr_db']} dB{outside}"
+        for row in encoded["failing"]
+    ]
+    hidden = encoded["failing_frames"] - len(encoded["failing"])
+    found += [f"encoded: {hidden} more frames differ"] if hidden > 0 else []
+    return found + faults.findings(encoded["every_frame"], code)
 
 
 def findings_of(composition: dict, encoded: dict | None, code: str) -> list[str]:
-    """The record's findings: each composition instant that differs beyond its captions, the
-    sampled encoded frames that differ beyond the encoder's noise, and the one-frame faults and
-    lasting differences that the scan of every frame found (`faults.findings`)."""
+    """The record's findings: each composition instant that differs beyond its captions, then the
+    encoded comparison's (`encoded_findings`)."""
     found = [
         f"composition at {row['time']:.3f} s: the captioned frame paints "
         f"{json.dumps(row['captioned'], ensure_ascii=False)}, the uncaptioned frame "
@@ -330,16 +366,56 @@ def findings_of(composition: dict, encoded: dict | None, code: str) -> list[str]
     ]
     hidden = composition["differing_instants"] - len(composition["findings"])
     found += [f"composition: {hidden} more instants differ"] if hidden > 0 else []
-    if encoded is not None:
-        found += [
-            f"encoded frame {row['frame']}: tile difference {row['largest_tile']} levels, "
-            f"PSNR {row['psnr_db']} dB outside the caption band"
-            for row in encoded["failing"]
-        ]
-        hidden = encoded["failing_frames"] - len(encoded["failing"])
-        found += [f"encoded: {hidden} more frames differ"] if hidden > 0 else []
-        found += faults.findings(encoded["every_frame"], code)
-    return found
+    return found + (encoded_findings(encoded, code) if encoded is not None else [])
+
+
+def frame_digests(path: Path) -> list[str]:
+    """The MD5 of every decoded frame of a picture's video stream, in presentation order."""
+    command = ["ffmpeg", "-v", "error", "-nostdin", "-i", str(path), "-map", "0:v:0"]
+    listed = repository.run([*command, "-f", "framemd5", "-"], timeout=DECODE_DEADLINE).stdout
+    rows = [line for line in listed.decode().splitlines() if line and not line.startswith("#")]
+    return [row.rsplit(",", 1)[1].strip() for row in rows]
+
+
+def compare_renders(first: Path, second: Path, work: Path) -> dict:
+    """Compare two renders of one stage, two picture files that should show the same frames, by
+    the measure of a rendered pair (`encoded_comparison`) with no row left out, in `work`.
+
+    A renderer's hardware encode of one stage is not the same from run to run, so two renders
+    are not asked to decode alike: they pass when the comparison finds nothing beyond the
+    encoders' noise, no one-frame fault and no lasting difference, and both hold the same count
+    of frames of the same size. The result holds each render's frames, the comparison's report,
+    its findings and the verdict, and, as a fact that decides nothing, how many frames decode
+    identically and the first that does not.
+    """
+    work.mkdir(parents=True, exist_ok=True)
+    pictures = {"first": first, "second": second}
+    streams = {name: media.video_stream(media.probe(path)) for name, path in pictures.items()}
+    counts = {name: int(stream["nb_frames"]) for name, stream in streams.items()}
+    sizes = {name: (stream["width"], stream["height"]) for name, stream in streams.items()}
+    encoded, identical, differing = None, None, None
+    if counts["first"] != counts["second"]:
+        findings = [f"the renders hold {counts['first']} and {counts['second']} frames"]
+    elif sizes["first"] != sizes["second"]:
+        findings = [f"the renders' frames are {sizes['first']} and {sizes['second']} pixels"]
+    else:
+        count, step = counts["first"], round(STEP * FPS)
+        encoded = encoded_comparison(
+            pictures, sizes["first"], count, list(range(0, count, step)), (0, 0), work
+        )
+        findings = encoded_findings(encoded, None)
+        with durations.phase("frame-digests"), ThreadPoolExecutor(max_workers=2) as pool:
+            ours, theirs = pool.map(frame_digests, (first, second))
+        unlike = [n for n, (a, b) in enumerate(zip(ours, theirs, strict=False)) if a != b]
+        identical, differing = count - len(unlike), unlike[0] if unlike else None
+    return {
+        "frames": counts,
+        "comparison": encoded,
+        "identical_frames": identical,
+        "first_differing_frame": differing,
+        "findings": findings,
+        "verdict": "refuse" if findings else "pass",
+    }
 
 
 def next_step(record: dict, code: str) -> str:
@@ -370,12 +446,10 @@ def compare_pictures(edition: Edition) -> dict:
         composition = composition_report(edition, work)
     encoded = None
     if composition["differing_instants"] == 0:
-        with durations.phase("sampled-frames"):
-            encoded = encoded_report(edition, timeline, composition["band"], work)
         files = {r.name: r.file for r in (edition.rendered(True), edition.rendered(False))}
-        rows, frames = tuple(encoded["excluded_rows"]), DURATION * FPS
-        with durations.phase("every-frame-scan"):
-            encoded["every_frame"] = faults.scan(files, PICTURE_SIZE, rows, frames, FPS, work)
+        rows = excluded_rows(composition["band"], PICTURE_SIZE[1])
+        sampled = sampled_frames(timeline)
+        encoded = encoded_comparison(files, PICTURE_SIZE, DURATION * FPS, sampled, rows, work)
     if current_bindings(edition) != bound:
         msg = "A picture, the composition or the timeline changed while they were compared"
         raise PictureError(msg)

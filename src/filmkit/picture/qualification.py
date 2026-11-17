@@ -1,22 +1,33 @@
-"""Qualify the renderer: two renders of one stage must decode to the same frames.
+"""Qualify the renderer: a second render of one stage must show what the first shows.
 
-A derived uncaptioned picture (`filmkit.picture.derivation`) relies on the renderer drawing a
-stage the same way every time, which a film's build no longer proves by rendering each stage
-twice. `qualify_renderer` proves it for the renderer, the browser and the capture a film
-installs: it renders the edition's current captioned stage a second time, with the pictures'
-settings, to a work file, decodes both renders completely and requires every frame of the second
-to equal the first's. It runs under whatever capture the film declares, and its record names
-that capture. The sample film declares software capture, the one under which uncaptioned pictures
-are derived, and its build runs the qualification, so every engine release qualifies the renderer
-supply it pins for that capture.
+A derived uncaptioned picture (`filmkit.picture.derivation`) rests on one render, where a film's
+build used to render each stage twice and compare the two. What that comparison guarded
+against, a render that draws a fragment wrong for one frame, which only a twin shows, is proven
+for the renderer, the browser and the capture a film installs by `qualify_renderer`: it renders
+the edition's current captioned stage a second time, with the pictures' settings, to a work
+file, and compares the two renders by the measure of a rendered pair
+(`filmkit.picture.equivalence.compare_renders`) with no row left out, the caption band being
+part of what must agree. It passes when that comparison finds nothing: no sampled frame beyond
+the encoders' noise, no one-frame fault, no lasting difference, and as many frames in each.
+
+Two renders are not asked to decode alike. The renderer's hardware encode of one stage varies
+from run to run when the encoder is shared, on frames that are given to it alike, so identical
+decoded frames would refuse a whole film or a busy host for the encoder's variation and say
+nothing of the renderer's drawing. How many frames do decode identically is recorded as a fact
+that decides nothing.
+
+It runs under whatever capture the film declares, and its record names that capture. The sample
+film declares software capture, the one under which uncaptioned pictures are derived, and its
+build runs the qualification, so every engine release qualifies the renderer supply it pins for
+that capture.
 
 The record, build/evidence/editions/<code>/renderer-qualification.json, states what ran, not
 what the engine pins: the renderer's version as the film's npm packages install it, the browser
 executable the renders ran with its SHA-256 and, when those are the pinned build's bytes, that
-build's name, and the capture. It names both renders' SHA-256 and worker counts, the frames
-compared and the first frame that differs, if any; a difference raises `PictureError` after it
-is written, and the second render is kept beside its receipt for inspection. A passing run
-removes it.
+build's name, and the capture. It names both renders' SHA-256, worker counts and frames, holds
+the comparison's report and findings, and the frames that decode identically with the first
+that does not. A finding raises `PictureError` after the record is written, and the second
+render is kept beside its receipt for inspection. A passing run removes it.
 
 Usage: python -m filmkit.produce qualify-renderer --language zh|en
 """
@@ -24,11 +35,11 @@ Usage: python -m filmkit.produce qualify-renderer --language zh|en
 from __future__ import annotations
 
 import json
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import filmkit.durations as durations
+import filmkit.picture.equivalence as equivalence
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
 from filmkit.picture import browser
@@ -40,16 +51,6 @@ if TYPE_CHECKING:
 
 # The second render and its receipt, below the film's root, in a folder for each edition.
 WORK = Path("build/runtime/work/renderer-qualification")
-# Seconds a picture's complete decode may take.
-DECODE_DEADLINE = 7200
-
-
-def frame_digests(path: Path) -> list[str]:
-    """The MD5 of every decoded frame of a picture's video stream, in presentation order."""
-    command = ["ffmpeg", "-v", "error", "-nostdin", "-i", str(path), "-map", "0:v:0"]
-    listed = repository.run([*command, "-f", "framemd5", "-"], timeout=DECODE_DEADLINE).stdout
-    rows = [line for line in listed.decode().splitlines() if line and not line.startswith("#")]
-    return [row.rsplit(",", 1)[1].strip() for row in rows]
 
 
 def supply() -> dict:
@@ -70,8 +71,8 @@ def supply() -> dict:
 
 
 def qualify_renderer(edition: Edition, deadline: float = rendering.DEADLINE) -> dict:
-    """Render the edition's captioned stage again and compare every decoded frame with the
-    picture's; the record. The captioned picture must be valid as it stands."""
+    """Render the edition's captioned stage again and compare the two renders by the measure of a
+    rendered pair; the record. The captioned picture must be valid as it stands."""
     ran = supply()
     with durations.phase("validation"):
         first_receipt = rendering.validate_picture(edition)
@@ -85,32 +86,29 @@ def qualify_renderer(edition: Edition, deadline: float = rendering.DEADLINE) -> 
         second_receipt = rendering.record_render(
             command, rendered.stage, again, receipt, deadline, rendered.name
         )
-    with durations.phase("decode"), ThreadPoolExecutor(max_workers=2) as pool:
-        first, second = pool.map(frame_digests, (rendered.file, again))
-    pairs = enumerate(zip(first, second, strict=False))
-    differing = [frame for frame, (ours, theirs) in pairs if ours != theirs]
-    identical = not differing and len(first) == len(second) and bool(first)
+    compared = equivalence.compare_renders(rendered.file, again, work)
+    frames, findings = compared["frames"], compared["findings"]
     record = {
         **ran,
         "capture": second_receipt.get("capture"),
         "stage_sha256": repository.sha(rendered.stage / "index.html"),
-        "first": render_of(rendered.file, first_receipt, len(first)),
-        "second": render_of(again, second_receipt, len(second)),
-        "differing_frames": len(differing),
-        "first_differing_frame": differing[0] if differing else None,
-        "verdict": "pass" if identical else "refuse",
+        "first": render_of(rendered.file, first_receipt, frames["first"]),
+        "second": render_of(again, second_receipt, frames["second"]),
+        "comparison": compared["comparison"],
+        # What decides nothing: the frames that decode identically, and the first that does not.
+        "identical_frames": compared["identical_frames"],
+        "first_differing_frame": compared["first_differing_frame"],
+        "findings": findings,
+        "verdict": compared["verdict"],
     }
     repository.write(edition.renderer_qualification, record)
-    print(json.dumps({key: record[key] for key in ("verdict", "differing_frames")}))
-    if not identical:
-        where = (
-            f"frame {differing[0]} is the first of {len(differing)} that differ"
-            if differing
-            else f"the renders hold {len(first)} and {len(second)} frames"
-        )
+    shown = {"verdict": record["verdict"], "findings": findings}
+    print(json.dumps({**shown, "identical_frames": record["identical_frames"]}))
+    if findings:
+        more = f" and {len(findings) - 1} more findings" if len(findings) > 1 else ""
         msg = (
-            f"Two renders of the {edition.code} captioned stage do not decode alike: {where}; "
-            f"the second render is kept in {repository.relative(work)}"
+            f"Two renders of the {edition.code} captioned stage do not show the same: "
+            f"{findings[0]}{more}; the second render is kept in {repository.relative(work)}"
         )
         raise PictureError(msg)
     again.unlink()

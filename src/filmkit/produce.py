@@ -10,7 +10,7 @@ every other action refuses it. render-picture --uncaptioned derives that picture
 captioned one (`filmkit.picture.derivation`) for a film that declares software capture, and
 renders its own stage for any other film or when `--native` asks for it. compare-pictures proves
 that the two pictures differ only by the captions (`filmkit.picture.equivalence`), and
-qualify-renderer that two renders of the captioned stage decode to the same frames
+qualify-renderer that two renders of the captioned stage show the same by that measure
 (`filmkit.picture.qualification`). `--variants` names fit's
 pause-policy variants, a file below the film's root or an absolute one
 (`filmkit.soundtrack.fit`), and `--attempts` bounds repair-pictures (`filmkit.picture.repair`);

@@ -43,9 +43,10 @@
 
 ## 5. Renderer qualification and the sample film
 
-- [x] 5.1 Add `qualify-renderer`: render the edition's captioned stage again to a work file, compare every decoded frame with the picture's, write the record and refuse a difference by its first frame; verify `tests/picture/test_qualification.py`.
+- [x] 5.1 Add `qualify-renderer`: render the edition's captioned stage again to a work file, compare the two renders (task 5.4), write the record and refuse by its first finding, keeping the second render; verify `tests/picture/test_qualification.py`.
 - [x] 5.2 Lay out the sample film's picture task as one list: both editions staged and checked, each captioned picture rendered by its own command, the Chinese stage rendered a second time by `qualify-renderer` and its uncaptioned picture with `--native`, the English one derived; and add the task that prints the sample's durations. Verify that `mise tasks` lists `sample:picture` and `sample:durations` and no picture task of one language.
 - [x] 5.3 State in the record of `qualify-renderer` what ran: the renderer's version read from the film's installed package after the engine's own check of it, and the browser executable with its SHA-256 and the pinned build's name when it holds that build's bytes; refuse before rendering where no browser stands. Verify `tests/picture/test_qualification.py`.
+- [x] 5.4 Judge two renders of one stage by the measure of a rendered pair with no row left out, through one function that `compare-pictures` calls too (`equivalence.encoded_comparison`), expose it for two picture files (`equivalence.compare_renders`), and record how many frames decode identically as a fact that decides nothing; verify `tests/picture/test_renders.py` (identical renders, encoder noise in every frame, a one-frame fault of either render, a lasting difference, other lengths), `tests/picture/test_qualification.py` (the record's keys, the printed line, the refusal) and `tests/picture/test_faults.py`.
 
 ## 6. Side by side and small savings
 
