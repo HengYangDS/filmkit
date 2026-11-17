@@ -8,7 +8,7 @@ Give each edition a picture without its captions that is, apart from the caption
 
 ### Requirement: Each edition renders a picture without its captions
 
-`stage-picture --uncaptioned` SHALL stage the composition and timeline of the captioned picture with the timeline's captions replaced by none, in a stage of its own, and `render-picture --uncaptioned` SHALL render it with the captioned picture's renderer settings to its own picture file and receipt. Each stage record and receipt SHALL name its picture, and validation SHALL refuse a receipt read for the other picture.
+`stage-picture --uncaptioned` SHALL stage the composition and timeline of the captioned picture with the timeline's captions replaced by none, in a stage of its own, and `render-picture --uncaptioned --native` SHALL render it with the captioned picture's renderer settings to its own picture file and receipt. Each stage record and receipt SHALL name its picture, and validation SHALL refuse a receipt read for the other picture.
 
 #### Scenario: The uncaptioned stage
 
@@ -70,7 +70,7 @@ Give each edition a picture without its captions that is, apart from the caption
 
 ### Requirement: Packaging waits for a current passing comparison
 
-`package-film` SHALL refuse an edition until both pictures validate and its equivalence record passes and binds the current composition, timeline, engine and both pictures' stage documents, files and receipts.
+`package-film` SHALL refuse an edition until both pictures validate and its equivalence record passes and binds the current composition, timeline, engine and both pictures' files and receipts, with the stage document of each picture that was rendered.
 
 #### Scenario: A picture rendered again after its comparison
 
@@ -98,7 +98,7 @@ When `compare-pictures` refuses a one-frame difference, or passes as residue one
 #### Scenario: A fault in the uncaptioned picture
 
 - **WHEN** the uncaptioned picture holds a one-frame fragment that the captioned picture does not
-- **THEN** the record names the uncaptioned picture and the refusal names `render-picture --uncaptioned` for its edition
+- **THEN** the record names the uncaptioned picture and the refusal names `render-picture --uncaptioned --native` for its edition, the command that renders that picture and never derives it
 
 ### Requirement: Attributed one-frame faults are rendered again within a limit
 
@@ -184,3 +184,133 @@ Before it renders a picture again, `repair-pictures` SHALL move the faulty pictu
 
 - **WHEN** the uncaptioned picture lacks that mark for five frames
 - **THEN** `compare-pictures` refuses, naming the frames, the samples and the bound, and no picture
+
+### Requirement: The uncaptioned picture is derived from the captioned one
+
+For a film that declares `software` capture, `render-picture --uncaptioned` SHALL, unless `--native` is given, derive the uncaptioned picture from the edition's valid captioned picture: every frame encoded again, without B-frames, with the rows of the caption band painted in the ground the captioned picture holds there. Its receipt SHALL say that the picture is derived and name the captioned picture's SHA-256, the painted rows, the ground and the command.
+
+#### Scenario: A derived picture
+
+- **WHEN** an edition whose band holds only captions on a flat ground derives its uncaptioned picture
+- **THEN** the picture has the captioned picture's frame count, frame rate, frame size and duration, its band holds the ground in every frame, and its receipt names the captioned picture it was derived from
+
+#### Scenario: A captioned picture that is not current
+
+- **WHEN** the captioned picture's receipt binds another stage than the current one
+- **THEN** the derivation refuses before it encodes anything
+
+#### Scenario: A stylesheet changed after the derivation
+
+- **WHEN** the stylesheet, a font, the template, the script or the soundtrack changes after an uncaptioned picture was derived
+- **THEN** `validate-picture --uncaptioned` refuses the derived picture as it refuses the captioned one
+
+### Requirement: A picture is derived only under software capture
+
+For a film that declares another capture than `software`, for a captioned picture whose receipt does not name the pinned browser build, and with `--native`, `render-picture --uncaptioned` SHALL render the uncaptioned stage, and `compare-pictures` SHALL then compare the pair at every frame. Each render receipt SHALL name the browser that drew it. The uncaptioned picture's receipt and the comparison record SHALL each say whether it was derived or rendered, and why.
+
+#### Scenario: A film that declares no capture
+
+- **WHEN** a film that declares no capture, and so captures `fast`, runs `render-picture --uncaptioned`
+- **THEN** its uncaptioned stage is rendered, and the receipt says that the picture was rendered because the film declares `fast` capture
+
+#### Scenario: A native render asked for under software capture
+
+- **WHEN** a film that declares `software` capture runs `render-picture --uncaptioned --native`
+- **THEN** its uncaptioned stage is rendered, and the receipt says that a render was asked for
+
+#### Scenario: A derived picture under another capture
+
+- **WHEN** a film changes its declared capture from `software` to `screenshot` after its uncaptioned picture was derived
+- **THEN** validation refuses the derived picture and asks for `render-picture --uncaptioned`
+
+#### Scenario: A captioned picture drawn by another browser
+
+- **WHEN** a film that declares `software` capture rendered its captioned picture with a browser named by `FILM_CHROMIUM_PATH`, whose bytes are not the pinned build's
+- **THEN** the captioned receipt names that browser's executable and SHA-256 and no pinned build, `render-picture --uncaptioned` renders the uncaptioned stage, and its receipt says that the captioned picture is no render by the pinned build
+
+#### Scenario: A captioned receipt that names no browser
+
+- **WHEN** the captioned picture's receipt names no browser, as a receipt written before this requirement does
+- **THEN** `render-picture --uncaptioned` renders the uncaptioned stage and says so
+
+#### Scenario: A repair's render of the uncaptioned picture
+
+- **WHEN** `repair-pictures` renders the uncaptioned picture of a rendered pair again and the pair then passes
+- **THEN** the new receipt and the passing comparison record say that the picture was rendered and why, as the receipt it replaces did
+
+#### Scenario: The comparison record of a rendered pair
+
+- **WHEN** `compare-pictures` passes a pair whose uncaptioned picture was rendered under `fast` capture
+- **THEN** its record holds every level's measures and says that the picture was rendered because the film declares `fast` capture
+
+### Requirement: A derivation proves that the band holds only captions on the ground
+
+Before it encodes, a derivation SHALL run the composition headlessly at every thirtieth of a second and refuse unless every caption paint lies within the painted rows and no other paint reaches them. It SHALL then refuse, leaving no uncaptioned picture in place and naming `--native`, unless the captioned picture stood within 3 levels of the ground in its band at every frame without a caption, and in the painted rows' edge rows, which no caption reaches, at every frame.
+
+#### Scenario: A mark that reaches the band
+
+- **WHEN** a scene of the composition draws a stroke into the rows the derivation would paint
+- **THEN** the derivation refuses before it encodes, naming the instant and the mark, and names `--native`
+
+#### Scenario: A caption that leaves the band
+
+- **WHEN** a caption is painted partly above the rows the derivation would paint
+- **THEN** the derivation refuses before it encodes, naming the instant and the caption
+
+#### Scenario: A ground that changes while a caption shows
+
+- **WHEN** the captioned picture's whole ground is another colour on exactly the frames that show a caption
+- **THEN** the derivation refuses on the edge rows, naming the first such frame and `--native`, though every frame without a caption holds the ground
+
+#### Scenario: A side of the painted rows without a row to measure
+
+- **WHEN** the captions come so close to one edge of the painted rows that no edge row is left there, and the picture continues beyond that edge
+- **THEN** the derivation refuses before it encodes, naming that side and `--native`, though the other side has edge rows
+
+#### Scenario: Painted rows at the frame's own edge
+
+- **WHEN** the painted rows end with the frame's last row and have edge rows at their top
+- **THEN** the derivation measures the top edge rows alone and goes on, since no picture row lies beyond the bottom
+
+#### Scenario: A ground that leaves by degrees
+
+- **WHEN** the ground under a caption stands a little off for thirty frames and far off for thirty more
+- **THEN** the refusal names the first frame beyond the tolerance with its departure, and beside it how many frames stand beyond the tolerance and the largest departure with its frame
+
+#### Scenario: A band that is not the ground
+
+- **WHEN** the captioned picture's band holds, at a frame without a caption, samples 10 levels from the ground
+- **THEN** the derivation refuses, naming the frame, and no uncaptioned picture stays in place
+
+### Requirement: A derivation scans the captioned picture's caption band for one-frame faults
+
+While it encodes, a derivation SHALL judge the captioned picture's caption band at every frame by the rule a rendered pair's comparison applies there: a sample far from both neighbouring frames, which agree, is a one-frame fault. It SHALL refuse on one before any uncaptioned picture is in place, naming the first ten by frame, time and box, the count of the rest and the command that renders the picture again. The receipt SHALL record the scan, and validation SHALL require that it passed.
+
+#### Scenario: A fragment for one frame in the band
+
+- **WHEN** the captioned picture shows a fragment inside its caption for exactly one frame
+- **THEN** the derivation refuses, naming that frame, its time and box and `render-picture` of the captioned picture, and names no native uncaptioned render
+
+#### Scenario: Captions that appear, change and leave
+
+- **WHEN** a caption appears, another takes its place at once, and it leaves
+- **THEN** the scan finds no one-frame change, and the receipt records every frame scanned and no change
+
+#### Scenario: A receipt without the scan
+
+- **WHEN** a derived picture's receipt holds no passed scan of the band
+- **THEN** validation refuses the picture and asks for the derivation again
+
+### Requirement: A derived pair is compared by its derivation's record
+
+For a pair whose uncaptioned picture is derived, `compare-pictures` SHALL decode no picture. It SHALL pass only when the composition report finds no difference beyond the captions and the derivation's receipt binds the current captioned picture, composition, timeline and engine, names the report's band and records its proofs as passed; its record SHALL say that the pair is derived. The requirements on two rendered pictures hold for a `--native` pair.
+
+#### Scenario: A current derived pair
+
+- **WHEN** `compare-pictures` runs on a pair whose uncaptioned picture was derived from the current captioned picture
+- **THEN** it passes without decoding a picture, and its record says that the pair is derived, names the painted rows and carries the derivation's proofs, the scan of the band among them
+
+#### Scenario: A captioned picture rendered again after the derivation
+
+- **WHEN** the captioned picture is rendered again after its uncaptioned picture was derived
+- **THEN** `compare-pictures` refuses and asks for `render-picture --uncaptioned`
