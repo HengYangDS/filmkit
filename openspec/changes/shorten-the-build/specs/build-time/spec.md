@@ -198,6 +198,16 @@ When more than one segment is to be generated, the narration SHALL generate them
 - **WHEN** the synthesis is given a receipt or a recordings folder outside the film's root
 - **THEN** it refuses before any segment is planned or generated, naming the option and the root, and writes nothing
 
+#### Scenario: The root spelled another way
+
+- **WHEN** the synthesis is given an absolute receipt or recordings folder that reaches a place below the film's root through another spelling of the root, as `/tmp` spells `/private/tmp` on macOS, or a place below a folder that is linked into the root
+- **THEN** it takes the place as inside the root, by its path from the root
+
+#### Scenario: A receipt that names no file
+
+- **WHEN** the synthesis is given `.`, an empty value or a folder as its receipt, or the root itself or a file as its recordings folder
+- **THEN** it refuses in words before any segment is planned, naming the option and what the value is, and writes nothing
+
 #### Scenario: The narration's duration record
 
 - **WHEN** an edition is narrated with the variable unset on a host of 128 GB

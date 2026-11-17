@@ -159,7 +159,7 @@ def load_request(argv: list[str] | None = None) -> Request:
     parser.add_argument("--dry-run", action="store_true", help="Print each segment's plan only")
     options = parser.parse_args(argv)
     folder = below_root("--folder", options.folder)
-    receipt = below_root("--receipt", options.receipt)
+    receipt = below_root("--receipt", options.receipt, file=True)
     script = repository.read(options.script)
     cast = repository.read(options.cast)
     _check_cast(cast)
@@ -184,13 +184,34 @@ def load_request(argv: list[str] | None = None) -> Request:
     )
 
 
-def below_root(option: str, named: str) -> Path:
-    """A place the command names for what it writes, refused unless it lies below the film's
-    root: every record names its recordings from the root, and the work of a narration's
-    processes is filed by the receipt's path from it."""
-    place = Path(os.path.normpath(repository.ROOT / named))
-    if not place.is_relative_to(repository.ROOT):
-        msg = f"{option} names {named}, which lies outside the film's root {repository.ROOT}"
+def below_root(option: str, named: str, *, file: bool = False) -> Path:
+    """A place the command names for what it writes, as a path below the film's root, refused
+    unless it lies below the root: every record names its recordings from the root, and the
+    work of a narration's processes is filed by the receipt's path from it.
+
+    A place is inside when its normalised path lies below the root as the engine spells it, as
+    a folder linked into the root does, or when its resolved path lies below the resolved root,
+    as an absolute path does that spells the root another way (macOS's /tmp is /private/tmp).
+    The root itself is no place for either, a folder none for a receipt (`file`) and a file
+    none for the recordings.
+    """
+    root = Path(os.path.normpath(repository.ROOT))
+    place = Path(os.path.normpath(root / named))
+    if not place.is_relative_to(root):
+        resolved, whole = place.resolve(), root.resolve()
+        if not resolved.is_relative_to(whole):
+            msg = f"{option} names {named}, which lies outside the film's root {root}"
+            raise ValueError(msg)
+        place = root / resolved.relative_to(whole)
+    kind = "file" if file else "folder"
+    if place == root:
+        msg = f"{option} names {named!r}, which is the film's root itself, not a {kind} below it"
+        raise ValueError(msg)
+    if file and (named.endswith("/") or place.is_dir()):
+        msg = f"{option} names {named}, which is a folder; the receipt is a file below the root"
+        raise ValueError(msg)
+    if not file and place.exists() and not place.is_dir():
+        msg = f"{option} names {named}, which is a file; the recordings lie in a folder"
         raise ValueError(msg)
     return place
 

@@ -314,6 +314,55 @@ def test_a_folder_or_receipt_outside_the_films_root_is_refused_before_any_effect
     assert not (tmp_path / "audio").exists() and not (tmp_path / "receipt.json").exists()
 
 
+@pytest.mark.parametrize(
+    ("option", "named", "refusal"),
+    [
+        ("--receipt", ".", r"--receipt names '\.', which is the film's root itself, not a file"),
+        ("--receipt", "", "--receipt names '', which is the film's root itself, not a file"),
+        ("--receipt", "audio/..", "--receipt names 'audio/..', which is the film's root itself"),
+        ("--receipt", "records/", "--receipt names records/, which is a folder; the receipt is"),
+        ("--receipt", "taken", "--receipt names taken, which is a folder; the receipt is a file"),
+        ("--folder", ".", r"--folder names '\.', which is the film's root itself, not a folder"),
+        ("--folder", "cast.json", "--folder names cast.json, which is a file; the recordings"),
+    ],
+)
+@pytest.mark.parametrize("mode", [[], ["--dry-run"]], ids=["run", "dry-run"])
+def test_a_receipt_that_is_no_file_and_a_folder_that_is_none_are_refused_in_words(
+    tmp_path, voice, option, named, refusal, mode
+):
+    write_sources(tmp_path, {"01": GROUPS})
+    (tmp_path / "taken").mkdir()
+    before = sorted(path.relative_to(tmp_path) for path in tmp_path.rglob("*"))
+    arguments = list(ARGUMENTS)
+    arguments[arguments.index(option) + 1] = named
+    with pytest.raises(ValueError, match=refusal):
+        narration_synthesis.main([*arguments, *mode])
+    assert voice.calls == []
+    assert sorted(path.relative_to(tmp_path) for path in tmp_path.rglob("*")) == before
+
+
+def test_a_place_below_the_root_is_inside_however_the_root_or_the_place_is_spelled(
+    tmp_path, voice, monkeypatch
+):
+    """An absolute path that spells the root another way, as /tmp does /private/tmp on macOS,
+    and a folder that is linked into the root from outside it, both lie below the root."""
+    root, alias, elsewhere = tmp_path / "film", tmp_path / "alias", tmp_path / "elsewhere"
+    root.mkdir()
+    elsewhere.mkdir()
+    alias.symlink_to(root)
+    (root / "build").symlink_to(elsewhere)
+    monkeypatch.setattr(repository, "ROOT", root)
+    spelled = narration_synthesis.below_root("--receipt", f"{alias}/records/zh.json", file=True)
+    assert spelled == root / "records/zh.json"
+    linked = narration_synthesis.below_root("--folder", "build/audio")
+    assert linked == root / "build/audio"
+    # The work of a narration's processes is filed by the receipt's path from the root.
+    assert narration_synthesis.processes.work_folder(spelled).name == "records-zh"
+    # A path that only passes through the root's other spelling lies outside.
+    with pytest.raises(ValueError, match="which lies outside the film's root"):
+        narration_synthesis.below_root("--folder", f"{alias}/../elsewhere/audio")
+
+
 def dry_run(capsys, arguments=ARGUMENTS) -> list[dict]:
     capsys.readouterr()
     narration_synthesis.main([*arguments, "--dry-run"])
