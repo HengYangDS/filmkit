@@ -99,7 +99,7 @@ Before it encodes, a derivation SHALL run the composition headlessly at every th
 
 ### Requirement: A derivation scans the captioned picture's caption band for one-frame faults
 
-While it encodes, a derivation SHALL judge the captioned picture's caption band at every frame by the rule the comparison of a rendered pair applies to a caption band: a sample far from both neighbouring frames while those agree is a one-frame fault. It SHALL refuse on such a fault before any uncaptioned picture is in place, naming each frame, time and box and the command that renders the captioned picture again. The receipt SHALL record the scan, and validation SHALL require that it passed.
+While it encodes, a derivation SHALL judge the captioned picture's caption band at every frame by the rule a rendered pair's comparison applies there: a sample far from both neighbouring frames, which agree, is a one-frame fault. It SHALL refuse on one before any uncaptioned picture is in place, naming the first ten by frame, time and box, the count of the rest and the command that renders the picture again. The receipt SHALL record the scan, and validation SHALL require that it passed.
 
 #### Scenario: A fragment for one frame in the band
 
