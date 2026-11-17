@@ -45,6 +45,8 @@ VARIABLE = "FILMKIT_NARRATION_PROCESSES"
 DEFAULT = 2
 # The children's receipts and logs, below the film's root, in a folder for each receipt.
 WORK = Path("build/runtime/work/narration-processes")
+# Seconds between two looks at the children that still run.
+POLL_SECONDS = 0.1
 
 
 class ProcessesError(ValueError):
@@ -116,6 +118,23 @@ def last_line(log: Path) -> str:
     return next((line.strip()[:300] for line in reversed(lines) if line.strip()), "")
 
 
+def wait_for_all(
+    children: list[tuple[list[str], Path, subprocess.Popen]], started: float
+) -> list[dict]:
+    """Wait for every child and return each one's segments, exit status, log and seconds: the
+    seconds from the narration's start to the moment that child was found ended, whichever
+    child ended first."""
+    ended: dict[int, dict] = {}
+    while len(ended) < len(children):
+        for number, (ids, log, child) in enumerate(children):
+            if number not in ended and (status := child.poll()) is not None:
+                seconds = round(time.monotonic() - started, 1)
+                ended[number] = {"ids": ids, "exit": status, "seconds": seconds, "log": log}
+        if len(ended) < len(children):
+            time.sleep(POLL_SECONDS)
+    return [ended[number] for number in range(len(children))]
+
+
 def cut_short(error: BaseException) -> str:
     """What cut a narration's wait for its children short, as its refusal names it."""
     if isinstance(error, child_processes.Terminated):
@@ -138,7 +157,6 @@ def narrate(sources: tuple[str, str, str], shares: list[list[str]], receipt: Pat
         earlier.unlink()
     started = time.monotonic()
     children: list[tuple[list[str], Path, subprocess.Popen]] = []
-    ended = []
     try:
         with child_processes.terminable():
             for number, ids in enumerate(shares, 1):
@@ -146,10 +164,7 @@ def narrate(sources: tuple[str, str, str], shares: list[list[str]], receipt: Pat
                 # A signal that arrives while a child starts waits until the child is held here.
                 with child_processes.held():
                     children.append((ids, log, start(child_command(sources, ids, own), log)))
-            for ids, log, child in children:
-                status = child.wait()
-                seconds = round(time.monotonic() - started, 1)
-                ended.append({"ids": ids, "exit": status, "seconds": seconds, "log": log})
+            ended = wait_for_all(children, started)
     except BaseException as error:
         child_processes.stop([child for *_, child in children], signal.SIGTERM, groups=True)
         msg = (

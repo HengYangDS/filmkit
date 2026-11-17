@@ -26,7 +26,7 @@ class Child:
     def __init__(self, status):
         self.status = status
 
-    def wait(self):
+    def poll(self):
         return self.status
 
 

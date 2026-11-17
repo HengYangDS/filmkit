@@ -26,12 +26,12 @@ def root(tmp_path, monkeypatch):
 
 class Child:
     """A stand-in child that has written its log and exits with the status given; one whose
-    status is an exception raises it when it is waited for."""
+    status is an exception raises it when the narration looks whether it has ended."""
 
     def __init__(self, status):
         self.status = status
 
-    def wait(self):
+    def poll(self):
         if isinstance(self.status, BaseException):
             raise self.status
         return self.status

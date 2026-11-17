@@ -105,6 +105,19 @@ def narration(tmp_path):
     return Narration(tmp_path.resolve())
 
 
+def test_each_child_of_a_passing_division_is_stamped_with_its_own_seconds(narration):
+    children = {"01,04": {"seconds": 2.0, "lines": ['{"id": "01"}', '{"id": "04"}']}}
+    parent = narration.start([["01", "04"], ["02", "03"]], children)
+    printed, refusal = parent.communicate(timeout=60)
+    assert (parent.returncode, refusal) == (0, "")
+    first, second = json.loads(printed)
+    assert (first["ids"], first["exit"]) == (["01", "04"], 0)
+    assert (second["ids"], second["exit"]) == (["02", "03"], 0)
+    # The second child ended at once and is not given the first child's two seconds.
+    assert first["seconds"] >= 2.0
+    assert second["seconds"] < first["seconds"] - 0.5
+
+
 def test_a_narration_asked_to_end_ends_every_child_and_what_each_started(narration):
     slow = {"seconds": 60}
     parent = narration.start([["01", "04"], ["02", "03"]], {"01,04": slow, "02,03": slow})

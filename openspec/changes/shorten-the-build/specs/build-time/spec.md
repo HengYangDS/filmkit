@@ -163,6 +163,11 @@ When more than one segment is to be generated, the narration SHALL generate them
 - **WHEN** `FILMKIT_NARRATION_PROCESSES` is `many`
 - **THEN** the narration is refused before any segment is generated, naming the variable
 
+#### Scenario: Each process's seconds
+
+- **WHEN** one of two processes ends after two seconds and the other at once
+- **THEN** the narration prints for each process the seconds until that process ended, and not the slower one's for both
+
 #### Scenario: A receipt outside the film's root
 
 - **WHEN** the synthesis is given a receipt or a recordings folder outside the film's root
