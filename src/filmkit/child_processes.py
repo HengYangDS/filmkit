@@ -2,8 +2,8 @@
 
 A command that starts children and waits for them stops them when its wait is cut short: by an
 interrupt, by a failure of its own, or by a request to end (SIGTERM), which `terminable` turns
-into the exception `Terminated` while the children run. `filmkit.picture.together` does so for
-two editions' pictures, `filmkit.narration.processes` for a narration's shares, and
+into the exception `Terminated` while the children run. `filmkit.picture.rendering` does so for
+a renderer, `filmkit.narration.processes` for a narration's shares, and
 `filmkit.narration.narrate` for each of its steps (`run`).
 
 `stop` asks each child that still runs to end, by a signal to the child or, for a child that

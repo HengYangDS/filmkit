@@ -13,7 +13,7 @@ Measured that night on a 120 s span of a film's UHD stages: the renderer's worke
 - **The renderer's determinism is qualified once for each renderer supply, in the sample build**: the sample renders one stage twice and requires every decoded frame identical, and compares a natively rendered pair at every frame. A film no longer pays for that proof in every build, and can still ask for it.
 - **The 1080p films are encoded by x264 with a keyframe forced at every 120th frame**, scene-cut keyframes off and no B-frames, not by VideoToolbox. No picture or film holds B-frames, as none delivered before did, and the checks of a picture and of a film refuse a stream that holds any. The 1080p uncaptioned film of a derived pair is painted and scaled from the captioned picture in one pass, so it is one encode from the render. **BREAKING** for a rebuild of an earlier release: its 1080p films are other encodes of the same pictures, compared by measure as a rebuilt film already is.
 - **Independent checks run side by side**: `check-picture`'s frame, motion and detail audits, and the verifier's films, up to four at once. Each reports and refuses what it does in sequence.
-- **`render-picture --language all` makes both editions' pictures with one command**: two rendered pictures at the same time, the renderer's own lock off for those two renders alone, two derived pictures in a row. Each edition keeps its own receipt and duration record. A film's task list may use it and need not.
+- **Considered and not taken: both editions' pictures rendered at once.** On a whole film two renders at once gained nothing at any measured setting, so an edition's pictures render one after the other, as before.
 - **Narration divides the segments it has to generate among processes of the speech model**, two unless `FILMKIT_NARRATION_PROCESSES` names another count, and writes the one receipt as before. Every take keeps its bytes.
 - **Exact small savings**: transcripts cached under the recording and the recognizer's weights and library, with the supplied recognizer checked on every run; one decode for both phases of a still scan; the reproduction's film pairs side by side.
 
@@ -21,18 +21,17 @@ Measured that night on a 120 s span of a film's UHD stages: the renderer's worke
 
 ### New Capabilities
 
-- `build-time`: the duration records and the command that prints them with the time of a build, the render's worker count, the checks that run side by side, and narration in several processes.
+- `build-time`: the duration records and the command that prints them with the time of a build, the render's worker count named for a measurement, the checks that run side by side, narration in several processes, and commands that end their child processes with them.
 
 ### Modified Capabilities
 
 - `caption-equivalence`: the uncaptioned picture is derived unless a native render is asked for; what a derivation proves; how a derived pair is compared; what packaging's comparison record binds.
-- `film-engine`: one command may make both editions' pictures.
 - `film-package`: the 1080p films' encoder and how it holds the keyframe grid; no picture or film holds B-frames; each film's record names the picture file its encode read.
-- `sample-film`: the sample film declares `software` capture; its build renders both captioned pictures at once, qualifies the renderer and derives one edition's uncaptioned picture; a task prints its durations.
+- `sample-film`: the sample film declares `software` capture; its build qualifies the renderer and derives one edition's uncaptioned picture; a task prints its durations.
 
 ## Impact
 
-- New: `src/filmkit/durations.py`, `picture/derivation.py`, `picture/ground.py`, `picture/band-audit.mjs`, `picture/qualification.py`, `picture/together.py` and `narration/processes.py`. Changed: `produce.py`, `tools.py`, `media.py`, `repository.py`, `production.py`, `narration/narrate.py`, `narration/synthesis.py`, `narration/transcription.py`, `narration/alignment.py`, `picture/rendering.py`, `picture/equivalence.py`, `picture/faults.py`, `picture/repair.py`, `picture/gates.py`, `picture/still_scan.py`, `delivery/packaging.py`, `delivery/verification.py` and `delivery/reproduction.py`, with their tests; the sample film's declaration and tasks; the README, AGENTS.md, CONTRIBUTING.md and the Changelog.
+- New: `src/filmkit/durations.py`, `picture/derivation.py`, `picture/ground.py`, `picture/band-audit.mjs`, `picture/qualification.py`, `picture/browser.py`, `child_processes.py` and `narration/processes.py`. Changed: `produce.py`, `tools.py`, `media.py`, `repository.py`, `production.py`, `narration/narrate.py`, `narration/synthesis.py`, `narration/transcription.py`, `narration/alignment.py`, `picture/rendering.py`, `picture/equivalence.py`, `picture/faults.py`, `picture/repair.py`, `picture/gates.py`, `picture/still_scan.py`, `delivery/packaging.py`, `delivery/verification.py` and `delivery/reproduction.py`, with their tests; the sample film's declaration and tasks; the README, AGENTS.md, CONTRIBUTING.md and the Changelog.
 - Record formats an adopting film's own tools may read: the uncaptioned picture's receipt (a derived one holds `uncaptioned` and `derived` and no `capture`, `workers` or `source_sha256`), the comparison record (`uncaptioned`, and `encoded.derived` in place of `encoded.frames` for a derived pair), the verifier's report (`ground_frames` in place of `encoded_frames` for a derived pair, and each film's seconds), each film's package member (`source`), the duration records, and the new record of `qualify-renderer`.
 - The budget this Change works towards, each figure to be measured on a film's build before and after with the durations command: a 25-minute film rebuilt in 90 minutes or less, by the time of the build that command prints. A change to one scene in 20 minutes or less needs span renders and is a later slice.
 - An adopting film keeps its task list: `render-picture --uncaptioned`, `validate-picture --uncaptioned` and `compare-pictures` keep their names and decide by the receipt. Its 1080p films change bytes; its UHD uncaptioned film becomes an encode of the captioned picture.

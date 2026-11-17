@@ -275,3 +275,17 @@ def test_native_applies_only_to_the_uncaptioned_render(arguments, capsys):
         produce.main(arguments)
     assert refused.value.code == 2
     assert "--native applies only to render-picture --uncaptioned" in capsys.readouterr().err
+
+
+def test_an_action_takes_one_edition_and_not_both(monkeypatch, capsys):
+    rendered = []
+    monkeypatch.setattr(
+        produce, "render_picture", lambda *arguments, **options: rendered.append(arguments)
+    )
+    # The command that rendered both editions' pictures at once is gone with its module.
+    with pytest.raises(SystemExit) as refused:
+        produce.main(["render-picture", "--language", "all"])
+    assert refused.value.code == 2
+    assert "invalid choice: 'all'" in capsys.readouterr().err
+    assert rendered == []
+    assert not hasattr(produce, "render_all")

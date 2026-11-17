@@ -101,9 +101,9 @@ An edition's build SHALL start at its duration record named `narrate`, which onl
 
 After the editions, `python -m filmkit.durations` SHALL print the time of the build: the seconds during which at least one counted command of the selected editions was running, beside the sum of those commands' seconds. Commands that ran at the same time SHALL count once in the build's time, and the time between commands not at all. A budget stated for a build SHALL be judged by the build's time.
 
-#### Scenario: Two renders at once
+#### Scenario: Two commands at once
 
-- **WHEN** the two editions' renders, of 170 s and 172 s, started half a second apart
+- **WHEN** two commands of 170 s and 172 s, one of each edition, started half a second apart
 - **THEN** the build's time holds 172.5 s for them, where the sum of their seconds holds 342 s
 
 #### Scenario: Commands in a row

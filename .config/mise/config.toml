@@ -64,7 +64,7 @@ run = [
 ]
 
 [tasks."sample:picture"]
-description = "Stage both of each sample edition's pictures, check the geometry, the cover and the audits, render and scan its draft and pass the pre-render check; render both captioned pictures at once and validate them; render the Chinese captioned stage a second time and require the same frames, render its uncaptioned picture natively and compare the pair at every frame; derive the English uncaptioned picture and compare the pair by the derivation's record; and check that both readiness receipts still admit their editions"
+description = "Stage both of each sample edition's pictures, check the geometry, the cover and the audits, render and scan its draft and pass the pre-render check; render each captioned picture and validate it; render the Chinese captioned stage a second time and require the same frames, render its uncaptioned picture natively and compare the pair at every frame; derive the English uncaptioned picture and compare the pair by the derivation's record; and check that both readiness receipts still admit their editions"
 dir = "{{config_root}}/examples/sample-film"
 run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language zh",
@@ -81,7 +81,8 @@ run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce check-picture --language en",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-draft --language en",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce preflight --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language all",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language en",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language en",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce qualify-renderer --language zh",

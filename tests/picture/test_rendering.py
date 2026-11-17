@@ -41,7 +41,6 @@ RECEIPT_KEYS = [
     "capture",
     "workers",
     "browser",
-    "render_lock",
     "exit",
     "timed_out",
     "deadline_seconds",

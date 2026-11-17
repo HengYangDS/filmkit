@@ -32,7 +32,7 @@ The repository SHALL carry a task that prints the duration records of the sample
 
 ### Requirement: The sample film offers its captions on and off
 
-The sample film's build SHALL make and validate each edition's picture with and without captions, both captioned pictures rendered at the same time by one command, the Chinese uncaptioned picture rendered and the English one derived, compare each pair, package the four films and read the players back with the captions turned off and on.
+The sample film's build SHALL make and validate each edition's picture with and without captions, the Chinese uncaptioned picture rendered and the English one derived, compare each pair, package the four films and read the players back with the captions turned off and on.
 
 #### Scenario: The sample film's four films
 

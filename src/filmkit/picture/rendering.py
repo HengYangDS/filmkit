@@ -93,8 +93,8 @@ CAPTURE_FLAGS = {
 # the encoder. A span of 7,200 frames had shown 16 a tenth to a fifth faster; a span that starts
 # inside a film pays a start that hides the encoder's lag, so that reading did not hold for a
 # whole film. The count changes no frame. The renderer runs one render at a time for a user
-# account unless the caller sets RENDER_LOCK to "off", which a receipt records.
-RENDER_LOCK = "HYPERFRAMES_RENDER_LOCK"
+# account, and the engine renders one at a time: two stages at once, the renderer's own lock off,
+# took 739.8 s at 8 workers each where one alone took 354.9 s, and 862 s at 16 each.
 WORKERS_VARIABLE = "FILMKIT_RENDER_WORKERS"
 WORKERS = 8
 # The renderer's encoding by quality: the delivered pictures' at CRF 14, and the draft's at the
@@ -592,7 +592,6 @@ def record_render(
         "capture": command_capture(command),
         "workers": command_workers(command),
         "browser": drawn_by,
-        "render_lock": os.environ.get(RENDER_LOCK, "on"),
         "exit": exit_code,
         "timed_out": timed_out,
         "deadline_seconds": deadline,
