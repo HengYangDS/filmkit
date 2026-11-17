@@ -1,3 +1,7 @@
+## Purpose
+
+Record how long each heavy command of a build took and print a build's time from those records; and keep the build short by what the records settle: where a build starts, the render's worker count, what runs side by side, narration in several processes, and commands that end what they started when they end.
+
 ## ADDED Requirements
 
 ### Requirement: Each heavy command records how long it took
