@@ -1,3 +1,7 @@
+## Purpose
+
+Keep, with each pre-render check, a receipt of an edition's answers and of the inputs they were judged on, so that a later step learns whether the edition is still ready without repeating the check.
+
 ## ADDED Requirements
 
 ### Requirement: The pre-render check writes a readiness receipt

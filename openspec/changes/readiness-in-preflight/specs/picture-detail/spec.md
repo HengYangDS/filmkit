@@ -1,3 +1,7 @@
+## Purpose
+
+Find, on every frame of an edition's picture, the faults of detail the motion audit does not follow: ink a line loses within one frame, a text outside every scene over the pace, a stroke at rest part-drawn, and names on a rail's two baselines too close; and let a film declare the findings it keeps.
+
 ## ADDED Requirements
 
 ### Requirement: The detail audit follows every frame of the film
