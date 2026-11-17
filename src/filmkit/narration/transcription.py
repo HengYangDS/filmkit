@@ -64,8 +64,11 @@ def transcript_record(language: str, record_id: str, wav_sha256: str, identity: 
 
 def cached_transcript(record: dict, language: str, identity: dict) -> str | None:
     """A recording's cached transcript, or None without one. An entry that cannot be read as a
-    transcript is none either: one line says so, and the transcript made again replaces it. A
-    cache that binds another recording, recognizer or language than its place names is refused."""
+    transcript is none either, and never silently: one line says so, and the transcript made
+    again replaces it. That is an entry that is no JSON object, that lacks its text or one of
+    the fields that bind it to its recording, recognizer and language, or whose text is no
+    text. A cache that binds another recording, recognizer or language than its place names
+    is refused."""
     path = transcript_record(language, record["id"], record["wav_sha256"], identity)
     if not path.exists():
         return None

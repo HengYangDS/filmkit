@@ -158,8 +158,24 @@ def test_a_cached_transcript_is_reused_without_loading_the_recognizer(receipt, m
         lambda entry: '"数据的用处"',
         lambda entry: json.dumps({key: value for key, value in entry.items() if key != "heard"}),
         lambda entry: json.dumps({**entry, "heard": None}),
+        # A field that binds the entry to its recording, recognizer or language is gone.
+        lambda entry: json.dumps(
+            {key: value for key, value in entry.items() if key != "recognizer"}
+        ),
+        lambda entry: json.dumps(
+            {key: value for key, value in entry.items() if key != "wav_sha256"}
+        ),
+        lambda entry: json.dumps({key: value for key, value in entry.items() if key != "language"}),
     ],
-    ids=["cut-off", "no-object", "no-transcript", "no-text"],
+    ids=[
+        "cut-off",
+        "no-object",
+        "no-transcript",
+        "no-text",
+        "no-recognizer",
+        "no-recording",
+        "no-language",
+    ],
 )
 def test_a_cached_transcript_that_cannot_be_read_is_made_again_and_replaced(
     receipt, capsys, damage

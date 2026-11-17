@@ -110,8 +110,33 @@ def test_alignment_binds_waveform_and_reuses_exact_cache(tmp_path, aligner):
         lambda entry: "[]",
         lambda entry: json.dumps({key: value for key, value in entry.items() if key != "items"}),
         lambda entry: b"\xff\xfe not text",
+        # A field that binds the entry to its recording, text or aligner is gone.
+        lambda entry: json.dumps({key: value for key, value in entry.items() if key != "aligner"}),
+        lambda entry: json.dumps(
+            {key: value for key, value in entry.items() if key != "wav_sha256"}
+        ),
+        lambda entry: json.dumps(
+            {key: value for key, value in entry.items() if key != "text_sha256"}
+        ),
+        lambda entry: json.dumps({key: value for key, value in entry.items() if key != "id"}),
+        # The items are no list of objects.
+        lambda entry: json.dumps({**entry, "items": "three words here"}),
+        lambda entry: json.dumps({**entry, "items": {"text": "one"}}),
+        lambda entry: json.dumps({**entry, "items": ["one", "two"]}),
     ],
-    ids=["cut-off", "no-object", "no-items", "no-text"],
+    ids=[
+        "cut-off",
+        "no-object",
+        "no-items",
+        "no-text",
+        "no-aligner",
+        "no-recording",
+        "no-text-binding",
+        "no-id",
+        "items-a-text",
+        "items-an-object",
+        "items-of-texts",
+    ],
 )
 def test_a_cached_alignment_that_cannot_be_read_is_made_again_and_replaced(
     tmp_path, aligner, capsys, damage

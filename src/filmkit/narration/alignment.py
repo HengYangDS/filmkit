@@ -82,13 +82,20 @@ def main(argv: list[str] | None = None) -> None:
 
 def _aligned(model, record: dict, aligner: dict, language: str) -> dict:
     """The record's alignment from its bound cache, or from the aligner, which `model` loads,
-    and then cached. A cached entry that cannot be read as an alignment is a miss: one line says
-    so, and the alignment made again replaces it."""
+    and then cached. A cached entry that cannot be read as an alignment is a miss, never a
+    silent one: one line says so, and the alignment made again replaces it. That is an entry
+    that is no JSON object, that lacks its items or one of the fields that bind it to its
+    recording, text and aligner, or whose items are no list of objects. An entry that reads
+    whole and binds another recording, text or aligner is refused."""
     path = repository.ROOT / alignment_record(
         language, record["id"], record["wav_sha256"], aligner["revision"]
     )
     fields = ("id", "items", "wav_sha256", "text_sha256", "aligner")
     aligned = repository.read_entry(path, fields) if path.exists() else None
+    if aligned is not None:
+        items = aligned["items"]
+        if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
+            aligned = None
     if path.exists() and aligned is None:
         unreadable = {"id": record["id"], "cache": repository.UNREADABLE_ENTRY}
         print(json.dumps({**unreadable, "entry": repository.relative(path)}), flush=True)
