@@ -141,19 +141,23 @@ def run(
         variables[metrics.VARIABLE] = str(metrics.current_table())
     with contextlib.ExitStack() as stack:
         output = None if stdout is None else stack.enter_context(stdout.open("w"))
-        tool_process = subprocess.Popen(
-            [node, str(script), *arguments],
-            cwd=repository.ROOT,
-            env=variables,
-            stdin=subprocess.DEVNULL,
-            stdout=output,
-        )
+        tool_process = None
         try:
+            # A request that arrives while the tool starts is acted on once the tool is held here.
+            with child_processes.held():
+                tool_process = subprocess.Popen(
+                    [node, str(script), *arguments],
+                    cwd=repository.ROOT,
+                    env=variables,
+                    stdin=subprocess.DEVNULL,
+                    stdout=output,
+                )
             return tool_process.wait()
         except BaseException:
             # The tool ends what it started, a browser it drives, from its own handling of the
             # request; it is killed only when that has not ended it.
-            child_processes.stop([tool_process], signal.SIGTERM, seconds=STOP_SECONDS)
+            if tool_process is not None:
+                child_processes.stop([tool_process], signal.SIGTERM, seconds=STOP_SECONDS)
             raise
 
 

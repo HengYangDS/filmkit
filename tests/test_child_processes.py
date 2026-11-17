@@ -7,6 +7,7 @@ run's: a test that hands this process a request does so as the interpreter does,
 """
 
 import json
+import os
 import signal
 import subprocess
 import sys
@@ -16,6 +17,7 @@ import pytest
 from real_processes import alive, gone
 
 import filmkit.child_processes as child_processes
+import filmkit.tools as tools
 from filmkit.child_processes import Terminated
 
 # Every test here has the deadline of a test that starts real processes, and their end.
@@ -116,6 +118,29 @@ with child_processes.held():
         time.sleep(0.01)
     note("still-inside")
 note("after")
+"""
+# A child that takes 0.3 s over its own ending when it is asked to end, and exits with 7.
+CLOSING = """
+import signal, sys, time
+def closing(*_):
+    time.sleep(0.3)
+    sys.exit(7)
+signal.signal(signal.SIGTERM, closing)
+print(1, flush=True)
+time.sleep(60)
+"""
+# A command that is asked to end while its standard output holds 6,000 bytes it has not written;
+# given a descriptor's number, it closes that descriptor of its own first.
+UNWRITTEN = """
+import os, sys, time
+import filmkit.child_processes as child_processes
+with child_processes.ending("unwritten: stopped by {request}"):
+    with child_processes.terminable():
+        sys.stdout.write("y" * 6000)
+        if len(sys.argv) > 1:
+            os.close(int(sys.argv[1]))
+        note("unwritten")
+        time.sleep(30)
 """
 # A command that runs one step, which takes the requests to end itself while the step runs, and
 # prints the request that cut its wait short.
@@ -297,9 +322,97 @@ def test_a_child_whose_end_cannot_be_waited_for_is_killed_and_reaped(processes, 
         raise OSError(child_processes.errno.EACCES, "the wait failed")
 
     monkeypatch.setattr(child_processes, "ended", failing)
-    # The failed wait does not leave the stop: the child is killed and reaped.
-    child_processes.stop([child], signal.SIGTERM, seconds=0.2)
+    # The failed wait does not leave the stop: the child is killed and reaped, after its grace.
+    asked = time.monotonic()
+    child_processes.stop([child], signal.SIGTERM, seconds=0.4)
     assert child.returncode == -signal.SIGKILL
+    assert 0.4 <= time.monotonic() - asked < 5
+
+
+def test_a_child_whose_end_cannot_be_waited_for_is_given_its_grace_to_end(processes, monkeypatch):
+    child = processes.python(processes.script("closing", CLOSING))
+    assert processes.line(child) == "1"
+
+    def failing(_child, _seconds=None):
+        raise OSError(child_processes.errno.EACCES, "the wait failed")
+
+    monkeypatch.setattr(child_processes, "ended", failing)
+    asked = time.monotonic()
+    child_processes.stop([child], signal.SIGTERM, seconds=10)
+    # It took 0.3 s over its own ending and was not killed: its exit status is its own.
+    assert child.returncode == 7
+    assert 0.3 <= time.monotonic() - asked < 5
+
+
+def test_a_group_whose_leaders_end_cannot_be_waited_for_is_given_its_grace_too(
+    processes, monkeypatch
+):
+    leader = processes.python(processes.script("closing", CLOSING), session=True)
+    assert processes.line(leader) == "1"
+
+    def failing(_child, _seconds=None):
+        raise OSError(child_processes.errno.EACCES, "the wait failed")
+
+    monkeypatch.setattr(child_processes, "ended", failing)
+    asked = time.monotonic()
+    child_processes.stop([leader], signal.SIGTERM, groups=True, seconds=3)
+    # The leader was looked at by its group's number, not reaped, until it had ended by its own
+    # handling; it was not killed. Where a kernel counts an ended leader that is not reaped as
+    # a member of its group, the look runs the full time and the status is still its own.
+    assert leader.returncode == 7
+    assert time.monotonic() - asked >= 0.3
+
+
+def test_a_stream_that_holds_more_than_its_pipe_has_room_for_does_not_keep_the_command(processes):
+    read, write = os.pipe()
+    try:
+        # The pipe is filled to the brim and then given 600 bytes of room; nobody reads it.
+        os.set_blocking(write, False)
+        filled = 0
+        for size in (65536, 4096, 512, 64, 8, 1):
+            try:
+                while True:
+                    filled += os.write(write, b"x" * size)
+            except BlockingIOError:
+                pass
+        os.set_blocking(write, True)
+        assert os.read(read, 600) == b"x" * 600
+        command = processes.start(
+            [sys.executable, "-B", str(processes.script("unwritten", UNWRITTEN))],
+            env={**os.environ, "NOTES": str(processes.notes)},
+            stdin=subprocess.DEVNULL,
+            stdout=write,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    finally:
+        os.close(write)
+    try:
+        processes.noted("unwritten")
+        command.send_signal(signal.SIGTERM)
+        # The command did not wait for a reader of what it held: it ended with its status.
+        assert command.wait(timeout=15) == 143
+        # The pipe is as its other holders left it: it waits on a write again.
+        assert os.get_blocking(read)
+        held = b""
+        while part := os.read(read, 65536):
+            held += part
+    finally:
+        os.close(read)
+    # The pipe took what it had room for, at most, and the rest was dropped.
+    assert held[: filled - 600] == b"x" * (filled - 600)
+    assert held[filled - 600 :] == b"y" * (len(held) - filled + 600)
+    assert len(held) <= filled
+    assert command.stderr.read() == "unwritten: stopped by a request to end (SIGTERM)\n"
+
+
+@pytest.mark.parametrize("closed", [1, 2])
+def test_a_command_that_closed_a_standard_descriptor_still_exits_with_its_status(processes, closed):
+    command = processes.python(processes.script("unwritten", UNWRITTEN), str(closed))
+    processes.noted("unwritten")
+    command.send_signal(signal.SIGTERM)
+    # The null device took the closed descriptor's number and stayed open under it.
+    assert command.wait(timeout=20) == 143
 
 
 def test_a_request_deferred_outside_a_block_that_takes_them_is_raised_again_after_it(processes):
@@ -374,4 +487,35 @@ def test_a_request_that_arrives_while_run_starts_its_child_still_ends_that_child
     monkeypatch.setattr(child_processes.subprocess, "Popen", Started)
     with pytest.raises(Terminated), child_processes.terminable():
         child_processes.run(["a-step"], cwd=tmp_path)
+    assert signals == [signal.SIGTERM]
+
+
+def test_a_request_that_arrives_while_a_tool_starts_still_has_that_tool_asked_to_end(
+    tmp_path, monkeypatch
+):
+    signals = []
+
+    class Started:
+        """A tool whose start is when the request to end arrives; it ends when it is asked to."""
+
+        pid, returncode = 0, None
+
+        def __init__(self, command, **options):
+            child_processes.receive(signal.SIGTERM)
+
+        def send_signal(self, number):
+            signals.append(number)
+            self.returncode = -number
+
+        def wait(self, timeout=None):
+            return self.returncode
+
+    monkeypatch.setattr(tools.picture_rendering, "require_renderer", lambda: None)
+    monkeypatch.setattr(tools.picture_rendering, "browser_path", lambda: "no-browser")
+    monkeypatch.setattr(tools.shutil, "which", lambda name: "node")
+    monkeypatch.setattr(tools, "stage_tools", lambda: tmp_path)
+    monkeypatch.setattr(tools, "TOOLS", {"standin": "standin.mjs"})
+    monkeypatch.setattr(tools.subprocess, "Popen", Started)
+    with pytest.raises(Terminated), child_processes.terminable():
+        tools.run("standin", [])
     assert signals == [signal.SIGTERM]
