@@ -340,6 +340,25 @@ def test_an_interrupt_of_the_command_alone_has_its_tool_asked_to_end_and_waited_
     assert gone([asked])
 
 
+@pytest.mark.parametrize("further", list(REQUESTS))
+def test_a_further_request_while_a_tool_is_being_ended_waits_for_the_tool(processes, further):
+    tool = processes.script("tool", TOOL)
+    command = processes.python(processes.script("check", CHECK), str(tool), CLOSING="1")
+    asked = processes.noted("tool")["pid"]
+    command.send_signal(signal.SIGINT)
+    # The tool has been asked to end and is closing what it started: the command waits for it.
+    processes.noted("tool-asked")
+    command.send_signal(further)
+    command.wait(timeout=30)
+    # The further request did not end the command before its tool had closed what it started.
+    processes.noted("tool-closed-its-browser", 0)
+    assert gone([asked])
+    # It was acted on then: SIGTERM and a hang-up by the signal itself, with no line, and a
+    # second interrupt as the first would have been.
+    said = ["check: stopped by an interrupt"] if further == signal.SIGINT else []
+    assert ended(processes, command) == (-further, said)
+
+
 def test_an_interrupt_of_the_command_alone_leaves_audits_that_run_side_by_side(processes):
     """The cost that is stated: the audits are waited for in threads, which no interrupt
     reaches, so the command ends and the audits run on to their own end."""
