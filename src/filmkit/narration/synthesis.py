@@ -100,19 +100,28 @@ def main(argv: list[str] | None = None) -> None:
         for job in jobs:
             print(json.dumps(_planned(job, request), ensure_ascii=False))
         return
+    # What an earlier run for this receipt left of its processes goes before anything else.
+    processes.clear_work(request.receipt)
     retained = [reuse_or_refuse(job) for job in jobs]
     pending = [job for job, record in zip(jobs, retained, strict=True) if record is None]
+    made_by: dict[str, int] = {}
     if len(pending) > 1 and processes.count() > 1:
-        retained = narrated_in_processes(request, jobs, pending)
+        retained, made_by = narrated_in_processes(request, jobs, pending)
     model = load_voice_model() if any(record is None for record in retained) else None
-    records = [_narrated(model, job, record) for job, record in zip(jobs, retained, strict=True)]
+    records = [
+        _narrated(model, job, record, made_by.get(job.segment["id"]))
+        for job, record in zip(jobs, retained, strict=True)
+    ]
     write_receipt(request.receipt, records, merge=request.merge)
 
 
-def narrated_in_processes(request: Request, jobs: list[Job], pending: list[Job]) -> list[dict]:
+def narrated_in_processes(
+    request: Request, jobs: list[Job], pending: list[Job]
+) -> tuple[list[dict], dict[str, int]]:
     """Narrate the segments still to generate in several processes at once
-    (`filmkit.narration.processes`) and return every job's retained record, which each must then
-    have: a process that ended well without its segment's recording is refused."""
+    (`filmkit.narration.processes`). Returns every job's retained record, which each must then
+    have, a process that ended well without its segment's recording being refused, and for each
+    segment generated in this run the number of the process that generated it."""
     lengths = [(job.segment["id"], len(job.segment["spoken_text"])) for job in pending]
     shares = processes.divide(lengths, processes.count())
     for child in processes.narrate(request.sources, shares, request.receipt):
@@ -122,7 +131,8 @@ def narrated_in_processes(request: Request, jobs: list[Job], pending: list[Job])
     if missing:
         msg = f"The narration processes ended without the recordings of {', '.join(missing)}"
         raise RetainedUtteranceError(msg)
-    return retained
+    made_by = {segment: number for number, ids in enumerate(shares, 1) for segment in ids}
+    return retained, made_by
 
 
 def load_request(argv: list[str] | None = None) -> Request:
@@ -338,10 +348,15 @@ def record_segment(model, job: Job) -> dict:
     return record
 
 
-def _narrated(model, job: Job, retained: dict | None) -> dict:
-    """The job's retained record, or the record of its new recording, reported as it lands."""
+def _narrated(model, job: Job, retained: dict | None, process: int | None = None) -> dict:
+    """The job's retained record, or the record of its new recording, reported as it lands. A
+    retained recording is reported as reused, or as generated, with the process's number, when
+    one of this run's processes generated it."""
     if retained is not None:
-        report = {"id": job.segment["id"], "state": "reused", "duration": retained["duration"]}
+        made = {"state": "reused"}
+        if process is not None:
+            made = {"state": "generated", "process": process}
+        report = {"id": job.segment["id"], **made, "duration": retained["duration"]}
         print(json.dumps(report), flush=True)
         return retained
     record = record_segment(model, job)

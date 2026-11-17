@@ -95,9 +95,11 @@ def test_each_child_is_the_synthesis_itself_on_its_segments_with_a_receipt_of_it
         (["01", "04"], 0),
         (["02", "03"], 0),
     ]
-    # No child's receipt stands where the edition's does, and a run that passes leaves no work.
-    assert not receipt.exists()
-    assert not (root / work).exists()
+    # The children's logs stay in the work folder after a run that passes.
+    assert sorted(path.name for path in (root / work).iterdir()) == [
+        "process-1.log",
+        "process-2.log",
+    ]
 
 
 def test_the_work_folder_is_named_after_the_receipts_whole_path_from_the_root(root):
@@ -126,10 +128,23 @@ def test_a_failed_child_is_named_with_its_segments_its_log_and_its_last_line(roo
     # Both children were started and waited for, and their logs stay for inspection.
     assert len(started) == 2
     assert all(log.is_file() for _, log in started)
-    # The next run clears what the last one left before it starts its own children.
-    starting(monkeypatch)
-    processes.narrate(SOURCES, [["02"], ["03"]], root / RECEIPT)
-    assert not started[0][1].parent.exists()
+
+
+def test_clearing_the_work_of_a_receipt_removes_what_an_earlier_run_left(root, monkeypatch):
+    starting(monkeypatch, statuses=(0, 1))
+    with pytest.raises(ProcessesError):
+        processes.narrate(SOURCES, [["01"], ["02"]], root / RECEIPT)
+    work = processes.work_folder(root / RECEIPT)
+    other = processes.work_folder(root / "build/other/narration-receipt.json")
+    other.mkdir(parents=True)
+    (other / "process-1.log").write_text("another receipt's run\n")
+    assert len(list(work.iterdir())) == 2
+    processes.clear_work(root / RECEIPT)
+    # The folder is gone with what it held, another receipt's is untouched, and clearing a
+    # receipt that has no work is no failure.
+    assert not work.exists()
+    assert [path.name for path in other.iterdir()] == ["process-1.log"]
+    processes.clear_work(root / RECEIPT)
 
 
 @pytest.fixture

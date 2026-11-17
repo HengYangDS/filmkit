@@ -8,7 +8,9 @@ generated and the count is over one, `narrate` here divides those segments among
 the longest spoken text first to the least loaded, and starts for each one child of the synthesis
 itself, `--ids <its segments>`, which writes a receipt of its own in a work folder that no other
 step reads. When all have ended, the synthesis takes its ordinary path, in which it finds every
-segment retained, loads no model and writes the one receipt in segment order.
+segment retained, loads no model and writes the one receipt in segment order. The work folder
+of a receipt is cleared when a synthesis for that receipt begins and kept when it ends, so the
+children's logs can be read after a run that passed as after one that failed.
 
 The count is `DEFAULT` unless `VARIABLE` names another; 1 keeps the single process. A child is
 given the count 1, so it never divides again. A child that fails does not stop the others; once
@@ -31,6 +33,7 @@ their fingerprints that the film delivered.
 from __future__ import annotations
 
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -87,6 +90,16 @@ def work_folder(receipt: Path) -> Path:
     return repository.ROOT / WORK / "-".join(place.parts)
 
 
+def clear_work(receipt: Path) -> None:
+    """Remove the work folder an earlier run for this receipt left: its children's logs and
+    receipts. Every run of the synthesis for a receipt does this first, whether it divides or
+    narrates in its own process, and leaves its own work after it, so a failed run's logs can be
+    read until the next run and no child's receipt of an earlier run stands beside a later one."""
+    work = work_folder(receipt)
+    if work.is_dir():
+        shutil.rmtree(work)
+
+
 def child_command(sources: tuple[str, str, str], ids: list[str], receipt: Path) -> list[str]:
     """One child's command: the synthesis itself on the given script, cast and folder, for these
     segments, into a receipt of its own."""
@@ -121,15 +134,16 @@ def last_line(log: Path) -> str:
 def wait_for_all(
     children: list[tuple[list[str], Path, subprocess.Popen]], started: float
 ) -> list[dict]:
-    """Wait for every child and return each one's segments, exit status, log and seconds: the
-    seconds from the narration's start to the moment that child was found ended, whichever
-    child ended first."""
+    """Wait for every child and return each one's number, segments, exit status, log and
+    seconds: the seconds from the narration's start to the moment that child was found ended,
+    whichever child ended first."""
     ended: dict[int, dict] = {}
     while len(ended) < len(children):
         for number, (ids, log, child) in enumerate(children):
             if number not in ended and (status := child.poll()) is not None:
                 seconds = round(time.monotonic() - started, 1)
-                ended[number] = {"ids": ids, "exit": status, "seconds": seconds, "log": log}
+                ended[number] = {"number": number + 1, "ids": ids, "exit": status}
+                ended[number] |= {"seconds": seconds, "log": log}
         if len(ended) < len(children):
             time.sleep(POLL_SECONDS)
     return [ended[number] for number in range(len(children))]
@@ -147,14 +161,13 @@ def cut_short(error: BaseException) -> str:
 def narrate(sources: tuple[str, str, str], shares: list[list[str]], receipt: Path) -> list[dict]:
     """Narrate each share of segments in a child of its own, all at once, and wait for all.
 
-    Returns each child's segments, exit status and seconds. Refused, once all have ended, when
-    any failed; the work folder then stays, with every child's log. A run that passes removes it.
-    A wait that is cut short ends every child's process group and refuses, naming the cause.
+    Returns each child's number, segments, exit status and seconds. Refused, once all have
+    ended, when any failed. The work folder, which the synthesis cleared when it began
+    (`clear_work`), stays after the run, pass or fail, with every child's log and receipt. A
+    wait that is cut short ends every child's process group and refuses, naming the cause.
     """
     work = work_folder(receipt)
     work.mkdir(parents=True, exist_ok=True)
-    for earlier in work.iterdir():
-        earlier.unlink()
     started = time.monotonic()
     children: list[tuple[list[str], Path, subprocess.Popen]] = []
     try:
@@ -182,7 +195,4 @@ def narrate(sources: tuple[str, str, str], shares: list[list[str]], receipt: Pat
     if failed:
         msg = "A narration process failed: " + "; ".join(failed)
         raise ProcessesError(msg)
-    for left in work.iterdir():
-        left.unlink()
-    work.rmdir()
-    return [{key: child[key] for key in ("ids", "exit", "seconds")} for child in ended]
+    return [{key: child[key] for key in ("number", "ids", "exit", "seconds")} for child in ended]

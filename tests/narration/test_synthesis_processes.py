@@ -22,6 +22,11 @@ LONG = ["这一段说得更长一些，好让它排在前面。", "再补一句�
 SEGMENTS = {"01": GROUPS, "02": LONG, "03": GROUPS, "04": ["短句。", "又一句。"]}
 
 
+def work_of(root):
+    """The folder of the children that narrate for the tests' receipt."""
+    return root / "build/runtime/work/narration-processes/receipt"
+
+
 class Child:
     def __init__(self, status):
         self.status = status
@@ -79,16 +84,27 @@ def test_segments_to_generate_are_divided_and_the_one_receipt_is_in_segment_orde
     records = repository.read("receipt.json")["records"]
     assert [record["id"] for record in records] == ["01", "02", "03", "04"]
     assert all((tmp_path / record["path"]).is_file() for record in records)
-    assert not (tmp_path / "build/runtime/work/narration-processes/receipt").exists()
-    lines = printed(capsys)
-    reports = [line["process"] for line in lines if "process" in line]
-    assert [(report["ids"], report["exit"]) for report in reports] == [
-        (["02", "04"], 0),
-        (["01", "03"], 0),
+    # The children's logs and receipts stay after the run, for whoever wants to read them.
+    assert sorted(path.name for path in work_of(tmp_path).iterdir()) == [
+        "process-1.json",
+        "process-1.log",
+        "process-2.json",
+        "process-2.log",
     ]
-    # Once the children have ended, the synthesis finds every segment retained.
-    reused = [line["id"] for line in lines if line.get("state") == "reused"]
-    assert reused == ["01", "02", "03", "04"]
+    lines = printed(capsys)
+    reports = [line["process"] for line in lines if isinstance(line.get("process"), dict)]
+    assert [(report["number"], report["ids"], report["exit"]) for report in reports] == [
+        (1, ["02", "04"], 0),
+        (2, ["01", "03"], 0),
+    ]
+    # The synthesis then finds every segment retained, and says which process generated it.
+    states = [(line["id"], line["state"], line["process"]) for line in lines if "state" in line]
+    assert states == [
+        ("01", "generated", 2),
+        ("02", "generated", 1),
+        ("03", "generated", 2),
+        ("04", "generated", 1),
+    ]
 
 
 def test_the_receipt_equals_a_single_process_runs_but_for_what_each_take_measured(
@@ -138,20 +154,50 @@ def test_a_failed_child_refuses_and_leaves_the_edition_receipt_as_it_was(
     # The other child ran to its end, and no model was loaded here to narrate what failed.
     assert [child["ids"] for child in started] == ["02,04", "01,03"]
     assert (tmp_path / "receipt.json").read_bytes() == before
-    work = tmp_path / "build/runtime/work/narration-processes/receipt"
+    work = work_of(tmp_path)
     assert (work / "process-1.log").read_text().startswith("RuntimeError")
+    assert (work / "process-2.json").is_file()
     # The next run divides only the failed child's segments and reuses what the other retained.
     capsys.readouterr()
     again = children(monkeypatch)
     narration_synthesis.main(ARGUMENTS)
     assert [child["ids"] for child in again] == ["02", "04"]
-    assert not work.exists()
     assert [record["id"] for record in repository.read("receipt.json")["records"]] == [
         "01",
         "02",
         "03",
         "04",
     ]
+    lines = [line for line in printed(capsys) if "state" in line]
+    assert [(line["id"], line["state"], line.get("process")) for line in lines] == [
+        ("01", "reused", None),
+        ("02", "generated", 1),
+        ("03", "reused", None),
+        ("04", "generated", 2),
+    ]
+
+
+def test_every_run_clears_the_work_an_earlier_run_left_and_keeps_its_own(
+    tmp_path, sources, monkeypatch
+):
+    work = work_of(tmp_path)
+    children(monkeypatch, fail=("02,04",))
+    with pytest.raises(ProcessesError):
+        narration_synthesis.main(ARGUMENTS)
+    (work / "note-of-the-first-run.txt").write_text("left by the failed run\n")
+    assert (work / "process-2.json").is_file()
+    # A run that fails again starts from an empty folder: nothing of the first run is left.
+    children(monkeypatch, fail=("02", "04"))
+    with pytest.raises(ProcessesError):
+        narration_synthesis.main(ARGUMENTS)
+    assert sorted(path.name for path in work.iterdir()) == ["process-1.log", "process-2.log"]
+    # A run that generates one segment in its own process clears the folder too, so no child's
+    # receipt of an earlier run stands there, and a dry run leaves it as it is.
+    narration_synthesis.main([*ARGUMENTS, "--dry-run"])
+    assert len(list(work.iterdir())) == 2
+    monkeypatch.setattr(processes, "start", None)
+    narration_synthesis.main([*ARGUMENTS, "--ids", "02"])
+    assert not work.exists()
 
 
 def test_a_child_that_ends_well_without_its_recording_is_refused(sources, monkeypatch):

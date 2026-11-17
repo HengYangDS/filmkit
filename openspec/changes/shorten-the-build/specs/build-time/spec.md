@@ -168,6 +168,16 @@ When more than one segment is to be generated, the narration SHALL generate them
 - **WHEN** `FILMKIT_NARRATION_PROCESSES` is `many`
 - **THEN** the narration is refused before any segment is generated, naming the variable
 
+#### Scenario: The work an earlier run left
+
+- **WHEN** a synthesis for a receipt begins, to divide its segments or to narrate one in its own process
+- **THEN** the logs and receipts that an earlier run's processes left for that receipt are removed first, and this run's stay after it ends, whether it passes or fails
+
+#### Scenario: A segment a process generated
+
+- **WHEN** a process generated a segment in this run
+- **THEN** the narration reports the segment as generated, with that process's number, and a segment retained from an earlier run as reused
+
 #### Scenario: Each process's seconds
 
 - **WHEN** one of two processes ends after two seconds and the other at once
