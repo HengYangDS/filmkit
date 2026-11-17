@@ -22,6 +22,8 @@ This draft holds the intent in the repository. It has no specs or tasks: each sl
 - **A film declares what a single thought's clarity is judged against.** The declaration states the line for a thought beside the floor for the soundtrack and its segments, `check-sound` gates it, and the review prompt prints it, so a reviewer and the gate hold the same line.
 - **Names on a rail's two baselines are neighbours.** The row gap also holds between names of one list that stand on alternate baselines.
 - **A retake is judged on the soundtrack against the take it replaces.** A comparison with a previous edition lists each changed thought that reads lower than the replaced take beyond a margin, and `preflight` reads its record.
+- **An audition ranks takes by the speech the assembly keeps.** Where a film asks for pace, the qualified takes that reach its clarity floor are ranked by their speech with inner quiet capped as the assembly caps it and edge quiet left out, in place of a tie broken by a take's whole length.
+- **A duration record states the host's load.** Each record carries the 1-minute load average at its command's start and end, and the durations command prints it, so a slower build can be told from a busier host.
 - **One study states the thresholds the films share and where each comes from**, so a film's design cites it instead of restating a value.
 
 ## Capabilities
@@ -37,7 +39,8 @@ This draft holds the intent in the repository. It has no specs or tasks: each sl
 - `picture-gates`: row gaps are gated at the declared floor; recorded classes are disposed.
 - `sound-gates`: a thought under the clarity floor is gated unless declared; changed takes are compared with a previous edition.
 - `caption-text`: breaks weigh the reading rate; a cue above it is gated unless declared.
-- `narration-retakes`: a script edit names the picture's words it leaves behind; narration can require a text review.
+- `narration-retakes`: a script edit names the picture's words it leaves behind; narration can require a text review; an audition ranks takes by the speech the assembly keeps.
+- `build-time`: a duration record states the host's load.
 
 ## Impact
 
@@ -45,6 +48,6 @@ This draft holds the intent in the repository. It has no specs or tasks: each sl
 - Each adopting film declares its accepted findings in `content/film.toml` and drops the scripts that counted them; its task list can call `preflight` before its first render ticket.
 - Out of scope: admitting a host ticket on a receipt, which is the host's owner's; the review round's changes note, dispositions and release documents, which a later Change takes; the values of the thresholds themselves.
 
-Deferred with this Change: `transformers` 5.23.0 and `mlx-audio` 0.6.5, which the archived Change `2026-11-14-declare-release-age-and-take-latest-supply` deferred to 16 November 2026. Read again on that day: the lock still holds `mlx-audio` 0.6.4, and the two film editions that were to be released first are not, since the DDWG film's review round 41 did not pass. `mlx-audio` 0.6.5 changes every take, so it moves in the release that admits this Change, accepted by comparing the sample film's takes and frames before and after, and a film adopts it with an edition it narrates anew. Owner: the engine's maintainer. Next action: the same release. Read again: 2026-11-18.
+Deferred with this Change: `transformers` 5.23.0 and `mlx-audio` 0.6.5, which the archived Change `2026-11-14-declare-release-age-and-take-latest-supply` deferred to 16 November 2026. Read again on that day: the lock still holds `mlx-audio` 0.6.4, and the two film editions that were to be released first are not, since the DDWG film's review round 41 did not pass. `mlx-audio` 0.6.5 changes every take, so it was to move in the release that admits this Change. Read again on 18 November 2026: the release that admits the first slice, 0.23.0, does not take the moves: it carries three Changes, and a new `mlx-audio` and a new renderer both change what a build produces. Upstream has moved on (read that day: `mlx-audio` 0.6.6, and `hyperframes` 0.9.63 against the pinned 0.9.46; the repository steward's reading of 17 November adds `numpy` 2.5.5, uv 0.13.9 and the locks' smaller moves). They move together in a supply Change of their own after 0.23.0, each accepted by comparing the sample film's takes and frames before and after, and a film adopts it with an edition it narrates anew. Owner: the engine's maintainer. Next action: open the supply Change once 0.23.0 is tagged, to land before the ETHOS rebind of 21 November or to open after it. Read again: 2026-11-20.
 
-Owner: the engine's maintainer. Next action: admit the Change with its specs and tasks once the ETHOS film's edition 2.0.1 and the DDWG film's edition 1.3.1 are released. Read again: 2026-11-18.
+Owner: the engine's maintainer. Next action: after 0.23.0, admit the next slice as a Change of its own: the audition's ranking by kept speech (decision 23), which the DDWG film's December edition waits for, with the duration record's load (decision 24). Read again: 2026-11-22.
