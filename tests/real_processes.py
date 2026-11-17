@@ -15,7 +15,8 @@ A process started through `Processes` begins with an interrupt and a hang-up at 
 actions, whatever the test run itself does with them: a run under nohup, or one that is the
 background job of a shell without job control, ignores one of them, a child inherits what its
 parent ignores, and the engine leaves an ignored signal ignored. A test that means "ignored, as
-under nohup" has its process ignore the signal itself.
+under nohup" has its process ignore the signal itself. A closed pipe and a file-size limit are
+at their default actions in it too, as in a process that `subprocess` starts itself.
 """
 
 from __future__ import annotations
@@ -43,13 +44,17 @@ def note(name, **facts):
     partial.replace(folder / f"{name}.json")
 """
 # What a process started here runs first: an interrupt and a hang-up at their default actions,
-# then the command itself in the same process, so that its number is the command's.
+# and with them a closed pipe and a file-size limit, which the interpreter that runs these lines
+# ignores from its start and would hand on ignored; then the command itself in the same
+# process, so that its number is the command's.
 DEFAULTS = """
 import os, signal, sys
-signal.signal(signal.SIGINT, signal.SIG_DFL)
-signal.signal(signal.SIGHUP, signal.SIG_DFL)
+for number in (signal.SIGINT, signal.SIGHUP, signal.SIGPIPE, signal.SIGXFSZ):
+    signal.signal(number, signal.SIG_DFL)
 os.execvp(sys.argv[1], sys.argv[1:])
 """
+# The facts of a note that name a process: the script's own number, and a child's that it notes.
+PROCESS_FACTS = ("pid", "own")
 
 
 @contextlib.contextmanager
@@ -163,9 +168,12 @@ class Processes:
         return json.loads(path.read_text())
 
     def pids(self) -> list[int]:
-        """Every process id the notes name; each is remembered with when it started."""
+        """Every process id the notes name, in the facts that name one (`PROCESS_FACTS`); each
+        is remembered with when it started. A whole number in another fact names no process."""
         notes = [json.loads(path.read_text()) for path in sorted(self.notes.glob("*.json"))]
-        found = [value for note in notes for value in note.values() if type(value) is int]
+        found = [
+            note[fact] for note in notes for fact in PROCESS_FACTS if type(note.get(fact)) is int
+        ]
         for pid in found:
             if pid not in self.named:
                 self.named[pid] = started_at(pid)
@@ -185,11 +193,12 @@ class Processes:
     def end(self) -> None:
         """Kill what still runs of the processes started here and of those the notes named. A
         named one is killed only while its number is still its own: the process of that number
-        started when the named one did."""
+        started when the named one did. One that may not be signalled is passed over, and the
+        rest are still ended."""
         self.pids()
         for pid, when in self.named.items():
             if when and started_at(pid) == when and alive(pid):
-                with contextlib.suppress(ProcessLookupError):
+                with contextlib.suppress(ProcessLookupError, PermissionError):
                     os.kill(pid, signal.SIGKILL)
         for process in self.started:
             if process.poll() is None:

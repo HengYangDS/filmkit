@@ -15,6 +15,7 @@ import pty
 import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -155,7 +156,8 @@ with child_processes.ending("between: stopped by {request}"):
 # A check that runs a tool by the engine's own run of one (`tools.run`) under `ending`, the tool a
 # stand-in script that Python runs where the engine runs Node; and the tool, which ends what it
 # started by its own handling of a request, taking CLOSING seconds over it, as a tool that
-# drives a browser closes it. With DEAF it ignores the request to end.
+# drives a browser closes it. With DEAF it notes the request to end and goes on. Either way it
+# notes the signals that asked it, in their order.
 CHECK = """
 import pathlib, sys
 import filmkit.child_processes as child_processes
@@ -174,13 +176,18 @@ with child_processes.ending("check: stopped by {request}"):
 """
 TOOL = """
 import os, signal, sys, time
+got = []
 def closing(number, frame):
-    note("tool-asked", number=number)
+    got.append(number)
+    note("tool-asked", signals=got)
     time.sleep(float(os.environ.get("CLOSING", "0")))
     note("tool-closed-its-browser")
     raise SystemExit(0)
+def deaf(number, frame):
+    got.append(number)
+    note("tool-asked", signals=got)
 for number in (signal.SIGINT, signal.SIGTERM):
-    signal.signal(number, signal.SIG_IGN if os.environ.get("DEAF") else closing)
+    signal.signal(number, deaf if os.environ.get("DEAF") else closing)
 note("tool")
 time.sleep(30)
 """
@@ -313,8 +320,9 @@ def test_an_interrupted_check_lets_its_tool_end_what_the_tool_started(processes)
     # A terminal's interrupt goes to the whole foreground group: the command and its tool.
     os.killpg(command.pid, signal.SIGINT)
     # The tool took the interrupt itself and needed a second for its own ending, longer than the
-    # quarter second a wait used to give it; the command waited and did not kill it.
-    assert processes.noted("tool-asked")["number"] == signal.SIGINT
+    # quarter second a wait used to give it; the command waited and did not kill it. The
+    # command's own request to end reaches the tool later and is noted after the interrupt.
+    assert processes.noted("tool-asked")["signals"][0] == signal.SIGINT
     processes.noted("tool-closed-its-browser", 10)
     assert ended(processes, command) == (-signal.SIGINT, ["check: stopped by an interrupt"])
 
@@ -326,7 +334,7 @@ def test_an_interrupt_of_the_command_alone_has_its_tool_asked_to_end_and_waited_
     # The interrupt reaches the command and not its tool, as `kill -INT` of the command does.
     command.send_signal(signal.SIGINT)
     # The command asked the tool to end; the tool ran its own ending and was not killed.
-    assert processes.noted("tool-asked")["number"] == signal.SIGTERM
+    assert processes.noted("tool-asked")["signals"][0] == signal.SIGTERM
     processes.noted("tool-closed-its-browser", 10)
     assert ended(processes, command) == (-signal.SIGINT, ["check: stopped by an interrupt"])
     assert gone([asked])
@@ -349,14 +357,23 @@ def test_an_interrupt_of_the_command_alone_leaves_audits_that_run_side_by_side(p
 
 
 def test_a_tool_that_does_not_end_when_asked_is_killed_after_the_grace(processes):
+    grace = 0.8
     tool = processes.script("tool", TOOL)
-    command = processes.python(processes.script("check", CHECK), str(tool), "0.3", DEAF="1")
+    command = processes.python(processes.script("check", CHECK), str(tool), str(grace), DEAF="1")
     deaf = processes.noted("tool")["pid"]
+    interrupted = time.monotonic()
     command.send_signal(signal.SIGINT)
-    assert ended(processes, command) == (-signal.SIGINT, ["check: stopped by an interrupt"])
-    # The tool ignored the request to end and was killed: it never ran its own ending.
+    # The tool was asked to end, noted it and went on.
+    assert processes.noted("tool-asked")["signals"] == [signal.SIGTERM]
+    assert command.wait(timeout=30) == -signal.SIGINT
+    lasted = time.monotonic() - interrupted
+    # It was given its grace and then killed: a stop that killed it at once would have ended
+    # the command a quarter second after the interrupt, and one that forgot the grace given
+    # here after a tool's own 20 s. It never ran its own ending.
+    assert grace <= lasted < 10
     assert gone([deaf])
     assert not (processes.notes / "tool-closed-its-browser.json").exists()
+    assert ended(processes, command) == (-signal.SIGINT, ["check: stopped by an interrupt"])
 
 
 def test_a_hang_up_whose_terminal_is_gone_still_exits_with_its_status(processes):

@@ -1,6 +1,7 @@
 """What the tests of real processes rest on: a deadline that fails a wait that hangs, and an end
 that kills what a test left running."""
 
+import os
 import subprocess
 import sys
 import time
@@ -72,3 +73,53 @@ def test_the_end_leaves_a_number_that_is_no_longer_the_named_process(tmp_path):
     finally:
         other.kill()
         other.wait()
+
+
+def test_a_whole_number_names_a_process_only_in_a_fact_that_names_one(tmp_path):
+    processes = real_processes.Processes(tmp_path)
+    other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    try:
+        # A running process's number under a fact that names none, as a signal's number stands.
+        (processes.notes / "asked.json").write_text(f'{{"number": {other.pid}, "signals": [2]}}')
+        assert processes.pids() == []
+        processes.end()
+        assert alive(other.pid)
+    finally:
+        other.kill()
+        other.wait()
+
+
+def test_the_end_goes_on_past_a_named_process_it_may_not_signal(tmp_path, monkeypatch):
+    processes = real_processes.Processes(tmp_path)
+    other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    kill = os.kill
+
+    def refusing(pid, number):
+        if pid == other.pid:
+            raise PermissionError(1, "Operation not permitted")
+        kill(pid, number)
+
+    try:
+        started = processes.python(processes.script("sleeper", SLEEPER))
+        processes.noted("sleeper")
+        (processes.notes / "other.json").write_text(f'{{"pid": {other.pid}}}')
+        monkeypatch.setattr(real_processes.os, "kill", refusing)
+        # The one it may not signal does not keep the end from the rest of its work.
+        processes.end()
+        assert started.returncode is not None
+    finally:
+        monkeypatch.undo()
+        other.kill()
+        other.wait()
+
+
+def test_a_process_started_here_dies_of_a_closed_pipe_as_any_process_does(tmp_path):
+    processes = real_processes.Processes(tmp_path)
+    try:
+        shell = processes.start(
+            ["/bin/sh", "-c", "kill -PIPE $$; echo went-on"], stdout=subprocess.PIPE, text=True
+        )
+        printed, _ = shell.communicate(timeout=20)
+    finally:
+        processes.end()
+    assert (shell.returncode, printed) == (-real_processes.signal.SIGPIPE, "")
