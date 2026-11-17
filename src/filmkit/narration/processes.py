@@ -167,11 +167,14 @@ def wait_for_all(
 ) -> list[dict]:
     """Wait for every child and return each one's number, segments, exit status, log and
     seconds: the seconds from the narration's start to the moment that child was found ended,
-    whichever child ended first."""
+    whichever child ended first. Each look at a child defers a request to end until the look
+    is over (`child_processes.exit_status`); between two looks a request cuts the wait."""
     ended: dict[int, dict] = {}
     while len(ended) < len(children):
         for number, (ids, log, child) in enumerate(children):
-            if number not in ended and (status := child.poll()) is not None:
+            if number in ended:
+                continue
+            if (status := child_processes.exit_status(child)) is not None:
                 seconds = round(time.monotonic() - started, 1)
                 ended[number] = {"number": number + 1, "ids": ids, "exit": status}
                 ended[number] |= {"seconds": seconds, "log": log}

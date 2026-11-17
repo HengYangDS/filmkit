@@ -39,8 +39,9 @@ within `SAY_SECONDS`, as a full pipe that nobody reads, or whose stream the comm
 without, is dropped and changes neither.
 
 Where a request must not interrupt, `held` defers the first one to the end of its block: while
-a child starts, so that the request finds the child already among those to end, and while
-children are being ended (`stop`), when the cause was not a request.
+a child starts, so that the request finds the child already among those to end, while a child
+is looked at (`exit_status`), since that look cannot be cut anywhere, and while children are
+being ended (`stop`), when the cause was not a request.
 
 `stop` asks each child that has not been reaped to end, by a signal to the child or, for a
 child that leads a session of its own, to its whole process group, so that what the child
@@ -429,6 +430,20 @@ def _outlasts(child: subprocess.Popen, ends: float, *, group: bool) -> bool:
             return False
         time.sleep(POLL_SECONDS)
     return True
+
+
+def exit_status(child: subprocess.Popen) -> int | None:
+    """A child's exit status, or None while it runs, looked at with a request deferred (`held`).
+
+    Inside a block of `terminable` a request is raised wherever the command stands, and
+    `Popen.poll` cannot be cut anywhere: it takes the child's lock and only then guards it, so a
+    request raised between the two leaves the lock taken, and the wait that ends a stop then
+    waits for that lock for ever, in a command whose children have ended and that takes no
+    further request. A block that takes requests therefore looks at a child through this, and
+    otherwise only sleeps or waits (`ended`, `Popen.wait` without a timeout), which a request
+    may cut."""
+    with held():
+        return child.poll()
 
 
 def run(command: list[str], *, cwd: Path) -> None:

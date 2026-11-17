@@ -52,6 +52,38 @@ with child_processes.ending("The narration was stopped by {request}"):
         raise SystemExit(str(error)) from None
     print(json.dumps(ended))
 """
+# The parent asked to end at the one instant a look at a child cannot be cut: once both children
+# have noted that they run, the second child's lock, as `Popen.poll` takes it, sends the parent
+# SIGTERM, the moment it is taken and before `poll` guards it. The handler runs before `acquire`
+# returns.
+ASKED_INSIDE_A_LOOK = """
+import os, pathlib, signal
+import filmkit.narration.processes as processes
+class Asking:
+    def __init__(self, lock):
+        self.lock, self.asked = lock, False
+    def acquire(self, *arguments):
+        taken = self.lock.acquire(*arguments)
+        noted = len(list(pathlib.Path(os.environ["NOTES"]).glob("*.json")))
+        if taken and not self.asked and noted == 2:
+            self.asked = True
+            os.kill(os.getpid(), signal.SIGTERM)
+        return taken
+    def release(self):
+        self.lock.release()
+    def __enter__(self):
+        return self.lock.__enter__()
+    def __exit__(self, *raised):
+        return self.lock.__exit__(*raised)
+started, start = [], processes.start
+def asking(command, log):
+    child = start(command, log)
+    started.append(child)
+    if len(started) == 2:
+        child._waitpid_lock = Asking(child._waitpid_lock)
+    return child
+processes.start = asking
+"""
 WORK = "build/runtime/work/narration-processes/build-evidence-narration-receipt"
 SLOW = {"seconds": 60}
 
@@ -66,10 +98,12 @@ class Narration:
         self.child = processes.script("child", CHILD)
         self.parent = processes.script("parent", PARENT)
 
-    def start(self, shares, children, **variables):
-        """Start the parent on the shares; `children` says what each share's child does."""
+    def start(self, shares, children, *, first="", **variables):
+        """Start the parent on the shares; `children` says what each share's child does, and
+        `first` is what the parent runs before the narration."""
         does = {"FILMKIT_ROOT": str(self.root), "CHILDREN": json.dumps(children), **variables}
-        return self.processes.python(self.parent, str(self.child), json.dumps(shares), **does)
+        parent = self.processes.script("asked", first + PARENT) if first else self.parent
+        return self.processes.python(parent, str(self.child), json.dumps(shares), **does)
 
     def child_of(self, *ids) -> dict:
         """The process id of the child that narrates this share, and that of the process it
@@ -148,6 +182,21 @@ def test_a_narration_asked_to_end_ends_every_child_and_what_each_started(
         f"The narration was stopped by {request_}; every narration process it had started (2) "
         f"was ended with it; their logs are in {WORK}"
     )
+    assert not any(alive(pid) for pid in everyone)
+
+
+def test_a_request_inside_a_look_at_a_child_still_ends_the_narration(narration):
+    """`Popen.poll` takes the child's lock and only then guards it. A request raised between
+    the two left the lock taken, and the wait that ends the stop waited for it for ever: the
+    children ended, the narration did not, and took no further request (once in a landing of
+    18 November 2026, under load; in 103 of 2,000 requests sent into a loop of looks). The
+    look defers the request, so the lock is free when the children are waited for."""
+    shares = [["01", "04"], ["02", "03"]]
+    parent = narration.start(shares, {"01,04": SLOW, "02,03": SLOW}, first=ASKED_INSIDE_A_LOOK)
+    everyone = narration.everyone(*shares)
+    _, refusal = parent.communicate(timeout=20)
+    assert parent.returncode == 143
+    assert "stopped by a request to end (SIGTERM)" in refusal
     assert not any(alive(pid) for pid in everyone)
 
 
