@@ -246,7 +246,10 @@ def test_an_interrupted_check_lets_its_tool_end_what_the_tool_started(processes)
 def test_a_hang_up_whose_terminal_is_gone_still_exits_with_its_status(processes):
     standin = processes.script("standin", STANDIN)
     script = processes.script("narration", NARRATION)
-    master, slave = pty.openpty()
+    try:
+        master, slave = pty.openpty()
+    except OSError as error:
+        pytest.skip(f"this host opens no pseudo-terminal: {error}")
     try:
         command = processes.start(
             [sys.executable, "-B", str(script), str(processes.folder), str(standin)]

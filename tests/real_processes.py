@@ -10,6 +10,12 @@ that a number the kernel has since given to another process is left alone. The `
 fixture fails a test that has not ended within its
 deadline instead of letting it stall a run (`tests/conftest.py`, `deadline`). A module whose
 tests start real processes asks for the fixture for every test.
+
+A process started through `Processes` begins with an interrupt and a hang-up at their default
+actions, whatever the test run itself does with them: a run under nohup, or one that is the
+background job of a shell without job control, ignores one of them, a child inherits what its
+parent ignores, and the engine leaves an ignored signal ignored. A test that means "ignored, as
+under nohup" has its process ignore the signal itself.
 """
 
 from __future__ import annotations
@@ -35,6 +41,14 @@ def note(name, **facts):
     partial = folder / f".{name}.{os.getpid()}"
     partial.write_text(json.dumps({"pid": os.getpid(), **facts}))
     partial.replace(folder / f"{name}.json")
+"""
+# What a process started here runs first: an interrupt and a hang-up at their default actions,
+# then the command itself in the same process, so that its number is the command's.
+DEFAULTS = """
+import os, signal, sys
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+signal.signal(signal.SIGHUP, signal.SIG_DFL)
+os.execvp(sys.argv[1], sys.argv[1:])
 """
 
 
@@ -129,8 +143,9 @@ class Processes:
         )
 
     def start(self, command: list[str], **options) -> subprocess.Popen:
-        """Start a process that the test's end will kill if it still runs."""
-        process = subprocess.Popen(command, **options)
+        """Start a process that the test's end will kill if it still runs, an interrupt and a
+        hang-up at their default actions in it (`DEFAULTS`)."""
+        process = subprocess.Popen([sys.executable, "-c", DEFAULTS, *command], **options)
         self.started.append(process)
         return process
 
