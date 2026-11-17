@@ -283,6 +283,25 @@ def test_an_event_that_is_an_error_is_the_childs_end_only_when_it_says_no_such_p
     assert child_processes.ended(child, 0) is True
 
 
+def test_a_child_whose_end_cannot_be_waited_for_is_killed_and_reaped(processes, monkeypatch):
+    ignore = "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN)"
+    child = processes.start(
+        [sys.executable, "-c", f"{ignore}; print(1, flush=True); time.sleep(60)"],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    # The child ignores the request to end by now.
+    assert processes.line(child) == "1"
+
+    def failing(_child, _seconds=None):
+        raise OSError(child_processes.errno.EACCES, "the wait failed")
+
+    monkeypatch.setattr(child_processes, "ended", failing)
+    # The failed wait does not leave the stop: the child is killed and reaped.
+    child_processes.stop([child], signal.SIGTERM, seconds=0.2)
+    assert child.returncode == -signal.SIGKILL
+
+
 def test_a_request_deferred_outside_a_block_that_takes_them_is_raised_again_after_it(processes):
     deferring = processes.python(processes.script("deferring", DEFERRING))
     processes.noted("inside")

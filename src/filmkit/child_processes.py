@@ -69,6 +69,8 @@ if TYPE_CHECKING:
 STOP_SECONDS = 30
 # Seconds between two looks at a child or a process group that is ending.
 POLL_SECONDS = 0.05
+# Seconds a command's last line waits for a stream that takes no write, before it is dropped.
+SAY_SECONDS = 1
 # The signals that ask a command to end, with what each is called.
 REQUESTS = {
     signal.SIGINT: "an interrupt",
@@ -194,13 +196,30 @@ def held() -> Iterator[None]:
             signal.raise_signal(deferred)
 
 
+def _takes_a_write(stream: object) -> bool:
+    """Whether a stream's descriptor takes a write within `SAY_SECONDS`. A stream that has no
+    descriptor, or whose descriptor cannot be asked, is written as it is."""
+    try:
+        return bool(select.select([], [stream.fileno()], [], SAY_SECONDS)[1])
+    except (OSError, ValueError, AttributeError):
+        return True
+
+
 def _say(line: str) -> None:
-    """Write a command's last line to standard error and flush what standard output holds. A
-    stream that cannot be written, as one on a terminal that has hung up, is pointed at the
-    null device, so that what it still holds drains there and the interpreter's own flush at
-    its exit does not fail and change the exit status."""
+    """Write a command's last line to standard error and flush what standard output holds,
+    without waiting for a reader: the command is ending and ignores every request by now. A
+    stream the command was started without is passed over. A stream that takes no write within
+    `SAY_SECONDS`, as a full pipe that nobody reads, or that cannot be written, as one on a
+    terminal that has hung up, is pointed at the null device, so that what it still holds
+    drains there and the interpreter's own flush at its exit neither waits nor fails and
+    changes the exit status; the line to such a stream is dropped. One case remains: a stream
+    that takes a write and holds more than its pipe has room for waits for its reader."""
     for stream, text in ((sys.stderr, f"{line}\n"), (sys.stdout, "")):
+        if stream is None:
+            continue
         try:
+            if not _takes_a_write(stream):
+                raise BlockingIOError
             stream.write(text)
             stream.flush()
         except (OSError, ValueError):
@@ -338,7 +357,8 @@ def stop(
     group, also where the child itself has ended and waits to be reaped while processes it
     started run on, as a renderer's workers do, and the wait is for the group. The child is
     reaped only when its group has ended or been killed, so the number that is signalled is the
-    child's own throughout. On a kernel that counts an ended child that is not reaped as a
+    child's own throughout. A child whose end cannot be waited for (`ended` raises) is killed as
+    one that has not ended. On a kernel that counts an ended child that is not reaped as a
     member of its group, which macOS does not, the wait for a group runs its full time. A first
     request to end that arrives meanwhile is deferred until every child has ended (`held`)."""
     with held():
@@ -347,7 +367,11 @@ def stop(
             send(child, asking, group=groups)
         ends = time.monotonic() + (STOP_SECONDS if seconds is None else seconds)
         for child in running:
-            late = not ended(child, max(0.0, ends - time.monotonic()))
+            try:
+                late = not ended(child, max(0.0, ends - time.monotonic()))
+            except OSError:
+                # The wait itself failed and says nothing of the child: it is killed as a late one.
+                late = True
             while groups and not late and time.monotonic() < ends and group_exists(child.pid):
                 time.sleep(POLL_SECONDS)
             if late or (groups and group_exists(child.pid)):

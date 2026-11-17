@@ -99,6 +99,15 @@ with child_processes.ending("idle: stopped by {request}"):
     time.sleep(30)
     note("idle-went-on")
 """
+# A command that holds a block which takes requests, as one that holds children does.
+HOLDING = """
+import time
+import filmkit.child_processes as child_processes
+with child_processes.ending("holding: stopped by {request}"):
+    with child_processes.terminable():
+        note("holding")
+        time.sleep(30)
+"""
 # A command that goes on unwinding after the block that took the request, until it is told to.
 BETWEEN = """
 import pathlib, sys, time
@@ -311,6 +320,64 @@ def test_a_hang_up_whose_terminal_is_gone_still_exits_with_its_status(processes)
     command.send_signal(signal.SIGHUP)
     assert command.wait(timeout=30) == 129
     assert gone(children)
+
+
+def test_a_line_that_a_full_pipe_does_not_take_is_dropped_and_the_command_ends(processes):
+    read, write = os.pipe()
+    try:
+        # The pipe is filled to the brim; nobody reads it while the command ends.
+        os.set_blocking(write, False)
+        filled = 0
+        for size in (65536, 4096, 512, 64, 8, 1):
+            try:
+                while True:
+                    filled += os.write(write, b"x" * size)
+            except BlockingIOError:
+                pass
+        os.set_blocking(write, True)
+        command = processes.start(
+            [sys.executable, "-B", str(processes.script("holding", HOLDING))],
+            env={**os.environ, "NOTES": str(processes.notes)},
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=write,
+        )
+    finally:
+        os.close(write)
+    try:
+        processes.noted("holding")
+        command.send_signal(signal.SIGTERM)
+        # The command did not wait for a reader: it dropped its line and exited with its status.
+        assert command.wait(timeout=15) == 143
+        held = b""
+        while part := os.read(read, 65536):
+            held += part
+    finally:
+        os.close(read)
+    assert held == b"x" * filled
+
+
+@pytest.mark.parametrize("closed", ["2>&-", ">&-"])
+@pytest.mark.parametrize("number", list(REQUESTS))
+def test_a_command_started_without_a_standard_stream_still_ends_as_a_shell_expects(
+    processes, closed, number
+):
+    # The shell closes the stream and becomes the command, which then has None in its place.
+    command = processes.start(
+        ["/bin/sh", "-c", f'exec "$@" {closed}', "sh", sys.executable, "-B"]
+        + [str(processes.script("holding", HOLDING))],
+        env={**os.environ, "NOTES": str(processes.notes)},
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    processes.noted("holding")
+    command.send_signal(number)
+    status, said = ended(processes, command)
+    assert status == exit_of(number)
+    # The line is written where standard error is left, and nothing else in either case.
+    assert said == ([] if closed == "2>&-" else [f"holding: stopped by {REQUESTS[number]}"])
 
 
 def test_requests_between_the_block_and_the_exit_do_not_end_the_command_early(processes):
