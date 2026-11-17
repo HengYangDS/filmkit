@@ -302,7 +302,8 @@ def ground_check(stats: Path, frames: list[tuple[int, int]], ground: dict, fps: 
     departure.
     """
     expected = [frame for a, b in frames for frame in range(a, b + 1)]
-    blocks = sum(1 for line in stats.open(errors="replace") if line.startswith("frame:"))
+    with stats.open(errors="replace") as measures:
+        blocks = sum(1 for line in measures if line.startswith("frame:"))
     if blocks != len(expected):
         msg = f"The band was measured at {blocks} of its {len(expected)} frames"
         raise PictureError(msg)
