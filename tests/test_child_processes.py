@@ -72,20 +72,38 @@ note("bystander")
 time.sleep(60)
 """
 # A block that takes the requests to end, in a process of its own: it prints what the request
-# was and whether the handlers that stood before stand again.
+# was, whether the requests stay taken after the block, since the command is then ending, and
+# whether the handlers that stood before stand again once the caller goes on (`restore`).
 BLOCK = """
 import signal, time
 import filmkit.child_processes as child_processes
 earlier = {number: signal.getsignal(number) for number in child_processes.REQUESTS}
+def stand(handlers):
+    wanted = {number: handlers.get(number, handlers.get(0)) for number in earlier}
+    return all(signal.getsignal(number) is handler for number, handler in wanted.items())
 try:
     with child_processes.terminable():
-        taken = all(signal.getsignal(n) is child_processes.receive for n in earlier)
+        taken = stand({0: child_processes.receive})
         note("inside")
         time.sleep(30)
 except child_processes.Terminated as asked:
-    restored = all(signal.getsignal(number) is handler for number, handler in earlier.items())
+    kept = stand({0: child_processes.receive})
+    child_processes.restore()
     said = {"number": asked.number, "request": asked.request, "status": asked.status}
-    print(json.dumps({**said, "taken": taken, "restored": restored}))
+    print(json.dumps({**said, "taken": taken, "kept": kept, "restored": stand(earlier)}))
+"""
+# A block that ends with no request: the handlers that stood before stand again after it.
+QUIET = """
+import signal
+import filmkit.child_processes as child_processes
+earlier = {number: signal.getsignal(number) for number in child_processes.REQUESTS}
+with child_processes.terminable():
+    with child_processes.terminable():
+        pass
+    inner = all(signal.getsignal(n) is child_processes.receive for n in earlier)
+print(json.dumps({"inner": inner, "restored": all(
+    signal.getsignal(number) is handler for number, handler in earlier.items()
+)}))
 """
 # A block that defers a request outside any block that takes them: it leaves the block only
 # once the request has arrived, and notes that it did.
@@ -99,13 +117,13 @@ with child_processes.held():
     note("still-inside")
 note("after")
 """
-# A command that runs one step and prints the request that cut its wait short.
+# A command that runs one step, which takes the requests to end itself while the step runs, and
+# prints the request that cut its wait short.
 RUN = """
 import sys
 import filmkit.child_processes as child_processes
 try:
-    with child_processes.terminable():
-        child_processes.run([sys.executable, "-B", sys.argv[1]], cwd=pathlib.Path.cwd())
+    child_processes.run([sys.executable, "-B", sys.argv[1]], cwd=pathlib.Path.cwd())
 except child_processes.Terminated as asked:
     print(json.dumps({"number": asked.number}))
 """
@@ -200,7 +218,7 @@ def test_without_groups_the_signal_goes_to_the_child_alone(processes):
 
 
 @pytest.mark.parametrize("number", list(child_processes.REQUESTS))
-def test_a_request_to_end_is_an_exception_inside_the_block_and_the_handlers_are_restored(
+def test_a_request_to_end_is_an_exception_inside_the_block_and_stays_taken_after_it(
     processes, number
 ):
     block = processes.python(processes.script("block", BLOCK))
@@ -213,8 +231,56 @@ def test_a_request_to_end_is_an_exception_inside_the_block_and_the_handlers_are_
         "request": child_processes.REQUESTS[number],
         "status": 128 + number,
         "taken": True,
+        "kept": True,
         "restored": True,
     }
+
+
+def test_a_block_that_ends_with_no_request_puts_the_earlier_handlers_back(processes):
+    quiet = processes.python(processes.script("quiet", QUIET))
+    printed, _ = quiet.communicate(timeout=20)
+    assert json.loads(printed) == {"inner": True, "restored": True}
+
+
+class Queue:
+    """A kernel queue that answers a registration with the events given."""
+
+    def __init__(self, events):
+        self.events = events
+
+    def control(self, changes, room, seconds):
+        return self.events
+
+    def close(self):
+        pass
+
+
+@pytest.mark.skipif(not hasattr(child_processes.select, "kqueue"), reason="no kernel queue")
+def test_an_event_that_is_an_error_is_the_childs_end_only_when_it_says_no_such_process(
+    processes, monkeypatch
+):
+    select = child_processes.select
+    child = processes.start([sys.executable, "-c", "import time; time.sleep(60)"])
+
+    def answering(*events):
+        monkeypatch.setattr(select, "kqueue", lambda: Queue(list(events)))
+
+    def error(number):
+        return select.kevent(child.pid, flags=select.KQ_EV_ERROR, data=number)
+
+    # A registration for a child that has ended already comes back as "no such process".
+    answering(error(child_processes.errno.ESRCH))
+    assert child_processes.ended(child, 0) is True
+    # Any other error says nothing of the child: it is raised, not read as the child's end.
+    answering(error(child_processes.errno.EACCES))
+    with pytest.raises(OSError, match="Permission denied") as failed:
+        child_processes.ended(child, 0)
+    assert failed.value.errno == child_processes.errno.EACCES
+    # No event within the wait: the child has not ended. An exit event: it has.
+    answering()
+    assert child_processes.ended(child, 0) is False
+    answering(select.kevent(child.pid, filter=select.KQ_FILTER_PROC, fflags=select.KQ_NOTE_EXIT))
+    assert child_processes.ended(child, 0) is True
 
 
 def test_a_request_deferred_outside_a_block_that_takes_them_is_raised_again_after_it(processes):

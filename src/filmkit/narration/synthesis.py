@@ -96,9 +96,9 @@ class Job:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Narrate as the command line asks. A request to end, an interrupt, SIGTERM or a hang-up,
-    ends the narration's processes first and then the command, with one line and the signal's
-    exit status (`filmkit.child_processes.ending`)."""
+    """Narrate as the command line asks. A request to end while the narration's processes run,
+    an interrupt, SIGTERM or a hang-up, ends them first and then the command, with one line
+    (`filmkit.child_processes.ending`)."""
     with child_processes.ending("The narration was stopped by {request}"):
         narrate(argv)
 

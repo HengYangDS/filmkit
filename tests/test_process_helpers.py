@@ -26,10 +26,19 @@ def test_a_wait_that_hangs_fails_at_the_deadline_and_the_earlier_alarm_stands_ag
         subprocess.run([sys.executable, "-c", "import time; time.sleep(60)"], check=False)
     assert time.monotonic() - started < 5
     assert real_processes.signal.getsignal(real_processes.signal.SIGALRM) is earlier
-    # A block that ends in time leaves no alarm behind.
-    with real_processes.deadline(0.2):
-        pass
-    time.sleep(0.4)
+    # A block that ends in time leaves no alarm behind: one that rang would be recorded here,
+    # where by its default action it would end the test run.
+    rang = []
+    signal = real_processes.signal
+    before = signal.signal(signal.SIGALRM, lambda *_: rang.append("an alarm"))
+    try:
+        with real_processes.deadline(0.2):
+            pass
+        time.sleep(0.4)
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, before)
+    assert rang == []
 
 
 def test_the_end_kills_what_was_started_and_what_a_note_named(tmp_path):
@@ -47,3 +56,19 @@ def test_the_end_kills_what_was_started_and_what_a_note_named(tmp_path):
     other.wait()
     assert started.returncode is not None
     assert gone([named, other.pid], 0)
+
+
+def test_the_end_leaves_a_number_that_is_no_longer_the_named_process(tmp_path):
+    processes = real_processes.Processes(tmp_path)
+    other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    try:
+        (processes.notes / "ended.json").write_text(f'{{"pid": {other.pid}}}')
+        # The note was read while its process ran; the number is then another process's, which
+        # is what a start at another time says.
+        processes.pids()
+        processes.named[other.pid] = "Thu Jan  1 00:00:00 1970"
+        processes.end()
+        assert alive(other.pid)
+    finally:
+        other.kill()
+        other.wait()

@@ -25,6 +25,7 @@ os.environ["FILMKIT_ROOT"] = str(Path(__file__).resolve().parents[1] / "examples
 # the processes names another.
 os.environ["FILMKIT_NARRATION_PROCESSES"] = "1"
 
+import filmkit.child_processes as child_processes
 import filmkit.delivery.folder as delivery_folder
 from filmkit.narration.thought_groups import join_quiet
 from filmkit.narration.voice_model import MODEL, NATIVE_DECODER, REVISION
@@ -110,6 +111,15 @@ def pytest_collection_modifyitems(items) -> None:
                 host_skipped[marker].append(item.nodeid)
 
 
+@pytest.fixture(autouse=True)
+def requests_restored():
+    """After each test, forget a request to end that the test handed this process as the
+    interpreter does, and put back the handlers that stood before (`child_processes.restore`):
+    a command that was asked to end keeps them taken to its exit, and the test run goes on."""
+    yield
+    child_processes.restore()
+
+
 # Seconds a test that starts real processes may take before it fails.
 PROCESS_TEST_DEADLINE = 60
 
@@ -127,6 +137,14 @@ def processes(tmp_path, request):
             yield started
     finally:
         started.end()
+
+
+@pytest.fixture
+def speech():
+    """Skip a test whose command loads the speech runtime where that runtime does not load, by
+    the probe that leaves the speech modules out of such a run."""
+    if collect_ignore:
+        pytest.skip("the speech runtime does not load on this host")
 
 
 def pytest_report_header() -> list[str]:

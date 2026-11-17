@@ -6,13 +6,27 @@ failure of its own, or by a request to end, which is an interrupt (SIGINT), a re
 (SIGTERM) or a hang-up (SIGHUP), the last from a terminal that closes or a session that drops.
 A signal the process ignores, as a hang-up under nohup, stays ignored.
 
-Inside `terminable` the first request raises `Terminated` where the command stands, so that its
-own handling ends its children. From that first arrival every further request is taken and
-dropped: the command is ending, and a second signal, at whatever interval, neither ends it
-early by its default action nor cuts the ending of its children short. `ending`, around a
-command's whole run, then says in one line what stopped it and exits with 128 and the signal's
-number, ignoring requests from there to the exit. Two different requests that both arrive
-before the process has acted on either are handed to it lowest number first: it acts on that one.
+The requests are taken only where the command holds children that must be ended in order: the
+blocks of `terminable`, which are a renderer's run, a narration's processes and a step of
+`narrate` (`run`). Inside such a block the first request raises `Terminated` where the command
+stands, so that its own handling ends its children. From that first arrival every further
+request is taken and dropped, also after the block, to the command's exit: the command is
+ending, and a second signal, at whatever interval, neither ends it early by its default action
+nor cuts the ending of its children short. Two different requests that both arrive before the
+process has acted on either are handed to it lowest number first: it acts on that one.
+
+Everywhere else a request has its usual effect, as in a command that knows nothing of this
+module: SIGTERM and a hang-up end the process by their default action, and an interrupt raises
+`KeyboardInterrupt`. A tool the command runs, a pool of them, a decode or a timer is therefore
+never met by an exception from a signal, nor left with a command that has stopped listening:
+a terminal's interrupt reaches the tool itself, which ends what it started, a browser among it.
+
+`ending`, around a command's whole run, sets no handler. It words the exit of a command that
+was asked to end where it stood in such a block, or that was interrupted anywhere: one line
+that says what stopped it, then, after SIGTERM or a hang-up, the exit status 128 and the
+signal's number, and after an interrupt the interrupt itself, by which the process then dies,
+so that a shell that ran the command in a script ends the script and reports 130. A line that
+cannot be written, since the terminal that hung up is gone, changes neither.
 
 Where a request must not interrupt, `held` defers the first one to the end of its block: while
 a child starts, so that the request finds the child already among those to end, and while
@@ -37,6 +51,7 @@ either, so a caller that must end such a command asks it to end and waits.
 from __future__ import annotations
 
 import contextlib
+import errno
 import os
 import select
 import signal
@@ -84,7 +99,7 @@ class Terminated(BaseException):
 class _Requests:
     """What the process knows of the requests to end it: how deep it stands in `terminable` and
     `held` blocks, the handlers that stood before, the request it acted on, one deferred in a
-    `held` block, those dropped since, and whether it is leaving (`leave`)."""
+    `held` block, and those dropped since."""
 
     def __init__(self) -> None:
         self.depth, self.deferring = 0, 0
@@ -92,7 +107,6 @@ class _Requests:
         self.acted: int | None = None
         self.deferred: int | None = None
         self.dropped: list[int] = []
-        self.leaving = False
 
 
 _REQUESTS = _Requests()
@@ -113,15 +127,19 @@ def receive(number: int, _frame: object = None) -> None:
 @contextlib.contextmanager
 def terminable() -> Iterator[None]:
     """Take the requests to end that the process does not ignore, for the block: the first
-    raises `Terminated` in it, and from then on every further one is dropped, to the end of the
-    outermost such block, so that the block's own handling ends its children undisturbed. A
-    block inside another adds nothing. Outside the main thread, where a process sets no
-    handler, the block runs as it is."""
+    raises `Terminated` in it, and from then on every further one is dropped, so that the
+    block's own handling ends its children undisturbed. A block inside another adds nothing.
+
+    The outermost block that ends with no request acted on puts back the handlers that stood
+    before. One that ends after a request leaves them taken: the command is ending, and a
+    further request between the block and the command's exit is dropped as one inside it is
+    (`leave` ends the command; `restore` is for a caller that goes on). Outside the main thread,
+    where a process sets no handler, the block runs as it is."""
     if threading.current_thread() is not threading.main_thread():
         yield
         return
-    if _REQUESTS.depth == 0:
-        _REQUESTS.acted, _REQUESTS.deferred, _REQUESTS.dropped = None, None, []
+    if _REQUESTS.depth == 0 and _REQUESTS.acted is None:
+        _REQUESTS.deferred, _REQUESTS.dropped = None, []
         for number in REQUESTS:
             if signal.getsignal(number) not in (signal.SIG_IGN, receive):
                 _REQUESTS.earlier[number] = signal.signal(number, receive)
@@ -130,10 +148,24 @@ def terminable() -> Iterator[None]:
         yield
     finally:
         _REQUESTS.depth -= 1
-        if _REQUESTS.depth == 0 and not _REQUESTS.leaving:
-            for number, handler in _REQUESTS.earlier.items():
-                signal.signal(number, signal.SIG_DFL if handler is None else handler)
-            _REQUESTS.earlier.clear()
+        if _REQUESTS.depth == 0 and _REQUESTS.acted is None:
+            _put_back()
+
+
+def _put_back() -> None:
+    """Put back the handlers that stood before the outermost block took the requests."""
+    for number, handler in _REQUESTS.earlier.items():
+        signal.signal(number, signal.SIG_DFL if handler is None else handler)
+    _REQUESTS.earlier.clear()
+
+
+def restore() -> None:
+    """Forget a request that was acted on and put back the handlers that stood before it: for a
+    caller that handled `Terminated` itself and goes on, as a test in its own process does. A
+    command that was asked to end leaves instead (`leave`)."""
+    if threading.current_thread() is threading.main_thread() and _REQUESTS.depth == 0:
+        _put_back()
+        _REQUESTS.acted, _REQUESTS.deferred, _REQUESTS.dropped = None, None, []
 
 
 @contextlib.contextmanager
@@ -162,30 +194,68 @@ def held() -> Iterator[None]:
             signal.raise_signal(deferred)
 
 
-def leave(asked: Terminated, said: str) -> NoReturn:
-    """End a command that was asked to end, once it has ended what it started: one line on
-    standard error, what the code that ended the children said or else `said`, then the exit
-    status a shell gives a command ended by that signal. Where the request was a signal's, every
-    further one is ignored from here to the exit, the interpreter's own shutdown included, so
-    that the status is that one."""
-    print(asked.said or said, file=sys.stderr, flush=True)
-    if _REQUESTS.acted is not None and threading.current_thread() is threading.main_thread():
-        _REQUESTS.leaving = True
-        for number in _REQUESTS.earlier:
-            signal.signal(number, signal.SIG_IGN)
+def _say(line: str) -> None:
+    """Write a command's last line to standard error and flush what standard output holds. A
+    stream that cannot be written, as one on a terminal that has hung up, is pointed at the
+    null device, so that what it still holds drains there and the interpreter's own flush at
+    its exit does not fail and change the exit status."""
+    for stream, text in ((sys.stderr, f"{line}\n"), (sys.stdout, "")):
+        try:
+            stream.write(text)
+            stream.flush()
+        except (OSError, ValueError):
+            with contextlib.suppress(OSError, ValueError, AttributeError):
+                null = os.open(os.devnull, os.O_WRONLY)
+                try:
+                    os.dup2(null, stream.fileno())
+                finally:
+                    os.close(null)
+                stream.flush()
+
+
+def leave(asked: Terminated, said: str, *, interrupted: bool = False) -> NoReturn:
+    """End a command that was asked to end, once it has ended what it started.
+
+    Where the request was a signal's, one taken in a block of `terminable` or an interrupt
+    that reached the command elsewhere (`interrupted`), every further request is ignored
+    first, from here to the exit, the interpreter's own shutdown included. Then one line on
+    standard error, what the code that ended the children said or else `said`; that it cannot
+    be written changes nothing. Then the exit a shell expects: after SIGTERM or a hang-up the
+    status 128 and the signal's number; after an interrupt the process dies by the interrupt
+    itself, its default action put back, since a shell ends a script on an interrupt only when
+    the command it waited for died by it, and reports 130 for one that did. Where the
+    interrupt was ignored before, where the request was no signal's, and outside the main
+    thread, the command exits with the status alone.
+    """
+    main = threading.current_thread() is threading.main_thread()
+    signalled = main and (interrupted or _REQUESTS.acted is not None)
+    ignored = set()
+    if signalled:
+        for number in REQUESTS:
+            if signal.signal(number, signal.SIG_IGN) is signal.SIG_IGN:
+                ignored.add(number)
+    _say(asked.said or said)
+    if signalled and asked.number == signal.SIGINT and signal.SIGINT not in ignored:
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        signal.raise_signal(signal.SIGINT)
     raise SystemExit(asked.status)
 
 
 @contextlib.contextmanager
 def ending(said: str) -> Iterator[None]:
-    """A command's whole run. A request to end that arrives in it is raised where the command
-    stands (`terminable`); once it has unwound the command, ending what the command started,
-    the command leaves (`leave`) with `said`, in which `{request}` stands for what asked."""
-    with terminable():
-        try:
-            yield
-        except Terminated as asked:
-            leave(asked, said.format(request=asked.request))
+    """A command's whole run. It takes no request itself: where the command holds children, a
+    block of `terminable` does, and the request is raised there; elsewhere SIGTERM and a
+    hang-up end the process and an interrupt raises `KeyboardInterrupt`. Once a request taken in
+    such a block, or an interrupt from anywhere, has unwound the command, ending what the
+    command started, the command leaves (`leave`) with `said`, in which `{request}` stands for
+    what asked."""
+    try:
+        yield
+    except Terminated as asked:
+        leave(asked, said.format(request=asked.request))
+    except KeyboardInterrupt:
+        asked = Terminated(signal.SIGINT)
+        leave(asked, said.format(request=asked.request), interrupted=True)
 
 
 # What signalling a process group raises when no process of it can take a signal any more: the
@@ -237,11 +307,20 @@ def ended(child: subprocess.Popen, seconds: float | None = None) -> bool:
             flags=select.KQ_EV_ADD | select.KQ_EV_ONESHOT,
             fflags=select.KQ_NOTE_EXIT,
         )
-        return bool(queue.control([exits], 1, seconds))
+        events = queue.control([exits], 1, seconds)
     except ProcessLookupError:
         return True
     finally:
         queue.close()
+    if not events:
+        return False
+    # With room for an event, a registration that fails comes back as one flagged an error:
+    # for a child that has ended already, "no such process", which is its end; any other error
+    # says nothing of the child and is raised.
+    failed = events[0].flags & select.KQ_EV_ERROR
+    if failed and events[0].data != errno.ESRCH:
+        raise OSError(events[0].data, os.strerror(events[0].data))
+    return True
 
 
 def stop(
@@ -277,19 +356,21 @@ def stop(
 
 
 def run(command: list[str], *, cwd: Path) -> None:
-    """Run one child to its end. A wait that is cut short asks the child to end (SIGTERM) and
-    waits for it before the cause goes on, twice as long as the child may itself wait for its own
-    children; an exit other than 0 raises `subprocess.CalledProcessError`, as `subprocess.run`
-    does with `check`."""
+    """Run one child to its end, taking the requests to end while it runs (`terminable`). A
+    wait that is cut short, by a request or by a failure, asks the child to end (SIGTERM) and
+    waits for it before the cause goes on, twice as long as the child may itself wait for its
+    own children; an exit other than 0 raises `subprocess.CalledProcessError`, as
+    `subprocess.run` does with `check`."""
     child = None
-    try:
-        # A request that arrives while the child starts is acted on once the child is held here.
-        with held():
-            child = subprocess.Popen(command, cwd=cwd)
-        status = child.wait()
-    except BaseException:
-        if child is not None:
-            stop([child], signal.SIGTERM, seconds=2 * STOP_SECONDS)
-        raise
+    with terminable():
+        try:
+            # A request that arrives while the child starts is acted on once it is held here.
+            with held():
+                child = subprocess.Popen(command, cwd=cwd)
+            status = child.wait()
+        except BaseException:
+            if child is not None:
+                stop([child], signal.SIGTERM, seconds=2 * STOP_SECONDS)
+            raise
     if status != 0:
         raise subprocess.CalledProcessError(status, command)

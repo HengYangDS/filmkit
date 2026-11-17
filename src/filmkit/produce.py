@@ -210,8 +210,8 @@ def main(argv: list[str] | None = None) -> None:
             parser.error(f"--{option} applies only to {action}")
     command = options.action + ("-uncaptioned" if options.uncaptioned else "")
     try:
-        # A request to end unwinds the action, which ends a renderer it runs, and the command
-        # then leaves with one line and the signal's exit status.
+        # A request to end while the action runs a renderer, or an interrupt anywhere, unwinds
+        # the action, which ends that renderer, and the command then leaves with one line.
         with (
             child_processes.ending(f"{options.action}: stopped by {{request}}"),
             durations.run(options.language, command),

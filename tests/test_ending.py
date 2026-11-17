@@ -4,13 +4,18 @@ themselves are run for what they say and how they exit; the many trials of a sec
 what a command does with a request, without the rest of the command's imports.
 
 Each scenario asks what a second request, at whatever interval after the first, must not change:
-the children are ended and reaped, and the command says so in one line and exits with 128 and
-the signal's number.
+the children are ended and reaped, and the command says so in one line and ends as a shell
+expects: with 128 and the signal's number after SIGTERM or a hang-up, and by the interrupt
+itself after an interrupt. Where a command holds no child, a request has its usual effect.
 """
 
 import json
 import os
+import pty
 import signal
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 from real_processes import alive, gone, twice
@@ -85,6 +90,48 @@ import filmkit.produce as produce
 produce.EDITION_ACTIONS["render-picture"] = render.render
 produce.main(["render-picture", "--language", "zh"])
 """
+# A command that holds no child while it runs: it takes no request.
+IDLE = """
+import time
+import filmkit.child_processes as child_processes
+with child_processes.ending("idle: stopped by {request}"):
+    note("idle")
+    time.sleep(30)
+    note("idle-went-on")
+"""
+# A command that goes on unwinding after the block that took the request, until it is told to.
+BETWEEN = """
+import pathlib, sys, time
+import filmkit.child_processes as child_processes
+with child_processes.ending("between: stopped by {request}"):
+    try:
+        with child_processes.terminable():
+            note("inside")
+            time.sleep(30)
+    finally:
+        note("between")
+        while not pathlib.Path(sys.argv[1]).exists():
+            time.sleep(0.01)
+        note("unwound")
+"""
+# A check that runs a tool as the engine runs one, by `subprocess.run`, under `ending`; and the
+# tool, which ends what it started by its own handling of an interrupt, as a tool that drives a
+# browser closes it.
+CHECK = """
+import subprocess, sys
+import filmkit.child_processes as child_processes
+with child_processes.ending("check: stopped by {request}"):
+    subprocess.run([sys.executable, "-B", sys.argv[1]], check=False)
+"""
+TOOL = """
+import signal, sys, time
+def closing(number, frame):
+    note("tool-closed-its-browser")
+    raise SystemExit(0)
+signal.signal(signal.SIGINT, closing)
+note("tool")
+time.sleep(30)
+"""
 SHARES = [["01", "04"], ["02", "03"]]
 CHILDREN = ("process-01-04", "process-02-03")
 STOPPED = (
@@ -99,6 +146,12 @@ REQUESTS = {
 # Microseconds between a first and a second request: across the interval in which a second one
 # used to end the command at once (about 50 to 230), and well to both sides of it.
 DELAYS = (0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 300, 400, 600, 1000, 3000, 10000)
+
+
+def exit_of(number: int) -> int:
+    """How a command that acted on the request ends, as `Popen.returncode` reads it: by the
+    interrupt itself, or with 128 and the number of SIGTERM or of a hang-up."""
+    return -signal.SIGINT if number == signal.SIGINT else 128 + number
 
 
 def narration(processes, command="narration", **variables):
@@ -121,12 +174,112 @@ def ended(processes, command, seconds: float = 30) -> tuple[int, list[str]]:
 
 @pytest.mark.parametrize("number", list(REQUESTS))
 def test_a_request_to_end_ends_the_children_and_the_command_with_one_line(processes, number):
-    command, children = narration(processes, "synthesis")
+    command, children = narration(processes)
     command.send_signal(number)
     status, said = ended(processes, command)
     assert said == [STOPPED.format(request=REQUESTS[number])]
-    assert status == 128 + number
+    assert status == exit_of(number)
     assert gone(children)
+
+
+@pytest.mark.usefixtures("speech")
+def test_the_synthesis_command_itself_ends_the_same_way(processes):
+    command, children = narration(processes, "synthesis")
+    command.send_signal(signal.SIGTERM)
+    status, said = ended(processes, command)
+    assert (status, said) == (143, [STOPPED.format(request=REQUESTS[signal.SIGTERM])])
+    assert gone(children)
+
+
+@pytest.mark.parametrize("number", [signal.SIGTERM, signal.SIGHUP])
+def test_where_a_command_holds_no_child_a_request_to_end_has_its_usual_effect(processes, number):
+    command = processes.python(processes.script("idle", IDLE))
+    processes.noted("idle")
+    command.send_signal(number)
+    # The command ended by the signal's default action, as one that takes no request does.
+    assert ended(processes, command) == (-number, [])
+
+
+def test_an_interrupt_anywhere_ends_the_command_with_its_line_and_by_the_interrupt(processes):
+    command = processes.python(processes.script("idle", IDLE))
+    processes.noted("idle")
+    command.send_signal(signal.SIGINT)
+    assert ended(processes, command) == (-signal.SIGINT, ["idle: stopped by an interrupt"])
+    assert not (processes.notes / "idle-went-on.json").exists()
+
+
+@pytest.mark.parametrize("shell", ["/bin/sh", "/bin/bash"])
+def test_a_shell_ends_its_script_when_the_command_it_ran_is_interrupted(processes, shell):
+    if not Path(shell).exists():
+        pytest.skip(f"no {shell}")
+    idle, marker = processes.script("idle", IDLE), processes.folder / "next"
+    script = f'"{sys.executable}" -B "{idle}"; echo next > "{marker}"'
+    # A terminal's interrupt goes to the whole foreground group: the shell and the command.
+    started = processes.start(
+        [shell, "-c", script],
+        env={**os.environ, "NOTES": str(processes.notes)},
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    processes.noted("idle")
+    os.killpg(started.pid, signal.SIGINT)
+    _, said = started.communicate(timeout=30)
+    assert said.splitlines() == ["idle: stopped by an interrupt"]
+    # The command died by the interrupt, so the shell did not go on to the script's next line.
+    assert not marker.exists()
+    assert started.returncode in (-signal.SIGINT, 130)
+
+
+def test_an_interrupted_check_lets_its_tool_end_what_the_tool_started(processes):
+    tool = processes.script("tool", TOOL)
+    command = processes.python(processes.script("check", CHECK), str(tool), session=True)
+    processes.noted("tool")
+    os.killpg(command.pid, signal.SIGINT)
+    # The tool took the interrupt itself and ran its own ending; the command did not kill it.
+    processes.noted("tool-closed-its-browser", 5)
+    assert ended(processes, command) == (-signal.SIGINT, ["check: stopped by an interrupt"])
+
+
+def test_a_hang_up_whose_terminal_is_gone_still_exits_with_its_status(processes):
+    standin = processes.script("standin", STANDIN)
+    script = processes.script("narration", NARRATION)
+    master, slave = pty.openpty()
+    try:
+        command = processes.start(
+            [sys.executable, "-B", str(script), str(processes.folder), str(standin)]
+            + [json.dumps(SHARES)],
+            env={**os.environ, "NOTES": str(processes.notes)},
+            stdin=subprocess.DEVNULL,
+            stdout=slave,
+            stderr=slave,
+        )
+    finally:
+        os.close(slave)
+    try:
+        children = [processes.noted(name)["pid"] for name in CHILDREN]
+    finally:
+        # The terminal goes away: what the command writes to it from now on fails.
+        os.close(master)
+    command.send_signal(signal.SIGHUP)
+    assert command.wait(timeout=30) == 129
+    assert gone(children)
+
+
+def test_requests_between_the_block_and_the_exit_do_not_end_the_command_early(processes):
+    go = processes.folder / "go"
+    command = processes.python(processes.script("between", BETWEEN), str(go))
+    processes.noted("inside")
+    command.send_signal(signal.SIGTERM)
+    # The block that took the request has ended, and the command is still unwinding.
+    processes.noted("between")
+    for number in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        command.send_signal(number)
+    assert command.poll() is None
+    go.write_text("go on\n")
+    assert ended(processes, command) == (143, ["between: stopped by a request to end (SIGTERM)"])
 
 
 @pytest.mark.deadline(240)
@@ -160,15 +313,16 @@ def test_a_request_while_the_children_are_being_ended_does_not_cut_their_end_sho
 
 def test_two_different_requests_end_the_command_once_by_the_one_it_acted_on(processes):
     """Two requests that both arrive before the process has acted on either are handed to it
-    lowest number first, so an interrupt sent right after a SIGTERM may be the one it names."""
-    for delay in (0, 100, 200, 1000, 50000):
+    lowest number first, so an interrupt sent right after a SIGTERM may be the one it names.
+    Which of the two a given interval gives is the host's to say; that a later request never
+    replaces the one acted on is shown where the command says it is waiting (the test above)."""
+    for delay in (0, 100, 200, 1000):
         command, children = narration(processes)
         twice(command.pid, signal.SIGTERM, signal.SIGINT, delay)
         status, said = ended(processes, command)
-        assert status in (130, 143)
-        assert said == [STOPPED.format(request=REQUESTS[status - 128])]
+        acted = {exit_of(number): number for number in (signal.SIGINT, signal.SIGTERM)}[status]
+        assert said == [STOPPED.format(request=REQUESTS[acted])]
         assert gone(children, 5)
-    assert status == 143
 
 
 @pytest.mark.deadline(240)
@@ -216,7 +370,7 @@ def test_a_request_to_end_ends_the_renderer_and_the_render_with_one_line(process
     command.send_signal(number)
     status, said = ended(processes, command)
     assert said == [f"render-picture: stopped by {REQUESTS[number]}"]
-    assert status == 128 + number
+    assert status == exit_of(number)
     assert gone([renderer])
     record = processes.folder / "build/evidence/editions/zh/durations/render-picture.json"
     assert json.loads(record.read_text())["completed"] is False

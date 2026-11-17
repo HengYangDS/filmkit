@@ -5,7 +5,9 @@ A test of signals never signals the pytest process: the scenario runs in a proce
 started here, and the test signals that. A test waits for what a process reports, a line on its
 standard output or a note it writes whole, and never for a fixed time. Every process started
 through `Processes`, and every process a note names, is killed when the test is over, also when
-an assertion failed, and the `processes` fixture fails a test that has not ended within its
+an assertion failed; a process a note named is known by its number and the time it started, so
+that a number the kernel has since given to another process is left alone. The `processes`
+fixture fails a test that has not ended within its
 deadline instead of letting it stall a run (`tests/conftest.py`, `deadline`). A module whose
 tests start real processes asks for the fixture for every test.
 """
@@ -62,6 +64,14 @@ def alive(pid: int) -> bool:
     return bool(listed.stdout.strip()) and not listed.stdout.strip().startswith("Z")
 
 
+def started_at(pid: int) -> str:
+    """When the process of that number started, as `ps` words it; empty when there is none."""
+    listed = subprocess.run(
+        ["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True, check=False
+    )
+    return listed.stdout.strip()
+
+
 def wait_for(condition, seconds: float = 10.0) -> bool:
     """Whether the condition came to hold within the seconds, looked at every 20 ms."""
     ends = time.monotonic() + seconds
@@ -96,7 +106,8 @@ class Processes:
         self.notes = folder / "notes"
         self.notes.mkdir(parents=True, exist_ok=True)
         self.started: list[subprocess.Popen] = []
-        self.named: list[int] = []
+        # Each process a note named, with when it started as first seen.
+        self.named: dict[int, str] = {}
 
     def script(self, name: str, text: str) -> Path:
         """Write a Python script, which can write notes, and return its path."""
@@ -133,12 +144,17 @@ class Processes:
         """The note of that name, waited for at most the seconds."""
         path = self.notes / f"{name}.json"
         assert wait_for(path.is_file, seconds), f"no note {name} within {seconds} s"
+        self.pids()
         return json.loads(path.read_text())
 
     def pids(self) -> list[int]:
-        """Every process id the notes name."""
+        """Every process id the notes name; each is remembered with when it started."""
         notes = [json.loads(path.read_text()) for path in sorted(self.notes.glob("*.json"))]
-        return [value for note in notes for value in note.values() if type(value) is int]
+        found = [value for note in notes for value in note.values() if type(value) is int]
+        for pid in found:
+            if pid not in self.named:
+                self.named[pid] = started_at(pid)
+        return found
 
     def kill(self, pid: int) -> None:
         """Kill a process a note named."""
@@ -147,15 +163,19 @@ class Processes:
     def forget(self) -> None:
         """Set the notes aside, for a next run under the same names; what they named is still
         killed at the end."""
-        self.named += self.pids()
+        self.pids()
         for note in self.notes.glob("*.json"):
             note.unlink()
 
     def end(self) -> None:
-        """Kill what still runs of the processes started here and of those the notes named."""
-        for pid in self.named + self.pids():
-            if alive(pid):
-                os.kill(pid, signal.SIGKILL)
+        """Kill what still runs of the processes started here and of those the notes named. A
+        named one is killed only while its number is still its own: the process of that number
+        started when the named one did."""
+        self.pids()
+        for pid, when in self.named.items():
+            if when and started_at(pid) == when and alive(pid):
+                with contextlib.suppress(ProcessLookupError):
+                    os.kill(pid, signal.SIGKILL)
         for process in self.started:
             if process.poll() is None:
                 process.kill()

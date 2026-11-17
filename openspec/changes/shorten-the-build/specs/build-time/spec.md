@@ -268,7 +268,7 @@ Each narration process SHALL lead a session of its own, as each renderer does. A
 
 ### Requirement: A command that is asked to end ends once, in one line
 
-From its first request to end until what it started has ended and it has exited, a command SHALL take every further request, at whatever interval, without ending early and without cutting the ending of its narration processes or its renderer short. It SHALL then write one line on standard error that names the request it acted on, with no traceback, and SHALL exit with 128 plus that signal's number: 130 after an interrupt, 143 after SIGTERM, 129 after a hang-up.
+From a first request to end that arrives while its narration processes, its renderer or a step of `narrate` run, until they have ended and it has exited, a command SHALL take every further request, at whatever interval, without ending early and without cutting their ending short. It SHALL then write one line on standard error that names the request, with no traceback, and SHALL exit with 143 after SIGTERM and 129 after a hang-up, or die by the interrupt after an interrupt.
 
 #### Scenario: A second request to end, at any interval
 
@@ -282,5 +282,34 @@ From its first request to end until what it started has ended and it has exited,
 
 #### Scenario: The exit status names the request
 
-- **WHEN** the synthesis is interrupted, sent SIGTERM, or sent SIGHUP without ignoring it
-- **THEN** it exits with 130, 143 or 129, and its one line names an interrupt, a request to end or a hang-up
+- **WHEN** the synthesis is interrupted, sent SIGTERM, or sent SIGHUP without ignoring it, while its processes narrate
+- **THEN** it dies by the interrupt, for which a shell reports 130, or exits with 143 or 129, and its one line names an interrupt, a request to end or a hang-up
+
+#### Scenario: A hang-up whose terminal is gone
+
+- **WHEN** the synthesis writes to a terminal that has closed and is sent SIGHUP while two processes narrate
+- **THEN** both processes have ended when it exits, and it exits with 129 although its line cannot be written
+
+#### Scenario: Requests while the command unwinds
+
+- **WHEN** a command has acted on SIGTERM, has ended what it held, and is sent SIGTERM, an interrupt and a hang-up before it has exited
+- **THEN** it exits with 143 and its one line names the request to end
+
+### Requirement: Outside those waits a request to end has its usual effect
+
+While a command holds no narration process, no renderer and no step of `narrate`, it SHALL take no request to end: SIGTERM and a hang-up SHALL end it by their default action, and an interrupt SHALL end it with one line that names the interrupt, by the interrupt itself. A tool, a pool of tools or a decode that the command runs SHALL therefore never be killed by the command on such a request, and the command SHALL never go on running deaf to requests.
+
+#### Scenario: SIGTERM during a check that runs tools
+
+- **WHEN** a command that holds no child of the kinds above is sent SIGTERM or SIGHUP
+- **THEN** it ends at once by that signal, with no line, as a command before this Change did
+
+#### Scenario: An interrupt during a check that runs a tool
+
+- **WHEN** a terminal's interrupt reaches a command and the tool it runs
+- **THEN** the tool ends by its own handling of the interrupt, closing what it started, and the command writes its one line and dies by the interrupt
+
+#### Scenario: An interrupt in a script
+
+- **WHEN** `sh` or `bash` runs a script whose command is interrupted
+- **THEN** the shell ends the script and does not run its next line

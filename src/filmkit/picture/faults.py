@@ -246,7 +246,10 @@ def decode(
             stdout=subprocess.PIPE,
             stderr=error,
         )
+        # The deadline's thread never keeps the interpreter from exiting, and it is cancelled
+        # whatever cuts the wait for the decode short.
         timer = threading.Timer(deadline, process.kill)
+        timer.daemon = True
         timer.start()
         try:
             for frame in range(count):
@@ -257,9 +260,11 @@ def decode(
                 read += 1
             extra = process.stdout.read(1)
         finally:
-            process.stdout.close()
-            process.wait()
-            timer.cancel()
+            try:
+                process.stdout.close()
+                process.wait()
+            finally:
+                timer.cancel()
     message = log.read_text(errors="replace").strip()
     if process.returncode or message or extra or read != count:
         msg = refused.format(read=read, count=count) + (f": {message[:600]}" if message else "")

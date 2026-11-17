@@ -394,7 +394,10 @@ def current_bindings(edition: Edition) -> dict:
 
 def run_audits(audits: list[tuple[str, list[str], Path, dict | None]]) -> None:
     """Run audits that share no file at the same time, each in a process of its own; once all
-    have ended, the first in the order given whose tool failed refuses."""
+    have ended, the first in the order given whose tool failed refuses. No request to end is
+    taken while they run (`filmkit.child_processes`): a terminal's interrupt reaches each tool
+    itself, and SIGTERM ends the command at once, so none waits on a command that has stopped
+    listening."""
     with ThreadPoolExecutor(max_workers=len(audits)) as pool:
         ended = [pool.submit(contextvars.copy_context().run, run_audit, *audit) for audit in audits]
     for audit in ended:

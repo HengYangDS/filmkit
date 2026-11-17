@@ -221,7 +221,10 @@ def compare_decoded(
             )
             for path, error in zip(paths, errors, strict=True)
         ]
+        # The deadline's thread never keeps the interpreter from exiting, and it is cancelled
+        # whatever cuts the wait for the decodes short.
         deadline = threading.Timer(DECODE_DEADLINE, lambda: [p.kill() for p in processes])
+        deadline.daemon = True
         deadline.start()
         try:
             for frame in frames:
@@ -232,10 +235,12 @@ def compare_decoded(
                 measured.append({"frame": frame, **frame_measures(a, b, size, rows)})
             extra = [process.stdout.read(1) for process in processes]
         finally:
-            for process in processes:
-                process.stdout.close()
-                process.wait()
-            deadline.cancel()
+            try:
+                for process in processes:
+                    process.stdout.close()
+                    process.wait()
+            finally:
+                deadline.cancel()
     messages = [log.read_text(errors="replace").strip() for log in logs]
     if (
         any(process.returncode for process in processes)
