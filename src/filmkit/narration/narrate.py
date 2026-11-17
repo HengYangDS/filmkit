@@ -149,12 +149,9 @@ def main(argv: list[str] | None = None) -> None:
         scope = Scope.CHECKS
     if scope is not Scope.CHECKS:
         print(json.dumps({"edition": options.language, "gate": gate(options.language)}), flush=True)
-    try:
-        with child_processes.terminable():
-            narrate(options.language, options.ids, scope)
-    except child_processes.Terminated as asked:
-        msg = f"The narration was stopped by {asked.request}; its running step was ended with it"
-        raise SystemExit(msg) from None
+    stopped = "The narration was stopped by {request}; its running step was ended with it"
+    with child_processes.ending(stopped):
+        narrate(options.language, options.ids, scope)
 
 
 def narrate(code: str, ids: str, scope: Scope) -> None:

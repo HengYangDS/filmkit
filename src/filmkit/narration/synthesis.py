@@ -30,6 +30,7 @@ from pathlib import Path
 import numpy as np
 from mlx_audio.audio_io import write
 
+import filmkit.child_processes as child_processes
 import filmkit.repository as repository
 from filmkit.narration import processes
 from filmkit.narration.group_generation import generate_native_groups, load_voice_model
@@ -95,6 +96,15 @@ class Job:
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Narrate as the command line asks. A request to end, an interrupt, SIGTERM or a hang-up,
+    ends the narration's processes first and then the command, with one line and the signal's
+    exit status (`filmkit.child_processes.ending`)."""
+    with child_processes.ending("The narration was stopped by {request}"):
+        narrate(argv)
+
+
+def narrate(argv: list[str] | None = None) -> None:
+    """Plan the chosen segments, narrate those to generate and write the receipt."""
     request = load_request(argv)
     jobs = speech_plan(request)
     if request.dry_run:

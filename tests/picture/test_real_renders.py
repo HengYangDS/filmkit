@@ -111,4 +111,5 @@ def test_a_second_interrupt_does_not_cut_the_renderers_end_short(render):
     assert render.process.wait(timeout=30) != 0
     assert not alive(render.renderer)
     assert render.signals() == [str(int(signal.SIGTERM))]
-    assert render.ended() == "KeyboardInterrupt"
+    # An interrupt ends the run as every request to end does, by `Terminated`.
+    assert render.ended() == "Terminated"

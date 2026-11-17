@@ -205,17 +205,17 @@ When more than one segment is to be generated, the narration SHALL generate them
 
 ### Requirement: No narration process and no renderer outlives its command
 
-Each narration process SHALL lead a session of its own, as each renderer does. A command that is interrupted, is asked to end (SIGTERM), is hung up on (SIGHUP) without ignoring it, or fails while its narration processes or its renderer run SHALL end each one's whole process group before it exits, also when a second signal arrives meanwhile, and SHALL refuse, naming what stopped it. `narrate` SHALL likewise end its running step, and its duration record SHALL then say that it did not complete.
+Each narration process SHALL lead a session of its own, as each renderer does. A command that is interrupted, is asked to end (SIGTERM), is hung up on (SIGHUP) without ignoring it, or fails while its narration processes or its renderer run SHALL end each one's whole process group before it exits, also when further requests arrive meanwhile, and SHALL say what stopped it. `narrate` SHALL likewise end its running step, and its duration record SHALL then say that it did not complete.
 
 #### Scenario: A narration asked to end
 
 - **WHEN** the synthesis is sent SIGTERM while two processes narrate
-- **THEN** both processes, and whatever each had started, have ended when it exits, and its refusal names the request to end and the folder of the processes' logs
+- **THEN** both processes, and whatever each had started, have ended when it exits, and its one line names the request to end and the folder of the processes' logs
 
 #### Scenario: A hang-up
 
 - **WHEN** the synthesis is sent SIGHUP while two processes narrate, and does not ignore it
-- **THEN** both processes, and whatever each had started, have ended when it exits, and its refusal names the hang-up
+- **THEN** both processes, and whatever each had started, have ended when it exits, and its one line names the hang-up
 
 #### Scenario: A hang-up under nohup
 
@@ -230,7 +230,7 @@ Each narration process SHALL lead a session of its own, as each renderer does. A
 #### Scenario: A render asked to end
 
 - **WHEN** a command that runs a renderer is sent SIGTERM while a renderer that ignores SIGTERM runs
-- **THEN** the renderer's process group is sent SIGTERM once and killed after the grace, the renderer has ended when the command exits, and the command refuses, naming the request
+- **THEN** the renderer's process group is sent SIGTERM once and killed after the grace, the renderer has ended when the command exits, and the command's one line names the request
 
 #### Scenario: A second interrupt during the grace
 
@@ -240,4 +240,23 @@ Each narration process SHALL lead a session of its own, as each renderer does. A
 #### Scenario: A request to end during a step of narrate
 
 - **WHEN** `narrate` is sent SIGTERM during its narration step
-- **THEN** it asks the step to end, waits for it, refuses, and its duration record says that it did not complete
+- **THEN** it asks the step to end, waits for it, says what stopped it, and its duration record says that it did not complete
+
+### Requirement: A command that is asked to end ends once, in one line
+
+From its first request to end until what it started has ended and it has exited, a command SHALL take every further request, at whatever interval, without ending early and without cutting the ending of its narration processes or its renderer short. It SHALL then write one line on standard error that names the request it acted on, with no traceback, and SHALL exit with 128 plus that signal's number: 130 after an interrupt, 143 after SIGTERM, 129 after a hang-up.
+
+#### Scenario: A second request to end, at any interval
+
+- **WHEN** the synthesis, or a command that runs a renderer, is sent SIGTERM twice, the second from 0 to 10,000 microseconds after the first
+- **THEN** every narration process or the renderer has ended when the command exits, and the command writes its one line and exits with 143
+
+#### Scenario: A request to the group, which narrate relays
+
+- **WHEN** SIGTERM is sent to the process group of `narrate` while its narration step runs two processes, so that the step gets the request from the group and again from `narrate`
+- **THEN** both processes have ended, the step and `narrate` each write their one line, and `narrate` exits with 143
+
+#### Scenario: The exit status names the request
+
+- **WHEN** the synthesis is interrupted, sent SIGTERM, or sent SIGHUP without ignoring it
+- **THEN** it exits with 130, 143 or 129, and its one line names an interrupt, a request to end or a hang-up

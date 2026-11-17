@@ -37,17 +37,20 @@ PARENT = """
     if os.environ.get("IGNORING_HANG_UPS"):
         # As under nohup: the process ignores a hang-up before the engine is loaded.
         signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    import filmkit.child_processes as child_processes
     import filmkit.narration.processes as processes
     child, shares = sys.argv[1], json.loads(sys.argv[2])
     processes.child_command = lambda sources, ids, receipt: [
         sys.executable, child, "--receipt", str(receipt), "--ids", ",".join(ids)
     ]
     receipt = processes.repository.ROOT / "build/evidence/narration-receipt.json"
-    try:
-        ended = processes.narrate(("script", "cast", "folder"), shares, receipt)
-    except processes.ProcessesError as error:
-        raise SystemExit(str(error)) from None
-    print(json.dumps(ended))
+    # A request to end is handled as the synthesis handles it.
+    with child_processes.ending("The narration was stopped by {request}"):
+        try:
+            ended = processes.narrate(("script", "cast", "folder"), shares, receipt)
+        except processes.ProcessesError as error:
+            raise SystemExit(str(error)) from None
+        print(json.dumps(ended))
 """
 
 
@@ -159,7 +162,7 @@ def test_a_narration_asked_to_end_ends_every_child_and_what_each_started(narrati
     # The parent alone is asked to end, as a kit ends a run by its process id.
     parent.send_signal(signal.SIGTERM)
     _, refusal = parent.communicate(timeout=30)
-    assert parent.returncode == 1
+    assert parent.returncode == 143
     assert refusal.strip().startswith(
         "The narration was stopped by a request to end (SIGTERM); every narration process it "
         "had started (2) was ended with it; their logs are in build/runtime/work/"

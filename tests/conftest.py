@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import wave
@@ -17,6 +18,7 @@ from typing import NamedTuple
 
 import numpy as np
 import pytest
+import real_processes
 
 os.environ["FILMKIT_ROOT"] = str(Path(__file__).resolve().parents[1] / "examples/sample-film")
 # The tests narrate with a model double in this process. A narration that divided its segments
@@ -104,6 +106,31 @@ def pytest_collection_modifyitems(items) -> None:
             if item.get_closest_marker(marker):
                 item.add_marker(skip)
                 host_skipped[marker].append(item.nodeid)
+
+
+# Seconds a test that starts real processes may take before it fails.
+PROCESS_TEST_DEADLINE = 60
+
+
+@pytest.fixture
+def processes(tmp_path):
+    """The real processes of one test (`real_processes.Processes`), killed when the test is over
+    whatever it did. A test that has not ended within `PROCESS_TEST_DEADLINE` seconds fails
+    there, so that a hang fails the test and does not stall the run."""
+
+    def expired(_number, _frame):
+        message = f"the test did not end within {PROCESS_TEST_DEADLINE} s"
+        raise TimeoutError(message)
+
+    started = real_processes.Processes(tmp_path.resolve())
+    earlier = signal.signal(signal.SIGALRM, expired)
+    signal.setitimer(signal.ITIMER_REAL, PROCESS_TEST_DEADLINE)
+    try:
+        yield started
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, earlier)
+        started.end()
 
 
 def pytest_report_header() -> list[str]:

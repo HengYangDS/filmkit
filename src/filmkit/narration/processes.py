@@ -184,8 +184,6 @@ def cut_short(error: BaseException) -> str:
     """What cut a narration's wait for its children short, as its refusal names it."""
     if isinstance(error, child_processes.Terminated):
         return error.request
-    if isinstance(error, KeyboardInterrupt):
-        return "an interrupt"
     return f"{type(error).__name__}: {error}"
 
 
@@ -195,28 +193,34 @@ def narrate(sources: tuple[str, str, str], shares: list[list[str]], receipt: Pat
     Returns each child's number, segments, exit status and seconds. Refused, once all have
     ended, when any failed. The work folder, which the synthesis cleared when it began
     (`clear_work`), stays after the run, pass or fail, with every child's log and receipt. A
-    wait that is cut short ends every child's process group and refuses, naming the cause.
+    wait that is cut short ends every child's process group and refuses, naming the cause: a
+    request to end goes on as `Terminated` with that refusal, anything else as `ProcessesError`.
     """
     work = work_folder(receipt)
     work.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
     children: list[tuple[list[str], Path, subprocess.Popen]] = []
-    try:
-        with child_processes.terminable():
+    # From a first request to end until the children are ended, every further one is dropped:
+    # the stop lies inside the block that takes the requests.
+    with child_processes.terminable():
+        try:
             for number, ids in enumerate(shares, 1):
                 own, log = work / f"process-{number}.json", work / f"process-{number}.log"
-                # A signal that arrives while a child starts waits until the child is held here.
+                # A request that arrives while a child starts waits until the child is held here.
                 with child_processes.held():
                     children.append((ids, log, start(child_command(sources, ids, own), log)))
             ended = wait_for_all(children, started)
-    except BaseException as error:
-        child_processes.stop([child for *_, child in children], signal.SIGTERM, groups=True)
-        msg = (
-            f"The narration was stopped by {cut_short(error)}; every narration process it had "
-            f"started ({len(children)}) was ended with it; their logs are in "
-            f"{repository.relative(work)}"
-        )
-        raise ProcessesError(msg) from error
+        except BaseException as error:
+            child_processes.stop([child for *_, child in children], signal.SIGTERM, groups=True)
+            msg = (
+                f"The narration was stopped by {cut_short(error)}; every narration process it "
+                f"had started ({len(children)}) was ended with it; their logs are in "
+                f"{repository.relative(work)}"
+            )
+            if isinstance(error, child_processes.Terminated):
+                # Still a request to end, now with what the narration says of it.
+                raise child_processes.Terminated(error.number, msg) from None
+            raise ProcessesError(msg) from error
     failed = [
         f"segments {', '.join(child['ids'])} exited {child['exit']} "
         f"({repository.relative(child['log'])}: {last_lines(child['log'])})"

@@ -1,7 +1,6 @@
 """Narration in several processes: the count, the division of segments, the children's commands,
 and what a failed child leaves for the refusal."""
 
-import os
 import signal
 import sys
 
@@ -209,10 +208,12 @@ def stopped(monkeypatch):
 def test_an_interrupted_wait_ends_every_childs_process_group_and_refuses(
     root, monkeypatch, stopped
 ):
-    starting(monkeypatch, statuses=(KeyboardInterrupt(), 0))
-    with pytest.raises(ProcessesError) as refused:
+    starting(monkeypatch, statuses=(child_processes.Terminated(signal.SIGINT), 0))
+    with pytest.raises(child_processes.Terminated) as asked:
         processes.narrate(SOURCES, [["01"], ["02"]], root / RECEIPT)
-    assert str(refused.value).startswith(
+    # The request goes on as it came, with the narration's refusal for the command to print.
+    assert (asked.value.number, asked.value.status) == (signal.SIGINT, 130)
+    assert asked.value.said.startswith(
         "The narration was stopped by an interrupt; every narration process it had started (2) "
         "was ended with it; their logs are in build/runtime/work/narration-processes/"
     )
@@ -228,14 +229,17 @@ def test_a_request_to_end_while_a_child_starts_waits_until_the_child_is_held(
 
     def start(command, log):
         if started:
-            # The request arrives while the second child starts.
-            os.kill(os.getpid(), signal.SIGTERM)
+            # The request arrives while the second child starts: inside the block that defers it.
+            child_processes.receive(signal.SIGTERM)
         started.append(Child(None))
         return started[-1]
 
     monkeypatch.setattr(processes, "start", start)
-    with pytest.raises(ProcessesError, match=r"request to end \(SIGTERM\); every .* \(2\) was"):
+    with pytest.raises(child_processes.Terminated) as asked:
         processes.narrate(SOURCES, [["01"], ["02"]], root / RECEIPT)
+    assert "a request to end (SIGTERM); every narration process it had started (2)" in (
+        asked.value.said
+    )
     # Both children were held when the request was acted on, so both were ended.
     ((children, _, _),) = stopped
     assert children == started and len(started) == 2
@@ -316,12 +320,20 @@ def test_a_value_that_is_no_count_refuses_the_narration_before_any_step(narratin
     assert not (repository.ROOT / "build").exists()
 
 
-def test_a_narration_asked_to_end_refuses_and_is_recorded_as_not_completed(narrating, monkeypatch):
+def test_a_narration_asked_to_end_says_so_and_is_recorded_as_not_completed(
+    narrating, monkeypatch, capsys
+):
     def asked(command, **options):
         raise child_processes.Terminated(signal.SIGTERM)
 
     monkeypatch.setattr(narration_narrate.child_processes, "run", asked)
-    with pytest.raises(SystemExit, match=r"request to end \(SIGTERM\); its running step was ended"):
+    with pytest.raises(SystemExit) as left:
         narration_narrate.main(["--language", "zh"])
+    # One line, and the status a shell gives a command that SIGTERM ended.
+    assert left.value.code == 143
+    assert capsys.readouterr().err == (
+        "The narration was stopped by a request to end (SIGTERM); its running step was ended "
+        "with it\n"
+    )
     record = repository.read("build/evidence/editions/zh/durations/narrate.json")
     assert record["completed"] is False

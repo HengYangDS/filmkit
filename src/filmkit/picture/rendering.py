@@ -452,14 +452,17 @@ def run_renderer(command: list[str], deadline: float) -> tuple[int | None, bool]
     """Run the renderer to its exit or deadline: its exit status, and whether it timed out.
 
     The renderer runs in its own session with its input closed, so stopping it reaches every
-    process it started; a failed exit stops remaining workers. A wait that is cut short, by an
-    interrupt or by a request to end (SIGTERM), which is an exception while the renderer runs
-    (`filmkit.child_processes`), stops the group before the cause propagates.
+    process it started; a failed exit stops remaining workers. A wait that is cut short by a
+    request to end, an interrupt, SIGTERM or a hang-up, which is an exception while the renderer
+    runs (`filmkit.child_processes`), stops the group before the cause propagates, undisturbed
+    by a further request.
     """
-    process = None
-    try:
-        with child_processes.terminable():
-            # A signal that arrives while the renderer starts waits until it is held here.
+    # From a first request to end until the renderer's group is ended, every further one is
+    # dropped: each stop lies inside the block that takes the requests.
+    with child_processes.terminable():
+        process = None
+        try:
+            # A request that arrives while the renderer starts waits until it is held here.
             with child_processes.held():
                 process = subprocess.Popen(
                     command,
@@ -469,16 +472,16 @@ def run_renderer(command: list[str], deadline: float) -> tuple[int | None, bool]
                     env=renderer_environment(),
                 )
             exit_code = process.wait(timeout=deadline)
-    except subprocess.TimeoutExpired:
-        stop_process_group(process)
-        return None, True
-    except BaseException:
-        if process is not None:
+        except subprocess.TimeoutExpired:
             stop_process_group(process)
-        raise
-    if exit_code != 0:
-        stop_process_group(process)
-    return exit_code, False
+            return None, True
+        except BaseException:
+            if process is not None:
+                stop_process_group(process)
+            raise
+        if exit_code != 0:
+            stop_process_group(process)
+        return exit_code, False
 
 
 def face_bindings() -> dict:

@@ -210,13 +210,15 @@ def main(argv: list[str] | None = None) -> None:
             parser.error(f"--{option} applies only to {action}")
     command = options.action + ("-uncaptioned" if options.uncaptioned else "")
     try:
-        with durations.run(options.language, command):
+        # A request to end unwinds the action, which ends a renderer it runs, and the command
+        # then leaves with one line and the signal's exit status.
+        with (
+            child_processes.ending(f"{options.action}: stopped by {{request}}"),
+            durations.run(options.language, command),
+        ):
             EDITION_ACTIONS[options.action](Edition(options.language), options)
     except REFUSALS as error:
         msg = f"{options.action}: {error}"
-        raise SystemExit(msg) from None
-    except child_processes.Terminated as asked:
-        msg = f"{options.action}: stopped by {asked.request}; the renderer it ran was ended with it"
         raise SystemExit(msg) from None
 
 
