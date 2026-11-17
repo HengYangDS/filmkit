@@ -66,7 +66,7 @@
 
 ### Requirement: A film declares the line a single thought's clarity is judged against
 
-A film MAY declare a margin under its clarity floor. `produce preflight` SHALL then refuse a thought that the sound gate record reads under the floor less that margin, a thought between that line and the floor that the film does not declare by name with a reason, and a declared thought that does not read under the floor. Without a margin it SHALL report that single thoughts are not judged.
+A film MAY declare a margin of zero or more under its clarity floor. `produce preflight` SHALL then refuse a thought that the sound gate record reads under the floor less that margin, a thought between that line and the floor that the film does not declare by name with a reason, and a declared thought that does not read under the floor. With a margin of zero no thought MAY be declared. Without a margin it SHALL report that single thoughts are not judged.
 
 #### Scenario: A thought under the thought line
 
@@ -82,6 +82,11 @@ A film MAY declare a margin under its clarity floor. `produce preflight` SHALL t
 
 - **WHEN** a declared thought reads 18.4 dB after a retake
 - **THEN** the check refuses the declaration as stale
+
+#### Scenario: A margin of zero
+
+- **WHEN** the floor is 18 dB and the margin 0
+- **THEN** a thought that reads 18.0 dB passes, a thought that reads 17.99 dB is refused as under the floor to which the film holds every thought, and a declaration that names a thought to keep beside that margin is refused when it loads
 
 #### Scenario: A film without a thought line
 

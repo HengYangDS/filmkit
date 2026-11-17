@@ -22,8 +22,9 @@ with `PreflightError` while any remains:
 - the sound gate: a passing record of `check-sound` bound to the current soundtrack, timeline
   and engine;
 - the thoughts under the clarity floor, for a film that declares the line a single thought is
-  judged against (`review.clarity_thought_margin_db`): none under that line, and each between
-  the line and the floor declared by its name (`review.clarity_exceptions`);
+  judged against (`review.clarity_thought_margin_db`): none under that line, which with a
+  margin of zero is the floor, and each between the line and the floor declared by its name
+  (`review.clarity_exceptions`);
 - the caption cues above the edition's reading rate, each declared by its text
   (`captions.rate_exceptions`);
 - the geometry: the record that the delivery's verification requires, passed on the whole
@@ -196,7 +197,8 @@ def clarity(edition: Edition) -> str | None:
     The sound gate holds the floor for the soundtrack and its segments and records the thoughts.
     A film that declares `review.clarity_thought_margin_db` holds every thought to the floor less
     that margin and names each thought between the two lines; one that declares none is not
-    judged here.
+    judged here. With a margin of zero the line is the floor: every thought under it is refused
+    and none is between the two.
     """
     margin = FILM.review.clarity_thought_margin_db
     if margin is None:
@@ -207,8 +209,11 @@ def clarity(edition: Edition) -> str | None:
     line = round(measured["floor_db"] - margin, 2)
     below = {row["id"]: row["cpp_db"] for row in measured["thoughts"] if row["below_floor"]}
     declared = {e.thought for e in FILM.review.clarity_exceptions if e.edition == edition.code}
+    held = f"the thought line of {line} dB"
+    if not margin:
+        held = f"the floor of {line} dB, to which the film holds every thought"
     found = [
-        f"thought {name} reads {value} dB, under the thought line of {line} dB"
+        f"thought {name} reads {value} dB, under {held}"
         for name, value in below.items()
         if value < line
     ]

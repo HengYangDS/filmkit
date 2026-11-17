@@ -348,6 +348,21 @@ def test_a_thought_under_the_floor_is_declared_and_none_stands_under_the_thought
     )
 
 
+def test_with_a_margin_of_zero_every_thought_is_held_to_the_floor_itself(edition, monkeypatch):
+    review = type(FILM.review)(**{**FILM.review.model_dump(), "clarity_thought_margin_db": 0})
+    monkeypatch.setattr(preflight, "FILM", FILM.model_copy(update={"review": review}))
+    # A thought at the floor passes.
+    thoughts(edition, **{"01.1": 18.0, "01.2": 18.4})
+    assert preflight.clarity(edition) is None
+    # A thought a hundredth of a decibel under it is refused, and no declaration could keep it.
+    thoughts(edition, **{"01.1": 18.0, "01.2": 17.99, "02.1": 16.9})
+    assert preflight.clarity(edition) == (
+        "thought 01.2 reads 17.99 dB, under the floor of 18.0 dB, to which the film holds every "
+        "thought; thought 02.1 reads 16.9 dB, under the floor of 18.0 dB, to which the film "
+        "holds every thought"
+    )
+
+
 def test_a_cue_above_the_reading_rate_is_declared_by_its_text(tmp_path, monkeypatch):
     monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
     edition = Edition("en")

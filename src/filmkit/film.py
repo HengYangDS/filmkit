@@ -276,7 +276,8 @@ class Review(Declared):
     The floor holds for a soundtrack and its segments. A single thought varies about its segment,
     so a film may keep a thought under the floor by a `clarity_exceptions` entry, and with
     `clarity_thought_margin_db` states the line no kept thought may read under, the floor less
-    that margin (`filmkit.preflight`).
+    that margin (`filmkit.preflight`). A margin of zero holds every thought to the floor
+    itself, and such a film keeps none.
     The levels, 信, 达 and 雅 when the film declares them, each hold some of the dimensions,
     every dimension in exactly one; a review then passes level by level (`review.record`).
     """
@@ -287,19 +288,26 @@ class Review(Declared):
     dimensions: dict[str, str] = Field(min_length=1)
     readings: str | None = None
     clarity_minimum_db: ClarityFloors | None = None
-    clarity_thought_margin_db: Annotated[float, Field(gt=0, le=6)] | None = None
+    clarity_thought_margin_db: Annotated[float, Field(ge=0, le=6)] | None = None
     clarity_exceptions: tuple[ClarityException, ...] = ()
     levels: dict[LevelName, Level] | None = None
 
     @model_validator(mode="after")
     def thoughts_judged_against_a_declared_line(self) -> Review:
         """Refuse a thought line without the floors it is taken from, declared thoughts without
-        that line, and a thought declared twice in one edition."""
+        that line or with a line that is the floor, and a thought declared twice in one edition."""
         if self.clarity_thought_margin_db is not None and self.clarity_minimum_db is None:
             message = "review.clarity_thought_margin_db needs review.clarity_minimum_db"
             raise ValueError(message)
         if self.clarity_exceptions and self.clarity_thought_margin_db is None:
             message = "review.clarity_exceptions needs review.clarity_thought_margin_db"
+            raise ValueError(message)
+        if self.clarity_exceptions and self.clarity_thought_margin_db == 0:
+            message = (
+                "review.clarity_exceptions keeps thoughts under the floor, and a "
+                "review.clarity_thought_margin_db of 0 holds every thought to the floor: no "
+                "thought can stand between the floor and itself"
+            )
             raise ValueError(message)
         names = [(e.edition, e.thought) for e in self.clarity_exceptions]
         if len(set(names)) != len(names):

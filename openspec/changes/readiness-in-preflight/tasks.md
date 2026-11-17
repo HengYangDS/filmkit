@@ -14,6 +14,7 @@
 - [x] 3.1 Ask in `preflight` for the sound gate's record, the geometry record as the delivery's verification requires it, the declared cues above the reading rate, the declared thoughts under the floor of a film with a thought line, and the draft scan only of a film that declares drafts; verify `tests/test_preflight.py` and `tests/delivery/test_verification_picture.py`.
 - [x] 3.2 Write the readiness receipt in `preflight` and add `produce admitted`, which checks the edition's receipt on every bound input and the other edition's on the shared ones; verify `tests/test_preflight.py` and `tests/test_produce.py`.
 - [x] 3.3 Declare the sample film's drafts, end its picture task with `admitted` for both editions, and state the audit, the declarations, `preflight` and `admitted` in the README and the Changelog; verify the repository's Markdown check on both files.
+- [x] 3.4 Take a margin of zero for the thought line: every thought under the floor is then refused, by a message that names the floor, and a declaration that keeps a thought beside a zero margin is refused when it loads; verify `tests/test_film.py` (the declaration loads with a margin of 0, is refused with a kept thought beside it and with a margin under 0) and `tests/test_preflight.py` (a thought at the floor passes, one 0.01 dB under it is refused).
 
 ## 4. Films and acceptance
 

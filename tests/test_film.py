@@ -562,12 +562,25 @@ def test_thoughts_under_the_floor_and_fast_cues_are_declared_by_identity(declare
     assert (cue.edition, cue.reason) == ("en", "a quoted line kept whole")
 
 
+def test_a_margin_of_zero_holds_every_thought_to_the_floor_and_keeps_none(declared):
+    rewrite(declared, "# The scored dimensions", "clarity_thought_margin_db = 0\n\n# The scored")
+    loaded = film.load(declared)
+    assert loaded.review.clarity_thought_margin_db == 0
+    assert loaded.review.clarity_exceptions == ()
+
+
 @pytest.mark.parametrize(
     ("old", "new", "refusal"),
     [
         ("clarity_thought_margin_db = 1.0\n", "", "needs review.clarity_thought_margin_db"),
         ("clarity_minimum_db = { zh = 18.0, en = 16.0 }\n", "", "needs review.clarity_minimum_db"),
-        ("clarity_thought_margin_db = 1.0", "clarity_thought_margin_db = 0", "margin_db"),
+        ("clarity_thought_margin_db = 1.0", "clarity_thought_margin_db = -0.5", "margin_db"),
+        (
+            "clarity_thought_margin_db = 1.0",
+            "clarity_thought_margin_db = 0",
+            "a review.clarity_thought_margin_db of 0 holds every thought to the floor: no thought "
+            "can stand between the floor and itself",
+        ),
         ('thought = "05.3"', 'thought = "5"', "review.clarity_exceptions.0.thought"),
         ('reason = "a quoted line kept whole"', 'reason = ""', "captions.rate_exceptions.0.reason"),
     ],
