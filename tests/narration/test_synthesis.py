@@ -294,6 +294,26 @@ def test_every_source_and_destination_is_named(tmp_path, voice, arguments):
     assert voice.calls == []
 
 
+@pytest.mark.parametrize("option", ["--folder", "--receipt"])
+@pytest.mark.parametrize("place", ["{outside}/{name}", "../{leaf}/{name}"], ids=["absolute", "up"])
+@pytest.mark.parametrize("mode", [[], ["--dry-run"]], ids=["run", "dry-run"])
+def test_a_folder_or_receipt_outside_the_films_root_is_refused_before_any_effect(
+    tmp_path, voice, option, place, mode
+):
+    write_sources(tmp_path, {"01": GROUPS})
+    outside = tmp_path.parent / f"outside-{tmp_path.name}"
+    name = "audio" if option == "--folder" else "receipt.json"
+    named = place.format(outside=outside, leaf=outside.name, name=name)
+    arguments = list(ARGUMENTS)
+    arguments[arguments.index(option) + 1] = named
+    with pytest.raises(ValueError, match=f"{option} names .*{name}, which lies outside the film"):
+        narration_synthesis.main([*arguments, *mode])
+    # Nothing was generated and nothing written, there or below the root.
+    assert voice.calls == []
+    assert not outside.exists()
+    assert not (tmp_path / "audio").exists() and not (tmp_path / "receipt.json").exists()
+
+
 def dry_run(capsys, arguments=ARGUMENTS) -> list[dict]:
     capsys.readouterr()
     narration_synthesis.main([*arguments, "--dry-run"])

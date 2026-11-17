@@ -100,6 +100,20 @@ def test_each_child_is_the_synthesis_itself_on_its_segments_with_a_receipt_of_it
     assert not (root / work).exists()
 
 
+def test_the_work_folder_is_named_after_the_receipts_whole_path_from_the_root(root):
+    work = root / processes.WORK
+    assert processes.work_folder(root / RECEIPT) == (
+        work / "build-evidence-editions-zh-ear-first-narration-receipt"
+    )
+    # Two receipts that differ only high in their paths do not share a folder.
+    first = processes.work_folder(root / "build/one/a/b/c/d/e/receipt.json")
+    second = processes.work_folder(root / "build/two/a/b/c/d/e/receipt.json")
+    assert first == work / "build-one-a-b-c-d-e-receipt" != second
+    # A receipt outside the root, which the synthesis refuses, names no folder.
+    with pytest.raises(ValueError, match="is not in the subpath"):
+        processes.work_folder(root.parent / "receipt.json")
+
+
 def test_a_failed_child_is_named_with_its_segments_its_log_and_its_last_line(root, monkeypatch):
     refusal = "RetainedUtteranceError: Unresolved native utterance; inspect before replay"
     logs = ['{"id": "01"}\n', f"Traceback (most recent call last):\n  ...\n{refusal}\n\n"]

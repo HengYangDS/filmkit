@@ -163,6 +163,11 @@ When more than one segment is to be generated, the narration SHALL generate them
 - **WHEN** `FILMKIT_NARRATION_PROCESSES` is `many`
 - **THEN** the narration is refused before any segment is generated, naming the variable
 
+#### Scenario: A receipt outside the film's root
+
+- **WHEN** the synthesis is given a receipt or a recordings folder outside the film's root
+- **THEN** it refuses before any segment is planned or generated, naming the option and the root, and writes nothing
+
 #### Scenario: The narration's duration record
 
 - **WHEN** an edition is narrated with the variable unset

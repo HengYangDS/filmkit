@@ -78,9 +78,11 @@ def divide(segments: list[tuple[str, int]], processes: int) -> list[list[str]]:
 
 
 def work_folder(receipt: Path) -> Path:
-    """The folder of the children that narrate for a receipt, named after the receipt's place."""
-    place = Path(repository.relative(receipt)).with_suffix("")
-    return repository.ROOT / WORK / "-".join(place.parts[-6:])
+    """The folder of the children that narrate for a receipt, named after the receipt's whole
+    path from the film's root, so that no two receipts share one. The synthesis refuses a
+    receipt outside the root before it comes here."""
+    place = receipt.relative_to(repository.ROOT).with_suffix("")
+    return repository.ROOT / WORK / "-".join(place.parts)
 
 
 def child_command(sources: tuple[str, str, str], ids: list[str], receipt: Path) -> list[str]:

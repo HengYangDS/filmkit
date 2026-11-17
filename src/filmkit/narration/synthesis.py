@@ -13,16 +13,18 @@ Usage: python -m filmkit.narration.synthesis --script FILE --cast FILE --folder 
     --receipt FILE [--ids 06,07] [--dry-run]
 With --ids only those segments are narrated, and their records replace theirs in an existing
 receipt. --dry-run prints each segment's plan: its fingerprint, its recording path and whether
-it would be reused, generated or refused. Paths are relative to the repository root.
+it would be reused, generated or refused. Paths are relative to the repository root, and a
+recordings folder or a receipt outside it is refused before anything is read or written.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import numpy as np
 from mlx_audio.audio_io import write
@@ -45,9 +47,6 @@ from filmkit.narration.thought_groups import (
     validate_group_inputs,
 )
 from filmkit.narration.voice_model import request_fingerprint
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 SCOPE = (
     "Synthetic narrator based only on selected synthetic reference; "
@@ -138,6 +137,8 @@ def load_request(argv: list[str] | None = None) -> Request:
     parser.add_argument("--ids", default="", help="Comma-separated segment ids")
     parser.add_argument("--dry-run", action="store_true", help="Print each segment's plan only")
     options = parser.parse_args(argv)
+    folder = below_root("--folder", options.folder)
+    receipt = below_root("--receipt", options.receipt)
     script = repository.read(options.script)
     cast = repository.read(options.cast)
     _check_cast(cast)
@@ -154,12 +155,23 @@ def load_request(argv: list[str] | None = None) -> Request:
             {**segment, "spoken_text": pronunciation_text(segment, contract)}
             for segment in segments
         ],
-        folder=repository.ROOT / options.folder,
-        receipt=repository.ROOT / options.receipt,
+        folder=folder,
+        receipt=receipt,
         merge=bool(options.ids),
         dry_run=options.dry_run,
         sources=(options.script, options.cast, options.folder),
     )
+
+
+def below_root(option: str, named: str) -> Path:
+    """A place the command names for what it writes, refused unless it lies below the film's
+    root: every record names its recordings from the root, and the work of a narration's
+    processes is filed by the receipt's path from it."""
+    place = Path(os.path.normpath(repository.ROOT / named))
+    if not place.is_relative_to(repository.ROOT):
+        msg = f"{option} names {named}, which lies outside the film's root {repository.ROOT}"
+        raise ValueError(msg)
+    return place
 
 
 def _check_cast(cast: dict) -> None:
