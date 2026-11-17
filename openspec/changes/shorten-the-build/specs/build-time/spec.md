@@ -151,12 +151,22 @@ Every render SHALL pass the renderer a worker count of the host's logical cores 
 
 ### Requirement: Narration divides its segments among processes
 
-When more than one segment is to be generated, the narration SHALL generate them in several processes at the same time, each segment in one: two processes, or the count `FILMKIT_NARRATION_PROCESSES` names, where 1 keeps a single process. It SHALL then write one receipt in segment order, as a single process writes it. A value that is no positive whole number SHALL be refused before any step, and the narration's duration record SHALL state the count.
+When more than one segment is to be generated, the narration SHALL generate them in several processes at the same time, each segment in one. The count SHALL be one process for every 16 GB of the host's memory, at least one and at most three, or the count `FILMKIT_NARRATION_PROCESSES` names. It SHALL then write one receipt in segment order. A value that is no positive whole number SHALL be refused before any step, and the narration's duration record SHALL state the count.
 
 #### Scenario: Four segments and two processes
 
-- **WHEN** four segments are to be generated and the variable is unset
+- **WHEN** four segments are to be generated on a host of 32 GB and the variable is unset
 - **THEN** two processes narrate at the same time, each segment in one of them and the longest spoken text alone or with the shortest, and the receipt lists the four segments in their order
+
+#### Scenario: The host's count
+
+- **WHEN** the variable is unset on hosts of 8, 16, 32, 48 and 128 GB of memory
+- **THEN** the narration uses 1, 1, 2, 3 and 3 processes, and 1 on a host whose memory cannot be read
+
+#### Scenario: A count the variable names
+
+- **WHEN** `FILMKIT_NARRATION_PROCESSES` is 2 on a host of 128 GB, or 1 on any host
+- **THEN** the narration uses two processes, or stays in its own
 
 #### Scenario: One segment to generate
 
@@ -195,8 +205,8 @@ When more than one segment is to be generated, the narration SHALL generate them
 
 #### Scenario: The narration's duration record
 
-- **WHEN** an edition is narrated with the variable unset
-- **THEN** its duration record states a count of 2 narration processes
+- **WHEN** an edition is narrated with the variable unset on a host of 128 GB
+- **THEN** its duration record states a count of 3 narration processes
 
 ### Requirement: No narration process outlives its narration
 

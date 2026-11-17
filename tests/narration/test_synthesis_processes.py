@@ -64,7 +64,9 @@ def printed(capsys) -> list[dict]:
 
 @pytest.fixture
 def sources(tmp_path, voice, monkeypatch):
+    """The four segments on a host of 32 GB, which narrates in two processes."""
     monkeypatch.delenv(processes.VARIABLE, raising=False)
+    monkeypatch.setattr(processes, "host_memory", lambda: 32 * 1024**3)
     write_sources(tmp_path, SEGMENTS)
     return voice
 
@@ -218,3 +220,28 @@ def test_a_value_that_is_no_count_refuses_before_any_effect(tmp_path, sources, m
         narration_synthesis.main(ARGUMENTS)
     assert started == []
     assert not (tmp_path / "audio").exists()
+
+
+def test_a_host_of_128_gb_divides_the_four_segments_among_three_processes(
+    tmp_path, sources, monkeypatch
+):
+    monkeypatch.setattr(processes, "host_memory", lambda: 128 * 1024**3)
+    started = children(monkeypatch)
+    narration_synthesis.main(ARGUMENTS)
+    assert len(started) == 3
+    narrated = sorted(",".join(child["ids"] for child in started).split(","))
+    assert narrated == ["01", "02", "03", "04"]
+    assert [record["id"] for record in repository.read("receipt.json")["records"]] == [
+        "01",
+        "02",
+        "03",
+        "04",
+    ]
+
+
+def test_a_host_of_16_gb_keeps_the_narration_in_its_own_process(tmp_path, sources, monkeypatch):
+    monkeypatch.setattr(processes, "host_memory", lambda: 16 * 1024**3)
+    started = children(monkeypatch)
+    narration_synthesis.main(ARGUMENTS)
+    assert started == []
+    assert len(repository.read("receipt.json")["records"]) == 4

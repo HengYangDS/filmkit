@@ -12,8 +12,9 @@ segment retained, loads no model and writes the one receipt in segment order. Th
 of a receipt is cleared when a synthesis for that receipt begins and kept when it ends, so the
 children's logs can be read after a run that passed as after one that failed.
 
-The count is `DEFAULT` unless `VARIABLE` names another; 1 keeps the single process. A child is
-given the count 1, so it never divides again. A child that fails does not stop the others; once
+The count comes from the host's memory, one process for every 16 GB up to three (`host_count`),
+unless `VARIABLE` names another; 1 keeps the single process. A child is given the count 1, so it
+never divides again. A child that fails does not stop the others; once
 all have ended the narration is refused, naming each failed child, its segments, its exit status,
 its log and the last five lines it wrote, among which the refusal an unresolved take raises
 stands. What a failed child left behind is then judged by the next run as an interrupted run's
@@ -26,13 +27,16 @@ a child that cannot be started, it ends every child's process group
 of several gigabytes and the GPU; one left running would narrate to the end of its share beside
 the next run's children.
 
-Measured on four segments of a film on 17 November 2026: one process 99.8 s, two 55.3 s, four
-55.2 s, since the longest segment bounds the run; all takes equal, byte for byte, to the takes of
-their fingerprints that the film delivered.
+Measured on the eight segments of a film's English edition, 511 s of speech, on a host of 128 GB
+on 17 November 2026, the arms back to back: one process 180.7 and 176.1 s, two 153.6 and 143.8
+s, three 117.2 s, four 126.2 s; all 64 takes equal, byte for byte, to the film's own. One process
+left the GPU a quarter idle; more filled it, and each take slowed as they shared it. Three and
+four processes were measured once each, on that one host.
 """
 
 from __future__ import annotations
 
+import functools
 import os
 import shutil
 import signal
@@ -44,9 +48,13 @@ from pathlib import Path
 import filmkit.child_processes as child_processes
 import filmkit.repository as repository
 
-# The variable that names how many processes narrate an edition, and the count without it.
+# The variable that names how many processes narrate an edition. Without it the count comes from
+# the host: one process for every `MEMORY_FOR_EACH` bytes of its memory, at least one and at most
+# `MOST`. A process holds about 4.6 GB at its peak, and the host needs the rest for everything
+# else it runs; three is where the gain stopped on the one host measured.
 VARIABLE = "FILMKIT_NARRATION_PROCESSES"
-DEFAULT = 2
+MEMORY_FOR_EACH = 16 * 1024**3
+MOST = 3
 # The children's receipts and logs, below the film's root, in a folder for each receipt.
 WORK = Path("build/runtime/work/narration-processes")
 # Seconds between two looks at the children that still run.
@@ -60,11 +68,28 @@ class ProcessesError(ValueError):
     was stopped while its processes ran."""
 
 
+@functools.cache
+def host_memory() -> int | None:
+    """The host's memory in bytes, read once by the standard library, or None where it cannot
+    be read."""
+    try:
+        return os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE")
+    except (AttributeError, OSError, ValueError):
+        return None
+
+
+def host_count() -> int:
+    """How many processes the host narrates in: one for every `MEMORY_FOR_EACH` bytes of its
+    memory, at least one and at most `MOST`; one where its memory cannot be read."""
+    return max(1, min(MOST, (host_memory() or 0) // MEMORY_FOR_EACH))
+
+
 def count() -> int:
-    """How many processes narrate: what `VARIABLE` names, a positive whole number, or `DEFAULT`."""
+    """How many processes narrate: what `VARIABLE` names, a positive whole number, or else the
+    host's count (`host_count`)."""
     named = os.environ.get(VARIABLE)
     if not named:
-        return DEFAULT
+        return host_count()
     if not (named.isascii() and named.isdigit() and int(named) > 0):
         msg = f"{VARIABLE} names {named!r}, which is no positive whole number of processes"
         raise ProcessesError(msg)

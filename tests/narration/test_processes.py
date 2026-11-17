@@ -17,10 +17,15 @@ SOURCES = ("content/film-script.json", "content/voice-reference.json", "build/re
 RECEIPT = "build/evidence/editions/zh/ear-first/narration-receipt.json"
 
 
+GB = 1024**3
+
+
 @pytest.fixture
 def root(tmp_path, monkeypatch):
+    """A film root on a host of 32 GB, which narrates in two processes, with no count named."""
     monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
     monkeypatch.delenv(processes.VARIABLE, raising=False)
+    monkeypatch.setattr(processes, "host_memory", lambda: 32 * GB)
     return tmp_path.resolve()
 
 
@@ -50,13 +55,49 @@ def starting(monkeypatch, statuses=(), written="{}"):
     return started
 
 
-@pytest.mark.parametrize(("named", "count"), [(None, 2), ("", 2), ("1", 1), ("4", 4)])
-def test_the_count_is_two_unless_the_variable_names_another(monkeypatch, named, count):
-    if named is None:
-        monkeypatch.delenv(processes.VARIABLE, raising=False)
-    else:
-        monkeypatch.setenv(processes.VARIABLE, named)
+@pytest.mark.parametrize(
+    ("memory", "count"),
+    [(8, 1), (16, 1), (24, 1), (32, 2), (36, 2), (48, 3), (64, 3), (128, 3), (None, 1), (0, 1)],
+)
+def test_the_count_comes_from_the_hosts_memory_one_for_every_16_gb_up_to_three(
+    monkeypatch, memory, count
+):
+    monkeypatch.delenv(processes.VARIABLE, raising=False)
+    monkeypatch.setattr(processes, "host_memory", lambda: None if memory is None else memory * GB)
     assert processes.count() == count
+
+
+@pytest.mark.parametrize(("named", "count"), [("", 3), ("1", 1), ("2", 2), ("4", 4)])
+def test_a_count_the_variable_names_replaces_the_hosts(monkeypatch, named, count):
+    monkeypatch.setattr(processes, "host_memory", lambda: 128 * GB)
+    monkeypatch.setenv(processes.VARIABLE, named)
+    assert processes.count() == count
+    # A host too small for a second process narrates in what the variable names all the same.
+    monkeypatch.setattr(processes, "host_memory", lambda: 8 * GB)
+    assert processes.count() == (count if named else 1)
+
+
+def test_the_hosts_memory_is_read_once_and_is_none_where_it_cannot_be_read(monkeypatch):
+    processes.host_memory.cache_clear()
+    reads = []
+
+    def sysconf(name):
+        reads.append(name)
+        return {"SC_PHYS_PAGES": 4 * 1024 * 1024, "SC_PAGE_SIZE": 16384}[name]
+
+    monkeypatch.setattr(processes.os, "sysconf", sysconf)
+    assert processes.host_memory() == 64 * GB
+    assert processes.host_memory() == 64 * GB
+    assert reads == ["SC_PHYS_PAGES", "SC_PAGE_SIZE"]
+    processes.host_memory.cache_clear()
+
+    def unknown(name):
+        message = "unrecognized configuration name"
+        raise ValueError(message)
+
+    monkeypatch.setattr(processes.os, "sysconf", unknown)
+    assert processes.host_memory() is None
+    processes.host_memory.cache_clear()
 
 
 @pytest.mark.parametrize("named", ["two", "0", "-1", "1.5", "２"])
@@ -253,6 +294,10 @@ def test_a_narration_records_the_count_of_processes_it_may_use(narrating, monkey
     narration_narrate.main(["--language", "zh"])
     record = repository.read("build/evidence/editions/zh/durations/narrate.json")
     assert record["settings"] == {"narration_processes": 2}
+    monkeypatch.setattr(processes, "host_memory", lambda: 128 * GB)
+    narration_narrate.main(["--language", "zh"])
+    record = repository.read("build/evidence/editions/zh/durations/narrate.json")
+    assert record["settings"] == {"narration_processes": 3}
     monkeypatch.setenv(processes.VARIABLE, "1")
     narration_narrate.main(["--language", "zh"])
     record = repository.read("build/evidence/editions/zh/durations/narrate.json")

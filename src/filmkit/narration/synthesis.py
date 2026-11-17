@@ -5,9 +5,10 @@ and retakes. Its recording and receipt are named by the fingerprint of its reque
 segment whose recording and receipt still match the request is reused. A recording that an
 interrupted run left unresolved is refused, except an attempt that started and wrote nothing,
 which is generated again. Every segment is checked before the model loads. When more than one
-segment is to be generated, they are narrated in several processes at once, two unless
-`FILMKIT_NARRATION_PROCESSES` names another count (`filmkit.narration.processes`), and the
-receipt is then written from the retained recordings as after any other run.
+segment is to be generated, they are narrated in several processes at once, as many as the
+host's memory gives, up to three, unless `FILMKIT_NARRATION_PROCESSES` names another count
+(`filmkit.narration.processes`), and the receipt is then written from the retained recordings
+as after any other run.
 
 Usage: python -m filmkit.narration.synthesis --script FILE --cast FILE --folder DIR
     --receipt FILE [--ids 06,07] [--dry-run]
