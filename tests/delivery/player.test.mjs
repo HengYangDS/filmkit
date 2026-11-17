@@ -104,7 +104,7 @@ test("the delivery has the entry page and twelve members per language", () => {
 
 test("a binding names an absolute destination, the film and exactly its delivery members", () => {
   assert.deepEqual(bindingProblems(binding()), []);
-  assert.deepEqual(bindingProblems(binding("Documents/sample-reel")), [
+  assert.deepEqual(bindingProblems(binding("Movies/sample-reel")), [
     "destination is not an absolute path",
   ]);
   const finderCopy = binding();

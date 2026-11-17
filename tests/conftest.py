@@ -24,7 +24,7 @@ os.environ["FILMKIT_ROOT"] = str(Path(__file__).resolve().parents[1] / "examples
 # the processes names another.
 os.environ["FILMKIT_NARRATION_PROCESSES"] = "1"
 
-import filmkit.delivery.documents_folder as delivery_documents_folder
+import filmkit.delivery.folder as delivery_folder
 from filmkit.narration.thought_groups import join_quiet
 from filmkit.narration.voice_model import MODEL, NATIVE_DECODER, REVISION
 
@@ -66,8 +66,8 @@ class HostTool(NamedTuple):
 
 def rsync_3() -> bool:
     """Whether the rsync on PATH is the rsync 3 that delivery requires."""
-    return bool(shutil.which("rsync")) and delivery_documents_folder.rsync_version().startswith(
-        delivery_documents_folder.RSYNC_3
+    return bool(shutil.which("rsync")) and delivery_folder.rsync_version().startswith(
+        delivery_folder.RSYNC_3
     )
 
 

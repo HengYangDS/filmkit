@@ -1,4 +1,12 @@
-"""Deliver both editions to the film's Documents folder with rsync, then read them back with shasum.
+"""Deliver both editions to the film's delivery folder with rsync, then read them back with shasum.
+
+The engine names no folder of a host. The destination is, in this order: the folder
+`--destination` names; the film's declared folder name (`delivery_folder`) below the root that
+`FILMKIT_DELIVERY_ROOT` names, a host's setting; or that name below the user's videos folder as
+the platform defines it, which on macOS is ~/Movies and elsewhere the XDG videos directory:
+`XDG_VIDEOS_DIR` in the environment, else its line in ${XDG_CONFIG_HOME:-~/.config}/user-dirs.dirs,
+else ~/Videos. Films are videos, and that folder is the user's place for them. The readback
+records the folder and which of these rules gave it.
 
 The destination holds exactly the 25 delivery members: the language entry page and, per
 edition, its four films, the UHD and the 1080p film each with the captions drawn and without
@@ -23,7 +31,7 @@ SHA-256. A dry run reads no player.
 The film verifier binds every member to its package records; the delivery task runs it first.
 A refusal before rsync leaves the destination unchanged and exits with status 1.
 
-Usage: python -m filmkit.delivery.documents_folder [--destination DIR] [--dry-run]
+Usage: python -m filmkit.delivery.folder [--destination DIR] [--dry-run]
 """
 
 from __future__ import annotations
@@ -31,7 +39,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -42,7 +52,12 @@ from filmkit.film import FILM
 from filmkit.picture.rendering import PictureError
 from filmkit.production import CODES, Edition
 
-DESTINATION = Path.home() / "Documents" / FILM.documents_folder
+# The variable by which a host names the folder below which its films' delivery folders lie.
+ROOT_VARIABLE = "FILMKIT_DELIVERY_ROOT"
+# The XDG variable of the user's videos folder, and the file that names it when the environment
+# does not, below the XDG configuration folder.
+XDG_VIDEOS = "XDG_VIDEOS_DIR"
+XDG_USER_DIRS = "user-dirs.dirs"
 # The folder below which every member lies as it lies below the destination.
 SOURCE = LANGUAGE_INDEX.parent
 PREDECESSORS = Path("build/artifacts/delivery/predecessors")
@@ -63,6 +78,38 @@ RSYNC_3 = "rsync  version 3."
 
 class DeliveryRefusedError(Exception):
     """A delivery that cannot be made or a destination that does not read back."""
+
+
+def videos_folder() -> tuple[Path, str]:
+    """The user's videos folder as the platform defines it, and the rule that names it: ~/Movies
+    on macOS; elsewhere the XDG videos directory, from the environment, else from the user's
+    directories file, else ~/Videos."""
+    home = Path.home()
+    if sys.platform == "darwin":
+        return home / "Movies", "the macOS videos folder ~/Movies"
+    if os.environ.get(XDG_VIDEOS):
+        return Path(os.environ[XDG_VIDEOS]), f"{XDG_VIDEOS} in the environment"
+    listed = Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config") / XDG_USER_DIRS
+    lines = listed.read_text(errors="replace") if listed.is_file() else ""
+    named = re.search(rf'^\s*{XDG_VIDEOS}="?([^"\n]+)"?\s*$', lines, re.MULTILINE)
+    if named:
+        # The file writes the home folder as $HOME.
+        folder = named[1].replace("${HOME}", str(home)).replace("$HOME", str(home))
+        return Path(folder), f"{XDG_VIDEOS} in {listed}"
+    return home / "Videos", "the XDG default videos folder ~/Videos"
+
+
+def delivery_destination(named: Path | None = None) -> tuple[Path, str]:
+    """The folder a delivery fills and the rule that gave it: the folder named; else the film's
+    declared folder name below the host's delivery root; else that name below the user's videos
+    folder."""
+    if named is not None:
+        return named.expanduser().resolve(), "--destination"
+    name = FILM.delivery_folder
+    if os.environ.get(ROOT_VARIABLE):
+        return (Path(os.environ[ROOT_VARIABLE]).expanduser() / name).resolve(), ROOT_VARIABLE
+    folder, rule = videos_folder()
+    return (folder.expanduser() / name).resolve(), rule
 
 
 def plan(root: Path) -> list[tuple[Path, str]]:
@@ -183,8 +230,12 @@ def read_players(root: Path, members: list[tuple[Path, str]]) -> dict:
     return {"receipt": str(PLAYERS), "sha256": repository.sha(root / PLAYERS)}
 
 
-def deliver(root: Path, destination: Path, *, dry_run: bool = False) -> dict:
-    """Replace the destination's delivery with the current members and read it back."""
+def deliver(
+    root: Path, destination: Path, *, dry_run: bool = False, rule: str = "--destination"
+) -> dict:
+    """Replace the destination's delivery with the current members and read it back. The report
+    states the destination and the rule that gave it, which is the caller's naming of the folder
+    unless `rule` says otherwise."""
     members = plan(root)
     missing = [path for source, path in members if not source.is_file()]
     if missing:
@@ -224,9 +275,10 @@ def deliver(root: Path, destination: Path, *, dry_run: bool = False) -> dict:
         msg = f"rsync failed: {synced.stderr.strip()}"
         raise DeliveryRefusedError(msg)
     changes = [line for line in synced.stdout.splitlines() if line.strip()]
+    place = {"destination": str(destination), "destination_rule": rule}
     if dry_run:
-        return {"destination": str(destination), "changes": changes, "dry_run": True}
-    report = readback(root, destination)
+        return {**place, "changes": changes, "dry_run": True}
+    report = {**place, **readback(root, destination)}
     report["players"] = players
     report["predecessors"] = kept.as_posix() if (root / kept).exists() else None
     report["changes"] = changes
@@ -236,19 +288,25 @@ def deliver(root: Path, destination: Path, *, dry_run: bool = False) -> dict:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--destination", type=Path, default=DESTINATION)
+    parser.add_argument(
+        "--destination",
+        type=Path,
+        help=f"the folder to fill; otherwise the film's folder below {ROOT_VARIABLE} or below "
+        "the user's videos folder",
+    )
     parser.add_argument("--dry-run", action="store_true")
     options = parser.parse_args(argv)
-    destination = options.destination.expanduser().resolve()
+    folder, rule = delivery_destination(options.destination)
     try:
-        report = deliver(repository.ROOT, destination, dry_run=options.dry_run)
+        report = deliver(repository.ROOT, folder, dry_run=options.dry_run, rule=rule)
     except DeliveryRefusedError as error:
         raise SystemExit(str(error)) from None
     if options.dry_run:
         print(json.dumps(report, ensure_ascii=False))
         return
-    summary = {key: report[key] for key in ("all_match", "predecessors")}
-    print(json.dumps({"members": len(report["members"]), **summary}))
+    summary = {key: report[key] for key in ("destination", "destination_rule")}
+    summary |= {key: report[key] for key in ("all_match", "predecessors")}
+    print(json.dumps({"members": len(report["members"]), **summary}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

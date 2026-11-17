@@ -1,7 +1,7 @@
 """Fixtures of the delivery tests.
 
-`film` is a root whose delivery sources are small texts, beside an absent Documents
-destination; `inputs` is one edition's inputs bound as the film verifier reads them.
+`film` is a root whose delivery sources are small texts, beside an absent destination;
+`inputs` is one edition's inputs bound as the film verifier reads them.
 """
 
 import json
@@ -12,7 +12,7 @@ from typing import NamedTuple
 
 import pytest
 
-import filmkit.delivery.documents_folder as delivery_documents_folder
+import filmkit.delivery.folder as delivery_folder
 import filmkit.delivery.packaging as delivery_packaging
 import filmkit.delivery.player as delivery_player
 import filmkit.delivery.verification as delivery_verification
@@ -64,7 +64,7 @@ class Folder(NamedTuple):
 
     def better(self) -> None:
         """Replace every member source with a successor edition."""
-        for source, path in delivery_documents_folder.plan(self.root):
+        for source, path in delivery_folder.plan(self.root):
             source.write_text(f"better {path}\n")
 
 
@@ -74,10 +74,10 @@ def film(tmp_path, monkeypatch) -> Folder:
 
     The players' real-browser readback passes every page, as its own tests read real pages.
     """
-    folder = Folder(tmp_path / "root", tmp_path / "Documents" / FILM.documents_folder)
-    for source, path in delivery_documents_folder.plan(folder.root):
+    folder = Folder(tmp_path / "root", tmp_path / "Movies" / FILM.delivery_folder)
+    for source, path in delivery_folder.plan(folder.root):
         write_input(source, f"current {path}\n")
-    monkeypatch.setattr(delivery_documents_folder, "check_players", passing_players)
+    monkeypatch.setattr(delivery_folder, "check_players", passing_players)
     return folder
 
 

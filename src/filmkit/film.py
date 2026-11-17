@@ -33,6 +33,8 @@ DECLARATION = repository.DECLARATION
 EDITION_FILES = ("film-script.json", "voice-reference.json")
 # The player template a sources folder once held; the engine renders each edition's player now.
 PLAYER_TEMPLATE = "player.html"
+# The key that named the delivery folder through 0.22.3, refused with the key that names it now.
+RENAMED_FOLDER = "documents_folder"
 # A lowercase name of words joined by hyphens.
 Name = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")]
 Floor = Annotated[int, Field(ge=0, le=100)]
@@ -455,7 +457,7 @@ class Film(Declared):
     """
 
     slug: Name
-    documents_folder: Name
+    delivery_folder: Name
     entry: str
     source_manifest: str
     concepts: str | None = None
@@ -505,7 +507,14 @@ def copied_players(root: Path, film: Film) -> str | None:
 def load(root: Path) -> Film:
     """Read and check the declaration below a root, refusing it with each failing field."""
     try:
-        film = Film.model_validate(tomllib.loads((root / DECLARATION).read_text(encoding="utf-8")))
+        declared = tomllib.loads((root / DECLARATION).read_text(encoding="utf-8"))
+        if RENAMED_FOLDER in declared:
+            message = (
+                f"{DECLARATION} declares {RENAMED_FOLDER}; the key is delivery_folder, the name "
+                "of the film's folder below the delivery root, which is no longer ~/Documents"
+            )
+            raise FilmError(message)
+        film = Film.model_validate(declared)
     except (OSError, tomllib.TOMLDecodeError, ValidationError) as error:
         message = f"{DECLARATION} is not a film declaration: {error}"
         raise FilmError(message) from error

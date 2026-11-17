@@ -85,6 +85,20 @@ def test_invalid_fields_refuse_naming_each_field(declared):
     assert "review.overall_minimum" in str(refusal.value)
 
 
+def test_the_key_of_the_delivery_folder_through_0_22_3_is_refused_naming_the_new_one(declared):
+    declaration = declared / film.DECLARATION
+    text = declaration.read_text()
+    assert text.count("\ndelivery_folder = ") == 1
+    declaration.write_text(text.replace("\ndelivery_folder = ", "\ndocuments_folder = "))
+    with pytest.raises(FilmError, match="declares documents_folder; the key is delivery_folder"):
+        film.load(declared)
+    # No second spelling is read: both keys together are refused the same way.
+    both = '\ndocuments_folder = "x"\ndelivery_folder = '
+    declaration.write_text(text.replace("\ndelivery_folder = ", both))
+    with pytest.raises(FilmError, match="declares documents_folder"):
+        film.load(declared)
+
+
 def test_an_unknown_field_refuses(declared):
     rewrite(declared, "[review]", 'title = "Another"\n\n[review]')
     with pytest.raises(FilmError, match="title"):
@@ -302,7 +316,7 @@ def identities() -> set[str]:
     Its file prefix, delivery folder and source, and each edition's title, title parts,
     author and chapter titles.
     """
-    names = {film.FILM.slug, film.FILM.documents_folder}
+    names = {film.FILM.slug, film.FILM.delivery_folder}
     source = repository.read(film.FILM.source_manifest)["repository"]
     names |= {source, source.rstrip("/").rsplit("/", 1)[-1]}
     for code in CODES:

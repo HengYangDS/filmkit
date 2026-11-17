@@ -133,7 +133,7 @@ def preview_copies(folder, codes=CODES):
 
 
 def test_an_unreviewed_build_is_set_aside_by_the_copies_its_consumer_holds(root, tmp_path):
-    consumer = preview_copies(tmp_path / "Documents/sample-reel-preview")
+    consumer = preview_copies(tmp_path / "Movies/sample-reel-preview")
     (consumer / "en" / Edition("en").film("uhd").name).write_bytes(b"another film")
     with pytest.raises(ReviewError) as refusal:
         review_set_aside.plan_unreviewed("preview-1", PURPOSE, consumer)
@@ -157,9 +157,7 @@ def test_an_unreviewed_build_is_set_aside_by_the_copies_its_consumer_holds(root,
         assert list(manifest) == ["purpose", "consumer", "exit_condition", "moved_at", "members"]
         assert manifest["purpose"] == f"{code} package of an unreviewed build: {PURPOSE}"
         # The consumer is named below the root when it lies there, as every member is.
-        assert manifest["consumer"] == (
-            f"Documents/sample-reel-preview/{code} holds the films' bytes"
-        )
+        assert manifest["consumer"] == (f"Movies/sample-reel-preview/{code} holds the films' bytes")
         assert manifest["exit_condition"] == "Retire after the successor delivery is accepted"
         assert manifest["moved_at"]
         assert [member["source"] for member in manifest["members"]] == [

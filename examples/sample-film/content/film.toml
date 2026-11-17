@@ -5,8 +5,9 @@
 
 # The prefix of every delivered file.
 slug = "sample-reel"
-# The folder in ~/Documents that a delivery would fill.
-documents_folder = "sample-reel"
+# The name of the folder a delivery fills, below the host's delivery root or the user's videos
+# folder (`filmkit.delivery.folder`).
+delivery_folder = "sample-reel"
 # The page that leads to each edition's player.
 entry = "content/index.html"
 # The commit and digest of the document the film explains.
