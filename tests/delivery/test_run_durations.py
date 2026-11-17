@@ -74,3 +74,54 @@ def test_a_reproduction_records_each_editions_comparison_unless_read_only(tmp_pa
         path.unlink()
     reproduction.compare_editions({"zh": None, "en": None}, {}, {}, record=False)
     assert list(tmp_path.rglob("*.json")) == []
+
+
+def comparing(monkeypatch, films_of):
+    """Have each edition's comparison return the given films' results and nothing else."""
+
+    def compare_edition(edition, record, assets, listed):
+        return {"films": films_of(edition.code), "documents": []}
+
+    monkeypatch.setattr(reproduction, "compare_edition", compare_edition)
+
+
+@pytest.mark.parametrize(
+    ("film", "completed"),
+    [
+        ({"asset": "film.mp4", "verdict": "pass", "failing": []}, True),
+        ({"asset": "film.mp4", "verdict": "fail", "failing": ["picture"]}, False),
+        # A film without a recorded floor is not yet reproduced.
+        ({"asset": "film.mp4", "verdict": "calibrating", "failing": []}, False),
+    ],
+    ids=["pass", "fail", "calibrating"],
+)
+def test_an_edition_whose_comparison_does_not_pass_is_recorded_as_not_completed(
+    tmp_path, monkeypatch, film, completed
+):
+    monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
+    # The Chinese edition passes; the English one holds the film in question.
+    passing = {"asset": "film.mp4", "verdict": "pass", "failing": []}
+    comparing(monkeypatch, lambda code: [passing if code == "zh" else film])
+    compared = reproduction.compare_editions({"zh": None, "en": None}, {}, {}, record=True)
+    assert [*compared] == ["zh", "en"]
+    assert compared["en"]["films"] == [film]
+    records = {
+        code: repository.read(f"build/evidence/editions/{code}/durations/reproduce.json")
+        for code in ("zh", "en")
+    }
+    assert records["zh"]["completed"] is True
+    assert records["en"]["completed"] is completed
+
+
+def test_a_failing_layer_of_an_edition_is_recorded_as_not_completed(tmp_path, monkeypatch):
+    monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
+
+    def compare_edition(edition, record, assets, listed):
+        soundtrack = {"verdict": "fail" if edition.code == "zh" else "pass"}
+        return {"soundtrack": soundtrack, "films": [], "documents": []}
+
+    monkeypatch.setattr(reproduction, "compare_edition", compare_edition)
+    reproduction.compare_editions({"zh": None, "en": None}, {}, {}, record=True)
+    zh = repository.read("build/evidence/editions/zh/durations/reproduce.json")
+    en = repository.read("build/evidence/editions/en/durations/reproduce.json")
+    assert (zh["completed"], en["completed"]) == (False, True)

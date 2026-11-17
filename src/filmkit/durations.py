@@ -71,6 +71,7 @@ class Run:
         self.started_at = datetime.now(UTC)
         self.phases: dict[str, float] = {}
         self.settings: dict[str, object] = {}
+        self.failed = False
         self._started = time.monotonic()
         self._lock = threading.Lock()
 
@@ -83,6 +84,11 @@ class Run:
         """Add seconds to a phase; a phase named again holds the sum."""
         with self._lock:
             self.phases[name] = self.phases.get(name, 0.0) + seconds
+
+    def fail(self) -> None:
+        """Say that the command did not complete, for one whose block ends without raising and
+        whose verdict is still no pass, such as a comparison that reports before it refuses."""
+        self.failed = True
 
     @contextlib.contextmanager
     def phase(self, name: str) -> Iterator[None]:
@@ -118,8 +124,9 @@ def current() -> Run | None:
 def run(code: str, command: str, *, record: bool = True) -> Iterator[Run]:
     """Measure the block as one command's run on an edition and write its record at the end.
 
-    The record says that the command completed only when the block ends without raising; the
-    exception of one that does not propagates after the record is written. With `record` False
+    The record says that the command completed only when the block ends without raising and
+    without the run being told that it failed (`Run.fail`); the exception of one that raises
+    propagates after the record is written. With `record` False
     the run is measured and nothing is written, for a command asked to write nothing.
     """
     opened = Run(code, command)
@@ -127,7 +134,7 @@ def run(code: str, command: str, *, record: bool = True) -> Iterator[Run]:
     completed = False
     try:
         yield opened
-        completed = True
+        completed = not opened.failed
     finally:
         _RUN.reset(token)
         if record:

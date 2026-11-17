@@ -29,6 +29,11 @@ Each action of `filmkit.produce`, each narration, the geometry check and the cov
 - **WHEN** the verifier or the reproduction runs with `--read-only`
 - **THEN** it writes no duration record
 
+#### Scenario: A reproduction that does not pass
+
+- **WHEN** the reproduction's comparison of an edition holds a failing layer or a film that is still calibrating
+- **THEN** that edition's duration record says that the reproduction did not complete, as a refused verification's does
+
 #### Scenario: The two checks a build runs from the command line
 
 - **WHEN** the geometry check or the cover check (`player-check cover`) is run from the command line on the Chinese edition's stage

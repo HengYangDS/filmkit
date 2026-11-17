@@ -458,14 +458,24 @@ def failures(report: dict) -> list[str]:
     return found
 
 
+def passed(code: str, compared: dict) -> bool:
+    """Whether an edition's comparison passed: no layer fails and no film is still calibrating."""
+    calibrating = any(result["verdict"] == "calibrating" for result in compared["films"])
+    return not calibrating and not failures({"editions": {code: compared}})
+
+
 def compare_editions(records: dict, assets: dict, listed: dict, *, record: bool) -> dict:
     """Each edition's comparison in the editions' order, as a run of its own whose duration is
-    recorded when `record` says so (`filmkit.durations`)."""
+    recorded when `record` says so (`filmkit.durations`). The comparison reports every layer
+    before the command refuses, so an edition that did not pass says so to its run, and its
+    record states that it did not complete."""
     compared = {}
     for code in production.CODES:
-        with durations.run(code, "reproduce", record=record):
+        with durations.run(code, "reproduce", record=record) as run:
             edition = production.Edition(code)
             compared[code] = compare_edition(edition, records[code], assets, listed)
+            if not passed(code, compared[code]):
+                run.fail()
     return compared
 
 
