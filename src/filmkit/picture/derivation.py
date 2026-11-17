@@ -123,9 +123,19 @@ def uncaptioned_way(*, native: bool = False) -> dict:
     return {"way": "derived", "reason": f"the film declares {qualified}"}
 
 
-def note_rendered(edition: Edition, way: dict) -> dict:
-    """Write into the receipt of an uncaptioned picture that was just rendered why it was
-    rendered and not derived; the receipt."""
+def render_uncaptioned(edition: Edition, deadline: float, *, asked: bool = False) -> dict:
+    """Render the edition's uncaptioned picture from its own stage and state in its receipt why
+    it is rendered and not derived; the receipt.
+
+    Every render of an uncaptioned picture goes through here, the command's and a repair's, so
+    every rendered receipt carries the statement and the comparison record after it. The reason
+    is the film's capture, or, with `asked` or for a film whose pictures are otherwise derived,
+    that a render was asked for: a rendered picture of such a film exists only because one was.
+    """
+    way = uncaptioned_way(native=asked)
+    if way["way"] == "derived":
+        way = uncaptioned_way(native=True)
+    rendering.render_picture(edition, deadline, captions=False)
     path = edition.rendered(False).receipt
     receipt = {**repository.read(path), "uncaptioned": way}
     repository.write(path, receipt)

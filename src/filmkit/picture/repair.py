@@ -30,6 +30,7 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import filmkit.picture.derivation as derivation
 import filmkit.picture.equivalence as equivalence
 import filmkit.picture.faults as faults
 import filmkit.picture.rendering as rendering
@@ -139,7 +140,11 @@ def render_and_compare(edition: Edition, attempt: dict, deadline: float) -> dict
     for name in attempt["faults"]:
         captions = name == "captioned"
         try:
-            rendering.render_picture(edition, deadline, captions=captions)
+            if captions:
+                rendering.render_picture(edition, deadline, captions=True)
+            else:
+                # The uncaptioned picture's render states why it is rendered and not derived.
+                derivation.render_uncaptioned(edition, deadline)
         finally:
             receipt = edition.rendered(captions).receipt
             if receipt.is_file():

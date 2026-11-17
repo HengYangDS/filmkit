@@ -78,9 +78,11 @@ def test_an_edition_action_passes_its_options_to_its_owner(monkeypatch, tmp_path
 
     for name in ("stage_picture", "render_picture", "validate_picture", "compare_pictures"):
         monkeypatch.setattr(produce, name, owner)
-    noted = []
+    # The uncaptioned picture's render goes through its one owner, which calls the same renderer.
     monkeypatch.setattr(
-        produce.derivation, "note_rendered", lambda edition, way: noted.append((edition, way))
+        produce.derivation,
+        "render_uncaptioned",
+        lambda edition, seconds, *, asked: owner(edition, seconds, captions=False, asked=asked),
     )
     output = tmp_path / "stage"
     stage = ["--output", str(output), "--duration", "60", "--width", "1920", "--height", "1080"]
@@ -97,12 +99,10 @@ def test_an_edition_action_passes_its_options_to_its_owner(monkeypatch, tmp_path
         (zh, output, 60, 1920, 1080, 12.5, {"captions": True}),
         (en, 600, {"captions": True}),
         (en, None, produce.DURATION, 3840, 2160, 0, {"captions": False}),
-        (zh, 600, {"captions": False}),
+        (zh, 600, {"captions": False, "asked": True}),
         (zh, {"captions": False}),
         (en, {}),
     ]
-    # The receipt of the uncaptioned picture rendered with --native says why it was rendered.
-    assert [(edition, way["way"]) for edition, way in noted] == [(zh, "rendered")]
 
 
 def test_each_owner_keeps_its_own_deadline_default(monkeypatch):
@@ -248,14 +248,18 @@ def test_the_uncaptioned_picture_is_derived_unless_a_native_render_is_asked_for(
     monkeypatch.setattr(
         produce, "render_picture", lambda *arguments, **options: rendered.append(options)
     )
-    monkeypatch.setattr(produce.derivation, "note_rendered", lambda edition, way: way)
+    monkeypatch.setattr(
+        produce.derivation,
+        "render_uncaptioned",
+        lambda edition, seconds, *, asked: rendered.append({"captions": False, "asked": asked}),
+    )
     produce.main(["render-picture", "--language", "zh", "--uncaptioned"])
     produce.main(["render-picture", "--language", "en", "--uncaptioned", "--deadline", "900"])
     zh, en = production.Edition("zh"), production.Edition("en")
     assert derived == [(zh, produce.derivation.DEADLINE), (en, 900)]
     produce.main(["render-picture", "--language", "zh", "--uncaptioned", "--native"])
     produce.main(["render-picture", "--language", "zh"])
-    assert rendered == [{"captions": False}, {"captions": True}]
+    assert rendered == [{"captions": False, "asked": True}, {"captions": True}]
     assert len(derived) == 2
 
 

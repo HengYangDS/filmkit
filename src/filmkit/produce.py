@@ -101,8 +101,8 @@ def render(edition: Edition, options: argparse.Namespace) -> object:
     way = derivation.uncaptioned_way(native=options.native)
     if way["way"] == "derived":
         return derivation.derive_uncaptioned(edition, deadline(options, derivation.DEADLINE))
-    render_picture(edition, deadline(options, rendering.DEADLINE), captions=False)
-    return derivation.note_rendered(edition, way)
+    seconds = deadline(options, rendering.DEADLINE)
+    return derivation.render_uncaptioned(edition, seconds, asked=options.native)
 
 
 # Each edition action's adapter from the parsed options to its owner. The adapters name their

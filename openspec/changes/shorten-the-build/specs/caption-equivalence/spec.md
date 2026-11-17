@@ -38,6 +38,11 @@ For a film that declares any other capture than `software`, and with `--native` 
 - **WHEN** a film changes its declared capture from `software` to `screenshot` after its uncaptioned picture was derived
 - **THEN** validation refuses the derived picture and asks for `render-picture --uncaptioned`
 
+#### Scenario: A repair's render of the uncaptioned picture
+
+- **WHEN** `repair-pictures` renders the uncaptioned picture of a rendered pair again and the pair then passes
+- **THEN** the new receipt and the passing comparison record say that the picture was rendered and why, as the receipt it replaces did
+
 #### Scenario: The comparison record of a rendered pair
 
 - **WHEN** `compare-pictures` passes a pair whose uncaptioned picture was rendered under `fast` capture

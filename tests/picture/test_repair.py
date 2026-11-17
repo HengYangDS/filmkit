@@ -49,7 +49,12 @@ def pair(film_root, monkeypatch):
     pictures of 96x54 and two seconds."""
     monkeypatch.setattr(equivalence, "PICTURE_SIZE", SIZE)
     monkeypatch.setattr(equivalence, "DURATION", SECONDS)
-    monkeypatch.setattr(equivalence, "validate_picture", lambda _edition, captions: {})
+    # The pictures' media are not checked here; the comparison reads each receipt as it stands.
+    monkeypatch.setattr(
+        equivalence,
+        "validate_picture",
+        lambda edition, captions: repository.read(edition.rendered(captions).receipt),
+    )
     monkeypatch.setattr(equivalence.tools, "run", reporting(BAND))
     edition = Edition("zh")
     film_root.timeline(edition, captions=CUES)
@@ -134,6 +139,11 @@ def test_an_injected_fault_is_repaired_in_one_attempt_of_its_picture(pair, film_
     assert attempt["rendered"] == {"uncaptioned": repository.read(faulty.receipt)}
     assert (attempt["verdict"], attempt["findings"]) == ("pass", [])
     assert not (repository.ROOT / REPAIRS / "2").exists()
+    # The repair's render states, as `render-picture --uncaptioned --native` does, why the
+    # picture is rendered and not derived, and the passing record carries the statement.
+    asked = {"way": "rendered", "reason": "a render of its own stage was asked for"}
+    assert repository.read(faulty.receipt)["uncaptioned"] == asked
+    assert passed["uncaptioned"] == asked
 
 
 @pytest.mark.ffmpeg
