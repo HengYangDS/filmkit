@@ -9,6 +9,9 @@ from real_processes import gone
 
 import filmkit.picture.rendering as rendering
 
+# Every test here has the deadline of a test that starts real processes, and their end.
+pytestmark = pytest.mark.usefixtures("processes")
+
 # A renderer that starts a worker, waits until the worker runs and exits with the status given.
 RENDERER = """
 import subprocess, sys, time

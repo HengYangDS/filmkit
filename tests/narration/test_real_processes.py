@@ -1,120 +1,96 @@
 """A narration's children as real processes: a parent process that divides its shares among
 stand-in children, which load no model and use no GPU.
 
-The parent is the engine's own `filmkit.narration.processes.narrate` in a process of its own;
-only the child's command is replaced, by a script that notes its process id, starts a process of
-its own, writes what it is told to and exits as it is told to.
+The parent is the engine's own `filmkit.narration.processes.narrate` in a process of its own,
+with a request to end handled as the synthesis handles it; only the child's command is replaced,
+by a script that notes its process id under its share's name, starts a process of its own,
+writes what it is told to and exits as it is told to. A test waits for a child's note or for
+the parent's exit, and every process is ended with its test (`processes`).
 """
 
 import json
-import os
 import signal
-import subprocess
-import sys
-import textwrap
-import time
 
 import pytest
+from real_processes import alive, gone
+
+# Every test here has the deadline of a test that starts real processes, and their end.
+pytestmark = pytest.mark.usefixtures("processes")
 
 # The stand-in child: `--ids` names its share, and CHILDREN says what each share does.
 CHILD = """
-    import json, os, pathlib, subprocess, sys, time
-    arguments = sys.argv[1:]
-    ids = arguments[arguments.index("--ids") + 1]
-    notes = pathlib.Path(os.environ["NOTES"])
-    does = json.loads(os.environ["CHILDREN"]).get(ids, {})
-    own = subprocess.Popen(["/bin/sleep", "60"])
-    (notes / f"{ids}.json").write_text(json.dumps({"pid": os.getpid(), "own": own.pid}))
-    for line in does.get("lines", []):
-        print(line, flush=True)
-    time.sleep(does.get("seconds", 0))
-    own.kill()
-    raise SystemExit(does.get("exit", 0))
+import subprocess, sys, time
+arguments = sys.argv[1:]
+ids = arguments[arguments.index("--ids") + 1]
+does = json.loads(os.environ["CHILDREN"]).get(ids, {})
+own = subprocess.Popen(["/bin/sleep", "60"])
+note(ids, own=own.pid)
+for line in does.get("lines", []):
+    print(line, flush=True)
+time.sleep(does.get("seconds", 0))
+own.kill()
+raise SystemExit(does.get("exit", 0))
 """
 # The parent: the engine's narration in processes, with the stand-in as each child's command.
 PARENT = """
-    import json, os, signal, sys
-    if os.environ.get("IGNORING_HANG_UPS"):
-        # As under nohup: the process ignores a hang-up before the engine is loaded.
-        signal.signal(signal.SIGHUP, signal.SIG_IGN)
-    import filmkit.child_processes as child_processes
-    import filmkit.narration.processes as processes
-    child, shares = sys.argv[1], json.loads(sys.argv[2])
-    processes.child_command = lambda sources, ids, receipt: [
-        sys.executable, child, "--receipt", str(receipt), "--ids", ",".join(ids)
-    ]
-    receipt = processes.repository.ROOT / "build/evidence/narration-receipt.json"
-    # A request to end is handled as the synthesis handles it.
-    with child_processes.ending("The narration was stopped by {request}"):
-        try:
-            ended = processes.narrate(("script", "cast", "folder"), shares, receipt)
-        except processes.ProcessesError as error:
-            raise SystemExit(str(error)) from None
-        print(json.dumps(ended))
+import signal, sys
+if os.environ.get("IGNORING_HANG_UPS"):
+    # As under nohup: the process ignores a hang-up before the engine is loaded.
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+import filmkit.child_processes as child_processes
+import filmkit.narration.processes as processes
+child, shares = sys.argv[1], json.loads(sys.argv[2])
+processes.child_command = lambda sources, ids, receipt: [
+    sys.executable, "-B", child, "--receipt", str(receipt), "--ids", ",".join(ids)
+]
+receipt = processes.repository.ROOT / "build/evidence/narration-receipt.json"
+# A request to end is handled as the synthesis handles it.
+with child_processes.ending("The narration was stopped by {request}"):
+    try:
+        ended = processes.narrate(("script", "cast", "folder"), shares, receipt)
+    except processes.ProcessesError as error:
+        raise SystemExit(str(error)) from None
+    print(json.dumps(ended))
 """
-
-
-def alive(pid: int) -> bool:
-    """Whether a process still runs; one that ended and awaits its parent's wait does not."""
-    listed = subprocess.run(
-        ["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True, check=False
-    )
-    return bool(listed.stdout.strip()) and not listed.stdout.strip().startswith("Z")
-
-
-def wait_for(condition, seconds=20.0) -> bool:
-    ends = time.monotonic() + seconds
-    while time.monotonic() < ends:
-        if condition():
-            return True
-        time.sleep(0.05)
-    return condition()
+WORK = "build/runtime/work/narration-processes/build-evidence-narration-receipt"
+SLOW = {"seconds": 60}
 
 
 class Narration:
     """A film root and a parent process that narrates shares in stand-in children."""
 
-    def __init__(self, root):
-        self.root = root
-        (root / "content").mkdir()
-        (root / "content/film.toml").write_text("")
-        self.notes = root / "notes"
-        self.notes.mkdir()
-        self.child, self.parent = root / "child.py", root / "parent.py"
-        self.child.write_text(textwrap.dedent(CHILD))
-        self.parent.write_text(textwrap.dedent(PARENT))
-        self.work = root / "build/runtime/work/narration-processes"
+    def __init__(self, processes):
+        self.processes, self.root = processes, processes.folder
+        (self.root / "content").mkdir()
+        (self.root / "content/film.toml").write_text("")
+        self.child = processes.script("child", CHILD)
+        self.parent = processes.script("parent", PARENT)
 
-    def start(self, shares, children, **variables) -> subprocess.Popen:
-        environment = {**os.environ, "FILMKIT_ROOT": str(self.root), "NOTES": str(self.notes)}
-        environment |= {"CHILDREN": json.dumps(children), **variables}
-        command = [sys.executable, "-B", str(self.parent), str(self.child), json.dumps(shares)]
-        return subprocess.Popen(
-            command,
-            cwd=self.root,
-            env=environment,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+    def start(self, shares, children, **variables):
+        """Start the parent on the shares; `children` says what each share's child does."""
+        does = {"FILMKIT_ROOT": str(self.root), "CHILDREN": json.dumps(children), **variables}
+        return self.processes.python(self.parent, str(self.child), json.dumps(shares), **does)
 
-    def noted(self, count) -> list[dict]:
-        """Each child's process id and that of the process it started, once all have noted."""
-        assert wait_for(lambda: len(list(self.notes.glob("*.json"))) == count)
-        time.sleep(0.2)
-        return [json.loads(path.read_text()) for path in sorted(self.notes.glob("*.json"))]
+    def child_of(self, *ids) -> dict:
+        """The process id of the child that narrates this share, and that of the process it
+        started, once the child has noted them."""
+        return self.processes.noted(",".join(ids))
+
+    def everyone(self, *shares) -> list[int]:
+        """Every process of the shares' children, each child and what it started."""
+        children = [self.child_of(*ids) for ids in shares]
+        return [pid for child in children for pid in (child["pid"], child["own"])]
 
 
 @pytest.fixture
-def narration(tmp_path):
-    return Narration(tmp_path.resolve())
+def narration(processes):
+    return Narration(processes)
 
 
 def test_each_child_of_a_passing_division_is_stamped_with_its_own_seconds(narration):
     children = {"01,04": {"seconds": 2.0, "lines": ['{"id": "01"}', '{"id": "04"}']}}
     parent = narration.start([["01", "04"], ["02", "03"]], children)
-    printed, refusal = parent.communicate(timeout=60)
+    printed, refusal = parent.communicate(timeout=40)
     assert (parent.returncode, refusal) == (0, "")
     first, second = json.loads(printed)
     assert (first["ids"], first["exit"]) == (["01", "04"], 0)
@@ -128,82 +104,63 @@ def test_a_failing_child_is_named_once_the_other_has_run_to_its_end(narration):
     failing = {"exit": 3, "lines": ["Traceback (most recent call last):", "RuntimeError: no take"]}
     children = {"01,04": failing, "02,03": {"seconds": 1.0, "lines": ['{"id": "02"}']}}
     parent = narration.start([["01", "04"], ["02", "03"]], children)
-    printed, refusal = parent.communicate(timeout=60)
+    printed, refusal = parent.communicate(timeout=40)
     assert (parent.returncode, printed) == (1, "")
-    work = "build/runtime/work/narration-processes/build-evidence-narration-receipt"
     assert refusal.strip() == (
-        f"A narration process failed: segments 01, 04 exited 3 ({work}/process-1.log: "
+        f"A narration process failed: segments 01, 04 exited 3 ({WORK}/process-1.log: "
         "Traceback (most recent call last): | RuntimeError: no take)"
     )
     # The other child was not stopped: it wrote its line and ended by itself, and both logs stay.
-    assert (narration.root / work / "process-2.log").read_text() == '{"id": "02"}\n'
-    assert (narration.root / work / "process-1.log").read_text().endswith("no take\n")
-    assert not any(alive(child["pid"]) for child in narration.noted(2))
+    assert (narration.root / WORK / "process-2.log").read_text() == '{"id": "02"}\n'
+    assert (narration.root / WORK / "process-1.log").read_text().endswith("no take\n")
+    assert gone(narration.everyone(["01", "04"], ["02", "03"]), 5)
 
 
 def test_a_child_that_is_killed_is_named_by_its_signal(narration):
-    parent = narration.start([["01"], ["02"]], {"02": {"seconds": 60}})
-    children = narration.noted(2)
-    slow = next(child for child in children if alive(child["pid"]))
-    os.kill(slow["pid"], signal.SIGKILL)
-    _, refusal = parent.communicate(timeout=60)
+    parent = narration.start([["01"], ["02"]], {"02": SLOW})
+    # The slow child is the one that narrates 02, whichever of the two is still running.
+    slow = narration.child_of("02")
+    narration.processes.kill(slow["pid"])
+    _, refusal = parent.communicate(timeout=40)
     assert parent.returncode == 1
-    assert "A narration process failed: segments 02 exited -9 (" in refusal
-    # What the killed child had started is none of the narration's to end; it ends by itself.
-    os.kill(slow["own"], signal.SIGKILL)
+    assert f"A narration process failed: segments 02 exited -9 ({WORK}/process-2.log" in refusal
+    assert "segments 01" not in refusal
 
 
-def test_a_narration_asked_to_end_ends_every_child_and_what_each_started(narration):
-    slow = {"seconds": 60}
-    parent = narration.start([["01", "04"], ["02", "03"]], {"01,04": slow, "02,03": slow})
-    children = narration.noted(2)
-    everyone = [pid for child in children for pid in (child["pid"], child["own"])]
+@pytest.mark.parametrize(
+    ("number", "request_"),
+    [(signal.SIGTERM, "a request to end (SIGTERM)"), (signal.SIGHUP, "a hang-up (SIGHUP)")],
+)
+def test_a_narration_asked_to_end_ends_every_child_and_what_each_started(
+    narration, number, request_
+):
+    """The parent alone is asked to end, as a kit ends a run by its process id, or is hung up
+    on, as by a terminal that closes. The children lead sessions of their own, so the signal
+    does not reach them: the narration ends them."""
+    shares = [["01", "04"], ["02", "03"]]
+    parent = narration.start(shares, {"01,04": SLOW, "02,03": SLOW})
+    everyone = narration.everyone(*shares)
     assert all(alive(pid) for pid in everyone)
-    # The parent alone is asked to end, as a kit ends a run by its process id.
-    parent.send_signal(signal.SIGTERM)
-    _, refusal = parent.communicate(timeout=30)
-    assert parent.returncode == 143
-    assert refusal.strip().startswith(
-        "The narration was stopped by a request to end (SIGTERM); every narration process it "
-        "had started (2) was ended with it; their logs are in build/runtime/work/"
+    parent.send_signal(number)
+    _, refusal = parent.communicate(timeout=40)
+    assert parent.returncode == 128 + number
+    assert refusal.strip() == (
+        f"The narration was stopped by {request_}; every narration process it had started (2) "
+        f"was ended with it; their logs are in {WORK}"
     )
-    assert wait_for(lambda: not any(alive(pid) for pid in everyone), 10)
-
-
-def test_a_hang_up_ends_every_child_as_a_request_to_end_does(narration):
-    """A terminal that closes sends a hang-up. The children lead sessions of their own, so the
-    signal that ends the narration does not reach them: the narration ends them."""
-    slow = {"seconds": 60}
-    parent = narration.start([["01", "04"], ["02", "03"]], {"01,04": slow, "02,03": slow})
-    children = narration.noted(2)
-    everyone = [pid for child in children for pid in (child["pid"], child["own"])]
-    try:
-        parent.send_signal(signal.SIGHUP)
-        _, refusal = parent.communicate(timeout=30)
-        assert "The narration was stopped by a hang-up (SIGHUP); every narration process" in refusal
-        assert wait_for(lambda: not any(alive(pid) for pid in everyone), 10)
-    finally:
-        for pid in everyone:
-            if alive(pid):
-                os.kill(pid, signal.SIGKILL)
+    assert not any(alive(pid) for pid in everyone)
 
 
 def test_a_narration_that_ignores_hang_ups_as_under_nohup_narrates_on(narration):
-    slow = {"seconds": 60}
-    children = {"01,04": slow, "02,03": slow}
-    parent = narration.start([["01", "04"], ["02", "03"]], children, IGNORING_HANG_UPS="1")
-    children = narration.noted(2)
-    everyone = [pid for child in children for pid in (child["pid"], child["own"])]
-    try:
-        parent.send_signal(signal.SIGHUP)
-        # Nothing ends: the hang-up stays ignored, by the narration and by what it started.
-        assert not wait_for(lambda: parent.poll() is not None, 1.0)
-        assert all(alive(pid) for pid in everyone)
-        parent.send_signal(signal.SIGTERM)
-        _, refusal = parent.communicate(timeout=30)
-        assert "stopped by a request to end (SIGTERM)" in refusal
-        assert wait_for(lambda: not any(alive(pid) for pid in everyone), 10)
-    finally:
-        for pid in everyone:
-            if alive(pid):
-                os.kill(pid, signal.SIGKILL)
+    shares = [["01", "04"], ["02", "03"]]
+    children = {"01,04": SLOW, "02,03": SLOW}
+    parent = narration.start(shares, children, IGNORING_HANG_UPS="1")
+    everyone = narration.everyone(*shares)
+    parent.send_signal(signal.SIGHUP)
+    parent.send_signal(signal.SIGTERM)
+    _, refusal = parent.communicate(timeout=40)
+    # Had the hang-up been taken, it would be the request the narration names: of two requests
+    # that wait, the lower number is handed over first. It stayed ignored.
+    assert parent.returncode == 143
+    assert "stopped by a request to end (SIGTERM)" in refusal
+    assert not any(alive(pid) for pid in everyone)

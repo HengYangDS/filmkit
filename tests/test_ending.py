@@ -15,6 +15,9 @@ import signal
 import pytest
 from real_processes import alive, gone, twice
 
+# Every test here has the deadline of a test that starts real processes, and their end.
+pytestmark = pytest.mark.usefixtures("processes")
+
 # A stand-in for a narration process or a renderer: it notes that it runs and waits to be ended.
 # With LINGER it takes that many seconds to end once it is asked to, and notes that it was asked.
 STANDIN = """
@@ -126,6 +129,7 @@ def test_a_request_to_end_ends_the_children_and_the_command_with_one_line(proces
     assert gone(children)
 
 
+@pytest.mark.deadline(240)
 def test_a_second_request_at_any_interval_changes_nothing_for_a_narration(processes):
     failed = []
     for trial, delay in enumerate(DELAYS * 3):
@@ -167,6 +171,7 @@ def test_two_different_requests_end_the_command_once_by_the_one_it_acted_on(proc
     assert status == 143
 
 
+@pytest.mark.deadline(240)
 def test_a_request_to_the_narrations_group_which_the_narration_relays_leaves_no_child(processes):
     """`narrate` and its step share a process group. A request to the group reaches both, and
     `narrate` then asks its step to end as well: the step gets the request twice."""
@@ -217,6 +222,7 @@ def test_a_request_to_end_ends_the_renderer_and_the_render_with_one_line(process
     assert json.loads(record.read_text())["completed"] is False
 
 
+@pytest.mark.deadline(240)
 def test_a_second_request_at_any_interval_changes_nothing_for_a_render(processes):
     failed = []
     for trial, delay in enumerate(DELAYS * 2):

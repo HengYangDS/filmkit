@@ -9,7 +9,6 @@ import hashlib
 import json
 import os
 import shutil
-import signal
 import subprocess
 import sys
 import wave
@@ -94,6 +93,9 @@ def pytest_configure(config) -> None:
     """Register the markers of the tests that run a host tool."""
     for marker, tool in HOST_TOOLS.items():
         config.addinivalue_line("markers", f"{marker}: runs {tool.runs}")
+    config.addinivalue_line(
+        "markers", "deadline(seconds): the seconds a test that starts real processes may take"
+    )
 
 
 def pytest_collection_modifyitems(items) -> None:
@@ -113,23 +115,17 @@ PROCESS_TEST_DEADLINE = 60
 
 
 @pytest.fixture
-def processes(tmp_path):
+def processes(tmp_path, request):
     """The real processes of one test (`real_processes.Processes`), killed when the test is over
-    whatever it did. A test that has not ended within `PROCESS_TEST_DEADLINE` seconds fails
-    there, so that a hang fails the test and does not stall the run."""
-
-    def expired(_number, _frame):
-        message = f"the test did not end within {PROCESS_TEST_DEADLINE} s"
-        raise TimeoutError(message)
-
+    whatever it did. A test that has not ended within `PROCESS_TEST_DEADLINE` seconds, or those
+    its `deadline` marker names, as a test of many trials does, fails there, so that a hang
+    fails the test and does not stall the run."""
     started = real_processes.Processes(tmp_path.resolve())
-    earlier = signal.signal(signal.SIGALRM, expired)
-    signal.setitimer(signal.ITIMER_REAL, PROCESS_TEST_DEADLINE)
+    named = request.node.get_closest_marker("deadline")
     try:
-        yield started
+        with real_processes.deadline(named.args[0] if named else PROCESS_TEST_DEADLINE):
+            yield started
     finally:
-        signal.setitimer(signal.ITIMER_REAL, 0)
-        signal.signal(signal.SIGALRM, earlier)
         started.end()
 
 

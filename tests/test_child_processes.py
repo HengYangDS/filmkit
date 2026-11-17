@@ -1,92 +1,167 @@
 """Stopping the children a command started: the signal to each child or to its whole process
-group, the wait, the kill of what does not end, and a termination turned into an exception."""
+group, the wait, the kill of what does not end, and a request to end as an exception.
 
-import os
+The children are real processes, which report when they are ready and are ended with their test
+(`processes`). What must take a real signal runs in a process of its own, never in the test
+run's: a test that hands this process a request does so as the interpreter does, by a call.
+"""
+
+import json
 import signal
 import subprocess
 import sys
 import time
 
 import pytest
+from real_processes import alive, gone
 
 import filmkit.child_processes as child_processes
 from filmkit.child_processes import Terminated
 
+# Every test here has the deadline of a test that starts real processes, and their end.
+pytestmark = pytest.mark.usefixtures("processes")
 
-def alive(pid: int) -> bool:
-    """Whether a process still runs; one that ended and awaits its parent's wait does not."""
-    listed = subprocess.run(
-        ["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True, check=False
-    )
-    return bool(listed.stdout.strip()) and not listed.stdout.strip().startswith("Z")
+# A child that leads a session of its own, starts a worker and waits for it. IGNORING says who
+# ignores a request to end, "both" or "worker"; with LEAVING the leader exits once the worker
+# runs. The worker reports only once it ignores what it is to ignore.
+LEADER = """
+import signal, subprocess, sys, time
+if os.environ.get("IGNORING") == "both":
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+worker = subprocess.Popen([sys.executable, "-B", sys.argv[1]])
+while not (pathlib.Path(os.environ["NOTES"]) / "worker.json").is_file():
+    time.sleep(0.01)
+note("leader")
+if os.environ.get("LEAVING"):
+    raise SystemExit(0)
+worker.wait()
+"""
+WORKER = """
+import signal, time
+if os.environ.get("IGNORING"):
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+note("worker")
+time.sleep(60)
+"""
+# A child that ends by its own handling of an interrupt, as a render child stops its renderer.
+INTERRUPTIBLE = """
+import signal, sys, time
+signal.signal(signal.SIGINT, lambda *_: sys.exit(7))
+note("child")
+time.sleep(60)
+"""
+# A step that runs until it is ended.
+STEP = """
+import time
+note("step")
+time.sleep(60)
+"""
+# A bystander in a session of its own: it keeps each signal it gets, and notes them when it is
+# sent SIGUSR1, which ends it.
+BYSTANDER = """
+import signal, sys, time
+got = []
+def told(number, frame):
+    got.append(number)
+    if number == signal.SIGUSR1:
+        note("bystander-got", signals=got)
+        raise SystemExit(0)
+signal.signal(signal.SIGTERM, told)
+signal.signal(signal.SIGUSR1, told)
+note("bystander")
+time.sleep(60)
+"""
+# A block that takes the requests to end, in a process of its own: it prints what the request
+# was and whether the handlers that stood before stand again.
+BLOCK = """
+import signal, time
+import filmkit.child_processes as child_processes
+earlier = {number: signal.getsignal(number) for number in child_processes.REQUESTS}
+try:
+    with child_processes.terminable():
+        taken = all(signal.getsignal(n) is child_processes.receive for n in earlier)
+        note("inside")
+        time.sleep(30)
+except child_processes.Terminated as asked:
+    restored = all(signal.getsignal(number) is handler for number, handler in earlier.items())
+    said = {"number": asked.number, "request": asked.request, "status": asked.status}
+    print(json.dumps({**said, "taken": taken, "restored": restored}))
+"""
+# A block that defers a request outside any block that takes them: it leaves the block only
+# once the request has arrived, and notes that it did.
+DEFERRING = """
+import time
+import filmkit.child_processes as child_processes
+with child_processes.held():
+    note("inside")
+    while child_processes._REQUESTS.deferred is None:
+        time.sleep(0.01)
+    note("still-inside")
+note("after")
+"""
+# A command that runs one step and prints the request that cut its wait short.
+RUN = """
+import sys
+import filmkit.child_processes as child_processes
+try:
+    with child_processes.terminable():
+        child_processes.run([sys.executable, "-B", sys.argv[1]], cwd=pathlib.Path.cwd())
+except child_processes.Terminated as asked:
+    print(json.dumps({"number": asked.number}))
+"""
 
 
-def wait_for(condition, seconds=10.0) -> bool:
-    ends = time.monotonic() + seconds
-    while time.monotonic() < ends:
-        if condition():
-            return True
-        time.sleep(0.02)
-    return condition()
+def group(processes, **variables):
+    """A child that leads a session of its own and the worker it started, both ready: the
+    leader, and the worker's process id."""
+    worker = processes.script("worker", WORKER)
+    leader = processes.script("leader", LEADER)
+    started = processes.python(leader, str(worker), session=True, **variables)
+    processes.noted("leader")
+    return started, processes.noted("worker")["pid"]
 
 
-def leader_with_a_grandchild(tmp_path, *, ignoring=False):
-    """A child that leads a session of its own and has started a process of its own, whose
-    process id it has written; with `ignoring`, both ignore the request to end."""
-    noted = tmp_path / "grandchild.pid"
-    trap = "trap '' TERM; " if ignoring else ""
-    script = f"{trap}/bin/sleep 60 & echo $! > {noted}; wait"
-    leader = subprocess.Popen(["/bin/sh", "-c", script], start_new_session=True)
-    assert wait_for(lambda: noted.is_file() and noted.read_text().strip())
-    return leader, int(noted.read_text())
-
-
-def test_a_group_is_stopped_with_everything_its_leader_started(tmp_path):
-    leader, grandchild = leader_with_a_grandchild(tmp_path)
-    ended = subprocess.Popen([sys.executable, "-c", "pass"], start_new_session=True)
+def test_a_group_is_stopped_with_everything_its_leader_started(processes):
+    leader, worker = group(processes)
+    ended = processes.start([sys.executable, "-c", "pass"], start_new_session=True)
     ended.wait()
     child_processes.stop([leader, ended], signal.SIGTERM, groups=True)
     assert leader.returncode == -signal.SIGTERM
-    assert wait_for(lambda: not alive(grandchild))
+    assert not alive(worker)
     assert ended.returncode == 0
 
 
-def test_what_ignores_the_request_is_killed_after_the_wait(tmp_path, monkeypatch):
+def test_what_ignores_the_request_is_killed_after_the_wait(processes, monkeypatch):
     monkeypatch.setattr(child_processes, "STOP_SECONDS", 0.3)
-    leader, grandchild = leader_with_a_grandchild(tmp_path, ignoring=True)
+    leader, worker = group(processes, IGNORING="both")
     started = time.monotonic()
     child_processes.stop([leader], signal.SIGTERM, groups=True)
     assert leader.returncode == -signal.SIGKILL
-    assert wait_for(lambda: not alive(grandchild))
-    assert time.monotonic() - started < 5
+    assert gone([worker], 3)
+    assert 0.3 <= time.monotonic() - started < 5
 
 
-def test_a_straggler_of_a_group_whose_leader_ended_is_killed_too(tmp_path, monkeypatch):
+def test_a_straggler_of_a_group_whose_leader_ended_is_killed_too(processes, monkeypatch):
     monkeypatch.setattr(child_processes, "STOP_SECONDS", 0.3)
-    noted = tmp_path / "straggler.pid"
-    script = f"(trap '' TERM; exec /bin/sleep 60) & echo $! > {noted}; wait"
-    leader = subprocess.Popen(["/bin/sh", "-c", script], start_new_session=True)
-    assert wait_for(lambda: noted.is_file() and noted.read_text().strip())
-    straggler = int(noted.read_text())
-    # Give the straggler the moment it needs to ignore the request before it is sent.
-    time.sleep(0.2)
+    # The worker ignores the request and has said so; the leader ends by it.
+    leader, straggler = group(processes, IGNORING="worker")
+    started = time.monotonic()
     child_processes.stop([leader], signal.SIGTERM, groups=True)
     assert leader.returncode == -signal.SIGTERM
-    assert wait_for(lambda: not alive(straggler), 3)
+    assert gone([straggler], 3)
+    # It took the kill after the wait to end it.
+    assert time.monotonic() - started >= 0.3
 
 
-def test_the_group_of_a_leader_that_has_ended_and_is_not_reaped_is_stopped(tmp_path):
-    noted = tmp_path / "worker.pid"
-    script = f"/bin/sleep 60 & echo $! > {noted}"
-    leader = subprocess.Popen(["/bin/sh", "-c", script], start_new_session=True)
+def test_the_group_of_a_leader_that_has_ended_and_is_not_reaped_is_stopped(processes):
+    leader, worker = group(processes, LEAVING="1")
     # The leader's end is waited for without reaping it, so its number is still its own.
     assert child_processes.ended(leader, 10)
     assert leader.returncode is None
-    worker = int(noted.read_text())
     assert alive(worker)
     # What it started still runs in its group, as a renderer's workers do.
     child_processes.stop([leader], signal.SIGTERM, groups=True)
-    assert wait_for(lambda: not alive(worker), 3)
+    assert gone([worker], 3)
     assert leader.returncode == 0
 
 
@@ -103,23 +178,6 @@ def test_a_wait_for_a_childs_end_does_not_reap_it_and_tells_when_it_has_not_ende
     assert running.poll() is None
 
 
-# A bystander in a session of its own: it notes each signal it gets, and what it got when it
-# is sent SIGUSR1, which ends it.
-BYSTANDER = """
-import signal, sys, time
-got = []
-def told(number, frame):
-    got.append(number)
-    if number == signal.SIGUSR1:
-        note("bystander-got", signals=got)
-        raise SystemExit(0)
-signal.signal(signal.SIGTERM, told)
-signal.signal(signal.SIGUSR1, told)
-note("bystander")
-time.sleep(60)
-"""
-
-
 def test_a_reaped_child_is_never_signalled_though_its_number_names_a_running_group(processes):
     bystander = processes.python(processes.script("bystander", BYSTANDER), session=True)
     processes.noted("bystander")
@@ -129,28 +187,44 @@ def test_a_reaped_child_is_never_signalled_though_its_number_names_a_running_gro
     # is set to that of a process that leads a group of its own and runs.
     reaped.pid = bystander.pid
     child_processes.stop([reaped], signal.SIGTERM, groups=True, seconds=0.2)
-    os.kill(bystander.pid, signal.SIGUSR1)
+    bystander.send_signal(signal.SIGUSR1)
     assert processes.noted("bystander-got")["signals"] == [signal.SIGUSR1]
 
 
-def test_without_groups_the_signal_goes_to_the_child_alone():
-    code = "import signal, sys, time\n"
-    code += "signal.signal(signal.SIGINT, lambda *_: sys.exit(7))\n"
-    code += "print('ready', flush=True)\ntime.sleep(60)\n"
-    child = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE)
-    assert child.stdout.readline() == b"ready\n"
+def test_without_groups_the_signal_goes_to_the_child_alone(processes):
+    child = processes.python(processes.script("interruptible", INTERRUPTIBLE))
+    processes.noted("child")
     child_processes.stop([child])
-    # The child ended by its own handling of the interrupt, as a render child stops its renderer.
+    # The child ended by its own handling of the interrupt.
     assert child.returncode == 7
-    child.stdout.close()
 
 
-def test_a_termination_is_an_exception_inside_the_block_and_the_handler_is_restored():
-    earlier = signal.getsignal(signal.SIGTERM)
-    with pytest.raises(Terminated), child_processes.terminable():
-        os.kill(os.getpid(), signal.SIGTERM)
-        time.sleep(5)
-    assert signal.getsignal(signal.SIGTERM) is earlier
+@pytest.mark.parametrize("number", list(child_processes.REQUESTS))
+def test_a_request_to_end_is_an_exception_inside_the_block_and_the_handlers_are_restored(
+    processes, number
+):
+    block = processes.python(processes.script("block", BLOCK))
+    processes.noted("inside")
+    block.send_signal(number)
+    printed, _ = block.communicate(timeout=20)
+    assert block.returncode == 0
+    assert json.loads(printed) == {
+        "number": number,
+        "request": child_processes.REQUESTS[number],
+        "status": 128 + number,
+        "taken": True,
+        "restored": True,
+    }
+
+
+def test_a_request_deferred_outside_a_block_that_takes_them_is_raised_again_after_it(processes):
+    deferring = processes.python(processes.script("deferring", DEFERRING))
+    processes.noted("inside")
+    deferring.send_signal(signal.SIGTERM)
+    assert deferring.wait(timeout=20) == -signal.SIGTERM
+    # The block ran to its end with the request pending, and nothing after it ran.
+    processes.noted("still-inside", 0)
+    assert not (processes.notes / "after.json").exists()
 
 
 def test_a_request_that_arrives_during_a_stop_is_acted_on_once_the_children_have_ended(
@@ -173,20 +247,22 @@ def test_a_request_that_arrives_during_a_stop_is_acted_on_once_the_children_have
     assert child.returncode == -signal.SIGTERM
 
 
-def test_run_refuses_a_failed_exit_and_stops_its_child_when_the_wait_is_cut_short(tmp_path):
+def test_run_refuses_a_failed_exit(tmp_path):
     child_processes.run([sys.executable, "-c", "pass"], cwd=tmp_path)
     with pytest.raises(subprocess.CalledProcessError) as failed:
         child_processes.run([sys.executable, "-c", "raise SystemExit(3)"], cwd=tmp_path)
     assert failed.value.returncode == 3
-    # The child tells this process to end once it runs; the wait is cut short and the child is
-    # stopped before the termination goes on.
-    noted = tmp_path / "child.pid"
-    code = "import os, signal, sys, time\n"
-    code += f"open({str(noted)!r}, 'w').write(str(os.getpid()))\n"
-    code += "os.kill(os.getppid(), signal.SIGTERM)\ntime.sleep(60)\n"
-    with pytest.raises(Terminated), child_processes.terminable():
-        child_processes.run([sys.executable, "-c", code], cwd=tmp_path)
-    assert not alive(int(noted.read_text()))
+
+
+def test_run_stops_its_child_when_its_wait_is_cut_short(processes):
+    step = processes.script("step", STEP)
+    command = processes.python(processes.script("run", RUN), str(step))
+    child = processes.noted("step")["pid"]
+    command.send_signal(signal.SIGTERM)
+    printed, _ = command.communicate(timeout=20)
+    # The step had ended before the request went on.
+    assert not alive(child)
+    assert json.loads(printed) == {"number": signal.SIGTERM}
 
 
 def test_a_request_that_arrives_while_run_starts_its_child_still_ends_that_child(

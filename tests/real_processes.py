@@ -6,7 +6,8 @@ started here, and the test signals that. A test waits for what a process reports
 standard output or a note it writes whole, and never for a fixed time. Every process started
 through `Processes`, and every process a note names, is killed when the test is over, also when
 an assertion failed, and the `processes` fixture fails a test that has not ended within its
-deadline instead of letting it stall a run (`tests/conftest.py`).
+deadline instead of letting it stall a run (`tests/conftest.py`, `deadline`). A module whose
+tests start real processes asks for the fixture for every test.
 """
 
 from __future__ import annotations
@@ -33,6 +34,24 @@ def note(name, **facts):
     partial.write_text(json.dumps({"pid": os.getpid(), **facts}))
     partial.replace(folder / f"{name}.json")
 """
+
+
+@contextlib.contextmanager
+def deadline(seconds: float):
+    """Fail the block with `TimeoutError` when it has not ended within the seconds, by the
+    process's alarm timer, so that a wait that hangs fails where it stands."""
+
+    def expired(_number, _frame):
+        message = f"the test did not end within {seconds} s"
+        raise TimeoutError(message)
+
+    earlier = signal.signal(signal.SIGALRM, expired)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, earlier)
 
 
 def alive(pid: int) -> bool:
@@ -120,6 +139,10 @@ class Processes:
         """Every process id the notes name."""
         notes = [json.loads(path.read_text()) for path in sorted(self.notes.glob("*.json"))]
         return [value for note in notes for value in note.values() if type(value) is int]
+
+    def kill(self, pid: int) -> None:
+        """Kill a process a note named."""
+        os.kill(pid, signal.SIGKILL)
 
     def forget(self) -> None:
         """Set the notes aside, for a next run under the same names; what they named is still
