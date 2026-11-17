@@ -25,8 +25,9 @@ The time of the build is therefore the last line's first figure: the seconds dur
 least one counted command of the selected editions was running, which counts such commands once
 and the waits between commands not at all. For commands run in a row the two figures are equal.
 
-The tools a film runs from the command line for one edition (`filmkit.tools`), the verifier and
-the reproduction write records too, the last two unless they are asked to be read-only.
+The two checks a film's build runs from the command line for an edition, the geometry check
+and the cover check (`filmkit.tools`), the verifier and the reproduction write records too, the
+last two unless they are asked to be read-only.
 
 Usage: python -m filmkit.durations [--language zh|en|all] [--since <time>] [--json]
 Prints each selected edition's records in the order their commands started, each with its

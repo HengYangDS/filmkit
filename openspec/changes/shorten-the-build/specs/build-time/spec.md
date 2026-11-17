@@ -2,7 +2,7 @@
 
 ### Requirement: Each heavy command records how long it took
 
-Each action of `filmkit.produce`, each narration, each tool run from the command line for one edition, the verifier and the reproduction SHALL write, when it ends, a duration record for its edition: the command, when it started, its seconds, whether it completed, its phases' seconds and the settings it names. The record SHALL stand beside the edition's evidence and inside no record that another binds by SHA-256. With `--read-only` the verifier and the reproduction SHALL write none.
+Each action of `filmkit.produce`, each narration, the geometry check and the cover check run from the command line, the verifier and the reproduction SHALL write, when it ends, a duration record for its edition: the command, when it started, its seconds, whether it completed, its phases' seconds and the settings it names. The record SHALL stand beside the edition's evidence and inside no record that another binds by SHA-256. With `--read-only` the verifier and the reproduction SHALL write none.
 
 #### Scenario: A comparison's phases
 
@@ -29,14 +29,19 @@ Each action of `filmkit.produce`, each narration, each tool run from the command
 - **WHEN** the verifier or the reproduction runs with `--read-only`
 - **THEN** it writes no duration record
 
-#### Scenario: A tool run for one edition
+#### Scenario: The two checks a build runs from the command line
 
-- **WHEN** the geometry check is run from the command line on the Chinese edition's stage
-- **THEN** the Chinese edition's duration record of the geometry check states the run, as not completed when the tool exits with a failure
+- **WHEN** the geometry check or the cover check (`player-check cover`) is run from the command line on the Chinese edition's stage
+- **THEN** the Chinese edition's duration record `geometry-check` or `player-check-cover` states the run, as not completed when the tool exits with a failure
 
-#### Scenario: A tool run for no single edition
+#### Scenario: A tool run by hand
 
-- **WHEN** a tool is run from the command line with arguments that name no edition, or both
+- **WHEN** another tool, such as `frame-audit` or `player-check players`, is run from the command line with arguments that name an edition
+- **THEN** it writes no duration record, and the records of the build's checks stand as they were
+
+#### Scenario: A check for no single edition of this film
+
+- **WHEN** the geometry check is run with arguments that name no edition, both editions, or a stage outside this film's root
 - **THEN** it writes no duration record
 
 ### Requirement: One command prints a build's durations

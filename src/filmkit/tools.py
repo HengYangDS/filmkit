@@ -11,9 +11,11 @@ widths of the film's declared faces (`filmkit.picture.metrics`), which a run nam
 `FILMKIT_TEXT_METRICS` unless the caller names its own table.
 
 A refusal exits with status 1 and "<tool>: <reason>" on standard error; otherwise the command
-exits with the tool's own status. A run whose arguments name one edition, by its stage or its
-folder of evidence or artifacts, writes that edition's duration record under the tool's name
-(`filmkit.durations`), so the checks a film's task list runs this way count in its build's time.
+exits with the tool's own status. The two checks that a film's build runs from the command line,
+the geometry check and the cover check (`BUILD_RUNS`), write a duration record
+(`filmkit.durations`) for the edition of this film that their arguments name, by its stage or
+its folder of evidence or artifacts, so that they count in its build's time. No other run
+writes one: an audit run by hand for a diagnosis is no command of a build.
 
 Usage: python -m filmkit.tools <tool> [arguments]
 """
@@ -53,6 +55,13 @@ TOOLS = {
 }
 # The copies, below the film's root, in a folder for each engine version.
 CACHE = picture_rendering.TOOL_CACHE / "filmkit"
+# The runs a film's build makes from the command line, which alone write a duration record: the
+# tool with the words its arguments begin with, and the record's name. Every other run, of
+# another tool or of the player check in another mode, is taken for a run by hand.
+BUILD_RUNS = {
+    ("geometry-check",): "geometry-check",
+    ("player-check", "cover"): "player-check-cover",
+}
 # Where a tool's argument names an edition: its stage, or its folder of evidence or artifacts.
 EDITION = "|".join(CODES)
 EDITION_PLACE = re.compile(
@@ -133,11 +142,25 @@ def run(
 
 
 def edition_of(arguments: list[str]) -> str | None:
-    """The edition a tool's arguments name: the one whose stage, evidence or artifacts folder
-    their paths lie in, or None when they name none or both."""
-    places = (place for argument in arguments for place in EDITION_PLACE.finditer(argument))
-    named = {place["stage"] or place["folder"] for place in places}
+    """The edition of this film a tool's arguments name: the one whose stage, evidence or
+    artifacts folder their paths lie in, or None when they name none or both. A path is read
+    from the film's root, where the tools run; one that leaves the root names no edition."""
+    named = set()
+    for argument in arguments:
+        place = Path(os.path.normpath(repository.ROOT / argument))
+        if place.is_relative_to(repository.ROOT):
+            found = EDITION_PLACE.finditer(place.relative_to(repository.ROOT).as_posix())
+            named |= {match["stage"] or match["folder"] for match in found}
     return named.pop() if len(named) == 1 else None
+
+
+def recorded(tool: str, arguments: list[str]) -> tuple[str, str] | None:
+    """The edition and the name of the duration record a run writes: for a run of `BUILD_RUNS`
+    whose arguments name one edition of this film, and None for every other run."""
+    words = (tool, *arguments)
+    name = next((BUILD_RUNS[run] for run in BUILD_RUNS if words[: len(run)] == run), None)
+    code = edition_of(arguments) if name else None
+    return (code, name) if code and name else None
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -147,10 +170,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("tool", choices=sorted(TOOLS))
     parser.add_argument("arguments", nargs=argparse.REMAINDER, help="the tool's own arguments")
     options = parser.parse_args(argv)
-    code = edition_of(options.arguments)
+    build_run = recorded(options.tool, options.arguments)
+    code, name = build_run or (CODES[0], options.tool)
     try:
-        # A run for one edition is part of that edition's build, and is recorded as such.
-        with durations.run(code or CODES[0], options.tool, record=code is not None):
+        # A check of an edition's build is recorded as a command of that build.
+        with durations.run(code, name, record=build_run is not None):
             status = run(options.tool, options.arguments)
             if status != 0:
                 raise ToolFailed(status)
