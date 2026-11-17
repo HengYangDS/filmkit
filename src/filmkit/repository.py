@@ -67,6 +67,20 @@ def read(path: str | Path) -> dict:
     return json.loads((ROOT / path).read_text())
 
 
+def read_entry(path: str | Path, fields: tuple[str, ...]) -> dict | None:
+    """The JSON object at a path when it holds every field named, or None when the file cannot
+    be read, is no JSON object or lacks one of them, as a cache entry that was damaged does."""
+    try:
+        entry = json.loads((ROOT / path).read_text())
+    except (OSError, ValueError):
+        return None
+    return entry if isinstance(entry, dict) and all(field in entry for field in fields) else None
+
+
+# What a cache prints for an entry that `read_entry` could not read and that it then replaces.
+UNREADABLE_ENTRY = "an entry that cannot be read; made again"
+
+
 def write_text(path: str | Path, text: str) -> None:
     """Write a text file whole, creating its folder.
 

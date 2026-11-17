@@ -103,6 +103,40 @@ def test_alignment_binds_waveform_and_reuses_exact_cache(tmp_path, aligner):
     assert (tmp_path / "result.json").read_bytes() == original_result
 
 
+@pytest.mark.parametrize(
+    "damage",
+    [
+        lambda entry: '{"id": "01", "items": [',
+        lambda entry: "[]",
+        lambda entry: json.dumps({key: value for key, value in entry.items() if key != "items"}),
+        lambda entry: b"\xff\xfe not text",
+    ],
+    ids=["cut-off", "no-object", "no-items", "no-text"],
+)
+def test_a_cached_alignment_that_cannot_be_read_is_made_again_and_replaced(
+    tmp_path, aligner, capsys, damage
+):
+    narration_alignment.main(aligner.arguments)
+    result = (tmp_path / "result.json").read_bytes()
+    cache = next((tmp_path / "build/evidence/alignment-records/chinese").glob("*.json"))
+    whole = cache.read_bytes()
+    damaged = damage(json.loads(whole))
+    cache.write_bytes(damaged if isinstance(damaged, bytes) else damaged.encode())
+    capsys.readouterr()
+    narration_alignment.main(aligner.arguments)
+    # The recording was aligned a second time, the entry is whole again, and one line says so.
+    assert len(aligner.calls) == 2
+    assert cache.read_bytes() == whole
+    assert (tmp_path / "result.json").read_bytes() == result
+    lines = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert lines[0] == {
+        "id": "01",
+        "cache": "an entry that cannot be read; made again",
+        "entry": str(cache.relative_to(tmp_path)),
+    }
+    assert len(lines) == 2
+
+
 def test_a_changed_recording_is_refused_before_the_aligner_loads(tmp_path, aligner):
     (tmp_path / "record.wav").write_bytes(b"changed waveform")
     with pytest.raises(ValueError, match="01: the recording differs from its receipt"):

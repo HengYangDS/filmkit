@@ -119,3 +119,14 @@ def test_a_text_is_written_beside_its_target_and_then_replaces_it(tmp_path, monk
     # A record is written the same way.
     repository.write("build/record.json", {"verdict": "pass"})
     assert len(seen) == 2 and repository.read("build/record.json") == {"verdict": "pass"}
+
+
+def test_an_entry_is_read_only_when_it_is_a_json_object_with_every_field(tmp_path, monkeypatch):
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    repository.write("entry.json", {"id": "01", "heard": "数据"})
+    assert repository.read_entry("entry.json", ("id", "heard")) == {"id": "01", "heard": "数据"}
+    assert repository.read_entry("entry.json", ("id", "items")) is None
+    assert repository.read_entry("absent.json", ("id",)) is None
+    for damaged in (b'{"id": "01", "heard": ', b"[]", b'"01"', b"\xff\xfe", b""):
+        (tmp_path / "entry.json").write_bytes(damaged)
+        assert repository.read_entry("entry.json", ("id",)) is None

@@ -1,6 +1,7 @@
 """Transcribing a narration receipt's recordings with the pinned recognition model."""
 
 import hashlib
+import json
 from dataclasses import replace
 from importlib.metadata import version
 from types import SimpleNamespace
@@ -110,7 +111,7 @@ def test_the_recognizer_loads_from_its_checked_supplied_snapshot(tmp_path, monke
         "repo": "repo",
         "revision": "r1",
         "weights_sha256": "w1",
-        "library": f"mlx-audio {version('mlx-audio')}",
+        "libraries": {"mlx-audio": version("mlx-audio"), "mlx": version("mlx")},
     }
     assert checks == ["verified", "verified"]
 
@@ -141,13 +142,46 @@ def test_a_cached_transcript_is_reused_without_loading_the_recognizer(receipt, m
         "repo": RECOGNIZER.repo,
         "revision": ASR_REVISION,
         "weights_sha256": RECOGNIZER.weights["model.safetensors"],
-        "library": f"mlx-audio {version('mlx-audio')}",
+        "libraries": {"mlx-audio": version("mlx-audio"), "mlx": version("mlx")},
     }
     # A cache that binds another recording or recognizer than its place names is refused.
     for change in ({"wav_sha256": "0" * 64}, {"recognizer": {**cached["recognizer"], "repo": "x"}}):
         repository.write(cache, {**cached, **change})
         with pytest.raises(ValueError, match="Cached transcript binding differs"):
             narration_transcription.main([*ARGUMENTS, "--language", "Chinese"])
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        lambda entry: '{"heard": "数据',
+        lambda entry: '"数据的用处"',
+        lambda entry: json.dumps({key: value for key, value in entry.items() if key != "heard"}),
+        lambda entry: json.dumps({**entry, "heard": None}),
+    ],
+    ids=["cut-off", "no-object", "no-transcript", "no-text"],
+)
+def test_a_cached_transcript_that_cannot_be_read_is_made_again_and_replaced(
+    receipt, capsys, damage
+):
+    narration_transcription.main([*ARGUMENTS, "--language", "Chinese"])
+    report = (repository.ROOT / "asr.json").read_bytes()
+    (cache,) = cache_files()
+    whole = cache.read_bytes()
+    cache.write_text(damage(json.loads(whole)))
+    capsys.readouterr()
+    narration_transcription.main([*ARGUMENTS, "--language", "Chinese"])
+    # The recording was transcribed a second time, the entry is whole again, and one line says so.
+    assert len(receipt["calls"]) == 2
+    assert cache.read_bytes() == whole
+    assert (repository.ROOT / "asr.json").read_bytes() == report
+    lines = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert lines[0] == {
+        "id": "01",
+        "cache": "an entry that cannot be read; made again",
+        "entry": str(cache.relative_to(repository.ROOT)),
+    }
+    assert len(lines) == 2
 
 
 def test_a_supplied_recognizer_that_differs_refuses_a_fully_cached_run(receipt, monkeypatch):
@@ -169,15 +203,18 @@ def test_a_supplied_recognizer_that_differs_refuses_a_fully_cached_run(receipt, 
     [
         {"revision": "f" * 40},
         {"weights": {"model.safetensors": "0" * 64}},
-        {"library": "mlx-audio 0.0.1"},
+        {"library": "mlx-audio"},
+        {"library": "mlx"},
     ],
-    ids=["revision", "weights", "library"],
+    ids=["revision", "weights", "mlx-audio", "mlx"],
 )
 def test_a_transcript_by_another_recognizer_or_library_is_not_reused(receipt, monkeypatch, change):
     narration_transcription.main([*ARGUMENTS, "--language", "Chinese"])
     library = change.pop("library", None)
     if library:
-        monkeypatch.setattr(narration_transcription, "LIBRARY", library)
+        # Another version of the speech library, or of the array library under it.
+        others = {**narration_transcription.LIBRARIES, library: "0.0.1"}
+        monkeypatch.setattr(narration_transcription, "LIBRARIES", others)
     else:
         other = replace(RECOGNIZER, **change)
         monkeypatch.setattr(narration_transcription, "RECOGNIZER", other)

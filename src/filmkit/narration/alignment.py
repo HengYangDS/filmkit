@@ -5,6 +5,8 @@ snapshot is refused before it loads, and every alignment records the aligner. Ea
 recording's alignment is cached under its waveform and the aligner revision, and a cache is
 reused only while it still binds the recording, its text and the aligner. The aligner is loaded
 when the first recording misses its cache, so a run that finds every alignment cached loads none.
+A cached entry that cannot be read as an alignment is a miss: the recording is aligned again and
+the entry replaced.
 
 Usage: python -m filmkit.narration.alignment --model DIR --receipt FILE --output FILE
     [--language Chinese|English]
@@ -80,12 +82,17 @@ def main(argv: list[str] | None = None) -> None:
 
 def _aligned(model, record: dict, aligner: dict, language: str) -> dict:
     """The record's alignment from its bound cache, or from the aligner, which `model` loads,
-    and then cached."""
+    and then cached. A cached entry that cannot be read as an alignment is a miss: one line says
+    so, and the alignment made again replaces it."""
     path = repository.ROOT / alignment_record(
         language, record["id"], record["wav_sha256"], aligner["revision"]
     )
-    if path.exists():
-        aligned = repository.read(path)
+    fields = ("id", "items", "wav_sha256", "text_sha256", "aligner")
+    aligned = repository.read_entry(path, fields) if path.exists() else None
+    if path.exists() and aligned is None:
+        unreadable = {"id": record["id"], "cache": repository.UNREADABLE_ENTRY}
+        print(json.dumps({**unreadable, "entry": repository.relative(path)}), flush=True)
+    if aligned is not None:
         if aligned["text_sha256"] != record["text_sha256"]:
             msg = "Cached alignment text binding differs"
             raise ValueError(msg)

@@ -4,10 +4,12 @@ Each recording's unit error rate is the edit distance between the recognition un
 text and of its transcript over the text's unit count. Recognition is a proxy for
 pronunciation, not certification or listening. Each recording's transcript is cached under its
 waveform, the language and the recognizer's identity: its hub repository and revision, its
-weights' SHA-256 and the version of the speech library that runs it. Every run checks the
-supplied recognizer against its pins first, which reads the weights, so a run that reuses every
-transcript still proves that the recognizer its cache names is the one supplied; the model is
-loaded only when a recording misses its cache. The error rate is taken anew from the text.
+weights' SHA-256 and the versions of the libraries that run it, `mlx-audio` and `mlx`. Every
+run checks the supplied recognizer against its pins first, which reads the weights, so a run
+that reuses every transcript still proves that the recognizer its cache names is the one
+supplied; the model is loaded only when a recording misses its cache. A cached entry that
+cannot be read as a transcript is a miss: the recording is transcribed again and the entry
+replaced. The error rate is taken anew from the text.
 
 Usage: python -m filmkit.narration.transcription
     --receipt FILE --output FILE --language Chinese|English
@@ -27,9 +29,10 @@ from filmkit.narration.receipts import bound_records
 from filmkit.narration.recognition import recognition_units, unit_distance
 from filmkit.narration.snapshots import RECOGNIZER
 
-# The speech library that runs the recognizer, as a cached transcript records it: another
-# version may hear a recording otherwise.
-LIBRARY = f"mlx-audio {version('mlx-audio')}"
+# The libraries that run the recognizer, as a cached transcript records them, since another
+# version of either may hear a recording otherwise: the speech library, and the array library
+# that does its arithmetic, which the lock pins apart from it.
+LIBRARIES = {name: version(name) for name in ("mlx-audio", "mlx")}
 SCOPE = "Automatic transcription proxy; not pronunciation certification or listening."
 # The cached transcripts, below the film's root, in a folder for each language.
 CACHE = "build/evidence/transcript-records"
@@ -37,7 +40,8 @@ CACHE = "build/evidence/transcript-records"
 
 def recognizer() -> dict:
     """Check the supplied recognizer against its pins and return its identity: its hub
-    repository and revision, its weights' SHA-256 and the speech library's version.
+    repository and revision, its weights' SHA-256 and the versions of the speech library and of
+    the array library under it.
 
     The check reads the weights, and is made on every run, also on one that finds every
     transcript cached and loads no model.
@@ -47,7 +51,7 @@ def recognizer() -> dict:
         "repo": RECOGNIZER.repo,
         "revision": RECOGNIZER.revision,
         "weights_sha256": RECOGNIZER.weights["model.safetensors"],
-        "library": LIBRARY,
+        "libraries": dict(LIBRARIES),
     }
 
 
@@ -59,12 +63,17 @@ def transcript_record(language: str, record_id: str, wav_sha256: str, identity: 
 
 
 def cached_transcript(record: dict, language: str, identity: dict) -> str | None:
-    """A recording's cached transcript, or None without one; a cache that binds another
-    recording, recognizer or language than its place names is refused."""
+    """A recording's cached transcript, or None without one. An entry that cannot be read as a
+    transcript is none either: one line says so, and the transcript made again replaces it. A
+    cache that binds another recording, recognizer or language than its place names is refused."""
     path = transcript_record(language, record["id"], record["wav_sha256"], identity)
     if not path.exists():
         return None
-    cached = repository.read(path)
+    cached = repository.read_entry(path, ("wav_sha256", "recognizer", "language", "heard"))
+    if cached is None or not isinstance(cached["heard"], str):
+        unreadable = {"id": record["id"], "cache": repository.UNREADABLE_ENTRY}
+        print(json.dumps({**unreadable, "entry": repository.relative(path)}), flush=True)
+        return None
     bound = {"wav_sha256": record["wav_sha256"], "recognizer": identity, "language": language}
     if any(cached.get(key) != value for key, value in bound.items()):
         msg = "Cached transcript binding differs"
