@@ -21,7 +21,7 @@ For a film that declares `software` capture, `render-picture --uncaptioned` SHAL
 
 ### Requirement: A picture is derived only under software capture
 
-For a film that declares any other capture than `software`, and with `--native` for every film, `render-picture --uncaptioned` SHALL render the uncaptioned stage, and `compare-pictures` SHALL then compare the pair at every frame. The receipt of an uncaptioned picture and the edition's comparison record SHALL each say whether the picture was derived or rendered, and why: the film's declared capture, or a render asked for.
+For a film that declares another capture than `software`, for a captioned picture whose receipt does not name the pinned browser build, and with `--native`, `render-picture --uncaptioned` SHALL render the uncaptioned stage, and `compare-pictures` SHALL then compare the pair at every frame. Each render receipt SHALL name the browser that drew it. The uncaptioned picture's receipt and the comparison record SHALL each say whether it was derived or rendered, and why.
 
 #### Scenario: A film that declares no capture
 
@@ -37,6 +37,16 @@ For a film that declares any other capture than `software`, and with `--native` 
 
 - **WHEN** a film changes its declared capture from `software` to `screenshot` after its uncaptioned picture was derived
 - **THEN** validation refuses the derived picture and asks for `render-picture --uncaptioned`
+
+#### Scenario: A captioned picture drawn by another browser
+
+- **WHEN** a film that declares `software` capture rendered its captioned picture with a browser named by `FILM_CHROMIUM_PATH`, whose bytes are not the pinned build's
+- **THEN** the captioned receipt names that browser's executable and SHA-256 and no pinned build, `render-picture --uncaptioned` renders the uncaptioned stage, and its receipt says that the captioned picture is no render by the pinned build
+
+#### Scenario: A captioned receipt that names no browser
+
+- **WHEN** the captioned picture's receipt names no browser, as a receipt written before this requirement does
+- **THEN** `render-picture --uncaptioned` renders the uncaptioned stage and says so
 
 #### Scenario: A repair's render of the uncaptioned picture
 

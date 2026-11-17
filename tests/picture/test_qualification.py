@@ -86,7 +86,9 @@ def test_the_record_states_the_renderer_and_the_browser_that_ran(rendered, monke
 
 def test_a_qualification_without_a_browser_is_refused_before_it_renders(rendered, monkeypatch):
     edition, film_root, _ = rendered
+    # No browser is named, and the supply has installed none.
     monkeypatch.delenv("FILM_CHROMIUM_PATH")
+    picture_rendering.supplied_browser().unlink()
     runs = len(film_root.runs())
     with pytest.raises(PictureError, match="No browser at .*chrome-headless-shell; run .*supply"):
         qualification.qualify_renderer(edition, 60)

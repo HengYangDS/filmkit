@@ -27,6 +27,7 @@
 - [x] 3.10 Render an uncaptioned picture through one function that writes into its receipt why it is rendered, for the command and for `repair-pictures` alike; verify `tests/picture/test_repair.py` (the repaired pair's receipt and passing record carry the statement), `tests/test_produce.py` and `tests/picture/test_uncaptioned_way.py`.
 - [x] 3.11 Name in both ground checks' refusals the first frame beyond the tolerance with its departure, how many frames stand beyond it and the largest departure with its frame; verify `tests/picture/test_derivation.py` (measures that leave by degrees; a clip whose ground stands about 11 and then 24 levels off under a caption).
 - [x] 3.12 Refuse a derivation, naming the side and `--native`, when a side of the painted rows beyond which the picture continues has no edge rows, and ask none of a side that ends with the frame; verify `tests/picture/test_derived_pair.py` (the top alone, the bottom alone, both; painted rows at the frame's last row).
+- [x] 3.13 Name in every render receipt the browser that drew the picture (`filmkit.picture.browser`: executable, SHA-256, the pinned build's name when it is that build), and derive only from a captioned picture whose receipt names the pinned build, rendering and saying why otherwise; verify `tests/picture/test_uncaptioned_way.py` (another browser, a receipt without a browser, the pinned build), `tests/picture/test_qualification.py` and `tests/picture/test_rendering.py`.
 
 ## 4. The 1080p films
 

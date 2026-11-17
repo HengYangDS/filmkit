@@ -99,7 +99,7 @@ def render(edition: Edition, options: argparse.Namespace) -> object:
     stage; rendered from that stage otherwise, its receipt saying why."""
     if not options.uncaptioned:
         return render_picture(edition, deadline(options, rendering.DEADLINE), captions=True)
-    way = derivation.uncaptioned_way(native=options.native)
+    way = derivation.uncaptioned_way(edition, native=options.native)
     if way["way"] == "derived":
         return derivation.derive_uncaptioned(edition, deadline(options, derivation.DEADLINE))
     seconds = deadline(options, rendering.DEADLINE)

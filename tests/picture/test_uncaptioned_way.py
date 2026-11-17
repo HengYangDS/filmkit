@@ -80,6 +80,66 @@ def test_a_film_of_software_capture_derives_and_native_still_renders(edition, mo
     }
 
 
+def test_a_render_receipt_names_the_browser_that_drew_the_picture(edition, tmp_path, monkeypatch):
+    edition, _, _ = edition
+    picture_rendering.render_picture(edition, 60)
+    pinned = picture_rendering.supplied_browser()
+    product, version = picture_rendering.BROWSER
+    assert repository.read(edition.render_receipt)["browser"] == {
+        "executable": repository.relative(pinned),
+        "sha256": repository.sha(pinned),
+        "pinned_build": f"{product}@{version}",
+    }
+    # Another browser, named by the film, is recorded as itself.
+    other = tmp_path / "another-browser"
+    other.write_text("another browser build")
+    monkeypatch.setenv("FILM_CHROMIUM_PATH", str(other))
+    picture_rendering.render_picture(edition, 60)
+    assert repository.read(edition.render_receipt)["browser"] == {
+        "executable": str(other),
+        "sha256": repository.sha(other),
+        "pinned_build": None,
+    }
+
+
+def test_a_picture_drawn_by_another_browser_is_not_derived_from(edition, tmp_path, monkeypatch):
+    edition, film_root, derived = edition
+    other = tmp_path / "another-browser"
+    other.write_text("another browser build")
+    monkeypatch.setenv("FILM_CHROMIUM_PATH", str(other))
+    picture_rendering.render_picture(edition, 60)
+    # The film declares software capture, and its captioned picture was not drawn by the pinned
+    # build: the uncaptioned stage is rendered, and the receipt says why.
+    uncaptioned()
+    assert derived == []
+    assert [run["argv"][1] for run in film_root.runs()] == [
+        str(edition.rendered(True).stage),
+        str(edition.rendered(False).stage),
+    ]
+    statement = repository.read(edition.rendered(False).receipt)["uncaptioned"]
+    assert statement["way"] == "rendered"
+    assert statement["reason"] == (
+        "the captioned picture is no render by the pinned build that the engine's release "
+        "qualifies: it was drawn by another browser than the build the engine pins, "
+        f"{'@'.join(picture_rendering.BROWSER)} ({other})"
+    )
+    # A captioned receipt that names no browser, as an earlier engine wrote it, derives nothing.
+    receipt = repository.read(edition.render_receipt)
+    del receipt["browser"]
+    repository.write(edition.render_receipt, receipt)
+    assert derivation.uncaptioned_way(edition) == {
+        "way": "rendered",
+        "reason": "the captioned picture is no render by the pinned build that the engine's "
+        "release qualifies: its receipt names no browser",
+    }
+    # Drawn by the pinned build, it is derived from.
+    monkeypatch.delenv("FILM_CHROMIUM_PATH")
+    picture_rendering.render_picture(edition, 60)
+    assert derivation.uncaptioned_way(edition)["way"] == "derived"
+    uncaptioned()
+    assert derived == [(edition, derivation.DEADLINE)]
+
+
 @pytest.mark.parametrize(
     ("capture", "native", "way"),
     [

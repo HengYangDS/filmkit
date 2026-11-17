@@ -122,6 +122,10 @@ def film_root(tmp_path, monkeypatch) -> FilmRoot:
             "soundtrack_sha256": repository.sha(edition.soundtrack),
         }
         put(edition.audio_assembly, assembly)
+    # The browser the supply installs, as a file whose bytes the engine pins here.
+    browser = put(picture_rendering.supplied_browser(), "the pinned browser build")
+    monkeypatch.setattr(picture_rendering, "BROWSER_SHA256", repository.sha(browser))
+    monkeypatch.delenv("FILM_CHROMIUM_PATH", raising=False)
     renderer = tmp_path.resolve() / "renderer" / "hyperframes"
     put(renderer, f"#!{sys.executable}\n{textwrap.dedent(STAND_IN)}").chmod(0o755)
     monkeypatch.setattr(picture_rendering, "RENDERER", renderer)

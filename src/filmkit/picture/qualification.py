@@ -31,6 +31,7 @@ from typing import TYPE_CHECKING
 import filmkit.durations as durations
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
+from filmkit.picture import browser
 from filmkit.picture.rendering import PictureError
 from filmkit.specification import FPS
 
@@ -58,20 +59,13 @@ def supply() -> dict:
     rendering.require_renderer()
     manifest = repository.node_modules() / rendering.RENDERER_PACKAGE
     installed = json.loads(manifest.read_text())
-    browser = rendering.browser_path()
-    if not browser.is_file():
-        msg = f"No browser at {browser}; run python -m filmkit.supply"
+    drawn_by = browser.identity()
+    if drawn_by["sha256"] is None:
+        msg = f"No browser at {rendering.browser_path()}; run python -m filmkit.supply"
         raise PictureError(msg)
-    digest = repository.sha(browser)
-    product, version = rendering.BROWSER
-    pinned = f"{product}@{version}" if digest == rendering.BROWSER_SHA256 else None
     return {
         "renderer": {"package": installed["name"], "version": installed["version"]},
-        "browser": {
-            "executable": repository.relative(browser),
-            "sha256": digest,
-            "pinned_build": pinned,
-        },
+        "browser": drawn_by,
     }
 
 

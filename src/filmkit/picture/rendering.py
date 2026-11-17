@@ -575,11 +575,14 @@ def record_render(
 ) -> dict:
     """Run a renderer command on a stage to its exit or deadline and write its receipt.
 
-    The receipt names the picture, the command and the capture and worker count it passes. A
+    The receipt names the picture, the command, the capture and worker count it passes and the
+    browser that draws it (`filmkit.picture.browser`). A
     render that does not exit 0 within its deadline, or whose stage changed meanwhile, raises
     `PictureError` after its receipt is written.
     """
-    source = sha(stage / "index.html")
+    from filmkit.picture import browser
+
+    source, drawn_by = sha(stage / "index.html"), browser.identity()
     started = datetime.now(UTC)
     exit_code, timed_out = run_renderer(command, deadline)
     record = {
@@ -587,6 +590,7 @@ def record_render(
         "command": command,
         "capture": command_capture(command),
         "workers": command_workers(command),
+        "browser": drawn_by,
         "render_lock": os.environ.get(RENDER_LOCK, "on"),
         "exit": exit_code,
         "timed_out": timed_out,

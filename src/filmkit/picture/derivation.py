@@ -57,6 +57,7 @@ import filmkit.picture.ground as ground_rows
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
 import filmkit.tools as tools
+from filmkit.picture import browser
 from filmkit.picture.rendering import (
     COMPOSITION_SCRIPT,
     PICTURE_SIZE,
@@ -111,8 +112,10 @@ NATIVE = "render-picture --language {code} --uncaptioned --native"
 PROOFS = ("band_audit", "ground_check", "edge_check")
 
 
-def uncaptioned_way(*, native: bool = False) -> dict:
-    """How the film's uncaptioned pictures are made, `derived` or `rendered`, and why."""
+def uncaptioned_way(edition: Edition | None = None, *, native: bool = False) -> dict:
+    """How an uncaptioned picture is made, `derived` or `rendered`, and why: by the request, by
+    the film's declared capture and, for an edition whose captioned picture is rendered, by the
+    browser its receipt names, since a release qualifies the pinned build alone."""
     declared = rendering.FILM.picture.capture
     qualified = f"{DERIVING_CAPTURE} capture, which the engine's release qualifies"
     if native:
@@ -120,6 +123,12 @@ def uncaptioned_way(*, native: bool = False) -> dict:
     if declared != DERIVING_CAPTURE:
         reason = f"the film declares {declared} capture, and a picture is derived only under "
         return {"way": "rendered", "reason": reason + qualified}
+    captioned = edition.rendered(True).receipt if edition else None
+    drawn = repository.read(captioned) if captioned and captioned.is_file() else None
+    why = browser.unqualified(drawn) if drawn else None
+    if why:
+        reason = "the captioned picture is no render by the pinned build that the engine's release "
+        return {"way": "rendered", "reason": f"{reason}qualifies: {why}"}
     return {"way": "derived", "reason": f"the film declares {qualified}"}
 
 
@@ -132,7 +141,7 @@ def render_uncaptioned(edition: Edition, deadline: float, *, asked: bool = False
     is the film's capture, or, with `asked` or for a film whose pictures are otherwise derived,
     that a render was asked for: a rendered picture of such a film exists only because one was.
     """
-    way = uncaptioned_way(native=asked)
+    way = uncaptioned_way(edition, native=asked)
     if way["way"] == "derived":
         way = uncaptioned_way(native=True)
     rendering.render_picture(edition, deadline, captions=False)
@@ -331,7 +340,7 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
     """Derive the edition's uncaptioned picture from its valid captioned picture and write its
     receipt; an earlier uncaptioned picture and receipt are removed first, so a refusal leaves
     none in place. Refused for a film whose declared capture is not the deriving one."""
-    way = uncaptioned_way()
+    way = uncaptioned_way(edition)
     if way["way"] != "derived":
         msg = f"The {edition.code} uncaptioned picture is not derived: {way['reason']}"
         raise PictureError(msg)
