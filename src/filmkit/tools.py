@@ -10,6 +10,11 @@ motion and detail audits, the caption equivalence and the band audit measure tex
 widths of the film's declared faces (`filmkit.picture.metrics`), which a run names to them in
 `FILMKIT_TEXT_METRICS` unless the caller names its own table.
 
+A run waits for its tool. When the wait is cut short, as by an interrupt of the command, the
+tool is asked to end (SIGTERM) and waited for, so that it ends what it started itself, as a tool
+that drives a browser closes it, and it is killed only when it has not ended after
+`STOP_SECONDS` (`filmkit.child_processes.stop`).
+
 A refusal exits with status 1 and "<tool>: <reason>" on standard error; otherwise the command
 exits with the tool's own status. The two checks that a film's build runs from the command line,
 the geometry check and the cover check (`BUILD_RUNS`), write a duration record
@@ -27,11 +32,13 @@ import contextlib
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 from importlib.metadata import version
 from pathlib import Path
 
+import filmkit.child_processes as child_processes
 import filmkit.durations as durations
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
@@ -67,6 +74,9 @@ EDITION = "|".join(CODES)
 EDITION_PLACE = re.compile(
     rf"(?:^|/)(?:final-delivery-(?P<stage>{EDITION})-uhd[^/]*|(?:editions|film)/(?P<folder>{EDITION}))(?=/|$)"
 )
+# Seconds a tool has to end, once the command's wait for it was cut short and it was asked to,
+# before it is killed.
+STOP_SECONDS = 20
 # The tools that run the composition headlessly, which measure text by the film's declared faces.
 MEASURING = ("frame-audit", "motion-audit", "detail-audit", "caption-equivalence", "band-audit")
 
@@ -113,7 +123,8 @@ def run(
     `environment` adds variables to the tool's environment, and `stdout` names a file that
     receives the tool's standard output instead of the caller's. A tool that runs the
     composition headlessly is given the table of the film's declared faces unless the caller
-    names one.
+    names one. A wait that is cut short asks the tool to end and waits for it, at most
+    `STOP_SECONDS`, before what cut it short goes on; the run itself takes no request to end.
     """
     picture_rendering.require_renderer()
     node = shutil.which("node")
@@ -130,15 +141,20 @@ def run(
         variables[metrics.VARIABLE] = str(metrics.current_table())
     with contextlib.ExitStack() as stack:
         output = None if stdout is None else stack.enter_context(stdout.open("w"))
-        completed = subprocess.run(
+        tool_process = subprocess.Popen(
             [node, str(script), *arguments],
             cwd=repository.ROOT,
             env=variables,
             stdin=subprocess.DEVNULL,
             stdout=output,
-            check=False,
         )
-    return completed.returncode
+        try:
+            return tool_process.wait()
+        except BaseException:
+            # The tool ends what it started, a browser it drives, from its own handling of the
+            # request; it is killed only when that has not ended it.
+            child_processes.stop([tool_process], signal.SIGTERM, seconds=STOP_SECONDS)
+            raise
 
 
 def edition_of(arguments: list[str]) -> str | None:

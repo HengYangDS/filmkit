@@ -114,21 +114,35 @@ with child_processes.ending("between: stopped by {request}"):
             time.sleep(0.01)
         note("unwound")
 """
-# A check that runs a tool as the engine runs one, by `subprocess.run`, under `ending`; and the
-# tool, which ends what it started by its own handling of an interrupt, as a tool that drives a
-# browser closes it.
+# A check that runs a tool by the engine's own run of one (`tools.run`) under `ending`, the tool a
+# stand-in script that Python runs where the engine runs Node; and the tool, which ends what it
+# started by its own handling of a request, taking CLOSING seconds over it, as a tool that
+# drives a browser closes it. With DEAF it ignores the request to end.
 CHECK = """
-import subprocess, sys
+import pathlib, sys
 import filmkit.child_processes as child_processes
+import filmkit.tools as tools
+tool = pathlib.Path(sys.argv[1])
+tools.repository.ROOT = tool.parent
+tools.picture_rendering.require_renderer = lambda: None
+tools.picture_rendering.browser_path = lambda: "no-browser"
+tools.shutil.which = lambda name: sys.executable
+tools.stage_tools = lambda: tool.parent
+tools.TOOLS = {"standin": tool.name}
+if len(sys.argv) > 2:
+    tools.STOP_SECONDS = float(sys.argv[2])
 with child_processes.ending("check: stopped by {request}"):
-    subprocess.run([sys.executable, "-B", sys.argv[1]], check=False)
+    tools.run("standin", [])
 """
 TOOL = """
-import signal, sys, time
+import os, signal, sys, time
 def closing(number, frame):
+    note("tool-asked", number=number)
+    time.sleep(float(os.environ.get("CLOSING", "0")))
     note("tool-closed-its-browser")
     raise SystemExit(0)
-signal.signal(signal.SIGINT, closing)
+for number in (signal.SIGINT, signal.SIGTERM):
+    signal.signal(number, signal.SIG_IGN if os.environ.get("DEAF") else closing)
 note("tool")
 time.sleep(30)
 """
@@ -235,12 +249,40 @@ def test_a_shell_ends_its_script_when_the_command_it_ran_is_interrupted(processe
 
 def test_an_interrupted_check_lets_its_tool_end_what_the_tool_started(processes):
     tool = processes.script("tool", TOOL)
-    command = processes.python(processes.script("check", CHECK), str(tool), session=True)
+    check = processes.script("check", CHECK)
+    command = processes.python(check, str(tool), session=True, CLOSING="1")
     processes.noted("tool")
+    # A terminal's interrupt goes to the whole foreground group: the command and its tool.
     os.killpg(command.pid, signal.SIGINT)
-    # The tool took the interrupt itself and ran its own ending; the command did not kill it.
-    processes.noted("tool-closed-its-browser", 5)
+    # The tool took the interrupt itself and needed a second for its own ending, longer than the
+    # quarter second a wait used to give it; the command waited and did not kill it.
+    assert processes.noted("tool-asked")["number"] == signal.SIGINT
+    processes.noted("tool-closed-its-browser", 10)
     assert ended(processes, command) == (-signal.SIGINT, ["check: stopped by an interrupt"])
+
+
+def test_an_interrupt_of_the_command_alone_has_its_tool_asked_to_end_and_waited_for(processes):
+    tool = processes.script("tool", TOOL)
+    command = processes.python(processes.script("check", CHECK), str(tool), CLOSING="1")
+    asked = processes.noted("tool")["pid"]
+    # The interrupt reaches the command and not its tool, as `kill -INT` of the command does.
+    command.send_signal(signal.SIGINT)
+    # The command asked the tool to end; the tool ran its own ending and was not killed.
+    assert processes.noted("tool-asked")["number"] == signal.SIGTERM
+    processes.noted("tool-closed-its-browser", 10)
+    assert ended(processes, command) == (-signal.SIGINT, ["check: stopped by an interrupt"])
+    assert gone([asked])
+
+
+def test_a_tool_that_does_not_end_when_asked_is_killed_after_the_grace(processes):
+    tool = processes.script("tool", TOOL)
+    command = processes.python(processes.script("check", CHECK), str(tool), "0.3", DEAF="1")
+    deaf = processes.noted("tool")["pid"]
+    command.send_signal(signal.SIGINT)
+    assert ended(processes, command) == (-signal.SIGINT, ["check: stopped by an interrupt"])
+    # The tool ignored the request to end and was killed: it never ran its own ending.
+    assert gone([deaf])
+    assert not (processes.notes / "tool-closed-its-browser.json").exists()
 
 
 def test_a_hang_up_whose_terminal_is_gone_still_exits_with_its_status(processes):
