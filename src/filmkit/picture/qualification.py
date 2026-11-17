@@ -77,6 +77,21 @@ def qualify_renderer(edition: Edition, deadline: float = rendering.DEADLINE) -> 
     ran = supply()
     with durations.phase("validation"):
         first_receipt = rendering.validate_picture(edition)
+    # The record states one browser for both renders, so the first was drawn by the one that
+    # runs now: two builds are not qualified as one.
+    drew, runs = first_receipt.get("browser"), ran["browser"]
+    if not isinstance(drew, dict) or drew.get("sha256") != runs["sha256"]:
+        first = (
+            f"{drew.get('executable')} (SHA-256 {drew.get('sha256')})"
+            if isinstance(drew, dict)
+            else "no browser"
+        )
+        msg = (
+            f"The {edition.code} captioned picture's receipt names {first}, and the browser "
+            f"that runs now is {runs['executable']} (SHA-256 {runs['sha256']}): a "
+            "qualification compares two renders by one browser; render the picture again"
+        )
+        raise PictureError(msg)
     rendered = edition.rendered(True)
     work = repository.ROOT / WORK / edition.code
     work.mkdir(parents=True, exist_ok=True)
@@ -99,6 +114,8 @@ def qualify_renderer(edition: Edition, deadline: float = rendering.DEADLINE) -> 
         # What decides nothing: the frames that decode identically, the first that does not, and
         # the lowest PSNR of any frame.
         **{key: compared[key] for key in equivalence.DECODED},
+        # Why those were not measured, when the pass that measures them failed.
+        "psnr_unmeasured": compared["psnr_unmeasured"],
         "findings": findings,
         "verdict": compared["verdict"],
     }

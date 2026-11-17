@@ -9,6 +9,16 @@ The sample film SHALL declare `software` capture, the capture under which pictur
 - **WHEN** `qualify-renderer` runs after the Chinese captioned picture is rendered and validated
 - **THEN** its record names both renders' SHA-256 and frames and `software` capture, holds the comparison's report without a finding, and states how many frames decode identically, the first that does not, and the lowest PSNR of any frame with that frame
 
+#### Scenario: A picture another browser drew
+
+- **WHEN** `qualify-renderer` runs and the captioned picture's receipt names another browser than the one that runs now, or none
+- **THEN** it refuses before it renders, naming both, and writes no record
+
+#### Scenario: A pass over every frame that fails
+
+- **WHEN** the pass that counts the frames that decode identically fails after the comparison has passed
+- **THEN** the record holds the comparison's report and its verdict, and says why those facts were not measured
+
 #### Scenario: The supply that ran
 
 - **WHEN** `qualify-renderer` runs with a browser other than the build the engine pins

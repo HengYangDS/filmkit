@@ -2,6 +2,7 @@
 measure of a rendered pair, on small real clips that the stand-in renderer writes."""
 
 import json
+import subprocess
 
 import pytest
 from test_faults import CAPTION, FRAGMENT, LABEL, SECONDS, encode
@@ -69,12 +70,14 @@ def test_two_renders_that_show_the_same_pass_and_the_second_is_removed(rendered,
         "first_differing_frame",
         "lowest_psnr_db",
         "lowest_psnr_frame",
+        "psnr_unmeasured",
         "findings",
         "verdict",
     ]
     assert (record["verdict"], record["findings"]) == ("pass", [])
     assert (record["identical_frames"], record["first_differing_frame"]) == (FRAMES, None)
     assert (record["lowest_psnr_db"], record["lowest_psnr_frame"]) == (None, None)
+    assert record["psnr_unmeasured"] is None
     assert record["renderer"] == {"package": "hyperframes", "version": RENDERER}
     # The record names the capture the two renders were made with, the sample film's own.
     assert record["capture"] == "software"
@@ -128,6 +131,53 @@ def test_the_record_states_the_renderer_and_the_browser_that_ran(rendered, monke
     with pytest.raises(PictureError, match="The film installs HyperFrames 0.0.1"):
         qualification.qualify_renderer(edition, 60)
     assert len(film_root.runs()) == runs
+
+
+def test_a_picture_another_browser_drew_is_not_qualified_with_the_one_that_runs(rendered):
+    edition, film_root, renders = rendered
+    renders([CAPTION], [CAPTION])
+    browser = film_root.path.parent / "browser/chrome-headless-shell"
+    drew = repository.sha(browser)
+    # The browser that runs now is another build than the one the picture's receipt names.
+    browser.write_text("another browser build")
+    runs = len(film_root.runs())
+    with pytest.raises(PictureError) as refused:
+        qualification.qualify_renderer(edition, 60)
+    assert str(refused.value) == (
+        f"The zh captioned picture's receipt names {browser} (SHA-256 {drew}), and the browser "
+        f"that runs now is {browser} (SHA-256 {repository.sha(browser)}): a qualification "
+        "compares two renders by one browser; render the picture again"
+    )
+    # Nothing was rendered and no record was written.
+    assert len(film_root.runs()) == runs
+    assert not edition.renderer_qualification.exists()
+    # A receipt that names no browser, as one of an earlier engine, is refused the same way.
+    receipt = repository.read(edition.rendered(True).receipt)
+    del receipt["browser"]
+    repository.write(edition.rendered(True).receipt, receipt)
+    with pytest.raises(PictureError, match="picture's receipt names no browser, and the"):
+        qualification.qualify_renderer(edition, 60)
+
+
+def test_a_failed_pass_over_every_frame_leaves_the_record_of_a_comparison_that_decided(
+    rendered, monkeypatch, capsys
+):
+    edition, film_root, renders = rendered
+    renders([CAPTION, LABEL], [CAPTION, LABEL])
+
+    def failed(*_):
+        raise subprocess.CalledProcessError(1, ["ffmpeg"], stderr=b"")
+
+    monkeypatch.setattr(qualification.equivalence.media, "frame_psnr", failed)
+    capsys.readouterr()
+    record = qualification.qualify_renderer(edition, 60)
+    assert repository.read(edition.renderer_qualification) == record
+    assert (record["verdict"], record["findings"]) == ("pass", [])
+    assert record["comparison"]["every_frame"]["frames"] == FRAMES
+    assert record["identical_frames"] is None
+    assert record["psnr_unmeasured"] == "FFmpeg's PSNR pass exited with 1"
+    printed = json.loads(capsys.readouterr().out.splitlines()[-1])
+    assert printed["identical_frames"] is None and printed["verdict"] == "pass"
 
 
 def test_a_qualification_without_a_browser_is_refused_before_it_renders(rendered, monkeypatch):

@@ -48,6 +48,7 @@ def test_two_renders_that_decode_alike_pass_and_the_report_holds_the_comparison(
         "first_differing_frame",
         "lowest_psnr_db",
         "lowest_psnr_frame",
+        "psnr_unmeasured",
         "findings",
         "verdict",
     ]
@@ -141,6 +142,7 @@ def test_renders_of_other_lengths_refuse_without_a_comparison(renders, monkeypat
         "first_differing_frame": None,
         "lowest_psnr_db": None,
         "lowest_psnr_frame": None,
+        "psnr_unmeasured": None,
         "findings": [f"the renders hold {FRAMES} and {FRAMES // 2} frames"],
         "verdict": "refuse",
     }
@@ -163,13 +165,57 @@ def test_one_pass_measures_every_frames_psnr_which_is_infinite_where_two_frames_
     assert len(other) == 30 and all(40 < value < 70 for value in other)
 
 
-def test_a_pass_that_measures_other_frames_than_the_renders_hold_is_refused(renders, monkeypatch):
+def failing(error):
+    def pass_(*_):
+        raise error
+
+    return pass_
+
+
+@pytest.mark.parametrize(
+    ("measure", "why"),
+    [
+        (
+            lambda *_: [math.inf] * (FRAMES - 1),
+            f"the PSNR of {FRAMES - 1} of the renders' {FRAMES} frames was measured",
+        ),
+        (
+            failing(subprocess.CalledProcessError(187, ["ffmpeg"], stderr=b"no such filter\n")),
+            "FFmpeg's PSNR pass exited with 187: no such filter",
+        ),
+        (
+            failing(subprocess.TimeoutExpired(["ffmpeg"], 7200)),
+            f"FFmpeg's PSNR pass did not end within {equivalence.DECODE_DEADLINE} s",
+        ),
+    ],
+)
+def test_a_pass_that_fails_decides_nothing_and_is_recorded_as_a_missing_fact(
+    renders, monkeypatch, measure, why
+):
     first, second, work = renders
     encode(first, CAPTION)
     encode(second, CAPTION)
-    monkeypatch.setattr(media, "frame_psnr", lambda *_: [math.inf] * (FRAMES - 1))
-    measured = f"The PSNR of {FRAMES - 1} of the renders' {FRAMES} frames was measured"
-    with pytest.raises(PictureError, match=measured):
+    monkeypatch.setattr(media, "frame_psnr", measure)
+    compared = equivalence.compare_renders(first, second, work)
+    # The comparison had decided: its report and verdict stand, and the facts are missing.
+    assert (compared["verdict"], compared["findings"]) == ("pass", [])
+    assert compared["comparison"]["every_frame"]["frames"] == FRAMES
+    assert [compared[key] for key in equivalence.DECODED] == [None] * 4
+    assert compared["psnr_unmeasured"] == why
+
+
+def test_a_file_whose_container_states_no_count_of_frames_is_refused_in_words(renders, monkeypatch):
+    first, second, work = renders
+    encode(first, CAPTION)
+    encode(second, CAPTION)
+    stream = media.video_stream
+
+    def without_a_count(probe):
+        return {key: value for key, value in stream(probe).items() if key != "nb_frames"}
+
+    monkeypatch.setattr(media, "video_stream", without_a_count)
+    refusal = f"{first.name} states no count of frames in its container \\(None\\)"
+    with pytest.raises(PictureError, match=refusal):
         equivalence.compare_renders(first, second, work)
 
 

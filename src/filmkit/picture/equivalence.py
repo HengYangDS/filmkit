@@ -389,14 +389,16 @@ def compare_renders(first: Path, second: Path, work: Path) -> dict:
     identically, the first that does not, and the lowest PSNR of any frame with that frame:
     one pass over both renders that measures every frame's PSNR, which is infinite where the
     two frames are equal (`filmkit.media.frame_psnr`, as a rebuilt film is compared with a
-    published one).
+    published one). That pass decides nothing, so its failure refuses nothing either: the
+    facts are then None and `psnr_unmeasured` says why, beside a comparison that has decided.
+    A file whose container states no count of frames is refused in words.
     """
     work.mkdir(parents=True, exist_ok=True)
     pictures = {"first": first, "second": second}
     streams = {name: media.video_stream(media.probe(path)) for name, path in pictures.items()}
-    counts = {name: int(stream["nb_frames"]) for name, stream in streams.items()}
+    counts = {name: stated_frames(pictures[name], stream) for name, stream in streams.items()}
     sizes = {name: (stream["width"], stream["height"]) for name, stream in streams.items()}
-    encoded, decoded = None, dict.fromkeys(DECODED)
+    encoded, decoded, unmeasured = None, dict.fromkeys(DECODED), None
     if counts["first"] != counts["second"]:
         findings = [f"the renders hold {counts['first']} and {counts['second']} frames"]
     elif sizes["first"] != sizes["second"]:
@@ -408,21 +410,53 @@ def compare_renders(first: Path, second: Path, work: Path) -> dict:
         )
         findings = encoded_findings(encoded, None)
         with durations.phase("every-frame-psnr"):
-            psnr = media.frame_psnr(first, second, DECODE_DEADLINE)
-        if len(psnr) != count:
-            msg = f"The PSNR of {len(psnr)} of the renders' {count} frames was measured"
-            raise PictureError(msg)
-        unlike = sorted((value, frame) for frame, value in enumerate(psnr) if math.isfinite(value))
-        lowest = unlike[0] if unlike else (None, None)
-        first_unlike = min((frame for _, frame in unlike), default=None)
-        decoded = dict(zip(DECODED, (count - len(unlike), first_unlike, *lowest), strict=True))
+            psnr, unmeasured = every_frame_psnr(first, second, count)
+        if psnr is not None:
+            unlike = sorted((v, frame) for frame, v in enumerate(psnr) if math.isfinite(v))
+            lowest = unlike[0] if unlike else (None, None)
+            first_unlike = min((frame for _, frame in unlike), default=None)
+            decoded = dict(zip(DECODED, (count - len(unlike), first_unlike, *lowest), strict=True))
     return {
         "frames": counts,
         "comparison": encoded,
         **decoded,
+        "psnr_unmeasured": unmeasured,
         "findings": findings,
         "verdict": "refuse" if findings else "pass",
     }
+
+
+def stated_frames(path: Path, stream: dict) -> int:
+    """The count of frames a picture file's container states for its picture; refused in words
+    for a file that states none, as a stream or a fragment without an index does not."""
+    stated = stream.get("nb_frames")
+    if stated is None or not str(stated).isdigit():
+        msg = (
+            f"{path.name} states no count of frames in its container ({stated!r}), so two "
+            "renders cannot be compared frame by frame; compare picture files as the renderer "
+            "and the engine write them"
+        )
+        raise PictureError(msg)
+    return int(stated)
+
+
+def every_frame_psnr(
+    first: Path, second: Path, count: int
+) -> tuple[list[float] | None, str | None]:
+    """Every frame's PSNR between two renders of `count` frames, or else None and why it was
+    not measured: FFmpeg's failure, its deadline, or a count of measures other than the frames."""
+    try:
+        psnr = media.frame_psnr(first, second, DECODE_DEADLINE)
+    except subprocess.CalledProcessError as error:
+        said = (error.stderr or b"").decode(errors="replace").strip()[:300]
+        return None, f"FFmpeg's PSNR pass exited with {error.returncode}" + (
+            f": {said}" if said else ""
+        )
+    except subprocess.TimeoutExpired:
+        return None, f"FFmpeg's PSNR pass did not end within {DECODE_DEADLINE} s"
+    if len(psnr) != count:
+        return None, f"the PSNR of {len(psnr)} of the renders' {count} frames was measured"
+    return psnr, None
 
 
 def next_step(record: dict, code: str) -> str:
