@@ -87,7 +87,7 @@ def commands(monkeypatch, gates, tmp_path) -> list:
     monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
     calls = []
     monkeypatch.setattr(
-        narration_narrate.subprocess,
+        narration_narrate.child_processes,
         "run",
         lambda command, **options: calls.append((command, options)),
     )
@@ -107,7 +107,7 @@ def test_narrate_edition_runs_the_whole_edition_from_the_root(commands, capsys):
     assert run[0][-1] == f"{base}/narration-receipt.json"
     assert run[1][-3:] == [f"{base}/alignment.json", "--language", "English"]
     assert run[2][-3:] == [f"{base}/asr.json", "--language", "English"]
-    assert [options for _, options in commands] == [{"cwd": repository.ROOT, "check": True}] * 3
+    assert [options for _, options in commands] == [{"cwd": repository.ROOT}] * 3
     printed = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     assert printed[0] == {
         "edition": "en",

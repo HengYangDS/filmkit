@@ -167,3 +167,22 @@ When more than one segment is to be generated, the narration SHALL generate them
 
 - **WHEN** an edition is narrated with the variable unset
 - **THEN** its duration record states a count of 2 narration processes
+
+### Requirement: No narration process outlives its narration
+
+Each narration process SHALL lead a session of its own. A narration that is interrupted, is asked to end (SIGTERM) or fails while its processes run SHALL end every process's whole process group before it exits, and SHALL refuse, naming what stopped it. `narrate` SHALL likewise end its running step when it is interrupted or asked to end, and its duration record SHALL then say that it did not complete.
+
+#### Scenario: A narration asked to end
+
+- **WHEN** the synthesis is sent SIGTERM while two processes narrate
+- **THEN** both processes, and whatever each had started, have ended when it exits, and its refusal names the request to end and the folder of the processes' logs
+
+#### Scenario: A process that cannot be started
+
+- **WHEN** the second of two processes cannot be started
+- **THEN** the first is ended, and the narration refuses, naming the failure
+
+#### Scenario: A request to end during a step of narrate
+
+- **WHEN** `narrate` is sent SIGTERM during its narration step
+- **THEN** it asks the step to end, waits for it, refuses, and its duration record says that it did not complete

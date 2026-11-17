@@ -1,10 +1,13 @@
 """Narration in several processes: the count, the division of segments, the children's commands,
 and what a failed child leaves for the refusal."""
 
+import os
+import signal
 import sys
 
 import pytest
 
+import filmkit.child_processes as child_processes
 import filmkit.narration.narrate as narration_narrate
 import filmkit.narration.processes as processes
 import filmkit.repository as repository
@@ -22,12 +25,15 @@ def root(tmp_path, monkeypatch):
 
 
 class Child:
-    """A stand-in child that has written its log and exits with the status given."""
+    """A stand-in child that has written its log and exits with the status given; one whose
+    status is an exception raises it when it is waited for."""
 
     def __init__(self, status):
         self.status = status
 
     def wait(self):
+        if isinstance(self.status, BaseException):
+            raise self.status
         return self.status
 
 
@@ -112,11 +118,74 @@ def test_a_failed_child_is_named_with_its_segments_its_log_and_its_last_line(roo
     assert not started[0][1].parent.exists()
 
 
+@pytest.fixture
+def stopped(monkeypatch):
+    """The children the narration ends, with the signal and whether it goes to their groups."""
+    calls = []
+    monkeypatch.setattr(
+        processes.child_processes,
+        "stop",
+        lambda children, asking, *, groups: calls.append((children, asking, groups)),
+    )
+    return calls
+
+
+def test_an_interrupted_wait_ends_every_childs_process_group_and_refuses(
+    root, monkeypatch, stopped
+):
+    starting(monkeypatch, statuses=(KeyboardInterrupt(), 0))
+    with pytest.raises(ProcessesError) as refused:
+        processes.narrate(SOURCES, [["01"], ["02"]], root / RECEIPT)
+    assert str(refused.value).startswith(
+        "The narration was stopped by an interrupt; every narration process it had started (2) "
+        "was ended with it; their logs are in build/runtime/work/narration-processes/"
+    )
+    ((children, asking, groups),) = stopped
+    assert [type(child) for child in children] == [Child, Child]
+    assert (asking, groups) == (signal.SIGTERM, True)
+
+
+def test_a_request_to_end_while_a_child_starts_waits_until_the_child_is_held(
+    root, monkeypatch, stopped
+):
+    started = []
+
+    def start(command, log):
+        if started:
+            # The request arrives while the second child starts.
+            os.kill(os.getpid(), signal.SIGTERM)
+        started.append(Child(None))
+        return started[-1]
+
+    monkeypatch.setattr(processes, "start", start)
+    with pytest.raises(ProcessesError, match=r"request to end \(SIGTERM\); every .* \(2\) was"):
+        processes.narrate(SOURCES, [["01"], ["02"]], root / RECEIPT)
+    # Both children were held when the request was acted on, so both were ended.
+    ((children, _, _),) = stopped
+    assert children == started and len(started) == 2
+
+
+def test_a_child_that_cannot_be_started_ends_the_ones_already_started(root, monkeypatch, stopped):
+    first = Child(0)
+
+    def start(command, log):
+        if "--ids" in command and command[-1] == "02":
+            message = "Resource temporarily unavailable"
+            raise BlockingIOError(message)
+        return first
+
+    monkeypatch.setattr(processes, "start", start)
+    with pytest.raises(ProcessesError, match=r"stopped by BlockingIOError: Resource .* \(1\)"):
+        processes.narrate(SOURCES, [["01"], ["02"]], root / RECEIPT)
+    assert stopped == [([first], signal.SIGTERM, True)]
+
+
 def test_a_child_starts_at_the_films_root_as_a_single_process(root, monkeypatch):
     seen = {}
 
-    def popen(command, *, cwd, env, stdin, stdout, stderr):
+    def popen(command, *, cwd, env, stdin, stdout, stderr, start_new_session):
         seen.update(command=command, cwd=cwd, env=env, stdin=stdin, stderr=stderr)
+        seen["session"] = start_new_session
         return Child(0)
 
     monkeypatch.setattr(processes.subprocess, "Popen", popen)
@@ -128,6 +197,8 @@ def test_a_child_starts_at_the_films_root_as_a_single_process(root, monkeypatch)
     assert seen["env"]["FILMKIT_ROOT"] == str(root)
     devnull, merged = processes.subprocess.DEVNULL, processes.subprocess.STDOUT
     assert (seen["stdin"], seen["stderr"]) == (devnull, merged)
+    # The child leads a session of its own, so its whole process group can be ended.
+    assert seen["session"] is True
     assert log.is_file()
 
 
@@ -138,7 +209,7 @@ def narrating(root, monkeypatch):
     monkeypatch.setattr(narration_narrate.readings, "check", lambda code: {})
     steps = []
     monkeypatch.setattr(
-        narration_narrate.subprocess, "run", lambda command, **options: steps.append(command)
+        narration_narrate.child_processes, "run", lambda command, **options: steps.append(command)
     )
     return steps
 
@@ -163,3 +234,14 @@ def test_a_value_that_is_no_count_refuses_the_narration_before_any_step(narratin
         narration_narrate.main(["--language", "zh"])
     assert narrating == []
     assert not (repository.ROOT / "build").exists()
+
+
+def test_a_narration_asked_to_end_refuses_and_is_recorded_as_not_completed(narrating, monkeypatch):
+    def asked(command, **options):
+        raise child_processes.Terminated(signal.SIGTERM)
+
+    monkeypatch.setattr(narration_narrate.child_processes, "run", asked)
+    with pytest.raises(SystemExit, match=r"asked to end \(SIGTERM\); its running step was ended"):
+        narration_narrate.main(["--language", "zh"])
+    record = repository.read("build/evidence/editions/zh/durations/narrate.json")
+    assert record["completed"] is False

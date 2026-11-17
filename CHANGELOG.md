@@ -40,6 +40,7 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - A refusal of a rendered pair names `render-picture --uncaptioned --native` as the command that renders the uncaptioned picture again; without `--native` the command it named before would have derived the picture and replaced the rendered one.
 - A 1080p film's keyframes are forced onto the 2 s grid by the encoder's interval, the interval's minimum and no keyframe at a scene cut. Under VideoToolbox the keyframes left the grid six times between 13 and 17 November 2026 under the host's load, for a cause never found, and each refusal ended a film's build.
 - The entry page `build/artifacts/film/index.html`, which both editions' packages write and bind by SHA-256, is written whole by replacement, as records are, so one edition's packaging can never hash half of the page the other is writing.
+- A narration's processes never outlive it. Each leads a session of its own; a synthesis that is interrupted, asked to end (SIGTERM) or fails while they run ends every process's group and refuses, naming what stopped it, and `narrate` ends its running step the same way and records the run as not completed. Before, a synthesis sent SIGTERM left its children narrating to the end of their shares, each with a speech model in memory. `render-picture --language all` stops its children through the same code, `filmkit.child_processes`.
 
 ## [0.22.3] - 2026-11-15
 

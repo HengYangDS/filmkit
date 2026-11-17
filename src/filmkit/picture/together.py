@@ -19,19 +19,16 @@ from __future__ import annotations
 
 import json
 import os
-import signal
 import subprocess
 import sys
 import time
 
+import filmkit.child_processes as child_processes
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
 from filmkit.picture.derivation import uncaptioned_way
 from filmkit.picture.rendering import PictureError
 from filmkit.production import CODES
-
-# Seconds a child has to stop its renderer after an interrupt before it is killed.
-STOP_SECONDS = 30
 
 
 def child_command(
@@ -49,19 +46,6 @@ def side_by_side(*, uncaptioned: bool, native: bool) -> bool:
     uncaptioned pictures are rendered when `--native` asks for it or the film's capture is not
     the deriving one (`filmkit.picture.derivation.uncaptioned_way`)."""
     return not uncaptioned or uncaptioned_way(native=native)["way"] == "rendered"
-
-
-def stop(children: list[subprocess.Popen]) -> None:
-    """Interrupt the children that still run, so that each stops its renderer, and wait."""
-    for child in children:
-        if child.poll() is None:
-            child.send_signal(signal.SIGINT)
-    for child in children:
-        try:
-            child.wait(timeout=STOP_SECONDS)
-        except subprocess.TimeoutExpired:
-            child.kill()
-            child.wait()
 
 
 def render_all(
@@ -88,7 +72,8 @@ def render_all(
         for code, child in zip(CODES, children, strict=True):
             exits[code] = child.wait()
     except BaseException:
-        stop(children)
+        # An interrupt to each child, which then stops its own renderer.
+        child_processes.stop(children)
         raise
     report = {"pictures": "uncaptioned" if uncaptioned else "captioned", "side_by_side": together}
     print(json.dumps({**report, "exits": exits, "seconds": round(time.monotonic() - started, 1)}))

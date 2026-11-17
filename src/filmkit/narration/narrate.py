@@ -12,7 +12,8 @@ stops the run and names every failure.
 Usage: python -m filmkit.narration.narrate
     --language zh|en [--ids 06,07] [--dry-run | --skip-generation]
 --dry-run prints the narration plan without writing; --skip-generation aligns and
-transcribes the existing receipt. Each step runs under this tool's interpreter. A run that is
+transcribes the existing receipt. Each step runs under this tool's interpreter, and none
+outlives a narration that is interrupted or asked to end (SIGTERM). A run that is
 not a dry run writes its duration record, each step a phase (`filmkit.durations`). A run that
 narrates is recorded as `narrate`, the record an edition's build starts from, and one that only
 checks, with --skip-generation, as `narrate-checks`, so that it neither replaces the narration's
@@ -25,10 +26,10 @@ no count is refused before any step.
 import argparse
 import enum
 import json
-import subprocess
 import sys
 import time
 
+import filmkit.child_processes as child_processes
 import filmkit.concepts as concepts
 import filmkit.durations as durations
 import filmkit.repository as repository
@@ -148,17 +149,27 @@ def main(argv: list[str] | None = None) -> None:
         scope = Scope.CHECKS
     if scope is not Scope.CHECKS:
         print(json.dumps({"edition": options.language, "gate": gate(options.language)}), flush=True)
+    try:
+        with child_processes.terminable():
+            narrate(options.language, options.ids, scope)
+    except child_processes.Terminated:
+        msg = "The narration was asked to end (SIGTERM); its running step was ended with it"
+        raise SystemExit(msg) from None
+
+
+def narrate(code: str, ids: str, scope: Scope) -> None:
+    """Run the scope's steps; a run that is not a dry run writes its duration record."""
     if scope is Scope.PLAN:
-        run_steps(options.language, options.ids, scope)
+        run_steps(code, ids, scope)
         return
     try:
         count = processes.count()
     except processes.ProcessesError as error:
         raise SystemExit(str(error)) from None
-    with durations.run(options.language, record_name(scope, options.ids)) as run:
+    with durations.run(code, record_name(scope, ids)) as run:
         if scope is Scope.ALL:
             run.settings["narration_processes"] = count
-        run_steps(options.language, options.ids, scope)
+        run_steps(code, ids, scope)
 
 
 def record_name(scope: Scope, ids: str = "") -> str:
@@ -169,11 +180,13 @@ def record_name(scope: Scope, ids: str = "") -> str:
 
 
 def run_steps(code: str, ids: str, scope: Scope) -> None:
-    """Run the scope's steps in order, each a phase of the current run, and print its seconds."""
+    """Run the scope's steps in order, each a phase of the current run, and print its seconds.
+    A step that fails raises; a narration that is interrupted or asked to end ends its running
+    step first (`filmkit.child_processes.run`), and the synthesis in turn its own children."""
     for name, command in steps(code, ids, scope):
         started = time.monotonic()
         with durations.phase(name):
-            subprocess.run(command, cwd=repository.ROOT, check=True)
+            child_processes.run(command, cwd=repository.ROOT)
         seconds = round(time.monotonic() - started, 1)
         print(json.dumps({"edition": code, "step": name, "seconds": seconds}), flush=True)
 

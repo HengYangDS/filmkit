@@ -16,6 +16,13 @@ all have ended the narration is refused, naming each failed child, its segments,
 its log and the last line it wrote, which holds the refusal an unresolved take raises. What a
 failed child left behind is then judged by the next run as an interrupted run's always was.
 
+No child outlives the narration. Each leads a session of its own, and when the narration's wait
+is cut short, by an interrupt, by a request to end (SIGTERM) or by a failure of its own, such as
+a child that cannot be started, it ends every child's process group
+(`filmkit.child_processes`) and refuses, naming what cut it short. A child holds a speech model
+of several gigabytes and the GPU; one left running would narrate to the end of its share beside
+the next run's children.
+
 Measured on four segments of a film on 17 November 2026: one process 99.8 s, two 55.3 s, four
 55.2 s, since the longest segment bounds the run; all takes equal, byte for byte, to the takes of
 their fingerprints that the film delivered.
@@ -24,11 +31,13 @@ their fingerprints that the film delivered.
 from __future__ import annotations
 
 import os
+import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
 
+import filmkit.child_processes as child_processes
 import filmkit.repository as repository
 
 # The variable that names how many processes narrate an edition, and the count without it.
@@ -39,7 +48,8 @@ WORK = Path("build/runtime/work/narration-processes")
 
 
 class ProcessesError(ValueError):
-    """The count of narration processes is no count, or a narration process failed."""
+    """The count of narration processes is no count, a narration process failed, or the narration
+    was stopped while its processes ran."""
 
 
 def count() -> int:
@@ -83,7 +93,8 @@ def child_command(sources: tuple[str, str, str], ids: list[str], receipt: Path) 
 
 
 def start(command: list[str], log: Path) -> subprocess.Popen:
-    """Start one child at the film's root as a single narration process, its output in `log`."""
+    """Start one child at the film's root as a single narration process that leads a session of
+    its own, so that its whole process group can be ended, its output in `log`."""
     environment = {**os.environ, VARIABLE: "1", repository.ROOT_VARIABLE: str(repository.ROOT)}
     with log.open("wb") as output:
         return subprocess.Popen(
@@ -93,6 +104,7 @@ def start(command: list[str], log: Path) -> subprocess.Popen:
             stdin=subprocess.DEVNULL,
             stdout=output,
             stderr=subprocess.STDOUT,
+            start_new_session=True,
         )
 
 
@@ -102,26 +114,48 @@ def last_line(log: Path) -> str:
     return next((line.strip()[:300] for line in reversed(lines) if line.strip()), "")
 
 
+def cut_short(error: BaseException) -> str:
+    """What cut a narration's wait for its children short, as its refusal names it."""
+    if isinstance(error, child_processes.Terminated):
+        return "a request to end (SIGTERM)"
+    if isinstance(error, KeyboardInterrupt):
+        return "an interrupt"
+    return f"{type(error).__name__}: {error}"
+
+
 def narrate(sources: tuple[str, str, str], shares: list[list[str]], receipt: Path) -> list[dict]:
     """Narrate each share of segments in a child of its own, all at once, and wait for all.
 
     Returns each child's segments, exit status and seconds. Refused, once all have ended, when
     any failed; the work folder then stays, with every child's log. A run that passes removes it.
+    A wait that is cut short ends every child's process group and refuses, naming the cause.
     """
     work = work_folder(receipt)
     work.mkdir(parents=True, exist_ok=True)
     for earlier in work.iterdir():
         earlier.unlink()
     started = time.monotonic()
-    children = []
-    for number, ids in enumerate(shares, 1):
-        own, log = work / f"process-{number}.json", work / f"process-{number}.log"
-        children.append((ids, log, start(child_command(sources, ids, own), log)))
+    children: list[tuple[list[str], Path, subprocess.Popen]] = []
     ended = []
-    for ids, log, child in children:
-        status = child.wait()
-        seconds = round(time.monotonic() - started, 1)
-        ended.append({"ids": ids, "exit": status, "seconds": seconds, "log": log})
+    try:
+        with child_processes.terminable():
+            for number, ids in enumerate(shares, 1):
+                own, log = work / f"process-{number}.json", work / f"process-{number}.log"
+                # A signal that arrives while a child starts waits until the child is held here.
+                with child_processes.held():
+                    children.append((ids, log, start(child_command(sources, ids, own), log)))
+            for ids, log, child in children:
+                status = child.wait()
+                seconds = round(time.monotonic() - started, 1)
+                ended.append({"ids": ids, "exit": status, "seconds": seconds, "log": log})
+    except BaseException as error:
+        child_processes.stop([child for *_, child in children], signal.SIGTERM, groups=True)
+        msg = (
+            f"The narration was stopped by {cut_short(error)}; every narration process it had "
+            f"started ({len(children)}) was ended with it; their logs are in "
+            f"{repository.relative(work)}"
+        )
+        raise ProcessesError(msg) from error
     failed = [
         f"segments {', '.join(child['ids'])} exited {child['exit']} "
         f"({repository.relative(child['log'])}: {last_line(child['log'])})"
