@@ -67,6 +67,16 @@ Before it encodes, a derivation SHALL run the composition headlessly at every th
 - **WHEN** the captioned picture's whole ground is another colour on exactly the frames that show a caption
 - **THEN** the derivation refuses on the edge rows, naming the first such frame and `--native`, though every frame without a caption holds the ground
 
+#### Scenario: A side of the painted rows without a row to measure
+
+- **WHEN** the captions come so close to one edge of the painted rows that no edge row is left there, and the picture continues beyond that edge
+- **THEN** the derivation refuses before it encodes, naming that side and `--native`, though the other side has edge rows
+
+#### Scenario: Painted rows at the frame's own edge
+
+- **WHEN** the painted rows end with the frame's last row and have edge rows at their top
+- **THEN** the derivation measures the top edge rows alone and goes on, since no picture row lies beyond the bottom
+
 #### Scenario: A ground that leaves by degrees
 
 - **WHEN** the ground under a caption stands a little off for thirty frames and far off for thirty more

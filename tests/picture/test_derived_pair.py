@@ -140,7 +140,18 @@ def test_a_derivation_writes_the_picture_and_a_receipt_that_binds_its_source(pai
         (lambda tools: tools.audit.update(free=[[1.0, 1.1]]), "a caption at every instant"),
         (
             lambda tools: tools.audit.update(caption_rows=[936, 1024]),
-            "leaves no row free of captions at either edge of the painted rows; .* --native",
+            "leaves no row free of captions at either edge of the painted rows, beyond which "
+            "the picture continues; .* --native",
+        ),
+        # One side alone without a row to measure, where the picture continues beyond it.
+        (
+            lambda tools: tools.audit.update(caption_rows=[936, 1000]),
+            "leaves no row free of captions at the top edge of the painted rows, beyond which "
+            "the picture continues; .* --native",
+        ),
+        (
+            lambda tools: tools.audit.update(caption_rows=[960, 1024]),
+            "leaves no row free of captions at the bottom edge of the painted rows, .* --native",
         ),
     ],
 )
@@ -154,6 +165,18 @@ def test_a_refused_derivation_encodes_nothing_and_leaves_no_picture(pair, change
         derivation.derive_uncaptioned(edition)
     assert encodes == []
     assert not uncaptioned.file.exists() and not uncaptioned.receipt.exists()
+
+
+def test_a_band_at_the_frames_own_edge_needs_no_edge_rows_on_that_side(pair):
+    edition, tools, encodes = pair
+    # The captions reach the frame's last row: the painted rows end with the frame, and no
+    # picture row lies beyond them that could keep what was not painted over.
+    tools.composition["band"] = {**BAND, "top": 1040, "bottom": 1080}
+    tools.audit["caption_rows"] = [1040, 1080]
+    receipt = derivation.derive_uncaptioned(edition, 600)
+    assert receipt["derived"]["rows"] == [2032, 2160]
+    assert encodes[0]["edges"] == (16, 0)
+    assert receipt["derived"]["edge_check"]["rows"] == [16, 0]
 
 
 def test_a_captioned_picture_that_is_not_valid_refuses_before_anything_else(pair):

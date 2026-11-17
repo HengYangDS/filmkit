@@ -360,11 +360,13 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
     frames = ground_rows.free_frames(audit["free"])
     scale = PICTURE_SIZE[1] / equivalence.COMPOSITION_HEIGHT
     edges = ground_rows.edge_rows(rows, audit["caption_rows"], scale)
-    if not frames or not any(edges):
+    unmeasured = ground_rows.unmeasured_sides(rows, edges, PICTURE_SIZE[1])
+    if not frames or unmeasured:
         why = (
             "shows a caption at every instant, so its band's ground cannot be read"
             if not frames
-            else "leaves no row free of captions at either edge of the painted rows"
+            else f"leaves no row free of captions at {unmeasured} edge of the painted rows, "
+            "beyond which the picture continues"
         )
         msg = f"The {edition.code} film {why}; render the uncaptioned picture with {native}"
         raise PictureError(msg)

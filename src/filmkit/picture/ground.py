@@ -91,6 +91,20 @@ def edge_rows(rows: tuple[int, int], caption: list[float], scale: float) -> tupl
     return tuple(max(0, min(EDGE_ROWS, free // 2 * 2)) for free in (top, bottom))
 
 
+def unmeasured_sides(rows: tuple[int, int], edges: tuple[int, int], height: int) -> str:
+    """The sides of the painted rows that have no edge rows to measure although the picture
+    continues beyond them, as a refusal names them: `the top`, `the bottom`, `either`, or nothing
+    when each such side is measured. A side that ends with the frame has no row beyond it that
+    could keep what was not painted over, and needs none; painted rows that fill the whole
+    frame leave nothing to measure and count as both."""
+    top, bottom = edges
+    open_top = not top and (rows[0] > 0 or rows[1] >= height)
+    open_bottom = not bottom and (rows[1] < height or rows[0] <= 0)
+    if open_top and open_bottom:
+        return "either"
+    return "the top" if open_top else "the bottom" if open_bottom else ""
+
+
 def edge_filter(
     source: str, size: tuple[int, int], rows: tuple[int, int], edges: tuple[int, int], stats: Path
 ) -> str:

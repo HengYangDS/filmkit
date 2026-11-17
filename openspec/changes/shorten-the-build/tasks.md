@@ -26,6 +26,7 @@
 - [x] 3.9 Validate the captioned picture's binding to its current stage before a derived picture's own, so a changed stylesheet, font, template, script or soundtrack refuses both; verify `tests/picture/test_derived_pair.py`.
 - [x] 3.10 Render an uncaptioned picture through one function that writes into its receipt why it is rendered, for the command and for `repair-pictures` alike; verify `tests/picture/test_repair.py` (the repaired pair's receipt and passing record carry the statement), `tests/test_produce.py` and `tests/picture/test_uncaptioned_way.py`.
 - [x] 3.11 Name in both ground checks' refusals the first frame beyond the tolerance with its departure, how many frames stand beyond it and the largest departure with its frame; verify `tests/picture/test_derivation.py` (measures that leave by degrees; a clip whose ground stands about 11 and then 24 levels off under a caption).
+- [x] 3.12 Refuse a derivation, naming the side and `--native`, when a side of the painted rows beyond which the picture continues has no edge rows, and ask none of a side that ends with the frame; verify `tests/picture/test_derived_pair.py` (the top alone, the bottom alone, both; painted rows at the frame's last row).
 
 ## 4. The 1080p films
 
