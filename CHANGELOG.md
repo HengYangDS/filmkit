@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-18
+
 ### Added
 
 - `check-picture` runs a fourth audit, the detail audit (`filmkit.tools detail-audit`), through every frame at 60 frames per second, and its record binds the audit's report. The gate refuses a firm solid stroke of a scene that loses 30 px or more of its ink within one frame outside a declared stage cut (`ink_drop`), a text outside every scene that moves at 900 px/s or more, or over the film's `pace_limit` (`outside_pace`), a stroke drawn by its tip that stands part-drawn at the middle of the quiet between two thoughts (`part_drawn`) or whose tip draws at 900 px/s or more (`racing_tip`), and the names of one list on two alternate baselines less than 48 px apart at the rest of a thought (`rail`). The strokes are read from a `draws` list the composition publishes with each frame's layout; a composition that publishes none is recorded as not judged.
@@ -480,7 +482,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.22.3...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/HengYangDS/filmkit/compare/v0.22.3...v0.23.0
 [0.22.3]: https://github.com/HengYangDS/filmkit/compare/v0.22.2...v0.22.3
 [0.22.2]: https://github.com/HengYangDS/filmkit/compare/v0.22.1...v0.22.2
 [0.22.1]: https://github.com/HengYangDS/filmkit/compare/v0.22.0...v0.22.1
