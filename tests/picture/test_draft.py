@@ -32,7 +32,7 @@ def no_declared_capture(monkeypatch):
 
 
 def lanes_command(stage, draft, capture="--experimental-fast-capture", browser="--browser-gpu"):
-    """The film lanes' draft.py command after the renderer's path, with the host's worker count."""
+    """The film lanes' draft.py command after the renderer's path."""
     return [
         "render",
         str(stage),
@@ -43,7 +43,7 @@ def lanes_command(stage, draft, capture="--experimental-fast-capture", browser="
         "--quality",
         "draft",
         "--workers",
-        str(picture_rendering.render_workers()),
+        "8",
         "--gpu",
         browser,
         "--no-low-memory-mode",

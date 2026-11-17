@@ -1,4 +1,4 @@
-"""The render's worker count: taken from the host, or named for a measurement, and recorded."""
+"""The render's worker count: eight, or a count named for a measurement, and recorded."""
 
 import os
 
@@ -10,14 +10,13 @@ from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
 
 
-@pytest.mark.parametrize(
-    ("cores", "workers"),
-    [(18, 16), (10, 8), (12, 10), (8, 8), (4, 8), (32, 16), (None, 8)],
-)
-def test_the_count_is_the_cores_less_two_held_between_8_and_16(monkeypatch, cores, workers):
+@pytest.mark.parametrize("cores", [4, 8, 10, 18, 32, None])
+def test_the_count_is_eight_on_every_host(monkeypatch, cores):
     monkeypatch.delenv(picture_rendering.WORKERS_VARIABLE, raising=False)
     monkeypatch.setattr(os, "cpu_count", lambda: cores)
-    assert picture_rendering.render_workers() == workers
+    assert picture_rendering.render_workers() == picture_rendering.WORKERS == 8
+    command = picture_rendering.renderer_command(repository.ROOT, repository.ROOT, 60, "looks")
+    assert command[command.index("--workers") + 1] == "8"
 
 
 def test_a_named_count_is_passed_as_it_is(monkeypatch):
@@ -38,7 +37,7 @@ def test_a_value_that_is_no_count_is_refused_by_the_variable(monkeypatch, named)
 def test_an_empty_variable_is_read_as_unset(monkeypatch):
     monkeypatch.setattr(os, "cpu_count", lambda: 18)
     monkeypatch.setenv(picture_rendering.WORKERS_VARIABLE, "")
-    assert picture_rendering.render_workers() == 16
+    assert picture_rendering.render_workers() == 8
 
 
 def test_the_receipt_records_the_count_its_command_passes(film_root, monkeypatch):

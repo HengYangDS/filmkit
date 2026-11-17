@@ -111,19 +111,14 @@ After the editions, `python -m filmkit.durations` SHALL print the time of the bu
 - **WHEN** every counted command ended before the next started
 - **THEN** the build's time equals the sum of their seconds, whatever time passed between them
 
-### Requirement: The render's worker count comes from the host
+### Requirement: A render's worker count is eight unless one is named for a measurement
 
-Every render SHALL pass the renderer a worker count of the host's logical cores less two, never under 8 nor over 16, unless `FILMKIT_RENDER_WORKERS` names a positive whole number, which it then passes. A value that is no positive whole number SHALL be refused by the variable's name. The render receipt SHALL record the count.
+Every render SHALL pass the renderer 8 workers, on every host, unless `FILMKIT_RENDER_WORKERS` names a positive whole number, which it then passes. A value that is no positive whole number SHALL be refused by the variable's name before the renderer starts. The render receipt SHALL record the count.
 
-#### Scenario: A host of 18 cores
+#### Scenario: The count without the variable
 
-- **WHEN** a picture is rendered on a host of 18 logical cores with the variable unset
-- **THEN** the renderer command passes 16 workers and the receipt records 16
-
-#### Scenario: A host of 10 cores
-
-- **WHEN** a picture is rendered on a host of 10 logical cores with the variable unset
-- **THEN** the renderer command passes 8 workers
+- **WHEN** a picture or a draft is rendered on a host of 10 or of 18 logical cores with the variable unset
+- **THEN** the renderer command passes 8 workers and the receipt records 8
 
 #### Scenario: A count named for a measurement
 

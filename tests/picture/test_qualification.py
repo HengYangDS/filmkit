@@ -48,7 +48,7 @@ def test_two_renders_that_decode_alike_pass_and_the_second_is_removed(rendered):
     first, second = record["first"], record["second"]
     assert first["sha256"] == repository.sha(edition.picture)
     assert (first["frames"], second["frames"]) == (3, 3)
-    assert first["workers"] == second["workers"] == picture_rendering.render_workers()
+    assert first["workers"] == second["workers"] == 8
     work = repository.ROOT / qualification.WORK / "zh"
     assert not (work / edition.picture.name).exists()
     # The second render ran the pictures' command on the same stage, to the work file.

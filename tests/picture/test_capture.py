@@ -35,8 +35,8 @@ def rendered(film_root, captions: bool = True) -> dict:
 def picture_command(
     film_root, captions: bool, capture_flag: str, browser_flag: str = "--browser-gpu"
 ) -> list[str]:
-    """filmkit 0.19.0's renderer command for a picture of the Chinese edition but for its worker
-    count, which the host gives, with the capture and browser flags given."""
+    """filmkit 0.19.0's renderer command for a picture of the Chinese edition, with the capture
+    and browser flags given."""
     places = Edition("zh").rendered(captions)
     return [
         str(film_root.renderer),
@@ -51,7 +51,7 @@ def picture_command(
         "--crf",
         "14",
         "--workers",
-        str(picture_rendering.render_workers()),
+        "8",
         "--gpu",
         browser_flag,
         "--no-low-memory-mode",

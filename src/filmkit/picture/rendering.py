@@ -8,10 +8,10 @@ update checks and self-installs off, and records a receipt; validation binds the
 picture to that receipt, the stage and the current inputs. Every render passes the browser and
 capture flags of the film's declared capture (`film.Picture.capture`) and its receipt records
 that mode; validation refuses a picture rendered in another mode, reading a receipt that records
-none by its command. Every render passes the renderer a worker count taken from the host
-(`render_workers`), which its receipt records. A stage, render or receipt that differs from this
-contract raises `PictureError`, as does a film whose installed renderer is not the version the
-engine renders with.
+none by its command. Every render passes the renderer eight workers, or the count named for a
+measurement (`render_workers`), which its receipt records. A stage, render or receipt that
+differs from this contract raises `PictureError`, as does a film whose installed renderer is not
+the version the engine renders with.
 
 Each edition has two pictures (`production.Edition.rendered`): the captioned one, which draws
 the timeline's captions, and the uncaptioned one. The uncaptioned picture is derived from the
@@ -85,16 +85,18 @@ CAPTURE_FLAGS = {
     "screenshot": ("--browser-gpu", "--experimental-fast-capture=false"),
     "software": ("--no-browser-gpu", "--experimental-fast-capture=false"),
 }
-# The renderer's worker count is the host's logical cores less WORKERS_SPARE, held within
-# WORKERS_RANGE, unless WORKERS_VARIABLE names a count for a measurement. On a host of 18 cores a
-# span of 7,200 UHD frames took 126.2 to 141.2 s with 8 warm workers and 114.1 and 118.0 s with
-# 16, and 184.2 against 143.6 s cold, every frame identical (17 November 2026): a tenth to a
-# fifth less time. The renderer runs one render at a time for a user account unless the caller
-# sets RENDER_LOCK to "off", which a receipt records.
+# The renderer's worker count, unless WORKERS_VARIABLE names another for a measurement. The
+# workers capture frames and one encoder reads them. On a whole film of 36,000 UHD frames, on a
+# host of 18 cores (17 November 2026, back to back in one ticket): alone with 8 workers 354.9 s,
+# the encoder keeping pace with the capture (350 s); alone with 16 workers 438.4 s, the capture
+# done in 255 s and the encoder then needing 179 s more. More workers capture faster and starve
+# the encoder. A span of 7,200 frames had shown 16 a tenth to a fifth faster; a span that starts
+# inside a film pays a start that hides the encoder's lag, so that reading did not hold for a
+# whole film. The count changes no frame. The renderer runs one render at a time for a user
+# account unless the caller sets RENDER_LOCK to "off", which a receipt records.
 RENDER_LOCK = "HYPERFRAMES_RENDER_LOCK"
 WORKERS_VARIABLE = "FILMKIT_RENDER_WORKERS"
-WORKERS_RANGE = (8, 16)
-WORKERS_SPARE = 2
+WORKERS = 8
 # The renderer's encoding by quality: the delivered pictures' at CRF 14, and the draft's at the
 # rate its quality sets.
 QUALITIES = {"looks": ("--quality", "looks", "--crf", "14"), "draft": ("--quality", "draft")}
@@ -518,12 +520,11 @@ def require_passing_gates(edition: Edition) -> None:
 
 
 def render_workers() -> int:
-    """The worker count a render passes: what `WORKERS_VARIABLE` names, a positive whole number,
-    or else the host's logical cores less `WORKERS_SPARE`, held within `WORKERS_RANGE`."""
+    """The worker count a render passes: `WORKERS`, or what `WORKERS_VARIABLE` names for a
+    measurement, a positive whole number."""
     named = os.environ.get(WORKERS_VARIABLE)
     if not named:
-        low, high = WORKERS_RANGE
-        return max(low, min(high, (os.cpu_count() or low) - WORKERS_SPARE))
+        return WORKERS
     if not (named.isascii() and named.isdigit() and int(named) > 0):
         msg = f"{WORKERS_VARIABLE} names {named!r}, which is no positive whole number of workers"
         raise PictureError(msg)

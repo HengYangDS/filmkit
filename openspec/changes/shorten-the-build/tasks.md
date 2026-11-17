@@ -10,7 +10,7 @@
 
 ## 2. Render settings
 
-- [x] 2.1 Take the render's worker count from the host or from `FILMKIT_RENDER_WORKERS`, for the pictures and the draft, and record it in the receipt; verify `tests/picture/test_workers.py` (18 cores give 16, 10 give 8, a named count is passed and recorded, a value that is no count is refused) and `tests/picture/test_capture.py`.
+- [x] 2.1 Pass the renderer 8 workers, a named constant with the whole-film measurement beside it, or the count `FILMKIT_RENDER_WORKERS` names for a measurement, for the pictures and the draft, and record the count in the receipt; verify `tests/picture/test_workers.py` (8 on every host, a named count is passed and recorded, a value that is no count is refused) and `tests/picture/test_capture.py` (the command is filmkit 0.19.0's, element for element).
 - [x] 2.2 Make both editions' pictures with one command, `render-picture --language all`: a child of the single-edition command for each edition, the rendered pictures at the same time with the renderer's own lock off for those children, two derivations in a row, and a failing edition named once both have ended; verify `tests/picture/test_together.py`.
 
 ## 3. The derived uncaptioned picture
