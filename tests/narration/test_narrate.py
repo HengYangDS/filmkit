@@ -169,6 +169,27 @@ def test_a_run_records_its_duration_with_each_step_as_a_phase(commands):
     assert len(commands) == 3
 
 
+def test_a_check_only_run_is_recorded_as_such_and_leaves_the_narrations_record(commands):
+    durations = repository.ROOT / "build/evidence/editions/zh/durations"
+    narration_narrate.main(["--language", "zh"])
+    narrated = (durations / "narrate.json").read_bytes()
+    # The checks alone, as a film runs them after narrating chosen segments by hand.
+    narration_narrate.main(["--language", "zh", "--skip-generation"])
+    assert (durations / "narrate.json").read_bytes() == narrated
+    record = repository.read(durations / "narrate-checks.json")
+    assert (record["command"], record["completed"]) == ("narrate-checks", True)
+    assert [*record["phases"]] == ["alignment", "transcription"]
+    narration_narrate.main(["--language", "zh", "--skip-generation", "--ids", "06,07"])
+    assert repository.read(durations / "narrate-checks-06-07.json")["command"] == (
+        "narrate-checks-06-07"
+    )
+    assert sorted(path.name for path in durations.iterdir()) == [
+        "narrate-checks-06-07.json",
+        "narrate-checks.json",
+        "narrate.json",
+    ]
+
+
 def test_a_dry_run_writes_no_duration_record(commands):
     narration_narrate.main(["--language", "zh", "--dry-run"])
     assert not (repository.ROOT / "build/evidence/editions/zh/durations").exists()

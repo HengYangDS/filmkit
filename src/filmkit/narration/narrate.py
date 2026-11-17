@@ -13,10 +13,13 @@ Usage: python -m filmkit.narration.narrate
     --language zh|en [--ids 06,07] [--dry-run | --skip-generation]
 --dry-run prints the narration plan without writing; --skip-generation aligns and
 transcribes the existing receipt. Each step runs under this tool's interpreter. A run that is
-not a dry run writes its duration record, each step a phase (`filmkit.durations`), named
-`narrate` and, with --ids, after the segments as the receipt is. The record of a run that
-narrates states how many processes the synthesis may use (`filmkit.narration.processes`), which
-`FILMKIT_NARRATION_PROCESSES` names; a value that is no count is refused before any step.
+not a dry run writes its duration record, each step a phase (`filmkit.durations`). A run that
+narrates is recorded as `narrate`, the record an edition's build starts from, and one that only
+checks, with --skip-generation, as `narrate-checks`, so that it neither replaces the narration's
+record nor moves the build's start; with --ids either name ends with the segments, as the
+receipt's does. The record of a run that narrates states how many processes the synthesis may
+use (`filmkit.narration.processes`), which `FILMKIT_NARRATION_PROCESSES` names; a value that is
+no count is refused before any step.
 """
 
 import argparse
@@ -152,11 +155,17 @@ def main(argv: list[str] | None = None) -> None:
         count = processes.count()
     except processes.ProcessesError as error:
         raise SystemExit(str(error)) from None
-    suffix = f"-{options.ids.replace(',', '-')}" if options.ids else ""
-    with durations.run(options.language, f"narrate{suffix}") as run:
+    with durations.run(options.language, record_name(scope, options.ids)) as run:
         if scope is Scope.ALL:
             run.settings["narration_processes"] = count
         run_steps(options.language, options.ids, scope)
+
+
+def record_name(scope: Scope, ids: str = "") -> str:
+    """The name of a run's duration record: `narrate` for a run that narrates, `narrate-checks`
+    for one that only aligns and transcribes, and after either the segments --ids names."""
+    name = "narrate-checks" if scope is Scope.CHECKS else durations.BUILD_START
+    return name + (f"-{ids.replace(',', '-')}" if ids else "")
 
 
 def run_steps(code: str, ids: str, scope: Scope) -> None:

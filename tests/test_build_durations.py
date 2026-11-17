@@ -64,6 +64,22 @@ def test_the_sum_covers_what_started_at_or_after_the_latest_whole_narration(caps
 
 
 @pytest.mark.usefixtures("root")
+def test_a_check_only_narration_neither_starts_a_build_nor_drops_what_ran_before_it(capsys):
+    # A build narrates, renders, runs the narration's checks again and packages.
+    record("zh", "narrate", "2026-11-17T01:00:00+00:00", 700.0)
+    record("zh", "render-picture", "2026-11-17T01:12:00+00:00", 600.0)
+    record("zh", "narrate-checks", "2026-11-17T01:23:00+00:00", 60.0)
+    record("zh", "narrate-checks-06-07", "2026-11-17T01:24:30+00:00", 20.0)
+    record("zh", "package-film", "2026-11-17T01:25:00+00:00", 300.0)
+    lines = printed(capsys, "--language", "zh")
+    assert not [line for line in lines if line.endswith("earlier")]
+    assert lines[-2] == (
+        "  sum of the 5 commands completed since the narration started at "
+        "2026-11-17T01:00:00+00:00: 1680.0 s"
+    )
+
+
+@pytest.mark.usefixtures("root")
 def test_since_names_another_start_and_no_narration_counts_every_record(capsys):
     record("en", "check-picture", "2026-11-17T01:05:00+00:00", 40.0)
     record("en", "render-picture", "2026-11-17T01:06:00+00:00", 900.0)

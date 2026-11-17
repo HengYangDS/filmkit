@@ -68,6 +68,25 @@ Each action of `filmkit.produce`, each narration, each tool run from the command
 - **WHEN** an edition holds no duration record
 - **THEN** the command says so for that edition and exits 0
 
+### Requirement: A build starts at its whole narration's record
+
+An edition's build SHALL start at its duration record named `narrate`, which only a narration of the whole edition that generates writes. A narration of chosen segments SHALL be recorded as `narrate-<ids>` and a check-only narration as `narrate-checks`, with the ids after it when given; neither SHALL replace the whole narration's record or move the build's start. A build narrated otherwise SHALL name its start with `--since`.
+
+#### Scenario: A check-only narration within a build
+
+- **WHEN** an edition is narrated whole and rendered, and `narrate --skip-generation` then runs
+- **THEN** the check-only run is recorded as `narrate-checks`, the record `narrate` stands byte for byte, and the build's sum still counts the narration and the render
+
+#### Scenario: Checks of chosen segments
+
+- **WHEN** `narrate --skip-generation --ids 06,07` runs
+- **THEN** its record is `narrate-checks-06-07`
+
+#### Scenario: A build narrated by the synthesis command
+
+- **WHEN** a build's segments are narrated by `filmkit.narration.synthesis --ids`, which writes no duration record, and checked by `narrate --skip-generation`
+- **THEN** the build wrote no `narrate` record, and its durations are printed with `--since` naming its start
+
 ### Requirement: A build's time counts commands that ran together once
 
 After the editions, `python -m filmkit.durations` SHALL print the time of the build: the seconds during which at least one counted command of the selected editions was running, beside the sum of those commands' seconds. Commands that ran at the same time SHALL count once in the build's time, and the time between commands not at all. A budget stated for a build SHALL be judged by the build's time.

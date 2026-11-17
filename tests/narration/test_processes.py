@@ -153,7 +153,8 @@ def test_a_narration_records_the_count_of_processes_it_may_use(narrating, monkey
     assert record["settings"] == {"narration_processes": 1}
     # The checks alone narrate nothing, so their record names no count.
     narration_narrate.main(["--language", "en", "--skip-generation"])
-    assert repository.read("build/evidence/editions/en/durations/narrate.json")["settings"] == {}
+    checks = repository.read("build/evidence/editions/en/durations/narrate-checks.json")
+    assert checks["settings"] == {}
 
 
 def test_a_value_that_is_no_count_refuses_the_narration_before_any_step(narrating, monkeypatch):

@@ -14,8 +14,10 @@ inputs leaves that check's own record byte for byte as it was.
 
 A folder keeps the latest run of every command ever run there, so the sum the command prints is
 a build's only once it says which records it covers. An edition's build begins with its latest
-whole narration: the sum covers the commands that completed and started at or after that, and
-`--since` names another start, such as a build that keeps its narration. Records that started
+whole narration, the record `narrate`, which a narration of chosen segments and a check-only
+narration do not write: the sum covers the commands that completed and started at or after
+that, and `--since` names another start, for a build that keeps its narration or narrates its
+segments by the synthesis command itself, which writes no record. Records that started
 earlier are listed, marked as earlier and left out, and the last line says what was summed.
 A command run twice in a build counts once, by its latest run. A sum adds each command's
 seconds, so two commands that ran at the same time, such as two editions' renders, count in full.
@@ -52,8 +54,10 @@ if TYPE_CHECKING:
 
 # The folder of an edition's duration records, below its evidence.
 FOLDER = "durations"
-# The command whose latest record marks where an edition's build began: its whole narration, not
-# a narration of chosen segments, which is a retake within some build.
+# The command whose latest record marks where an edition's build began: its whole narration. A
+# narration of chosen segments is a retake within some build, and a check-only narration, which
+# generates nothing, runs at any point of one; each writes a record of another name
+# (`filmkit.narration.narrate.record_name`).
 BUILD_START = "narrate"
 
 
