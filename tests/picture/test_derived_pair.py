@@ -26,6 +26,8 @@ class Tools:
 
     def __init__(self):
         self.runs = []
+        # What the stand-in derivation refuses with for a one-frame change in the band, if any.
+        self.band_fault = ""
         self.composition = {
             "format": "caption-equivalence",
             "instants": 7,
@@ -69,14 +71,17 @@ def pair(film_root, monkeypatch):
     monkeypatch.setattr(derivation.tools, "run", tools)
     encodes = []
 
-    def derive(source, target, size, rows, frames, work, deadline, *, edges):
+    def derive(source, target, size, rows, frames, work, deadline, *, edges, code):
         encodes.append({"rows": rows, "frames": frames, "deadline": deadline, "edges": edges})
+        if tools.band_fault:
+            raise derivation.BandFault(tools.band_fault.format(code=code))
         target.write_text(f"derived from {repository.sha(source)}")
         check = {"frames": 99, "largest_departure": 1, "verdict": "pass"}
         whole = derivation.DURATION * derivation.FPS
         edge = {"rows": list(edges), "frames": whole, "largest_departure": 0, "verdict": "pass"}
+        scan = {"frames": whole, "changes": 0, "faults": [], "verdict": "pass"}
         made = {"ground": GROUND, "command": ["ffmpeg"], "elapsed_seconds": 1.5, "check": check}
-        return {**made, "edge_check": edge}
+        return {**made, "edge_check": edge, "band_scan": scan}
 
     monkeypatch.setattr(derivation, "derive", derive)
     return edition, tools, encodes
@@ -101,6 +106,13 @@ def test_a_derivation_writes_the_picture_and_a_receipt_that_binds_its_source(pai
     assert (derived["band"], derived["rows"]) == (BAND, [1872, 2048])
     assert (derived["ground"], derived["tolerance"]) == (GROUND, 3)
     assert derived["band_audit"]["verdict"] == derived["ground_check"]["verdict"] == "pass"
+    # The captioned picture's band was scanned at every frame for a one-frame change.
+    assert derived["band_scan"] == {
+        "frames": derivation.DURATION * derivation.FPS,
+        "changes": 0,
+        "faults": [],
+        "verdict": "pass",
+    }
     assert receipt["output_sha256"] == repository.sha(uncaptioned.file)
     # The edge rows: 16 at each side, of the 48 between the painted rows and the caption's.
     encode = {"rows": (1872, 2048), "frames": [(4, 50), (124, 176)], "deadline": 600}
@@ -179,6 +191,34 @@ def test_a_band_at_the_frames_own_edge_needs_no_edge_rows_on_that_side(pair):
     assert receipt["derived"]["edge_check"]["rows"] == [16, 0]
 
 
+def test_a_one_frame_change_in_the_band_refuses_naming_the_captioned_render_alone(pair):
+    edition, tools, _ = pair
+    uncaptioned = edition.rendered(False)
+    tools.band_fault = (
+        "The captioned picture's caption band changes for one frame: encoded frame 50 at 0.833 "
+        "s: the captioned picture holds a one-frame fault of 219 levels in box [1500, 1900, "
+        "1540, 1940] in the caption band; render it again with python -m filmkit.produce "
+        "render-picture --language {code}"
+    )
+    with pytest.raises(derivation.BandFault) as refused:
+        derivation.derive_uncaptioned(edition)
+    # The fault is the captioned picture's: the refusal does not offer a native uncaptioned
+    # render, which would leave the fault in the captioned films.
+    assert str(refused.value).endswith("render-picture --language zh")
+    assert "--native" not in str(refused.value)
+    assert not uncaptioned.file.exists() and not uncaptioned.receipt.exists()
+
+
+def test_a_derived_receipt_without_a_passed_band_scan_does_not_validate(pair):
+    edition, _, _ = pair
+    receipt = derivation.derive_uncaptioned(edition)
+    derivation.validate_binding(edition, receipt)
+    # A receipt of the Change's earlier form holds no scan of the band.
+    earlier = {key: value for key, value in receipt["derived"].items() if key != "band_scan"}
+    with pytest.raises(PictureError, match="records no completed derivation; run render-picture"):
+        derivation.validate_binding(edition, {**receipt, "derived": earlier})
+
+
 def test_a_captioned_picture_that_is_not_valid_refuses_before_anything_else(pair):
     edition, tools, encodes = pair
     edition.rendered(True).file.write_text("another picture")
@@ -229,7 +269,7 @@ def test_a_derived_pair_is_compared_by_its_record_without_decoding(compared):
     derived = record["encoded"]["derived"]
     assert (derived["rows"], derived["ground"]) == ([1872, 2048], GROUND)
     assert derived["ground_check"]["frames"] == 99
-    assert derived["edge_check"]["verdict"] == "pass"
+    assert derived["edge_check"]["verdict"] == derived["band_scan"]["verdict"] == "pass"
     assert repository.read(edition.caption_equivalence) == record
     assert equivalence.require_equivalence(edition) == record
 
@@ -262,7 +302,7 @@ def test_a_band_other_than_the_painted_one_is_a_finding_that_no_render_repairs(c
 def test_a_receipt_without_both_proofs_or_of_another_picture_is_refused(pair):
     edition, _, _ = pair
     receipt = derivation.derive_uncaptioned(edition)
-    for proof in ("band_audit", "ground_check", "edge_check"):
+    for proof in ("band_audit", "ground_check", "edge_check", "band_scan"):
         unproven = {**receipt, "derived": {**receipt["derived"], proof: {"verdict": "refuse"}}}
         with pytest.raises(PictureError, match="records no completed derivation"):
             derivation.validate_binding(edition, unproven)

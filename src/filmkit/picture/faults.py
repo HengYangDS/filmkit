@@ -221,15 +221,22 @@ def scan_command(
     return [*DECODE, *inputs, "-filter_complex", ";".join(graph), "-map", "[out]", *RAW]
 
 
+# What a decode that did not yield every plane is refused with, unless its caller names its own.
+REFUSED = "Decoding both pictures at every frame gave {read} of their {count} frames"
+
+
 def decode(
     command: list[str],
     length: int,
     log: Path,
     count: int,
     each: Callable[[int, np.ndarray], None],
+    deadline: float = DEADLINE,
+    refused: str = REFUSED,
 ) -> None:
     """Run a decode and hand `each` every frame's number and its plane of `length` bytes; refused
-    unless the decode yields exactly `count` planes without a message within DEADLINE."""
+    unless the decode yields exactly `count` planes without a message within `deadline`. The
+    refusal is `refused` with the planes read and due, then the decode's message."""
     read = 0
     with log.open("wb") as error:
         process = subprocess.Popen(
@@ -239,8 +246,8 @@ def decode(
             stdout=subprocess.PIPE,
             stderr=error,
         )
-        deadline = threading.Timer(DEADLINE, process.kill)
-        deadline.start()
+        timer = threading.Timer(deadline, process.kill)
+        timer.start()
         try:
             for frame in range(count):
                 data = process.stdout.read(length)
@@ -252,13 +259,10 @@ def decode(
         finally:
             process.stdout.close()
             process.wait()
-            deadline.cancel()
+            timer.cancel()
     message = log.read_text(errors="replace").strip()
     if process.returncode or message or extra or read != count:
-        msg = (
-            f"Decoding both pictures at every frame gave {read} of their {count} frames"
-            f"{': ' + message[:300] if message else ''}"
-        )
+        msg = refused.format(read=read, count=count) + (f": {message[:600]}" if message else "")
         raise PictureError(msg)
 
 

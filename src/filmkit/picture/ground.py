@@ -14,6 +14,13 @@ under a caption that is taller than the band.
 
 Not proven by either check: a change of the ground confined to the rows a caption covers, at
 frames that show the caption. The derived picture would paint over it.
+
+`BandScan` is the third thing the same decode proves, of the captioned picture itself: its band
+rows, as full-range grey, judged at every frame by the rule the comparison of a rendered pair
+applies to each picture's caption band (`filmkit.picture.faults.Band`). A sample far from both
+neighbouring frames while those agree is a one-frame fault, a fragment of a glyph drawn wrong
+for one frame in the text every viewer reads. The rule needs no twin, so a pair that is compared
+by its derivation's record keeps it.
 """
 
 from __future__ import annotations
@@ -21,10 +28,12 @@ from __future__ import annotations
 import math
 import re
 import subprocess
+import time
 from typing import TYPE_CHECKING
 
 import numpy as np
 
+import filmkit.picture.faults as faults
 import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
 from filmkit.specification import FPS
@@ -176,6 +185,52 @@ def edge_check(stats: Path, ground: dict, tolerance: int, fps: int) -> dict:
         )
         raise PictureError(beyond.refusal(what, "the band's ground"))
     return {"frames": count, "largest_departure": beyond.largest, "verdict": "pass"}
+
+
+class BandScan:
+    """The captioned picture's band rows at every frame of a derivation's decode, judged by the
+    comparison's rule for a caption band, with the seconds the judging took."""
+
+    def __init__(self, size: tuple[int, int], rows: tuple[int, int]) -> None:
+        self.width, self.height = size[0], rows[1] - rows[0]
+        self.band = faults.Band(rows[0])
+        self.seconds = 0.0
+        # The rows as the scan of a rendered pair decodes them, cropped before they are converted.
+        self.filter = f"crop={self.width}:{self.height}:0:{rows[0]},{faults.GREY}"
+
+    @property
+    def length(self) -> int:
+        """The bytes of one frame's band rows."""
+        return self.width * self.height
+
+    def add(self, frame: int, plane: np.ndarray) -> None:
+        began = time.monotonic()
+        self.band.add(frame, plane.reshape(self.height, self.width))
+        self.seconds += time.monotonic() - began
+
+    def report(self, count: int, fps: int = FPS) -> dict:
+        """What a derivation's receipt keeps of the scan: the frames, the rule's two levels, the
+        one-frame changes and the first of them as the comparison lists faults."""
+        changes = self.band.changes
+        listed = [
+            faults.fault(change, fps, "captioned", caption_band=True)
+            for change in changes[: faults.LISTED]
+        ]
+        return {
+            "frames": count,
+            "threshold": faults.THRESHOLD,
+            "tolerance": faults.TOLERANCE,
+            "changes": len(changes),
+            "faults": listed,
+            "verdict": "refuse" if changes else "pass",
+        }
+
+
+def band_findings(scan: dict, code: str | None) -> list[str]:
+    """A band scan's one-frame changes as the comparison's findings name faults, each with the
+    command that renders the captioned picture of the edition `code` again."""
+    every = {"faults": scan["faults"], "fault_frames": scan["changes"]}
+    return faults.findings({**every, "lasting": [], "lasting_runs": 0}, code)
 
 
 def free_frames(stretches: list[list[float]], fps: int = FPS) -> list[tuple[int, int]]:

@@ -97,6 +97,25 @@ Before it encodes, a derivation SHALL run the composition headlessly at every th
 - **WHEN** the captioned picture's band holds, at a frame without a caption, samples 10 levels from the ground
 - **THEN** the derivation refuses, naming the frame, and no uncaptioned picture stays in place
 
+### Requirement: A derivation scans the captioned picture's caption band for one-frame faults
+
+While it encodes, a derivation SHALL judge the captioned picture's caption band at every frame by the rule the comparison of a rendered pair applies to a caption band: a sample far from both neighbouring frames while those agree is a one-frame fault. It SHALL refuse on such a fault before any uncaptioned picture is in place, naming each frame, time and box and the command that renders the captioned picture again. The receipt SHALL record the scan, and validation SHALL require that it passed.
+
+#### Scenario: A fragment for one frame in the band
+
+- **WHEN** the captioned picture shows a fragment inside its caption for exactly one frame
+- **THEN** the derivation refuses, naming that frame, its time and box and `render-picture` of the captioned picture, and names no native uncaptioned render
+
+#### Scenario: Captions that appear, change and leave
+
+- **WHEN** a caption appears, another takes its place at once, and it leaves
+- **THEN** the scan finds no one-frame change, and the receipt records every frame scanned and no change
+
+#### Scenario: A receipt without the scan
+
+- **WHEN** a derived picture's receipt holds no passed scan of the band
+- **THEN** validation refuses the picture and asks for the derivation again
+
 ### Requirement: A derived pair is compared by its derivation's record
 
 For a pair whose uncaptioned picture is derived, `compare-pictures` SHALL decode no picture. It SHALL pass only when the composition report finds no difference beyond the captions and the derivation's receipt binds the current captioned picture, composition, timeline and engine, names the report's band and records its proofs as passed; its record SHALL say that the pair is derived. The requirements on two rendered pictures hold for a `--native` pair.
@@ -104,7 +123,7 @@ For a pair whose uncaptioned picture is derived, `compare-pictures` SHALL decode
 #### Scenario: A current derived pair
 
 - **WHEN** `compare-pictures` runs on a pair whose uncaptioned picture was derived from the current captioned picture
-- **THEN** it passes without decoding a picture, and its record says that the pair is derived and names the painted rows
+- **THEN** it passes without decoding a picture, and its record says that the pair is derived, names the painted rows and carries the derivation's proofs, the scan of the band among them
 
 #### Scenario: A captioned picture rendered again after the derivation
 

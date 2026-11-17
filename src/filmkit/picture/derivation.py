@@ -15,7 +15,7 @@ x264, the band's rows replaced by the ground as the captioned picture itself hol
 one of its frames in YUV, so no colour is converted. The rows are the band the composition report
 names, widened as a comparison widens it (`filmkit.picture.equivalence.excluded_rows`).
 
-A derivation proves three things, in work it does anyway:
+A derivation proves four things, in work it does anyway:
 
 - before it encodes, the band audit (`picture/band-audit.mjs`) runs the composition headlessly at
   every thirtieth of a second and refuses a caption paint that leaves the rows or any other paint
@@ -25,10 +25,17 @@ A derivation proves three things, in work it does anyway:
   highest sample of each plane stand within 3 levels of the ground (`filmkit.picture.ground`);
 - the same decode measures, at every frame of the film, the edge rows of the painted rows, which
   no caption reaches (`filmkit.picture.ground`), against the same ground and tolerance, so a
-  ground that changes while a caption shows is refused.
+  ground that changes while a caption shows is refused;
+- the same decode hands the captioned picture's band rows of every frame, as grey planes, to
+  the rule the comparison of a rendered pair applies to a caption band
+  (`filmkit.picture.faults.Band`): a sample far from both neighbouring frames while those agree
+  is a one-frame fault of the captioned picture, in the text every viewer reads. That rule
+  needs no twin, so a derived pair, whose comparison decodes nothing, keeps it.
 
 A refusal leaves no uncaptioned picture or receipt in place and names `--native`, which renders
-the uncaptioned stage instead (`filmkit.picture.rendering.render_picture`). The receipt, at the
+the uncaptioned stage instead (`filmkit.picture.rendering.render_picture`); a one-frame fault in
+the band is the captioned picture's own, and its refusal (`BandFault`) names the command that
+renders that picture again. The receipt, at the
 uncaptioned picture's own place, says `derived` and binds the captioned picture, its receipt, the
 composition, the timeline and the engine, with the rows, the ground and the proofs; validation
 reads either kind of receipt (`validate`, `validate_binding`), and `compare_derived` writes the
@@ -53,6 +60,7 @@ from typing import TYPE_CHECKING
 import filmkit.durations as durations
 import filmkit.media as media
 import filmkit.picture.equivalence as equivalence
+import filmkit.picture.faults as faults
 import filmkit.picture.ground as ground_rows
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
@@ -109,7 +117,12 @@ ENCODER = (
 DEADLINE = 7200
 NATIVE = "render-picture --language {code} --uncaptioned --native"
 # The proofs a derivation's receipt records, each with its verdict.
-PROOFS = ("band_audit", "ground_check", "edge_check")
+PROOFS = ("band_audit", "ground_check", "edge_check", "band_scan")
+
+
+class BandFault(PictureError):
+    """The captioned picture's caption band changes for one frame: a fault of that render, which
+    no derivation repairs."""
 
 
 def uncaptioned_way(edition: Edition | None = None, *, native: bool = False) -> dict:
@@ -227,14 +240,18 @@ def derive_command(
 ) -> list[str]:
     """The FFmpeg command of a derivation: one decode of the captioned picture feeds the encode,
     with the band's rows set to the ground, the measure of the band at the frames given, whose
-    lowest and highest samples go to `stats`, a path without a colon or a quote, and with `edges`
-    the measure of the edge rows at every frame, which goes beside it (`edge_stats`)."""
+    lowest and highest samples go to `stats`, a path without a colon or a quote, with `edges`
+    the measure of the edge rows at every frame, which goes beside it (`edge_stats`), and the
+    band's rows of every frame as grey planes on its standard output, for the band's one-frame
+    scan (`filmkit.picture.ground.BandScan`)."""
     measured = any(edges)
     graph = (
-        f"[0:v:0]split={3 if measured else 2}[picture][measure]{'[edge]' if measured else ''};"
+        f"[0:v:0]split={4 if measured else 3}[picture][measure][scan]"
+        f"{'[edge]' if measured else ''};"
         f"{painted('picture', size, rows, ground, 'derived')};"
         f"[measure]select='{ground_rows.selection(frames)}',{band_crop(size, rows)},signalstats,"
-        f"metadata=mode=print:file={stats}[measured]"
+        f"metadata=mode=print:file={stats}[measured];"
+        f"[scan]{ground_rows.BandScan(size, rows).filter}[band]"
     )
     if measured:
         graph += ";" + ground_rows.edge_filter("edge", size, rows, edges, edge_stats(stats))
@@ -258,6 +275,9 @@ def derive_command(
         "null",
         "-",
         *(["-map", "[edges]", "-f", "null", os.devnull] if measured else []),
+        "-map",
+        "[band]",
+        *faults.RAW,
     ]
 
 
@@ -276,11 +296,14 @@ def derive(
     deadline: float = DEADLINE,
     *,
     edges: tuple[int, int] = (0, 0),
+    code: str | None = None,
 ) -> dict:
-    """Derive `target` from `source` with the rows painted, in the work folder, and check the
-    ground: the ground, the command, its seconds and the checks' results, the band's at the
-    frames given and, with `edges`, the edge rows' at every frame (`filmkit.picture.ground`).
-    `target` is written only once the checks passed; a refusal removes the work's picture."""
+    """Derive `target` from `source` with the rows painted, in the work folder, and check what
+    the same decode proves: the ground, the command, its seconds and the checks' results, the
+    band's at the frames given, with `edges` the edge rows' at every frame, and the band's
+    one-frame scan of the source at every frame (`filmkit.picture.ground`). `target` is written
+    only once the checks passed; a refusal removes the work's picture. A one-frame change in the
+    source's band is a `BandFault`, which names the captioned render of the edition `code`."""
     work.mkdir(parents=True, exist_ok=True)
     partial, stats = work / "derived.mp4", work / "band-stats.txt"
     for earlier in (partial, stats, edge_stats(stats)):
@@ -289,21 +312,23 @@ def derive(
         ground = ground_rows.read_ground(source, rows, size, frames[0][0])
     relative = Path(repository.relative(stats))
     command = derive_command(source, partial, size, rows, ground, frames, relative, edges)
+    count = int(media.video_stream(media.probe(source))["nb_frames"])
+    scan, run = ground_rows.BandScan(size, rows), durations.current()
     started = time.monotonic()
     try:
         with durations.phase("encode"):
-            encode = subprocess.run(
-                command,
-                cwd=repository.ROOT,
-                stdin=subprocess.DEVNULL,
-                capture_output=True,
-                check=False,
-                timeout=deadline,
-            )
+            failed = "The derivation's encode failed after {read} of {count} frames"
+            log = work / "derive.log"
+            faults.decode(command, scan.length, log, count, scan.add, deadline, failed)
         seconds = time.monotonic() - started
-        if encode.returncode != 0 or encode.stderr:
-            msg = f"The derivation's encode failed: {encode.stderr.decode(errors='replace')[:600]}"
-            raise PictureError(msg)
+        if run is not None:
+            # The judging of the band's rows, which runs while the encode does.
+            run.add("band-scan", scan.seconds)
+        scanned = scan.report(count)
+        if scanned["changes"]:
+            found = "; ".join(ground_rows.band_findings(scanned, code))
+            msg = f"The captioned picture's caption band changes for one frame: {found}"
+            raise BandFault(msg)
         with durations.phase("ground-check"):
             check = ground_rows.ground_check(stats, frames, ground)
             edge = (
@@ -320,6 +345,7 @@ def derive(
     target.parent.mkdir(parents=True, exist_ok=True)
     partial.replace(target)
     made = {"ground": ground, "command": command, "elapsed_seconds": seconds, "check": check}
+    made["band_scan"] = scanned
     return made if edge is None else {**made, "edge_check": {"rows": list(edges), **edge}}
 
 
@@ -382,8 +408,19 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
     started = datetime.now(UTC)
     try:
         made = derive(
-            captioned.file, rendered.file, PICTURE_SIZE, rows, frames, work, deadline, edges=edges
+            captioned.file,
+            rendered.file,
+            PICTURE_SIZE,
+            rows,
+            frames,
+            work,
+            deadline,
+            edges=edges,
+            code=edition.code,
         )
+    except BandFault:
+        # The fault is the captioned picture's: its refusal names that render, not a native one.
+        raise
     except PictureError as error:
         msg = f"{error}; render the uncaptioned picture with {native}"
         raise PictureError(msg) from error
@@ -419,6 +456,7 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
             },
             "ground_check": made["check"],
             "edge_check": made["edge_check"],
+            "band_scan": made["band_scan"],
         },
         "command": made["command"],
         "exit": 0,

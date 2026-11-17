@@ -111,7 +111,7 @@ def test_a_failed_read_or_encode_is_refused_with_ffmpegs_message(root, monkeypat
     with pytest.raises(PictureError, match="Reading the band of frame 2 failed"):
         derivation.derive(source, root / "out.mp4", SIZE, (144, 400), FREE, root / "work")
     monkeypatch.setattr(derivation, "ENCODER", ("-c:v", "no-such-encoder"))
-    with pytest.raises(PictureError, match="encode failed: .*no-such-encoder"):
+    with pytest.raises(PictureError, match="encode failed after 0 of 120 frames: .*no-such-enc"):
         derivation.derive(source, root / "out.mp4", SIZE, ROWS, FREE, root / "work")
     assert not (root / "out.mp4").exists()
     assert not (root / "work/derived.mp4").exists()
