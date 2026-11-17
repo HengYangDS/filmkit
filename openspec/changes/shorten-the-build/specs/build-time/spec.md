@@ -208,9 +208,9 @@ When more than one segment is to be generated, the narration SHALL generate them
 - **WHEN** an edition is narrated with the variable unset on a host of 128 GB
 - **THEN** its duration record states a count of 3 narration processes
 
-### Requirement: No narration process outlives its narration
+### Requirement: No narration process and no renderer outlives its command
 
-Each narration process SHALL lead a session of its own. A narration that is interrupted, is asked to end (SIGTERM) or fails while its processes run SHALL end every process's whole process group before it exits, and SHALL refuse, naming what stopped it. `narrate` SHALL likewise end its running step when it is interrupted or asked to end, and its duration record SHALL then say that it did not complete.
+Each narration process SHALL lead a session of its own, as each renderer does. A command that is interrupted, is asked to end (SIGTERM) or fails while its narration processes or its renderer run SHALL end each one's whole process group before it exits, also when a second signal arrives meanwhile, and SHALL refuse, naming what stopped it. `narrate` SHALL likewise end its running step, and its duration record SHALL then say that it did not complete.
 
 #### Scenario: A narration asked to end
 
@@ -221,6 +221,16 @@ Each narration process SHALL lead a session of its own. A narration that is inte
 
 - **WHEN** the second of two processes cannot be started
 - **THEN** the first is ended, and the narration refuses, naming the failure
+
+#### Scenario: A render asked to end
+
+- **WHEN** a command that runs a renderer is sent SIGTERM while a renderer that ignores SIGTERM runs
+- **THEN** the renderer's process group is sent SIGTERM once and killed after the grace, the renderer has ended when the command exits, and the command refuses, naming the request
+
+#### Scenario: A second interrupt during the grace
+
+- **WHEN** a command that runs a renderer is interrupted, and interrupted again while it waits out the renderer's grace
+- **THEN** the renderer is still killed after the grace, and has ended when the command exits
 
 #### Scenario: A request to end during a step of narrate
 

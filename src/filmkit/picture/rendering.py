@@ -24,18 +24,17 @@ names none, and its places bind it to the captioned picture.
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import shutil
 import signal
 import subprocess
-import time
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import filmkit.child_processes as child_processes
 import filmkit.media as media
 import filmkit.repository as repository
 import filmkit.sources as sources
@@ -413,26 +412,9 @@ def require_receipt_places(receipt: dict, stage: Path, picture: Path) -> None:
 
 
 def stop_process_group(process: subprocess.Popen) -> None:
-    """End a process and the rest of its group: SIGTERM, then SIGKILL after the grace."""
-    with contextlib.suppress(ProcessLookupError):
-        os.killpg(process.pid, signal.SIGTERM)
-    ends = time.monotonic() + STOP_GRACE_SECONDS
-    with contextlib.suppress(subprocess.TimeoutExpired):
-        process.wait(timeout=STOP_GRACE_SECONDS)
-    while time.monotonic() < ends and group_exists(process.pid):
-        time.sleep(0.05)
-    with contextlib.suppress(ProcessLookupError):
-        os.killpg(process.pid, signal.SIGKILL)
-    process.wait()
-
-
-def group_exists(group: int) -> bool:
-    """Whether any process of a process group is still running."""
-    try:
-        os.killpg(group, 0)
-    except ProcessLookupError:
-        return False
-    return True
+    """End a renderer and the rest of its process group: SIGTERM, then SIGKILL after the grace
+    (`filmkit.child_processes.stop`, which holds a further signal until the group has ended)."""
+    child_processes.stop([process], signal.SIGTERM, groups=True, seconds=STOP_GRACE_SECONDS)
 
 
 def supplied_browser() -> Path:
@@ -468,23 +450,29 @@ def run_renderer(command: list[str], deadline: float) -> tuple[int | None, bool]
     """Run the renderer to its exit or deadline: its exit status, and whether it timed out.
 
     The renderer runs in its own session with its input closed, so stopping it reaches every
-    process it started; a failed exit stops remaining workers, and an interrupted wait stops
-    the group before the interruption propagates.
+    process it started; a failed exit stops remaining workers. A wait that is cut short, by an
+    interrupt or by a request to end (SIGTERM), which is an exception while the renderer runs
+    (`filmkit.child_processes`), stops the group before the cause propagates.
     """
-    process = subprocess.Popen(
-        command,
-        cwd=repository.ROOT,
-        stdin=subprocess.DEVNULL,
-        start_new_session=True,
-        env=renderer_environment(),
-    )
+    process = None
     try:
-        exit_code = process.wait(timeout=deadline)
+        with child_processes.terminable():
+            # A signal that arrives while the renderer starts waits until it is held here.
+            with child_processes.held():
+                process = subprocess.Popen(
+                    command,
+                    cwd=repository.ROOT,
+                    stdin=subprocess.DEVNULL,
+                    start_new_session=True,
+                    env=renderer_environment(),
+                )
+            exit_code = process.wait(timeout=deadline)
     except subprocess.TimeoutExpired:
         stop_process_group(process)
         return None, True
     except BaseException:
-        stop_process_group(process)
+        if process is not None:
+            stop_process_group(process)
         raise
     if exit_code != 0:
         stop_process_group(process)

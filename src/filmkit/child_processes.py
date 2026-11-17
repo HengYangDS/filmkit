@@ -111,10 +111,16 @@ def stop(
 ) -> None:
     """Ask the children that still run to end and wait for them; kill what has not ended after
     `seconds`, `STOP_SECONDS` unless given. With `groups` each child leads a session of its own:
-    both signals go to its whole process group, and the wait is for the group. An interrupt or a
-    request to end that arrives meanwhile is held until every child has ended."""
+    both signals go to its whole process group, the wait is for the group, and a child that has
+    ended while processes of its group still run, such as a renderer's workers, counts as
+    running. An interrupt or a request to end that arrives meanwhile is held until every child
+    has ended."""
     with held():
-        running = [child for child in children if child.poll() is None]
+        running = [
+            child
+            for child in children
+            if child.poll() is None or (groups and group_exists(child.pid))
+        ]
         for child in running:
             send(child, asking, group=groups)
         ends = time.monotonic() + (STOP_SECONDS if seconds is None else seconds)

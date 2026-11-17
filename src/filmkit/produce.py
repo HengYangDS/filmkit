@@ -37,6 +37,7 @@ import argparse
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import filmkit.child_processes as child_processes
 import filmkit.durations as durations
 import filmkit.picture.derivation as derivation
 import filmkit.picture.draft as draft
@@ -228,6 +229,9 @@ def main(argv: list[str] | None = None) -> None:
             EDITION_ACTIONS[options.action](Edition(options.language), options)
     except REFUSALS as error:
         msg = f"{options.action}: {error}"
+        raise SystemExit(msg) from None
+    except child_processes.Terminated:
+        msg = f"{options.action}: asked to end (SIGTERM); the renderer it ran was ended with it"
         raise SystemExit(msg) from None
 
 

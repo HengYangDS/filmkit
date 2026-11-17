@@ -75,6 +75,18 @@ def test_a_straggler_of_a_group_whose_leader_ended_is_killed_too(tmp_path, monke
     assert wait_for(lambda: not alive(straggler), 3)
 
 
+def test_a_group_whose_leader_has_ended_is_stopped_all_the_same(tmp_path):
+    noted = tmp_path / "worker.pid"
+    script = f"/bin/sleep 60 & echo $! > {noted}"
+    leader = subprocess.Popen(["/bin/sh", "-c", script], start_new_session=True)
+    assert leader.wait(timeout=10) == 0
+    worker = int(noted.read_text())
+    assert alive(worker)
+    # The leader has ended; what it started still runs in its group, as a renderer's workers do.
+    child_processes.stop([leader], signal.SIGTERM, groups=True)
+    assert wait_for(lambda: not alive(worker), 3)
+
+
 def test_without_groups_the_signal_goes_to_the_child_alone():
     code = "import signal, sys, time\n"
     code += "signal.signal(signal.SIGINT, lambda *_: sys.exit(7))\n"
