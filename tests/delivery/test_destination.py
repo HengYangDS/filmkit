@@ -74,6 +74,86 @@ def test_elsewhere_the_xdg_videos_directory_is_read_in_its_order(home, tmp_path,
     )
 
 
+@pytest.fixture
+def listed(home, monkeypatch):
+    """The user's directories file on a host that is not macOS, to be written by the test."""
+    monkeypatch.setattr(delivery_folder.sys, "platform", "linux")
+    file = home / ".config/user-dirs.dirs"
+    file.parent.mkdir()
+    return file
+
+
+@pytest.mark.parametrize(
+    ("line", "folder"),
+    [
+        ('XDG_VIDEOS_DIR="$HOME/Filme"', "{home}/Filme"),
+        ('XDG_VIDEOS_DIR="${{HOME}}/Filme"', "{home}/Filme"),
+        ('XDG_VIDEOS_DIR="$HOME"', "{home}"),
+        ("XDG_VIDEOS_DIR='$HOME/Filme'", "{home}/Filme"),
+        ('XDG_VIDEOS_DIR="/srv/films"', "/srv/films"),
+        ("XDG_VIDEOS_DIR='/srv/our films'", "/srv/our films"),
+        ('XDG_VIDEOS_DIR="$HOME/Filme"  # where the films go', "{home}/Filme"),
+        ('  XDG_VIDEOS_DIR = "$HOME/Filme"\t#x', "{home}/Filme"),
+        (r'''XDG_VIDEOS_DIR="$HOME/My \"Films\" \$1"''', '{home}/My "Films" $1'),
+        ('XDG_VIDEOS_DIR="$HOME/Alt"\nXDG_VIDEOS_DIR="$HOME/Neu"', "{home}/Neu"),
+        ('# XDG_VIDEOS_DIR="/commented"\nXDG_VIDEOS_DIR="$HOME/Filme"', "{home}/Filme"),
+    ],
+)
+def test_the_videos_line_is_read_as_xdg_user_dirs_writes_it(home, listed, line, folder):
+    listed.write_text(f'XDG_MUSIC_DIR="$HOME/Musik"\n{line.format(home=home)}\n')
+    found, rule = delivery_folder.delivery_destination()
+    assert found == (delivery_folder.Path(folder.format(home=home)) / NAME).resolve()
+    assert rule == f"XDG_VIDEOS_DIR in {listed}"
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        'XDG_VIDEOS_DIR="Filme"',
+        'XDG_VIDEOS_DIR="./Filme"',
+        'XDG_VIDEOS_DIR="~/Filme"',
+        'XDG_VIDEOS_DIR="$HOMER/Filme"',
+        'XDG_VIDEOS_DIR="$XDG_DATA_HOME/Filme"',
+        "XDG_VIDEOS_DIR=$HOME/Filme",
+        'XDG_VIDEOS_DIR="$HOME/Filme',
+        'XDG_VIDEOS_DIR="$HOME/Filme" and more',
+        'export XDG_VIDEOS_DIR="$HOME/Filme"',
+        'XDG_VIDEOS_DIR=""',
+        "XDG_VIDEOS_DIR=",
+    ],
+)
+def test_a_videos_line_that_names_no_absolute_folder_is_not_used_and_the_rule_says_so(
+    home, listed, line
+):
+    # An earlier line that is usable does not count: the last one is what a shell would hold.
+    listed.write_text(f'XDG_VIDEOS_DIR="$HOME/Filme"\n{line}\n')
+    found, rule = delivery_folder.delivery_destination()
+    assert found == (home / "Videos" / NAME).resolve()
+    assert rule == (
+        "the XDG default videos folder ~/Videos, since the XDG_VIDEOS_DIR line of "
+        f"{listed} is not usable ({line})"
+    )
+
+
+def test_a_relative_folder_in_the_environment_is_not_used_either(home, listed, monkeypatch):
+    monkeypatch.setenv(delivery_folder.XDG_VIDEOS, "films")
+    monkeypatch.setenv("XDG_CONFIG_HOME", "relative/config")
+    listed.write_text('XDG_VIDEOS_DIR="$HOME/Filme"\n')
+    # The file below ~/.config is read, since the configuration folder named is relative too.
+    assert delivery_folder.delivery_destination() == (
+        (home / "Filme" / NAME).resolve(),
+        f"XDG_VIDEOS_DIR in {listed}",
+    )
+    listed.write_text('XDG_VIDEOS_DIR="Filme"\n')
+    found, rule = delivery_folder.delivery_destination()
+    assert found == (home / "Videos" / NAME).resolve()
+    assert rule == (
+        "the XDG default videos folder ~/Videos, since XDG_VIDEOS_DIR in the environment is no "
+        f"absolute path (films) and the XDG_VIDEOS_DIR line of {listed} is not usable "
+        '(XDG_VIDEOS_DIR="Filme")'
+    )
+
+
 @pytest.mark.rsync
 def test_a_delivery_records_its_destination_and_the_rule_that_gave_it(
     film, home, monkeypatch, capsys

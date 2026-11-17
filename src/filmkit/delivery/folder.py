@@ -5,8 +5,9 @@ The engine names no folder of a host. The destination is, in this order: the fol
 `FILMKIT_DELIVERY_ROOT` names, a host's setting; or that name below the user's videos folder as
 the platform defines it, which on macOS is ~/Movies and elsewhere the XDG videos directory:
 `XDG_VIDEOS_DIR` in the environment, else its line in ${XDG_CONFIG_HOME:-~/.config}/user-dirs.dirs,
-else ~/Videos. Films are videos, and that folder is the user's place for them. The readback
-records the folder and which of these rules gave it.
+else ~/Videos; a value there that is no absolute path is passed over. Films are videos, and that
+folder is the user's place for them. The readback records the folder and which of these rules
+gave it, with what was passed over.
 
 The destination holds exactly the 25 delivery members: the language entry page and, per
 edition, its four films, the UHD and the 1080p film each with the captions drawn and without
@@ -64,6 +65,11 @@ ROOT_VARIABLE = "FILMKIT_DELIVERY_ROOT"
 # does not, below the XDG configuration folder.
 XDG_VIDEOS = "XDG_VIDEOS_DIR"
 XDG_USER_DIRS = "user-dirs.dirs"
+# The videos line of that file as xdg-user-dirs writes it: the name, the value in double quotes,
+# where a backslash guards the next character, or in single quotes, and at most a comment after.
+XDG_LINE = re.compile(
+    rf"""^[ \t]*{XDG_VIDEOS}[ \t]*=[ \t]*(?:"((?:[^"\\]|\\.)*)"|'([^']*)')[ \t]*(?:\#.*)?$"""
+)
 # The folder below which every member lies as it lies below the destination.
 SOURCE = LANGUAGE_INDEX.parent
 PREDECESSORS = Path("build/artifacts/delivery/predecessors")
@@ -86,23 +92,55 @@ class DeliveryRefusedError(Exception):
     """A delivery that cannot be made or a destination that does not read back."""
 
 
+def listed_videos(listed: Path, home: Path) -> tuple[Path | None, str | None]:
+    """The videos folder that the user's directories file names, or else the line that names it
+    and cannot be used; neither where the file is absent or has no such line.
+
+    The line is read as xdg-user-dirs writes it and the last one counts, as for a shell that
+    reads the file: the value in quotes, `$HOME/...` or an absolute path, then at most a
+    comment. Any other line that sets it, a relative value or an `export` among them, names no
+    folder.
+    """
+    text = listed.read_text(errors="replace") if listed.is_file() else ""
+    naming = re.compile(rf"[ \t]*(export[ \t]+)?{XDG_VIDEOS}[ \t]*=")
+    lines = [line for line in text.splitlines() if naming.match(line)]
+    if not lines:
+        return None, None
+    written = XDG_LINE.match(lines[-1])
+    value = ""
+    if written:
+        value = written[2] if written[1] is None else re.sub(r"\\(.)", r"\1", written[1])
+        for spelled in ("$HOME", "${HOME}"):
+            if value == spelled or value.startswith(f"{spelled}/"):
+                value = str(home) + value[len(spelled) :]
+    if value.startswith("/"):
+        return Path(value), None
+    return None, lines[-1].strip()
+
+
 def videos_folder() -> tuple[Path, str]:
     """The user's videos folder as the platform defines it, and the rule that names it: ~/Movies
     on macOS; elsewhere the XDG videos directory, from the environment, else from the user's
-    directories file, else ~/Videos."""
+    directories file, else ~/Videos. A value that is not an absolute path, in the environment
+    or in the file, is not used, and the rule then says which was passed over."""
     home = Path.home()
     if sys.platform == "darwin":
         return home / "Movies", "the macOS videos folder ~/Movies"
-    if os.environ.get(XDG_VIDEOS):
-        return Path(os.environ[XDG_VIDEOS]), f"{XDG_VIDEOS} in the environment"
-    listed = Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config") / XDG_USER_DIRS
-    lines = listed.read_text(errors="replace") if listed.is_file() else ""
-    named = re.search(rf'^\s*{XDG_VIDEOS}="?([^"\n]+)"?\s*$', lines, re.MULTILINE)
+    passed_over = []
+    named = os.environ.get(XDG_VIDEOS)
+    if named and Path(named).is_absolute():
+        return Path(named), f"{XDG_VIDEOS} in the environment"
     if named:
-        # The file writes the home folder as $HOME.
-        folder = named[1].replace("${HOME}", str(home)).replace("$HOME", str(home))
-        return Path(folder), f"{XDG_VIDEOS} in {listed}"
-    return home / "Videos", "the XDG default videos folder ~/Videos"
+        passed_over.append(f"{XDG_VIDEOS} in the environment is no absolute path ({named})")
+    config = os.environ.get("XDG_CONFIG_HOME", "")
+    listed = (Path(config) if Path(config).is_absolute() else home / ".config") / XDG_USER_DIRS
+    folder, line = listed_videos(listed, home)
+    if folder:
+        return folder, f"{XDG_VIDEOS} in {listed}"
+    if line:
+        passed_over.append(f"the {XDG_VIDEOS} line of {listed} is not usable ({line})")
+    rule = "the XDG default videos folder ~/Videos"
+    return home / "Videos", rule + (f", since {' and '.join(passed_over)}" if passed_over else "")
 
 
 def delivery_destination(named: str | Path | None = None) -> tuple[Path, str]:

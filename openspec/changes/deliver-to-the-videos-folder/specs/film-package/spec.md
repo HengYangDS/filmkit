@@ -24,6 +24,16 @@ The delivery SHALL fill, in this order: the folder `--destination` names; the fi
 - **WHEN** the delivery runs elsewhere with neither
 - **THEN** the videos folder is `XDG_VIDEOS_DIR` of the environment, else the `XDG_VIDEOS_DIR` line of `user-dirs.dirs` below `XDG_CONFIG_HOME` or `~/.config`, else `~/Videos`
 
+#### Scenario: The videos line as xdg-user-dirs writes it
+
+- **WHEN** the `XDG_VIDEOS_DIR` line of `user-dirs.dirs` holds its value in double or in single quotes, as `$HOME/...` or as an absolute path, with or without a comment after it
+- **THEN** that folder is the videos folder, and of several such lines the last counts
+
+#### Scenario: A videos line that cannot be used
+
+- **WHEN** that line holds a relative value, a value without quotes or anything else after the value than a comment
+- **THEN** the videos folder is `~/Videos`, and the rule the readback records says that the file's line was not usable and gives the line
+
 #### Scenario: A dry run
 
 - **WHEN** the delivery runs with `--dry-run`
