@@ -18,9 +18,13 @@ Where a request must not interrupt, `held` defers the first one to the end of it
 a child starts, so that the request finds the child already among those to end, and while
 children are being ended (`stop`), when the cause was not a request.
 
-`stop` asks each child that still runs to end, by a signal to the child or, for a child that
-leads a session of its own, to its whole process group, so that what the child started ends
-with it; it waits for them and kills what has not ended after `STOP_SECONDS`.
+`stop` asks each child that has not been reaped to end, by a signal to the child or, for a
+child that leads a session of its own, to its whole process group, so that what the child
+started ends with it; it waits for them and kills what has not ended after `STOP_SECONDS`. A
+child is reaped only once that is done, and one that was reaped before is never signalled: a
+reaped child's number is no longer its own, and the kernel may have given it to another process
+since. `ended` waits for a child's end without reaping it, so that a caller can still have the
+group it leads ended.
 
 `filmkit.picture.rendering` uses these for a renderer, `filmkit.narration.processes` for a
 narration's shares, and `filmkit.narration.narrate` for each of its steps (`run`).
@@ -34,6 +38,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import select
 import signal
 import subprocess
 import sys
@@ -206,6 +211,39 @@ def send(child: subprocess.Popen, number: int, *, group: bool) -> None:
             child.send_signal(number)
 
 
+def ended(child: subprocess.Popen, seconds: float | None = None) -> bool:
+    """Wait until a child has ended, at most `seconds`, without reaping it: whether it ended.
+
+    A child that has ended and is not reaped keeps its number, and with it the number of the
+    process group it leads, so what is left of that group can still be ended by the number with
+    no risk of reaching another process (`stop`). The wait is the kernel's own for a process's
+    end: a kernel queue where there is one, as on macOS, and `waitid` elsewhere.
+    """
+    if child.returncode is not None:
+        return True
+    if not hasattr(select, "kqueue"):
+        ends = None if seconds is None else time.monotonic() + seconds
+        look = os.WEXITED | os.WNOWAIT | os.WNOHANG
+        while os.waitid(os.P_PID, child.pid, look) is None:
+            if ends is not None and time.monotonic() >= ends:
+                return False
+            time.sleep(POLL_SECONDS)
+        return True
+    queue = select.kqueue()
+    try:
+        exits = select.kevent(
+            child.pid,
+            filter=select.KQ_FILTER_PROC,
+            flags=select.KQ_EV_ADD | select.KQ_EV_ONESHOT,
+            fflags=select.KQ_NOTE_EXIT,
+        )
+        return bool(queue.control([exits], 1, seconds))
+    except ProcessLookupError:
+        return True
+    finally:
+        queue.close()
+
+
 def stop(
     children: list[subprocess.Popen],
     asking: int = signal.SIGINT,
@@ -213,31 +251,27 @@ def stop(
     groups: bool = False,
     seconds: float | None = None,
 ) -> None:
-    """Ask the children that still run to end and wait for them; kill what has not ended after
-    `seconds`, `STOP_SECONDS` unless given. With `groups` each child leads a session of its own:
-    both signals go to its whole process group, the wait is for the group, and a child that has
-    ended while processes of its group still run, such as a renderer's workers, counts as
-    running. A first request to end that arrives meanwhile is deferred until every child has
-    ended (`held`)."""
+    """Ask the children that have not been reaped to end and wait for them; kill what has not
+    ended after `seconds`, `STOP_SECONDS` unless given, and reap each one last. A child that was
+    reaped before the call is left out: its number may be another process's by now.
+
+    With `groups` each child leads a session of its own: both signals go to its whole process
+    group, also where the child itself has ended and waits to be reaped while processes it
+    started run on, as a renderer's workers do, and the wait is for the group. The child is
+    reaped only when its group has ended or been killed, so the number that is signalled is the
+    child's own throughout. On a kernel that counts an ended child that is not reaped as a
+    member of its group, which macOS does not, the wait for a group runs its full time. A first
+    request to end that arrives meanwhile is deferred until every child has ended (`held`)."""
     with held():
-        running = [
-            child
-            for child in children
-            if child.poll() is None or (groups and group_exists(child.pid))
-        ]
+        running = [child for child in children if child.returncode is None]
         for child in running:
             send(child, asking, group=groups)
         ends = time.monotonic() + (STOP_SECONDS if seconds is None else seconds)
-        late = []
         for child in running:
-            try:
-                child.wait(timeout=max(0.0, ends - time.monotonic()))
-            except subprocess.TimeoutExpired:
-                late.append(child)
-        while groups and time.monotonic() < ends and any(group_exists(c.pid) for c in running):
-            time.sleep(POLL_SECONDS)
-        for child in running:
-            if any(child is other for other in late) or (groups and group_exists(child.pid)):
+            late = not ended(child, max(0.0, ends - time.monotonic()))
+            while groups and not late and time.monotonic() < ends and group_exists(child.pid):
+                time.sleep(POLL_SECONDS)
+            if late or (groups and group_exists(child.pid)):
                 send(child, signal.SIGKILL, group=groups)
             child.wait()
 

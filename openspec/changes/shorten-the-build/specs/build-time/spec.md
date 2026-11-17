@@ -232,6 +232,16 @@ Each narration process SHALL lead a session of its own, as each renderer does. A
 - **WHEN** a command that runs a renderer is sent SIGTERM while a renderer that ignores SIGTERM runs
 - **THEN** the renderer's process group is sent SIGTERM once and killed after the grace, the renderer has ended when the command exits, and the command's one line names the request
 
+#### Scenario: A renderer that exits and leaves a worker
+
+- **WHEN** a renderer exits, with status 0 or with another, while a process it started still runs
+- **THEN** that process has ended when the run of the renderer returns, and the run reports the renderer's own exit status
+
+#### Scenario: A narration process that ended long before
+
+- **WHEN** a narration is asked to end after one of its two processes has ended and been waited for
+- **THEN** only the process that still runs is sent a signal, and no process that has since been given the other's number
+
 #### Scenario: A second interrupt during the grace
 
 - **WHEN** a command that runs a renderer is interrupted, and interrupted again while it waits out the renderer's grace

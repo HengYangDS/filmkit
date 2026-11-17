@@ -75,16 +75,62 @@ def test_a_straggler_of_a_group_whose_leader_ended_is_killed_too(tmp_path, monke
     assert wait_for(lambda: not alive(straggler), 3)
 
 
-def test_a_group_whose_leader_has_ended_is_stopped_all_the_same(tmp_path):
+def test_the_group_of_a_leader_that_has_ended_and_is_not_reaped_is_stopped(tmp_path):
     noted = tmp_path / "worker.pid"
     script = f"/bin/sleep 60 & echo $! > {noted}"
     leader = subprocess.Popen(["/bin/sh", "-c", script], start_new_session=True)
-    assert leader.wait(timeout=10) == 0
+    # The leader's end is waited for without reaping it, so its number is still its own.
+    assert child_processes.ended(leader, 10)
+    assert leader.returncode is None
     worker = int(noted.read_text())
     assert alive(worker)
-    # The leader has ended; what it started still runs in its group, as a renderer's workers do.
+    # What it started still runs in its group, as a renderer's workers do.
     child_processes.stop([leader], signal.SIGTERM, groups=True)
     assert wait_for(lambda: not alive(worker), 3)
+    assert leader.returncode == 0
+
+
+def test_a_wait_for_a_childs_end_does_not_reap_it_and_tells_when_it_has_not_ended(processes):
+    child = processes.start([sys.executable, "-c", "raise SystemExit(3)"])
+    assert child_processes.ended(child) is True
+    # Not reaped: the process is still there as one that has ended, and the look is repeatable.
+    assert child.returncode is None
+    assert child_processes.ended(child, 0) is True
+    assert child.wait() == 3
+    assert child_processes.ended(child) is True
+    running = processes.start([sys.executable, "-c", "import time; time.sleep(60)"])
+    assert child_processes.ended(running, 0.2) is False
+    assert running.poll() is None
+
+
+# A bystander in a session of its own: it notes each signal it gets, and what it got when it
+# is sent SIGUSR1, which ends it.
+BYSTANDER = """
+import signal, sys, time
+got = []
+def told(number, frame):
+    got.append(number)
+    if number == signal.SIGUSR1:
+        note("bystander-got", signals=got)
+        raise SystemExit(0)
+signal.signal(signal.SIGTERM, told)
+signal.signal(signal.SIGUSR1, told)
+note("bystander")
+time.sleep(60)
+"""
+
+
+def test_a_reaped_child_is_never_signalled_though_its_number_names_a_running_group(processes):
+    bystander = processes.python(processes.script("bystander", BYSTANDER), session=True)
+    processes.noted("bystander")
+    reaped = processes.start([sys.executable, "-c", "pass"], start_new_session=True)
+    assert reaped.wait(timeout=10) == 0
+    # The kernel is free to give a reaped child's number to another process: here the number
+    # is set to that of a process that leads a group of its own and runs.
+    reaped.pid = bystander.pid
+    child_processes.stop([reaped], signal.SIGTERM, groups=True, seconds=0.2)
+    os.kill(bystander.pid, signal.SIGUSR1)
+    assert processes.noted("bystander-got")["signals"] == [signal.SIGUSR1]
 
 
 def test_without_groups_the_signal_goes_to_the_child_alone():
@@ -107,31 +153,22 @@ def test_a_termination_is_an_exception_inside_the_block_and_the_handler_is_resto
     assert signal.getsignal(signal.SIGTERM) is earlier
 
 
-def test_a_stop_is_not_cut_short_by_a_second_request():
-    """A request that arrives while the children are being stopped waits until they have ended."""
-    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
-    sent = []
+def test_a_request_that_arrives_during_a_stop_is_acted_on_once_the_children_have_ended(
+    processes, monkeypatch
+):
+    child = processes.start([sys.executable, "-c", "import time; time.sleep(60)"])
+    send, sent = child_processes.send, []
 
-    class Asking:
-        """The child, which asks this process to end as soon as it is itself asked to."""
+    def asking(child, number, *, group):
+        # The request arrives as the child is asked to end, handed over as the interpreter does.
+        child_processes.receive(signal.SIGTERM)
+        sent.append(number)
+        send(child, number, group=group)
 
-        pid = child.pid
-
-        def poll(self):
-            return child.poll()
-
-        def send_signal(self, number):
-            os.kill(os.getpid(), signal.SIGTERM)
-            sent.append(number)
-            child.send_signal(number)
-
-        def wait(self, timeout=None):
-            return child.wait(timeout=timeout)
-
+    monkeypatch.setattr(child_processes, "send", asking)
     with pytest.raises(Terminated), child_processes.terminable():
-        child_processes.stop([Asking()], signal.SIGTERM)
-        time.sleep(5)
-    # The second request was raised only after the child had been waited for.
+        child_processes.stop([child], signal.SIGTERM)
+    # The request was raised only after the child had been waited for, and nothing was killed.
     assert sent == [signal.SIGTERM]
     assert child.returncode == -signal.SIGTERM
 
@@ -158,21 +195,20 @@ def test_a_request_that_arrives_while_run_starts_its_child_still_ends_that_child
     signals = []
 
     class Started:
-        """A child whose start is when the request to end arrives."""
+        """A child whose start is when the request to end arrives, handed over as the
+        interpreter does; it ends when it is asked to."""
 
-        pid = 0
+        pid, returncode = 0, None
 
         def __init__(self, command, cwd):
-            os.kill(os.getpid(), signal.SIGTERM)
-
-        def poll(self):
-            return -signal.SIGTERM if signals else None
+            child_processes.receive(signal.SIGTERM)
 
         def send_signal(self, number):
             signals.append(number)
+            self.returncode = -number
 
         def wait(self, timeout=None):
-            return -signal.SIGTERM
+            return self.returncode
 
     monkeypatch.setattr(child_processes.subprocess, "Popen", Started)
     with pytest.raises(Terminated), child_processes.terminable():

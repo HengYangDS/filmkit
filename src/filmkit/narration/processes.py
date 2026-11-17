@@ -211,7 +211,9 @@ def narrate(sources: tuple[str, str, str], shares: list[list[str]], receipt: Pat
                     children.append((ids, log, start(child_command(sources, ids, own), log)))
             ended = wait_for_all(children, started)
         except BaseException as error:
-            child_processes.stop([child for *_, child in children], signal.SIGTERM, groups=True)
+            # A child that has ended was reaped by the wait: its number is not signalled.
+            running = [child for *_, child in children if child.returncode is None]
+            child_processes.stop(running, signal.SIGTERM, groups=True)
             msg = (
                 f"The narration was stopped by {cut_short(error)}; every narration process it "
                 f"had started ({len(children)}) was ended with it; their logs are in "

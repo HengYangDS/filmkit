@@ -30,14 +30,16 @@ def root(tmp_path, monkeypatch):
 
 class Child:
     """A stand-in child that has written its log and exits with the status given; one whose
-    status is an exception raises it when the narration looks whether it has ended."""
+    status is an exception raises it when the narration looks whether it has ended. As with a
+    real child, the look that finds it ended reaps it: its return code is set from then on."""
 
     def __init__(self, status):
-        self.status = status
+        self.status, self.returncode = status, None
 
     def poll(self):
         if isinstance(self.status, BaseException):
             raise self.status
+        self.returncode = self.status
         return self.status
 
 
@@ -220,6 +222,18 @@ def test_an_interrupted_wait_ends_every_childs_process_group_and_refuses(
     ((children, asking, groups),) = stopped
     assert [type(child) for child in children] == [Child, Child]
     assert (asking, groups) == (signal.SIGTERM, True)
+
+
+def test_a_child_that_had_ended_and_was_reaped_is_not_handed_on_to_be_stopped(
+    root, monkeypatch, stopped
+):
+    """A reaped child's number is no longer its own: the kernel may have given it to another
+    process since, whose group a stop would then end."""
+    starting(monkeypatch, statuses=(0, child_processes.Terminated(signal.SIGTERM)))
+    with pytest.raises(child_processes.Terminated):
+        processes.narrate(SOURCES, [["01"], ["02"]], root / RECEIPT)
+    ((children, _, _),) = stopped
+    assert [child.returncode for child in children] == [None]
 
 
 def test_a_request_to_end_while_a_child_starts_waits_until_the_child_is_held(

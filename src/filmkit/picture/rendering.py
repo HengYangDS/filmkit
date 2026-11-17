@@ -414,8 +414,9 @@ def require_receipt_places(receipt: dict, stage: Path, picture: Path) -> None:
 
 
 def stop_process_group(process: subprocess.Popen) -> None:
-    """End a renderer and the rest of its process group: SIGTERM, then SIGKILL after the grace
-    (`filmkit.child_processes.stop`, which holds a further signal until the group has ended)."""
+    """End a renderer that has not been reaped and the rest of its process group, and reap it:
+    SIGTERM, then SIGKILL after the grace (`filmkit.child_processes.stop`, which holds a further
+    signal until the group has ended)."""
     child_processes.stop([process], signal.SIGTERM, groups=True, seconds=STOP_GRACE_SECONDS)
 
 
@@ -452,10 +453,12 @@ def run_renderer(command: list[str], deadline: float) -> tuple[int | None, bool]
     """Run the renderer to its exit or deadline: its exit status, and whether it timed out.
 
     The renderer runs in its own session with its input closed, so stopping it reaches every
-    process it started; a failed exit stops remaining workers. A wait that is cut short by a
-    request to end, an interrupt, SIGTERM or a hang-up, which is an exception while the renderer
-    runs (`filmkit.child_processes`), stops the group before the cause propagates, undisturbed
-    by a further request.
+    process it started. Its end is waited for without reaping it, so that its number is still
+    its own when what is left of its group is ended, which is done after every run: after a
+    failed exit that is its remaining workers. A wait that is cut short by a request to end, an
+    interrupt, SIGTERM or a hang-up, which is an exception while the renderer runs
+    (`filmkit.child_processes`), stops the group before the cause propagates, undisturbed by a
+    further request.
     """
     # From a first request to end until the renderer's group is ended, every further one is
     # dropped: each stop lies inside the block that takes the requests.
@@ -471,17 +474,13 @@ def run_renderer(command: list[str], deadline: float) -> tuple[int | None, bool]
                     start_new_session=True,
                     env=renderer_environment(),
                 )
-            exit_code = process.wait(timeout=deadline)
-        except subprocess.TimeoutExpired:
-            stop_process_group(process)
-            return None, True
+            timed_out = not child_processes.ended(process, deadline)
         except BaseException:
             if process is not None:
                 stop_process_group(process)
             raise
-        if exit_code != 0:
-            stop_process_group(process)
-        return exit_code, False
+        stop_process_group(process)
+        return (None if timed_out else process.returncode), timed_out
 
 
 def face_bindings() -> dict:
