@@ -215,8 +215,8 @@ def main(argv: list[str] | None = None) -> None:
     except REFUSALS as error:
         msg = f"{options.action}: {error}"
         raise SystemExit(msg) from None
-    except child_processes.Terminated:
-        msg = f"{options.action}: asked to end (SIGTERM); the renderer it ran was ended with it"
+    except child_processes.Terminated as asked:
+        msg = f"{options.action}: stopped by {asked.request}; the renderer it ran was ended with it"
         raise SystemExit(msg) from None
 
 

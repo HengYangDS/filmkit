@@ -1,8 +1,9 @@
 """Stop the child processes a command started, so that none outlives it.
 
 A command that starts children and waits for them stops them when its wait is cut short: by an
-interrupt, by a failure of its own, or by a request to end (SIGTERM), which `terminable` turns
-into the exception `Terminated` while the children run. `filmkit.picture.rendering` does so for
+interrupt, by a failure of its own, or by a request to end (SIGTERM) or a hang-up (SIGHUP),
+which `terminable` turns into the exception `Terminated` while the children run. A signal the
+process ignores, as a hang-up under nohup, stays ignored. `filmkit.picture.rendering` does so for
 a renderer, `filmkit.narration.processes` for a narration's shares, and
 `filmkit.narration.narrate` for each of its steps (`run`).
 
@@ -37,15 +38,35 @@ if TYPE_CHECKING:
 STOP_SECONDS = 30
 
 
+# The signals that ask a command to end, with what each is called: a request to end, and a
+# hang-up, which a terminal that closes or a session that drops sends.
+REQUESTS = {signal.SIGTERM: "a request to end (SIGTERM)", signal.SIGHUP: "a hang-up (SIGHUP)"}
+
+
 class Terminated(BaseException):
-    """The command was asked to end (SIGTERM) while it waited for its children."""
+    """The command was asked to end, by the signal `number`, while it waited for its children."""
+
+    def __init__(self, number: int) -> None:
+        super().__init__(number)
+        self.number = number
+
+    @property
+    def request(self) -> str:
+        """What asked the command to end, in words."""
+        return REQUESTS.get(self.number, f"signal {self.number}")
+
+
+def taken(numbers: tuple[int, ...]) -> list[int]:
+    """The signals of `numbers` that the process does not ignore. One it ignores, as a hang-up
+    under nohup, stays ignored: the command was started to outlive it."""
+    return [number for number in numbers if signal.getsignal(number) is not signal.SIG_IGN]
 
 
 @contextlib.contextmanager
 def terminable() -> Iterator[None]:
-    """Raise `Terminated` in the block when the process is asked to end, so that the block's own
-    handling stops its children. Outside the main thread, where a process sets no handler, the
-    block runs as it is."""
+    """Raise `Terminated` in the block when the process is asked to end, by SIGTERM or by a
+    hang-up it does not ignore, so that the block's own handling stops its children. Outside the
+    main thread, where a process sets no handler, the block runs as it is."""
     if threading.current_thread() is not threading.main_thread():
         yield
         return
@@ -53,11 +74,12 @@ def terminable() -> Iterator[None]:
     def asked(number: int, _frame: object) -> None:
         raise Terminated(number)
 
-    earlier = signal.signal(signal.SIGTERM, asked)
+    earlier = {number: signal.signal(number, asked) for number in taken(tuple(REQUESTS))}
     try:
         yield
     finally:
-        signal.signal(signal.SIGTERM, signal.SIG_DFL if earlier is None else earlier)
+        for number, handler in earlier.items():
+            signal.signal(number, signal.SIG_DFL if handler is None else handler)
 
 
 @contextlib.contextmanager
@@ -68,7 +90,7 @@ def held() -> Iterator[None]:
         yield
         return
     arrived: list[int] = []
-    numbers = (signal.SIGINT, signal.SIGTERM)
+    numbers = taken((signal.SIGINT, *REQUESTS))
     earlier = {n: signal.signal(n, lambda number, _frame: arrived.append(number)) for n in numbers}
     try:
         yield

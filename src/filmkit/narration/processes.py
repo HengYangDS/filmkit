@@ -21,8 +21,8 @@ stands. What a failed child left behind is then judged by the next run as an int
 always was.
 
 No child outlives the narration. Each leads a session of its own, and when the narration's wait
-is cut short, by an interrupt, by a request to end (SIGTERM) or by a failure of its own, such as
-a child that cannot be started, it ends every child's process group
+is cut short, by an interrupt, by a request to end (SIGTERM), by a hang-up (SIGHUP) or by a
+failure of its own, such as a child that cannot be started, it ends every child's process group
 (`filmkit.child_processes`) and refuses, naming what cut it short. A child holds a speech model
 of several gigabytes and the GPU; one left running would narrate to the end of its share beside
 the next run's children.
@@ -183,7 +183,7 @@ def wait_for_all(
 def cut_short(error: BaseException) -> str:
     """What cut a narration's wait for its children short, as its refusal names it."""
     if isinstance(error, child_processes.Terminated):
-        return "a request to end (SIGTERM)"
+        return error.request
     if isinstance(error, KeyboardInterrupt):
         return "an interrupt"
     return f"{type(error).__name__}: {error}"

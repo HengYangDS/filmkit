@@ -13,7 +13,7 @@ Usage: python -m filmkit.narration.narrate
     --language zh|en [--ids 06,07] [--dry-run | --skip-generation]
 --dry-run prints the narration plan without writing; --skip-generation aligns and
 transcribes the existing receipt. Each step runs under this tool's interpreter, and none
-outlives a narration that is interrupted or asked to end (SIGTERM). A run that is
+outlives a narration that is interrupted, asked to end (SIGTERM) or hung up on. A run that is
 not a dry run writes its duration record, each step a phase (`filmkit.durations`). A run that
 narrates is recorded as `narrate`, the record an edition's build starts from, and one that only
 checks, with --skip-generation, as `narrate-checks`, so that it neither replaces the narration's
@@ -152,8 +152,8 @@ def main(argv: list[str] | None = None) -> None:
     try:
         with child_processes.terminable():
             narrate(options.language, options.ids, scope)
-    except child_processes.Terminated:
-        msg = "The narration was asked to end (SIGTERM); its running step was ended with it"
+    except child_processes.Terminated as asked:
+        msg = f"The narration was stopped by {asked.request}; its running step was ended with it"
         raise SystemExit(msg) from None
 
 

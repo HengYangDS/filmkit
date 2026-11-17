@@ -205,12 +205,22 @@ When more than one segment is to be generated, the narration SHALL generate them
 
 ### Requirement: No narration process and no renderer outlives its command
 
-Each narration process SHALL lead a session of its own, as each renderer does. A command that is interrupted, is asked to end (SIGTERM) or fails while its narration processes or its renderer run SHALL end each one's whole process group before it exits, also when a second signal arrives meanwhile, and SHALL refuse, naming what stopped it. `narrate` SHALL likewise end its running step, and its duration record SHALL then say that it did not complete.
+Each narration process SHALL lead a session of its own, as each renderer does. A command that is interrupted, is asked to end (SIGTERM), is hung up on (SIGHUP) without ignoring it, or fails while its narration processes or its renderer run SHALL end each one's whole process group before it exits, also when a second signal arrives meanwhile, and SHALL refuse, naming what stopped it. `narrate` SHALL likewise end its running step, and its duration record SHALL then say that it did not complete.
 
 #### Scenario: A narration asked to end
 
 - **WHEN** the synthesis is sent SIGTERM while two processes narrate
 - **THEN** both processes, and whatever each had started, have ended when it exits, and its refusal names the request to end and the folder of the processes' logs
+
+#### Scenario: A hang-up
+
+- **WHEN** the synthesis is sent SIGHUP while two processes narrate, and does not ignore it
+- **THEN** both processes, and whatever each had started, have ended when it exits, and its refusal names the hang-up
+
+#### Scenario: A hang-up under nohup
+
+- **WHEN** the synthesis ignores SIGHUP, as under nohup, and is sent it while two processes narrate
+- **THEN** the narration and both processes go on
 
 #### Scenario: A process that cannot be started
 

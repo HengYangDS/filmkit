@@ -33,7 +33,10 @@ CHILD = """
 """
 # The parent: the engine's narration in processes, with the stand-in as each child's command.
 PARENT = """
-    import json, sys
+    import json, os, signal, sys
+    if os.environ.get("IGNORING_HANG_UPS"):
+        # As under nohup: the process ignores a hang-up before the engine is loaded.
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
     import filmkit.narration.processes as processes
     child, shares = sys.argv[1], json.loads(sys.argv[2])
     processes.child_command = lambda sources, ids, receipt: [
@@ -79,9 +82,9 @@ class Narration:
         self.parent.write_text(textwrap.dedent(PARENT))
         self.work = root / "build/runtime/work/narration-processes"
 
-    def start(self, shares, children) -> subprocess.Popen:
+    def start(self, shares, children, **variables) -> subprocess.Popen:
         environment = {**os.environ, "FILMKIT_ROOT": str(self.root), "NOTES": str(self.notes)}
-        environment["CHILDREN"] = json.dumps(children)
+        environment |= {"CHILDREN": json.dumps(children), **variables}
         command = [sys.executable, "-B", str(self.parent), str(self.child), json.dumps(shares)]
         return subprocess.Popen(
             command,
@@ -162,3 +165,42 @@ def test_a_narration_asked_to_end_ends_every_child_and_what_each_started(narrati
         "had started (2) was ended with it; their logs are in build/runtime/work/"
     )
     assert wait_for(lambda: not any(alive(pid) for pid in everyone), 10)
+
+
+def test_a_hang_up_ends_every_child_as_a_request_to_end_does(narration):
+    """A terminal that closes sends a hang-up. The children lead sessions of their own, so the
+    signal that ends the narration does not reach them: the narration ends them."""
+    slow = {"seconds": 60}
+    parent = narration.start([["01", "04"], ["02", "03"]], {"01,04": slow, "02,03": slow})
+    children = narration.noted(2)
+    everyone = [pid for child in children for pid in (child["pid"], child["own"])]
+    try:
+        parent.send_signal(signal.SIGHUP)
+        _, refusal = parent.communicate(timeout=30)
+        assert "The narration was stopped by a hang-up (SIGHUP); every narration process" in refusal
+        assert wait_for(lambda: not any(alive(pid) for pid in everyone), 10)
+    finally:
+        for pid in everyone:
+            if alive(pid):
+                os.kill(pid, signal.SIGKILL)
+
+
+def test_a_narration_that_ignores_hang_ups_as_under_nohup_narrates_on(narration):
+    slow = {"seconds": 60}
+    children = {"01,04": slow, "02,03": slow}
+    parent = narration.start([["01", "04"], ["02", "03"]], children, IGNORING_HANG_UPS="1")
+    children = narration.noted(2)
+    everyone = [pid for child in children for pid in (child["pid"], child["own"])]
+    try:
+        parent.send_signal(signal.SIGHUP)
+        # Nothing ends: the hang-up stays ignored, by the narration and by what it started.
+        assert not wait_for(lambda: parent.poll() is not None, 1.0)
+        assert all(alive(pid) for pid in everyone)
+        parent.send_signal(signal.SIGTERM)
+        _, refusal = parent.communicate(timeout=30)
+        assert "stopped by a request to end (SIGTERM)" in refusal
+        assert wait_for(lambda: not any(alive(pid) for pid in everyone), 10)
+    finally:
+        for pid in everyone:
+            if alive(pid):
+                os.kill(pid, signal.SIGKILL)

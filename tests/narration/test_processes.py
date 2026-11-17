@@ -321,7 +321,7 @@ def test_a_narration_asked_to_end_refuses_and_is_recorded_as_not_completed(narra
         raise child_processes.Terminated(signal.SIGTERM)
 
     monkeypatch.setattr(narration_narrate.child_processes, "run", asked)
-    with pytest.raises(SystemExit, match=r"asked to end \(SIGTERM\); its running step was ended"):
+    with pytest.raises(SystemExit, match=r"request to end \(SIGTERM\); its running step was ended"):
         narration_narrate.main(["--language", "zh"])
     record = repository.read("build/evidence/editions/zh/durations/narrate.json")
     assert record["completed"] is False
