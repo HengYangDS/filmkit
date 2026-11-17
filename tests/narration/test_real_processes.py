@@ -118,6 +118,35 @@ def test_each_child_of_a_passing_division_is_stamped_with_its_own_seconds(narrat
     assert second["seconds"] < first["seconds"] - 0.5
 
 
+def test_a_failing_child_is_named_once_the_other_has_run_to_its_end(narration):
+    failing = {"exit": 3, "lines": ["Traceback (most recent call last):", "RuntimeError: no take"]}
+    children = {"01,04": failing, "02,03": {"seconds": 1.0, "lines": ['{"id": "02"}']}}
+    parent = narration.start([["01", "04"], ["02", "03"]], children)
+    printed, refusal = parent.communicate(timeout=60)
+    assert (parent.returncode, printed) == (1, "")
+    work = "build/runtime/work/narration-processes/build-evidence-narration-receipt"
+    assert refusal.strip() == (
+        f"A narration process failed: segments 01, 04 exited 3 ({work}/process-1.log: "
+        "RuntimeError: no take)"
+    )
+    # The other child was not stopped: it wrote its line and ended by itself, and both logs stay.
+    assert (narration.root / work / "process-2.log").read_text() == '{"id": "02"}\n'
+    assert (narration.root / work / "process-1.log").read_text().endswith("no take\n")
+    assert not any(alive(child["pid"]) for child in narration.noted(2))
+
+
+def test_a_child_that_is_killed_is_named_by_its_signal(narration):
+    parent = narration.start([["01"], ["02"]], {"02": {"seconds": 60}})
+    children = narration.noted(2)
+    slow = next(child for child in children if alive(child["pid"]))
+    os.kill(slow["pid"], signal.SIGKILL)
+    _, refusal = parent.communicate(timeout=60)
+    assert parent.returncode == 1
+    assert "A narration process failed: segments 02 exited -9 (" in refusal
+    # What the killed child had started is none of the narration's to end; it ends by itself.
+    os.kill(slow["own"], signal.SIGKILL)
+
+
 def test_a_narration_asked_to_end_ends_every_child_and_what_each_started(narration):
     slow = {"seconds": 60}
     parent = narration.start([["01", "04"], ["02", "03"]], {"01,04": slow, "02,03": slow})
