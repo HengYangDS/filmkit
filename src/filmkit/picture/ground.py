@@ -112,28 +112,56 @@ def edge_filter(
     )
 
 
+class Beyond:
+    """The frames of a check that stand beyond its tolerance: the first with its departure, how
+    many there are, and the largest departure of all the frames read with its frame."""
+
+    def __init__(self, tolerance: int) -> None:
+        self.tolerance = tolerance
+        self.first: tuple[int, int] | None = None
+        self.count, self.largest, self.worst = 0, 0, None
+
+    def read(self, frame: int, departure: int) -> None:
+        if departure > self.largest:
+            self.largest, self.worst = departure, frame
+        if departure > self.tolerance:
+            self.count += 1
+            self.first = self.first or (frame, departure)
+
+    def refusal(self, what: str, ground: str) -> str:
+        """The refusal's text: `what` at the first frame beyond the tolerance, where a change of
+        ground begins, its departure from `ground`, then how many frames stand beyond the
+        tolerance and the largest departure with its frame."""
+        frame, departure = self.first
+        frames = "frame stands" if self.count == 1 else "frames stand"
+        return (
+            f"{what.format(frame=frame)}: a sample stands {departure} levels from {ground}; "
+            f"{self.count} {frames} beyond the tolerance of {self.tolerance} levels, the largest "
+            f"departure {self.largest} levels at frame {self.worst}"
+        )
+
+
 def edge_check(stats: Path, ground: dict, tolerance: int, fps: int) -> dict:
-    """Read the edge rows' measures and refuse a frame that departs from the ground.
+    """Read the edge rows' measures and refuse a frame that departs from the ground, naming the
+    first such frame and the largest departure.
 
     Every frame from the first must be measured, in order. Returns the frames checked and the
     largest departure.
     """
-    count, largest, worst = 0, 0, None
+    count, beyond = 0, Beyond(tolerance)
     for frame, departure in departures(stats, ground, fps):
         if frame != count:
             msg = f"The edge rows were measured at frame {frame} where frame {count} was due"
             raise PictureError(msg)
         count += 1
-        if departure > largest:
-            largest, worst = departure, frame
-    if largest > tolerance:
-        msg = (
+        beyond.read(frame, departure)
+    if beyond.first:
+        what = (
             "The captioned picture shows another ground at the edge of the painted rows, where "
-            f"no caption stands, at frame {worst}: a sample stands {largest} levels from the "
-            "band's ground"
+            "no caption stands, at frame {frame}"
         )
-        raise PictureError(msg)
-    return {"frames": count, "largest_departure": largest, "verdict": "pass"}
+        raise PictureError(beyond.refusal(what, "the band's ground"))
+    return {"frames": count, "largest_departure": beyond.largest, "verdict": "pass"}
 
 
 def free_frames(stretches: list[list[float]], fps: int = FPS) -> list[tuple[int, int]]:
@@ -200,26 +228,26 @@ def ground_check(stats: Path, frames: list[tuple[int, int]], ground: dict, fps: 
     """Read the band's measures and refuse a frame that departs from the ground.
 
     Every frame of the runs given must be measured, and the lowest and the highest sample of each
-    plane must stand within `GROUND_TOLERANCE` levels of the ground. Returns the frames checked
-    and the largest departure.
+    plane must stand within `GROUND_TOLERANCE` levels of the ground; a refusal names the first
+    frame beyond it and the largest departure. Returns the frames checked and the largest
+    departure.
     """
     expected = [frame for a, b in frames for frame in range(a, b + 1)]
     blocks = sum(1 for line in stats.open(errors="replace") if line.startswith("frame:"))
     if blocks != len(expected):
         msg = f"The band was measured at {blocks} of its {len(expected)} frames"
         raise PictureError(msg)
-    largest, worst = 0, None
+    beyond = Beyond(GROUND_TOLERANCE)
     measured = departures(stats, ground, fps)
     for frame, (at, departure) in zip(expected, measured, strict=True):
         if at != frame:
             msg = f"The band's measure of frame {frame} is not readable"
             raise PictureError(msg)
-        if departure > largest:
-            largest, worst = departure, frame
-    if largest > GROUND_TOLERANCE:
-        msg = (
-            f"The captioned picture's band is not the ground at frame {worst}, a frame without a "
-            f"caption: a sample stands {largest} levels from the ground"
+        beyond.read(frame, departure)
+    if beyond.first:
+        what = (
+            "The captioned picture's band is not the ground at frame {frame}, a frame without a "
+            "caption"
         )
-        raise PictureError(msg)
-    return {"frames": len(expected), "largest_departure": largest, "verdict": "pass"}
+        raise PictureError(beyond.refusal(what, "the ground"))
+    return {"frames": len(expected), "largest_departure": beyond.largest, "verdict": "pass"}

@@ -67,6 +67,11 @@ Before it encodes, a derivation SHALL run the composition headlessly at every th
 - **WHEN** the captioned picture's whole ground is another colour on exactly the frames that show a caption
 - **THEN** the derivation refuses on the edge rows, naming the first such frame and `--native`, though every frame without a caption holds the ground
 
+#### Scenario: A ground that leaves by degrees
+
+- **WHEN** the ground under a caption stands a little off for thirty frames and far off for thirty more
+- **THEN** the refusal names the first frame beyond the tolerance with its departure, and beside it how many frames stand beyond the tolerance and the largest departure with its frame
+
 #### Scenario: A band that is not the ground
 
 - **WHEN** the captioned picture's band holds, at a frame without a caption, samples 10 levels from the ground

@@ -151,6 +151,49 @@ def test_the_ground_check_reads_every_frame_and_the_largest_departure(tmp_path):
         ground_rows.ground_check(stats, [(2, 5)], ground)
 
 
+def test_a_refusal_names_the_first_frame_beyond_the_tolerance_and_the_largest_departure(tmp_path):
+    ground = {"y": 21, "u": 129, "v": 125}
+    stats = tmp_path / "stats.txt"
+    # Frame 3 stands 5 levels off, frame 4 within the tolerance, frame 5 stands 214 levels off.
+    blocks = [measured([2]), measured([3]).replace("YMAX=21", "YMAX=26")]
+    blocks += [measured([4]).replace("UMAX=129", "UMAX=131")]
+    blocks += [measured([5]).replace("YMAX=21", "YMAX=235")]
+    stats.write_text("".join(blocks))
+    with pytest.raises(PictureError) as refused:
+        ground_rows.ground_check(stats, [(2, 5)], ground)
+    assert str(refused.value) == (
+        "The captioned picture's band is not the ground at frame 3, a frame without a caption: "
+        "a sample stands 5 levels from the ground; 2 frames stand beyond the tolerance of 3 "
+        "levels, the largest departure 214 levels at frame 5"
+    )
+    # The edge rows are measured from the first frame on, each in its turn.
+    edges = [measured([0]), measured([1]).replace("VMAX=125", "VMAX=130")]
+    edges += [measured([2]).replace("YMAX=21", "YMAX=45"), measured([3])]
+    stats.write_text("".join(edges))
+    with pytest.raises(PictureError) as refused:
+        ground_rows.edge_check(stats, ground, 3, 60)
+    assert str(refused.value) == (
+        "The captioned picture shows another ground at the edge of the painted rows, where no "
+        "caption stands, at frame 1: a sample stands 5 levels from the band's ground; 2 frames "
+        "stand beyond the tolerance of 3 levels, the largest departure 24 levels at frame 2"
+    )
+
+
+@pytest.mark.ffmpeg
+def test_a_ground_that_rises_under_a_caption_is_refused_where_it_first_leaves_the_ground(root):
+    # The whole frame's ground stands about 11 levels off on frames 30 to 59 and 24 levels off
+    # on frames 60 to 90, all under the caption: the refusal names where the change begins.
+    slight = "drawbox=x=0:y=0:w=iw:h=ih:color=0x1A2126:t=fill:enable='between(n,30,59)'"
+    other = "drawbox=x=0:y=0:w=iw:h=ih:color=0x2A3238:t=fill:enable='between(n,60,90)'"
+    source, target = root / "captioned.mp4", root / "uncaptioned.mp4"
+    encode(source, slight, other, LABEL, CAPTION)
+    first = r"at frame (29|30|31): a sample stands (9|1[0-3]) levels"
+    largest = r"the largest departure (2[2-6]) levels at frame (59|[6-8][0-9]|9[01])"
+    with pytest.raises(PictureError, match=f"{first}.*{largest}"):
+        derivation.derive(source, target, SIZE, ROWS, FREE, root / "work", edges=(8, 8))
+    assert not target.exists()
+
+
 @pytest.mark.ffmpeg
 def test_a_ground_that_changes_while_a_caption_shows_is_refused_by_the_edge_rows(root):
     # The whole frame's ground is another colour on exactly the frames that show the caption, so
