@@ -38,19 +38,28 @@ CAPTION = "drawbox=x=120:y=186:w=140:h=10:color=white:t=fill:enable='between(n,3
 CREATED = "2026-11-17T00:00:00+00:00"
 
 
+# Every FFmpeg run of these tests uses two threads: its decoder and filters by these options
+# before the picture, an x264 encode by `-threads` among its own options.
+TWO_THREADS = ("-filter_threads", "2", "-filter_complex_threads", "2", "-threads", "2")
+
+
 def small(rendition):
-    """A rendition at the small frame, its scale written for it."""
+    """A rendition at the small frame, its scale written for it, on two threads."""
     video = tuple(option.replace("w=1920:h=1080", "w=192:h=108") for option in rendition.video)
     width, height = VIEWING_SIZE if rendition.reencoded else SIZE
-    return replace(rendition, width=width, height=height, video=video)
+    if rendition.reencoded:
+        video += ("-threads:v:0", "2")
+    return replace(rendition, width=width, height=height, video=video, decoding=TWO_THREADS)
 
 
 RENDITIONS = {kind: small(rendition) for kind, rendition in production.RENDITIONS.items()}
 
 
 def ffmpeg(*arguments):
-    command = ["ffmpeg", "-v", "error", "-nostdin", "-y", "-threads", "2", *arguments]
-    subprocess.run(command, check=True, capture_output=True, timeout=60)
+    """Run FFmpeg on two threads: the options given, then the output, its encoder limited too."""
+    *options, output = arguments
+    command = ["ffmpeg", "-v", "error", "-nostdin", "-y", *TWO_THREADS, *options]
+    subprocess.run([*command, "-threads", "2", output], check=True, capture_output=True, timeout=60)
 
 
 def picture(path, *options):
@@ -82,6 +91,7 @@ def pair(tmp_path_factory):
         for module in (delivery_packaging, delivery_verification, derivation):
             patch.setattr(module, "DURATION", SECONDS)
         patch.setattr(derivation, "PICTURE_SIZE", SIZE)
+        patch.setattr(derivation, "ENCODER", ("-threads", "2", *derivation.ENCODER))
         for height, level in ((SIZE[1], 52), (VIEWING_SIZE[1], 42)):
             patch.setitem(specification.H264_LEVELS, height, level)
         release = {"title": script["title"], "release": script["release"]}
@@ -127,6 +137,9 @@ def test_each_film_of_a_derived_pair_passes_packagings_check_and_the_verifiers(p
     # The 1080p uncaptioned film read the captioned picture; every other film its own.
     read = pair.rendered(rendition.captions or rendition.reencoded).file.name
     assert (member["path"], member["source"]) == (film.name, read)
+    encode = member["commands"][0]
+    assert encode[encode.index("-i") - 6 : encode.index("-i")] == list(TWO_THREADS)
+    assert ("-threads:v:0" in encode) is rendition.reencoded
     report = delivery_verification.verify_media(pair, film, rendition)
     assert report["dimensions"] == [rendition.width, rendition.height]
     assert report["video_frames"] == FRAMES
