@@ -17,16 +17,24 @@ process has acted on either are handed to it lowest number first: it acts on tha
 
 Everywhere else a request has its usual effect, as in a command that knows nothing of this
 module: SIGTERM and a hang-up end the process by their default action, and an interrupt raises
-`KeyboardInterrupt`. A tool the command runs, a pool of them, a decode or a timer is therefore
-never met by an exception from a signal, nor left with a command that has stopped listening:
-a terminal's interrupt reaches the tool itself, which ends what it started, a browser among it.
+`KeyboardInterrupt` in the main thread. A process that a signal ends so runs nothing more: what
+it had started runs on, a check's audits to their end, and what it would have written at its
+end, its duration record among it, is not written. A wait for a tool that an interrupt cuts
+short asks the tool to end and waits for it before the interrupt goes on (`filmkit.tools.run`,
+by `stop`), so that the tool ends what it started, a browser among it, whether or not the
+interrupt reached the tool itself. The audits that a check runs side by side are waited for in
+threads of their own, which no interrupt reaches: one that reached the command alone leaves
+them running to their end.
 
-`ending`, around a command's whole run, sets no handler. It words the exit of a command that
-was asked to end where it stood in such a block, or that was interrupted anywhere: one line
+`ending`, around the whole run of `filmkit.produce`, of `narrate` and of the synthesis, sets no
+handler. It words the exit of a command that was asked to end where it stood in such a block,
+or that was interrupted anywhere: one line
 that says what stopped it, then, after SIGTERM or a hang-up, the exit status 128 and the
 signal's number, and after an interrupt the interrupt itself, by which the process then dies,
 so that a shell that ran the command in a script ends the script and reports 130. A line that
-cannot be written, since the terminal that hung up is gone, changes neither.
+cannot be written, since the terminal that hung up is gone, that its stream does not take
+within `SAY_SECONDS`, as a full pipe that nobody reads, or whose stream the command was started
+without, is dropped and changes neither.
 
 Where a request must not interrupt, `held` defers the first one to the end of its block: while
 a child starts, so that the request finds the child already among those to end, and while

@@ -6,7 +6,7 @@ Record how long each heavy command of a build took and print a build's time from
 
 ### Requirement: Each heavy command records how long it took
 
-Each action of `filmkit.produce`, each narration, the geometry check and the cover check run from the command line, the verifier and the reproduction SHALL write, when it ends, a duration record for its edition: the command, when it started, its seconds, whether it completed, its phases' seconds and the settings it names. The record SHALL stand beside the edition's evidence and inside no record that another binds by SHA-256. With `--read-only` the verifier and the reproduction SHALL write none.
+Each action of `filmkit.produce`, each narration, the geometry check and the cover check run from the command line, the verifier and the reproduction SHALL write, at its own end, a duration record for its edition: the command, when it started, its seconds, whether it completed, its phases' seconds and the settings it names. The record SHALL stand beside the edition's evidence and inside no record that another binds by SHA-256. With `--read-only` the verifier and reproduction SHALL write none.
 
 #### Scenario: A comparison's phases
 
@@ -268,7 +268,7 @@ Each narration process SHALL lead a session of its own, as each renderer does. A
 
 ### Requirement: A command that is asked to end ends once, in one line
 
-From a first request to end that arrives while its narration processes, its renderer or a step of `narrate` run, until they have ended and it has exited, a command SHALL take every further request, at whatever interval, without ending early and without cutting their ending short. It SHALL then write one line on standard error that names the request, with no traceback, and SHALL exit with 143 after SIGTERM and 129 after a hang-up, or die by the interrupt after an interrupt.
+From a first request to end that arrives while its narration processes, its renderer or a step of `narrate` run, until they have ended and it has exited, a command SHALL take every further request, at whatever interval, without ending early or cutting their ending short. It SHALL then write one line on standard error that names the request, with no traceback, or drop the line where that stream takes none, and SHALL exit with 143 after SIGTERM and 129 after a hang-up, or die by the interrupt.
 
 #### Scenario: A second request to end, at any interval
 
@@ -290,24 +290,53 @@ From a first request to end that arrives while its narration processes, its rend
 - **WHEN** the synthesis writes to a terminal that has closed and is sent SIGHUP while two processes narrate
 - **THEN** both processes have ended when it exits, and it exits with 129 although its line cannot be written
 
+#### Scenario: A line that no stream takes
+
+- **WHEN** a command that acted on a request has standard error on a full pipe that nobody reads, or was started without standard error or standard output
+- **THEN** it drops the line after at most a second, waits for no reader, and ends with the status of its request
+
 #### Scenario: Requests while the command unwinds
 
 - **WHEN** a command has acted on SIGTERM, has ended what it held, and is sent SIGTERM, an interrupt and a hang-up before it has exited
 - **THEN** it exits with 143 and its one line names the request to end
 
+### Requirement: A command that a signal ends where it stands writes no duration record
+
+A command that SIGTERM or a hang-up ends by its default action, since it holds no narration process, no renderer and no step of `narrate`, SHALL write no duration record, and the record that an earlier run of that command wrote SHALL stand as it was. A command that unwinds, by a refusal, by an interrupt or by a request it takes, SHALL write its record, which says that it did not complete.
+
+#### Scenario: A duration record after an interrupt and after SIGTERM
+
+- **WHEN** a production action that holds no child of the kinds above is interrupted, run again and sent SIGTERM
+- **THEN** the interrupted run's record says that it did not complete, and the second run writes none and leaves that record as it was
+
 ### Requirement: Outside those waits a request to end has its usual effect
 
-While a command holds no narration process, no renderer and no step of `narrate`, it SHALL take no request to end: SIGTERM and a hang-up SHALL end it by their default action, and an interrupt SHALL end it with one line that names the interrupt, by the interrupt itself. A tool, a pool of tools or a decode that the command runs SHALL therefore never be killed by the command on such a request, and the command SHALL never go on running deaf to requests.
+While a command holds no narration process, no renderer and no step of `narrate`, it SHALL take no request to end: SIGTERM and a hang-up SHALL end it by their default action, and an interrupt SHALL end `filmkit.produce`, `narrate` and the synthesis with one line that names it, by the interrupt itself. A tool whose wait an interrupt cuts short SHALL be asked to end and waited for, and killed only when it has not ended after 20 s.
 
 #### Scenario: SIGTERM during a check that runs tools
 
 - **WHEN** a command that holds no child of the kinds above is sent SIGTERM or SIGHUP
-- **THEN** it ends at once by that signal, with no line, as a command before this Change did
+- **THEN** it ends at once by that signal, with no line, as a command before this Change did, and the tools it had started run on to their own end
 
 #### Scenario: An interrupt during a check that runs a tool
 
-- **WHEN** a terminal's interrupt reaches a command and the tool it runs
-- **THEN** the tool ends by its own handling of the interrupt, closing what it started, and the command writes its one line and dies by the interrupt
+- **WHEN** a terminal's interrupt reaches a command and the tool it runs, and the tool takes a second to close what it started
+- **THEN** the tool ends by its own handling of the interrupt, and the command waits for it, writes its one line and dies by the interrupt
+
+#### Scenario: An interrupt of the command alone
+
+- **WHEN** an interrupt reaches a command and not the tool it waits for
+- **THEN** the command asks the tool to end, the tool closes what it started and is not killed, and the command then writes its one line and dies by the interrupt
+
+#### Scenario: An interrupt of the command alone during audits that run side by side
+
+- **WHEN** an interrupt reaches `check-picture` and not the audits it runs side by side
+- **THEN** the command writes its one line and dies by the interrupt, and the audits run on to their own end
+
+#### Scenario: A tool that does not end when asked
+
+- **WHEN** the tool ignores the request to end for longer than the grace
+- **THEN** it is killed, and the command writes its one line and dies by the interrupt
 
 #### Scenario: An interrupt in a script
 

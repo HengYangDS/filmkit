@@ -397,7 +397,9 @@ def run_audits(audits: list[tuple[str, list[str], Path, dict | None]]) -> None:
     have ended, the first in the order given whose tool failed refuses. No request to end is
     taken while they run (`filmkit.child_processes`): a terminal's interrupt reaches each tool
     itself, and SIGTERM ends the command at once, so none waits on a command that has stopped
-    listening."""
+    listening. The audits are waited for in the pool's threads, so an interrupt that reaches
+    the command alone, as SIGTERM does, leaves them running to their own end: each then writes
+    its report, and a check started again meanwhile would write the same files."""
     with ThreadPoolExecutor(max_workers=len(audits)) as pool:
         ended = [pool.submit(contextvars.copy_context().run, run_audit, *audit) for audit in audits]
     for audit in ended:
