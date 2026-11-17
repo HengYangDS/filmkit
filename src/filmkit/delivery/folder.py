@@ -28,6 +28,12 @@ four of its films, and delivery refuses a page that fails, naming the page and i
 its receipt is build/evidence/delivery/player-check.json, which the readback names with its
 SHA-256. A dry run reads no player.
 
+A delivery empties its destination of whatever is no member, so it refuses, before anything is
+read back or changed and in a dry run too, a destination it must not fill (`refuse_unfit`): an
+empty `--destination`, which an unset variable in a script leaves; the film's root, a folder
+that holds it or one inside it, judged on resolved paths and whichever rule gave the folder; and
+a folder that holds entries and no entry page of an earlier delivery.
+
 The film verifier binds every member to its package records; the delivery task runs it first.
 A refusal before rsync leaves the destination unchanged and exits with status 1.
 
@@ -99,17 +105,60 @@ def videos_folder() -> tuple[Path, str]:
     return home / "Videos", "the XDG default videos folder ~/Videos"
 
 
-def delivery_destination(named: Path | None = None) -> tuple[Path, str]:
+def delivery_destination(named: str | Path | None = None) -> tuple[Path, str]:
     """The folder a delivery fills and the rule that gave it: the folder named; else the film's
     declared folder name below the host's delivery root; else that name below the user's videos
-    folder."""
+    folder. A name that is empty is refused: as a path it would be the working directory."""
     if named is not None:
-        return named.expanduser().resolve(), "--destination"
+        if not str(named).strip():
+            msg = (
+                "--destination names no folder: its value is empty, as an unset variable in a "
+                "script leaves it, and nothing is delivered"
+            )
+            raise DeliveryRefusedError(msg)
+        return Path(named).expanduser().resolve(), "--destination"
     name = FILM.delivery_folder
     if os.environ.get(ROOT_VARIABLE):
         return (Path(os.environ[ROOT_VARIABLE]).expanduser() / name).resolve(), ROOT_VARIABLE
     folder, rule = videos_folder()
     return (folder.expanduser() / name).resolve(), rule
+
+
+def refuse_unfit(root: Path, destination: Path, rule: str) -> None:
+    """Refuse a destination that a delivery must not fill, naming the folder, the rule that gave
+    it and what was found there.
+
+    A delivery moves every entry of its destination that is no member into the predecessors. So
+    the destination is not the film's root, a folder that holds it or one inside it, on resolved
+    paths; and a folder that exists holds nothing but the preserved entries, or the entry page
+    of an earlier delivery.
+    """
+    place, film = destination.resolve(), root.resolve()
+    found = None
+    if place == film:
+        found = "it is the film's root"
+    elif film.is_relative_to(place):
+        found = f"it holds the film's root, {film}"
+    elif place.is_relative_to(film):
+        found = f"it lies inside the film's root, {film}"
+    elif place.exists() and not place.is_dir():
+        found = "it is no folder"
+    elif place.is_dir() and not (place / LANGUAGE_INDEX.name).is_file():
+        preserved = (FINDER_METADATA, APP_FOLDER)
+        others = sorted(entry.name for entry in place.iterdir() if entry.name not in preserved)
+        if others:
+            listed = ", ".join(others[:5]) + (", ..." if len(others) > 5 else "")
+            found = (
+                f"it holds {len(others)} entries ({listed}) and no {LANGUAGE_INDEX.name} of an "
+                "earlier delivery"
+            )
+    if found:
+        msg = (
+            f"The destination {destination}, which {rule} gave, is refused: {found}. A delivery "
+            "moves every entry of its destination that is no member into the predecessors, so "
+            "nothing is delivered"
+        )
+        raise DeliveryRefusedError(msg)
 
 
 def plan(root: Path) -> list[tuple[Path, str]]:
@@ -235,7 +284,9 @@ def deliver(
 ) -> dict:
     """Replace the destination's delivery with the current members and read it back. The report
     states the destination and the rule that gave it, which is the caller's naming of the folder
-    unless `rule` says otherwise."""
+    unless `rule` says otherwise. A destination that must not be filled is refused first, in a
+    dry run too (`refuse_unfit`)."""
+    refuse_unfit(root, destination, rule)
     members = plan(root)
     missing = [path for source, path in members if not source.is_file()]
     if missing:
@@ -290,14 +341,13 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "--destination",
-        type=Path,
         help=f"the folder to fill; otherwise the film's folder below {ROOT_VARIABLE} or below "
         "the user's videos folder",
     )
     parser.add_argument("--dry-run", action="store_true")
     options = parser.parse_args(argv)
-    folder, rule = delivery_destination(options.destination)
     try:
+        folder, rule = delivery_destination(options.destination)
         report = deliver(repository.ROOT, folder, dry_run=options.dry_run, rule=rule)
     except DeliveryRefusedError as error:
         raise SystemExit(str(error)) from None

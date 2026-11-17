@@ -28,3 +28,37 @@ The delivery SHALL fill, in this order: the folder `--destination` names; the fi
 
 - **WHEN** the delivery runs with `--dry-run`
 - **THEN** its report states the destination and the rule, and the destination is not created
+
+### Requirement: A delivery refuses a destination that is not its own to empty
+
+Before it reads a player or changes anything, and in a dry run too, the delivery SHALL refuse: a `--destination` whose value is empty; a destination that, on resolved paths, is the film's root, holds it or lies inside it, whichever rule gave it; and one that is no folder, or that holds entries other than `.DS_Store` and `.claude` and no entry page of an earlier delivery. The refusal SHALL name the folder, the rule that gave it and what was found.
+
+#### Scenario: An empty destination
+
+- **WHEN** the delivery runs at the film's root with `--destination ""`, as an unset variable in a script leaves it
+- **THEN** it refuses, naming the empty value, and no file below the root is moved
+
+#### Scenario: The film's root, by each rule
+
+- **WHEN** the destination resolves to the film's root or to a folder that holds it: named by the caller, as `.` or through a symbolic link; given by `FILMKIT_DELIVERY_ROOT` where the film's checkout has the name of its delivery folder; or given by the videos folder where the film is checked out inside its delivery folder
+- **THEN** the delivery refuses, naming that rule and the film's root, and nothing is read back, run or written
+
+#### Scenario: A folder that holds the root or lies inside it
+
+- **WHEN** the destination is a folder above the film's root, or a folder below it
+- **THEN** the delivery refuses, naming the film's root
+
+#### Scenario: A populated folder that no delivery filled
+
+- **WHEN** the destination holds a user's files and folders and no `index.html`
+- **THEN** the delivery refuses, naming how many entries it holds and the first of them, and the folder is unchanged
+
+#### Scenario: A folder an earlier delivery filled
+
+- **WHEN** the destination holds the `index.html` of an earlier delivery and an entry beside the members
+- **THEN** the delivery fills it, and that entry is moved into the predecessors
+
+#### Scenario: A dry run refuses the same
+
+- **WHEN** any of these destinations is given with `--dry-run`
+- **THEN** the dry run refuses as the delivery does

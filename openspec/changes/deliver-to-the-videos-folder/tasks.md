@@ -2,6 +2,7 @@
 
 - [x] 1.1 Resolve the delivery's destination from `--destination`, else `FILMKIT_DELIVERY_ROOT` joined with the film's declared folder, else the platform's videos folder joined with it (`~/Movies` on macOS; the XDG videos directory elsewhere), and name no folder of a host in the engine; verify `tests/delivery/test_destination.py` (the three rules in their order, the macOS and the XDG forms, every delivery below the test's own folder).
 - [x] 1.2 State the destination and the rule that gave it in the readback, in a dry run's report and in the command's summary; verify `tests/delivery/test_destination.py` and `tests/delivery/test_folder.py`.
+- [x] 1.3 Refuse, before the sources are looked for, the players read or rsync run, and in a dry run too, an empty `--destination`, a destination that on resolved paths is the film's root, holds it or lies inside it, by whichever of the three rules, and one that is no folder or holds entries and no `index.html` of an earlier delivery, naming the folder, the rule and what was found; verify `tests/delivery/test_refused_destinations.py` (films and folders below the test's own folder; the whole tree unchanged after each refusal; a folder with the preserved entries alone and one an earlier delivery filled are delivered to).
 
 ## 2. The names
 
