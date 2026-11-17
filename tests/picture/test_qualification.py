@@ -159,6 +159,35 @@ def test_a_picture_another_browser_drew_is_not_qualified_with_the_one_that_runs(
         qualification.qualify_renderer(edition, 60)
 
 
+def test_a_picture_another_renderer_version_made_is_not_qualified_with_the_one_installed(
+    rendered,
+):
+    edition, film_root, renders = rendered
+    renders([CAPTION], [CAPTION])
+    # A render's receipt names the renderer version the film's packages install.
+    receipt = repository.read(edition.rendered(True).receipt)
+    assert receipt["renderer_version"] == RENDERER
+    # The picture's receipt names another version than the one installed now.
+    repository.write(edition.rendered(True).receipt, receipt | {"renderer_version": "0.9.45"})
+    runs = len(film_root.runs())
+    with pytest.raises(PictureError) as refused:
+        qualification.qualify_renderer(edition, 60)
+    assert str(refused.value) == (
+        "The zh captioned picture's receipt names HyperFrames 0.9.45, and the renderer that "
+        f"runs now is HyperFrames {RENDERER}: a qualification compares two renders by one "
+        "renderer version; render the picture again"
+    )
+    # Nothing was rendered and no record was written.
+    assert len(film_root.runs()) == runs
+    assert not edition.renderer_qualification.exists()
+    # A receipt that names no renderer version, as one of an earlier engine, is refused too.
+    del receipt["renderer_version"]
+    repository.write(edition.rendered(True).receipt, receipt)
+    with pytest.raises(PictureError, match="receipt names no renderer version, and the"):
+        qualification.qualify_renderer(edition, 60)
+    assert len(film_root.runs()) == runs
+
+
 def test_a_failed_pass_over_every_frame_leaves_the_record_of_a_comparison_that_decided(
     rendered, monkeypatch, capsys
 ):

@@ -27,9 +27,11 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import signal
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import filmkit.child_processes as child_processes
 import filmkit.picture.derivation as derivation
 import filmkit.picture.equivalence as equivalence
 import filmkit.picture.faults as faults
@@ -134,6 +136,16 @@ def stopped(edition: Edition, folder: Path, attempt: dict, error: BaseException)
     )
 
 
+def cut_short(error: BaseException) -> str:
+    """What stopped an attempt, in words: the refusal's own, or the request that ended the
+    command while the attempt ran."""
+    if isinstance(error, child_processes.Terminated):
+        return f"stopped by {error.request}"
+    if isinstance(error, KeyboardInterrupt):
+        return f"stopped by {child_processes.REQUESTS[signal.SIGINT]}"
+    return str(error) or type(error).__name__
+
+
 def render_and_compare(edition: Edition, attempt: dict, deadline: float) -> dict:
     """Render each picture an attempt names again, keeping each receipt in the attempt as it is
     written, and compare the two pictures; the comparison record."""
@@ -192,7 +204,7 @@ def repair_pictures(
         try:
             record = render_and_compare(edition, attempt, deadline)
         except BaseException as error:
-            repository.write(folder / "attempt.json", {**attempt, "error": str(error)})
+            repository.write(folder / "attempt.json", {**attempt, "error": cut_short(error)})
             if isinstance(error, REFUSALS):
                 raise PictureError(stopped(edition, folder, attempt, error)) from error
             raise

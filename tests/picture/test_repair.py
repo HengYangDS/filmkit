@@ -2,6 +2,7 @@
 names, within an attempt limit, keeping each faulty picture, its receipt and the refused record."""
 
 import hashlib
+import signal
 import sys
 
 import pytest
@@ -18,6 +19,7 @@ from test_faults import (
     square,
 )
 
+import filmkit.child_processes as child_processes
 import filmkit.picture.equivalence as equivalence
 import filmkit.picture.faults as faults
 import filmkit.picture.rendering as picture_rendering
@@ -402,6 +404,32 @@ def test_a_render_that_fails_in_an_attempt_is_recorded_with_the_way_back(pair, f
     assert "verdict" not in attempt
     assert (repository.ROOT / folder / pair.rendered(False).file.name).read_bytes() == faulty
     assert not (repository.ROOT / REPAIRS / "2").exists()
+
+
+@pytest.mark.ffmpeg
+@pytest.mark.parametrize(
+    ("raised", "said"),
+    [
+        (child_processes.Terminated(signal.SIGTERM), "stopped by a request to end (SIGTERM)"),
+        (child_processes.Terminated(signal.SIGHUP), "stopped by a hang-up (SIGHUP)"),
+        (KeyboardInterrupt(), "stopped by an interrupt"),
+    ],
+)
+def test_an_attempt_that_a_request_cut_short_says_so_in_words(
+    pair, takes, monkeypatch, raised, said
+):
+    rendered(pair, takes, uncaptioned=[FRAGMENT])
+
+    def asked_to_end(edition, deadline):
+        raise raised
+
+    monkeypatch.setattr(picture_repair.derivation, "render_uncaptioned", asked_to_end)
+    # The request goes on as it is: it is the command's to end by.
+    with pytest.raises(type(raised)):
+        picture_repair.repair_pictures(pair, 2, 60)
+    attempt = repository.read(repository.ROOT / REPAIRS / "1/attempt.json")
+    assert attempt["error"] == said
+    assert "verdict" not in attempt
 
 
 @pytest.mark.ffmpeg

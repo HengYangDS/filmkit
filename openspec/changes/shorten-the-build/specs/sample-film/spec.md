@@ -14,6 +14,11 @@ The sample film SHALL declare `software` capture, the capture under which pictur
 - **WHEN** `qualify-renderer` runs and the captioned picture's receipt names another browser than the one that runs now, or none
 - **THEN** it refuses before it renders, naming both, and writes no record
 
+#### Scenario: A picture another renderer version made
+
+- **WHEN** `qualify-renderer` runs and the captioned picture's receipt names another renderer version than the one the film's npm packages install now, or none
+- **THEN** it refuses before it renders, naming both, and writes no record
+
 #### Scenario: A pass over every frame that fails
 
 - **WHEN** the pass that counts the frames that decode identically fails after the comparison has passed

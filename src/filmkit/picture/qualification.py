@@ -92,6 +92,16 @@ def qualify_renderer(edition: Edition, deadline: float = rendering.DEADLINE) -> 
             "qualification compares two renders by one browser; render the picture again"
         )
         raise PictureError(msg)
+    # Nor two renderer versions as one: the record states the installed one for both.
+    rendered_by, installed = first_receipt.get("renderer_version"), ran["renderer"]["version"]
+    if rendered_by != installed:
+        first = f"HyperFrames {rendered_by}" if rendered_by else "no renderer version"
+        msg = (
+            f"The {edition.code} captioned picture's receipt names {first}, and the renderer "
+            f"that runs now is HyperFrames {installed}: a qualification compares two renders "
+            "by one renderer version; render the picture again"
+        )
+        raise PictureError(msg)
     rendered = edition.rendered(True)
     work = repository.ROOT / WORK / edition.code
     work.mkdir(parents=True, exist_ok=True)

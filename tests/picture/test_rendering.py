@@ -41,6 +41,7 @@ RECEIPT_KEYS = [
     "capture",
     "workers",
     "browser",
+    "renderer_version",
     "exit",
     "timed_out",
     "deadline_seconds",
@@ -357,6 +358,8 @@ def test_rendering_records_a_completed_render_that_binds(staged, root, tmp_path,
     assert receipt["command"][:5] == [str(fake), "render", str(stage), "--output", str(picture)]
     assert receipt["command"][5:7] == ["--fps", str(FPS)]
     assert (receipt["exit"], receipt["timed_out"], receipt["deadline_seconds"]) == (0, False, 60)
+    # The renderer version the film's packages install, which is the engine's.
+    assert receipt["renderer_version"] == picture_rendering.RENDERER_VERSION
     assert receipt["source_sha256"] == repository.sha(stage / "index.html")
     assert receipt["output_sha256"] == repository.sha(picture)
     observed = json.loads(Path(f"{fake}.json").read_text(encoding="utf-8"))

@@ -220,13 +220,18 @@ def picture_html(
     return html
 
 
-def require_renderer() -> None:
-    """Refuse a film whose npm packages install another renderer version than the engine's."""
+def installed_renderer() -> str | None:
+    """The renderer version the film's npm packages install, or None where they state none."""
     manifest = repository.node_modules() / RENDERER_PACKAGE
     try:
-        installed = json.loads(manifest.read_text())["version"]
+        return json.loads(manifest.read_text())["version"]
     except (OSError, ValueError, KeyError, TypeError):
-        installed = None
+        return None
+
+
+def require_renderer() -> None:
+    """Refuse a film whose npm packages install another renderer version than the engine's."""
+    installed = installed_renderer()
     if installed != RENDERER_VERSION:
         found = f"HyperFrames {installed}" if installed else "no HyperFrames"
         msg = f"The film installs {found}; the engine renders with HyperFrames {RENDERER_VERSION}"
@@ -578,8 +583,9 @@ def record_render(
 ) -> dict:
     """Run a renderer command on a stage to its exit or deadline and write its receipt.
 
-    The receipt names the picture, the command, the capture and worker count it passes and the
-    browser that draws it (`filmkit.picture.browser`). A
+    The receipt names the picture, the command, the capture and worker count it passes, the
+    browser that draws it (`filmkit.picture.browser`) and the renderer version the film's npm
+    packages install. A
     render that does not exit 0 within its deadline, or whose stage changed meanwhile, raises
     `PictureError` after its receipt is written.
     """
@@ -594,6 +600,7 @@ def record_render(
         "capture": command_capture(command),
         "workers": command_workers(command),
         "browser": drawn_by,
+        "renderer_version": installed_renderer(),
         "exit": exit_code,
         "timed_out": timed_out,
         "deadline_seconds": deadline,
