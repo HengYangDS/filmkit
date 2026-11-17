@@ -67,11 +67,14 @@ def test_two_renders_that_show_the_same_pass_and_the_second_is_removed(rendered,
         "comparison",
         "identical_frames",
         "first_differing_frame",
+        "lowest_psnr_db",
+        "lowest_psnr_frame",
         "findings",
         "verdict",
     ]
     assert (record["verdict"], record["findings"]) == ("pass", [])
     assert (record["identical_frames"], record["first_differing_frame"]) == (FRAMES, None)
+    assert (record["lowest_psnr_db"], record["lowest_psnr_frame"]) == (None, None)
     assert record["renderer"] == {"package": "hyperframes", "version": RENDERER}
     # The record names the capture the two renders were made with, the sample film's own.
     assert record["capture"] == "software"
@@ -87,9 +90,11 @@ def test_two_renders_that_show_the_same_pass_and_the_second_is_removed(rendered,
     assert (every["frames"], every["differing_frames"], every["fault_frames"]) == (FRAMES, 0, 0)
     assert (every["lasting_runs"], every["residue_frames"]) == (0, 0)
     assert every["slivers"]["frames_beyond_the_bound"] == 0
-    # The printed line names the verdict, the findings and the frames that decode identically.
+    # The printed line names the verdict, the findings, the frames that decode identically and
+    # the lowest PSNR of any frame, which no frame has here.
     printed = json.loads(capsys.readouterr().out.splitlines()[-1])
-    assert printed == {"verdict": "pass", "findings": [], "identical_frames": FRAMES}
+    facts = {"identical_frames": FRAMES, "lowest_psnr_db": None}
+    assert printed == {"verdict": "pass", "findings": [], **facts}
     work = repository.ROOT / qualification.WORK / "zh"
     assert not (work / edition.picture.name).exists()
     # The second render ran the pictures' command on the same stage, to the work file.
@@ -156,8 +161,12 @@ def test_a_one_frame_fault_of_the_second_render_is_refused_by_its_frame(rendered
     assert record["comparison"]["every_frame"]["fault_frames"] == 1
     # One frame of 120 does not decode identically; that is recorded and decides nothing.
     assert (record["identical_frames"], record["first_differing_frame"]) == (FRAMES - 1, 77)
+    # The lowest PSNR of any frame is that frame's, which no sampled frame is.
+    assert record["lowest_psnr_frame"] == 77 and record["lowest_psnr_db"] < 60
+    assert record["comparison"]["lowest_psnr_db"] is None
     printed = json.loads(capsys.readouterr().out.splitlines()[-1])
-    assert printed == {"verdict": "refuse", "findings": [fault], "identical_frames": FRAMES - 1}
+    facts = {"identical_frames": FRAMES - 1, "lowest_psnr_db": record["lowest_psnr_db"]}
+    assert printed == {"verdict": "refuse", "findings": [fault], **facts}
     # The second render is kept for inspection.
     assert (repository.ROOT / kept / edition.picture.name).is_file()
 

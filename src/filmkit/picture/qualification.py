@@ -13,8 +13,8 @@ the encoders' noise, no one-frame fault, no lasting difference, and as many fram
 Two renders are not asked to decode alike. The renderer's hardware encode of one stage varies
 from run to run when the encoder is shared, on frames that are given to it alike, so identical
 decoded frames would refuse a whole film or a busy host for the encoder's variation and say
-nothing of the renderer's drawing. How many frames do decode identically is recorded as a fact
-that decides nothing.
+nothing of the renderer's drawing. How many frames do decode identically, and the lowest PSNR of
+any frame, are recorded as facts that decide nothing, from one pass over both renders.
 
 It runs under whatever capture the film declares, and its record names that capture. The sample
 film declares software capture, the one under which uncaptioned pictures are derived, and its
@@ -26,8 +26,9 @@ what the engine pins: the renderer's version as the film's npm packages install 
 executable the renders ran with its SHA-256 and, when those are the pinned build's bytes, that
 build's name, and the capture. It names both renders' SHA-256, worker counts and frames, holds
 the comparison's report and findings, and the frames that decode identically with the first
-that does not. A finding raises `PictureError` after the record is written, and the second
-render is kept beside its receipt for inspection. A passing run removes it.
+that does not and the lowest PSNR of any frame. A finding raises `PictureError` after the record
+is written, and the second render is kept beside its receipt for inspection. A passing run
+removes it.
 
 Usage: python -m filmkit.produce qualify-renderer --language zh|en
 """
@@ -95,15 +96,15 @@ def qualify_renderer(edition: Edition, deadline: float = rendering.DEADLINE) -> 
         "first": render_of(rendered.file, first_receipt, frames["first"]),
         "second": render_of(again, second_receipt, frames["second"]),
         "comparison": compared["comparison"],
-        # What decides nothing: the frames that decode identically, and the first that does not.
-        "identical_frames": compared["identical_frames"],
-        "first_differing_frame": compared["first_differing_frame"],
+        # What decides nothing: the frames that decode identically, the first that does not, and
+        # the lowest PSNR of any frame.
+        **{key: compared[key] for key in equivalence.DECODED},
         "findings": findings,
         "verdict": compared["verdict"],
     }
     repository.write(edition.renderer_qualification, record)
     shown = {"verdict": record["verdict"], "findings": findings}
-    print(json.dumps({**shown, "identical_frames": record["identical_frames"]}))
+    print(json.dumps(shown | {key: record[key] for key in ("identical_frames", "lowest_psnr_db")}))
     if findings:
         more = f" and {len(findings) - 1} more findings" if len(findings) > 1 else ""
         msg = (

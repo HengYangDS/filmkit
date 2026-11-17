@@ -194,11 +194,11 @@ def decodes(monkeypatch) -> list[str]:
     equal frames, equal audio and an equal container, so that no damaged file reaches FFmpeg."""
     decoded = []
 
-    def frames(rebuilt: Path, _published: Path) -> list[float]:
+    def frames(rebuilt: Path, _published: Path, _timeout: int) -> list[float]:
         decoded.append(rebuilt.name)
         return [float("inf")] * 6
 
-    monkeypatch.setattr(reproduction, "frame_psnr", frames)
+    monkeypatch.setattr(reproduction.media, "frame_psnr", frames)
     monkeypatch.setattr(reproduction, "decoded_audio", lambda _path: "audio")
     monkeypatch.setattr(reproduction, "container", lambda _path: {})
     return decoded

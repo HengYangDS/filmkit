@@ -46,7 +46,6 @@ import json
 import math
 import subprocess
 import threading
-from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -98,6 +97,10 @@ PSNR_FLOOR_DB = 45.0
 WORST = 10
 # Seconds a picture's decode may take.
 DECODE_DEADLINE = 7200
+# What a comparison of two renders records of every decoded frame, and what decides nothing: the
+# frames that decode identically, the first that does not, and the lowest PSNR of any frame,
+# with that frame.
+DECODED = ("identical_frames", "first_differing_frame", "lowest_psnr_db", "lowest_psnr_frame")
 
 
 def picture_bindings(edition: Edition, captions: bool) -> dict:
@@ -369,14 +372,6 @@ def findings_of(composition: dict, encoded: dict | None, code: str) -> list[str]
     return found + (encoded_findings(encoded, code) if encoded is not None else [])
 
 
-def frame_digests(path: Path) -> list[str]:
-    """The MD5 of every decoded frame of a picture's video stream, in presentation order."""
-    command = ["ffmpeg", "-v", "error", "-nostdin", "-i", str(path), "-map", "0:v:0"]
-    listed = repository.run([*command, "-f", "framemd5", "-"], timeout=DECODE_DEADLINE).stdout
-    rows = [line for line in listed.decode().splitlines() if line and not line.startswith("#")]
-    return [row.rsplit(",", 1)[1].strip() for row in rows]
-
-
 def compare_renders(first: Path, second: Path, work: Path) -> dict:
     """Compare two renders of one stage, two picture files that should show the same frames, by
     the measure of a rendered pair (`encoded_comparison`) with no row left out, in `work`.
@@ -385,15 +380,18 @@ def compare_renders(first: Path, second: Path, work: Path) -> dict:
     are not asked to decode alike: they pass when the comparison finds nothing beyond the
     encoders' noise, no one-frame fault and no lasting difference, and both hold the same count
     of frames of the same size. The result holds each render's frames, the comparison's report,
-    its findings and the verdict, and, as a fact that decides nothing, how many frames decode
-    identically and the first that does not.
+    its findings and the verdict, and, as facts that decide nothing, how many frames decode
+    identically, the first that does not, and the lowest PSNR of any frame with that frame:
+    one pass over both renders that measures every frame's PSNR, which is infinite where the
+    two frames are equal (`filmkit.media.frame_psnr`, as a rebuilt film is compared with a
+    published one).
     """
     work.mkdir(parents=True, exist_ok=True)
     pictures = {"first": first, "second": second}
     streams = {name: media.video_stream(media.probe(path)) for name, path in pictures.items()}
     counts = {name: int(stream["nb_frames"]) for name, stream in streams.items()}
     sizes = {name: (stream["width"], stream["height"]) for name, stream in streams.items()}
-    encoded, identical, differing = None, None, None
+    encoded, decoded = None, dict.fromkeys(DECODED)
     if counts["first"] != counts["second"]:
         findings = [f"the renders hold {counts['first']} and {counts['second']} frames"]
     elif sizes["first"] != sizes["second"]:
@@ -404,15 +402,19 @@ def compare_renders(first: Path, second: Path, work: Path) -> dict:
             pictures, sizes["first"], count, list(range(0, count, step)), (0, 0), work
         )
         findings = encoded_findings(encoded, None)
-        with durations.phase("frame-digests"), ThreadPoolExecutor(max_workers=2) as pool:
-            ours, theirs = pool.map(frame_digests, (first, second))
-        unlike = [n for n, (a, b) in enumerate(zip(ours, theirs, strict=False)) if a != b]
-        identical, differing = count - len(unlike), unlike[0] if unlike else None
+        with durations.phase("every-frame-psnr"):
+            psnr = media.frame_psnr(first, second, DECODE_DEADLINE)
+        if len(psnr) != count:
+            msg = f"The PSNR of {len(psnr)} of the renders' {count} frames was measured"
+            raise PictureError(msg)
+        unlike = sorted((value, frame) for frame, value in enumerate(psnr) if math.isfinite(value))
+        lowest = unlike[0] if unlike else (None, None)
+        first_unlike = min((frame for _, frame in unlike), default=None)
+        decoded = dict(zip(DECODED, (count - len(unlike), first_unlike, *lowest), strict=True))
     return {
         "frames": counts,
         "comparison": encoded,
-        "identical_frames": identical,
-        "first_differing_frame": differing,
+        **decoded,
         "findings": findings,
         "verdict": "refuse" if findings else "pass",
     }

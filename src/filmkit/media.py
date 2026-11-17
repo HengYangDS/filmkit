@@ -120,6 +120,30 @@ def decoded_video_frames(path: Path, expected_frames: int, timeout: int) -> int:
     return expected_frames
 
 
+def frame_psnr(first: Path, second: Path, timeout: int) -> list[float]:
+    """Each decoded frame's PSNR between two files' pictures, in one FFmpeg pass over both;
+    infinite where the two frames are equal in every sample."""
+    stats = repository.run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-nostdin",
+            "-i",
+            str(first),
+            "-i",
+            str(second),
+            "-lavfi",
+            "[0:v:0][1:v:0]psnr=stats_file=-",
+            "-f",
+            "null",
+            "-",
+        ],
+        timeout=timeout,
+    ).stdout.decode()
+    return [float(value) for value in re.findall(r"psnr_avg:(\S+)", stats)]
+
+
 def decoded_audio_frames(path: Path) -> int:
     """Decode the first audio stream to 16-bit stereo and count its sample frames."""
     pcm = repository.run(

@@ -7,7 +7,7 @@ The sample film SHALL declare `software` capture, the capture under which pictur
 #### Scenario: Two renders of one stage
 
 - **WHEN** `qualify-renderer` runs after the Chinese captioned picture is rendered and validated
-- **THEN** its record names both renders' SHA-256 and frames and `software` capture, holds the comparison's report without a finding, and states how many frames decode identically
+- **THEN** its record names both renders' SHA-256 and frames and `software` capture, holds the comparison's report without a finding, and states how many frames decode identically, the first that does not, and the lowest PSNR of any frame with that frame
 
 #### Scenario: The supply that ran
 
@@ -17,7 +17,7 @@ The sample film SHALL declare `software` capture, the capture under which pictur
 #### Scenario: Renders that differ by the encoder alone
 
 - **WHEN** the second render differs from the first in every decoded frame, within the encoders' noise
-- **THEN** `qualify-renderer` passes, and its record states that no frame decodes identically
+- **THEN** `qualify-renderer` passes, and its record states that no frame decodes identically and the lowest PSNR of any frame, which one pass over both renders measured
 
 #### Scenario: A one-frame fault in one render
 

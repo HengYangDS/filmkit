@@ -31,7 +31,6 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -232,29 +231,6 @@ def review(edition: production.Edition, assets: dict[str, Path]) -> dict:
     return {"verdict": "pass", **accepted}
 
 
-def frame_psnr(rebuilt: Path, published: Path) -> list[float]:
-    """Each decoded frame's PSNR between two films' pictures, infinite where they are equal."""
-    stats = repository.run(
-        [
-            "ffmpeg",
-            "-v",
-            "error",
-            "-nostdin",
-            "-i",
-            str(rebuilt),
-            "-i",
-            str(published),
-            "-lavfi",
-            "[0:v:0][1:v:0]psnr=stats_file=-",
-            "-f",
-            "null",
-            "-",
-        ],
-        timeout=DECODE_DEADLINE,
-    ).stdout.decode()
-    return [float(value) for value in re.findall(r"psnr_avg:(\S+)", stats)]
-
-
 def decoded_audio(path: Path) -> str:
     """The SHA-256 of a film's first audio stream, decoded."""
     hashed = repository.run(
@@ -351,7 +327,7 @@ def film(asset: Asset, rebuilt: Path, published: Path, floor: float | None) -> d
     if rebuilt.stat().st_size == asset.bytes and repository.sha(rebuilt) == asset.sha256:
         return identical_film(asset, floor)
     frames = media.video_stream(media.probe(published)).get("nb_frames")
-    psnr = frame_psnr(rebuilt, published)
+    psnr = media.frame_psnr(rebuilt, published, DECODE_DEADLINE)
     finite = sorted((value, index) for index, value in enumerate(psnr) if math.isfinite(value))
     below = [index for index, value in enumerate(psnr) if floor is not None and value < floor]
     result = {

@@ -1,13 +1,17 @@
 """Two renders of one stage, compared by the measure of a rendered pair with no row left out:
 what `qualify-renderer` judges, on small real clips."""
 
+import contextlib
+import math
 import subprocess
 
 import pytest
 from test_faults import BROKEN, CAPTION, FRAGMENT, LABEL, SECONDS, SIZE, encode
 
+import filmkit.media as media
 import filmkit.picture.equivalence as equivalence
 import filmkit.repository as repository
+from filmkit.picture.rendering import PictureError
 
 pytestmark = pytest.mark.ffmpeg
 
@@ -42,12 +46,16 @@ def test_two_renders_that_decode_alike_pass_and_the_report_holds_the_comparison(
         "comparison",
         "identical_frames",
         "first_differing_frame",
+        "lowest_psnr_db",
+        "lowest_psnr_frame",
         "findings",
         "verdict",
     ]
     assert compared["frames"] == {"first": FRAMES, "second": FRAMES}
     assert (compared["verdict"], compared["findings"]) == ("pass", [])
     assert (compared["identical_frames"], compared["first_differing_frame"]) == (FRAMES, None)
+    # No frame differs, so no frame has a PSNR.
+    assert (compared["lowest_psnr_db"], compared["lowest_psnr_frame"]) == (None, None)
     comparison = compared["comparison"]
     # The comparison of a rendered pair, at the sampled frames and at every frame, with no row
     # left out and the pair's own thresholds.
@@ -68,6 +76,12 @@ def test_renders_that_differ_by_the_encoders_noise_in_every_frame_pass(renders):
     # No frame decodes identically, and nothing differs beyond the encoders' noise.
     assert (compared["identical_frames"], compared["first_differing_frame"]) == (0, 0)
     assert (compared["verdict"], compared["findings"]) == ("pass", [])
+    # The lowest PSNR is that of every frame's pass, and the frame it names is one of them.
+    every = media.frame_psnr(first, second, 60)
+    assert len(every) == FRAMES
+    assert compared["lowest_psnr_db"] == min(every)
+    assert every[compared["lowest_psnr_frame"]] == min(every)
+    assert 30 < compared["lowest_psnr_db"] < 80
     comparison = compared["comparison"]
     assert comparison["identical_frames"] == 0
     assert comparison["lowest_psnr_db"] >= equivalence.PSNR_FLOOR_DB
@@ -90,8 +104,12 @@ def test_a_one_frame_fault_of_one_render_refuses_naming_the_frame_and_the_render
         "in box [40, 10, 44, 14]",
     ]
     assert compared["comparison"]["every_frame"]["fault_frames"] == 2
-    # All but those two frames decode identically; that count decides nothing.
+    # All but those two frames decode identically; that count decides nothing. The lowest PSNR
+    # is one of the two frames', which the sampled frames, every half second, do not hold.
     assert (compared["identical_frames"], compared["first_differing_frame"]) == (FRAMES - 2, 50)
+    assert compared["lowest_psnr_frame"] in (50, 77)
+    assert compared["lowest_psnr_db"] < 60
+    assert compared["comparison"]["lowest_psnr_db"] is None
 
 
 def test_a_difference_that_lasts_refuses(renders):
@@ -121,12 +139,16 @@ def test_renders_of_other_lengths_refuse_without_a_comparison(renders, monkeypat
         "comparison": None,
         "identical_frames": None,
         "first_differing_frame": None,
+        "lowest_psnr_db": None,
+        "lowest_psnr_frame": None,
         "findings": [f"the renders hold {FRAMES} and {FRAMES // 2} frames"],
         "verdict": "refuse",
     }
 
 
-def test_the_digests_are_one_for_each_decoded_frame(tmp_path, monkeypatch):
+def test_one_pass_measures_every_frames_psnr_which_is_infinite_where_two_frames_are_equal(
+    tmp_path, monkeypatch
+):
     monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
     clips = []
     for name, colour in (("a", "0x0F1519"), ("b", "0x0F1519"), ("c", "0x101519")):
@@ -134,6 +156,36 @@ def test_the_digests_are_one_for_each_decoded_frame(tmp_path, monkeypatch):
         command = ["ffmpeg", "-v", "error", "-nostdin", "-y", "-threads", "2", "-f", "lavfi"]
         command += ["-i", f"color=c={colour}:s=64x36:r=60:d=0.5", "-c:v", "libx264", "-qp", "0"]
         subprocess.run([*command, "-pix_fmt", "yuv420p", str(clip)], check=True, timeout=60)
-        clips.append(equivalence.frame_digests(clip))
-    assert [len(digests) for digests in clips] == [30, 30, 30]
-    assert clips[0] == clips[1] != clips[2]
+        clips.append(clip)
+    same, other = (media.frame_psnr(clips[0], clip, 60) for clip in clips[1:])
+    assert same == [math.inf] * 30
+    # One level of one channel in every sample of a plane is far from equal, and is measured.
+    assert len(other) == 30 and all(40 < value < 70 for value in other)
+
+
+def test_a_pass_that_measures_other_frames_than_the_renders_hold_is_refused(renders, monkeypatch):
+    first, second, work = renders
+    encode(first, CAPTION)
+    encode(second, CAPTION)
+    monkeypatch.setattr(media, "frame_psnr", lambda *_: [math.inf] * (FRAMES - 1))
+    measured = f"The PSNR of {FRAMES - 1} of the renders' {FRAMES} frames was measured"
+    with pytest.raises(PictureError, match=measured):
+        equivalence.compare_renders(first, second, work)
+
+
+def test_the_comparison_names_its_pass_over_every_frame_as_a_phase(renders, monkeypatch):
+    first, second, work = renders
+    encode(first, CAPTION)
+    encode(second, CAPTION)
+    phases = []
+
+    @contextlib.contextmanager
+    def phase(name):
+        phases.append(name)
+        yield
+
+    monkeypatch.setattr(equivalence.durations, "phase", phase)
+    equivalence.compare_renders(first, second, work)
+    assert phases == ["sampled-frames", "every-frame-scan", "every-frame-psnr"]
+    # Nothing hashes every frame of each render any more.
+    assert not hasattr(equivalence, "frame_digests")
