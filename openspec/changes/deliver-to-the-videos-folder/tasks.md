@@ -1,0 +1,13 @@
+## 1. The destination
+
+- [ ] 1.1 Resolve the delivery's destination from `--destination`, else `FILMKIT_DELIVERY_ROOT` joined with the film's declared folder, else the platform's videos folder joined with it (`~/Movies` on macOS; the XDG videos directory elsewhere), and name no folder of a host in the engine; verify `tests/delivery/test_destination.py` (the three rules in their order, the macOS and the XDG forms, every delivery below the test's own folder).
+- [ ] 1.2 State the destination and the rule that gave it in the readback, in a dry run's report and in the command's summary; verify `tests/delivery/test_destination.py` and `tests/delivery/test_folder.py`.
+
+## 2. The names
+
+- [ ] 2.1 Declare the delivery folder as `delivery_folder` and refuse `documents_folder` with a message that names the new key; verify `tests/test_film.py`.
+- [ ] 2.2 Rename the module to `filmkit.delivery.folder`, with no alias, and say "delivery folder" in its texts, the README, the sample film's declaration and the Changelog; verify that no source, test fixture name or document of the engine names the old module or key except the refusal and the Changelog, and the repository's Markdown check.
+
+## 3. Acceptance
+
+- [ ] 3.1 Run every command of `mise run check` on the lane's head; verify that the dependency checks, the Node suite, the Markdown check, the Python suite and the lint pass.
