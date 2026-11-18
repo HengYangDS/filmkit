@@ -10,5 +10,5 @@
 
 ## 3. Documents
 
-- [ ] 3.1 Say in the README's "Whole endings" which mlx-audio release carries the upstream repair and what the sample film's takes showed, and record the moves in the Changelog; done when the Markdown check and the proof's prose gate pass.
-- [ ] 3.2 Prepare 0.23.1 in `VERSION`, the Changelog's dated section and the README's install line; done when every command of `mise run check` passes on that head.
+- [x] 3.1 Say in the README's "Whole endings" which mlx-audio release carries the upstream repair and what the sample film's takes showed, and record the moves in the Changelog; done when the Markdown check and the proof's prose gate pass. The README's "Whole endings" names mlx-audio 0.6.5 as the release that carries the repair, and the Changelog records the three moves with what the sample film showed of each; on `ec40b88` on 18 November 2026 the Markdown check and the proof's `prose`, `markdown-lint` and `markdown-links` gates pass.
+- [x] 3.2 Prepare 0.23.1 in `VERSION`, the Changelog's dated section and the README's install line; done when every command of `mise run check` passes on that head. `VERSION` reads 0.23.1, the Changelog holds the section of 0.23.1 dated 2026-11-18 with its links, and the README's install line names `v0.23.1`; on a clone of `ec40b88` with that content, every command of `mise run check` passes on 18 November 2026, the suite with warnings as errors (1609 passed).

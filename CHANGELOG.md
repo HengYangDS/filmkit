@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-11-18
+
 ### Changed
 
 - The engine narrates with mlx-audio 0.6.6, from 0.6.4, and numpy 2.5.5. **A film that adopts this release narrates its takes anew:** from the same seed the model produces the same codes and another waveform, because mlx-audio 0.6.5 decodes with the speech tokenizer's sliding window. Its trim of decoded audio also keeps the frames whose first codebook id is 0, the fault the README describes under "Whole endings". Built on the supply of 0.23.0 and again on this one, the sample film's twenty takes keep their lengths and none keeps its samples, the aligner's word times move by up to a tenth of a second, and every gate of both editions passes on both. A film that keeps its takes holds `mlx-audio` at its present version in its own lock.
@@ -488,7 +490,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.23.1...HEAD
+[0.23.1]: https://github.com/HengYangDS/filmkit/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/HengYangDS/filmkit/compare/v0.22.3...v0.23.0
 [0.22.3]: https://github.com/HengYangDS/filmkit/compare/v0.22.2...v0.22.3
 [0.22.2]: https://github.com/HengYangDS/filmkit/compare/v0.22.1...v0.22.2
