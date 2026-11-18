@@ -35,7 +35,7 @@ It is kept narrow on purpose. The derivation of the uncaptioned picture, its pro
 - `src/filmkit/picture/rendering.py` (the stage, the render commands, validation), the new `renderer.py` (what draws) and `native-canvas.mjs`, the new `encoding.py`, `faces.py` and `errors.py`, `browser.py` (the checks' browser alone), `draft.py`, `still_scan.py`, `qualification.py`, `derivation.py`, `metrics.py`, `headless-composition.mjs` (the scope a composition runs in), `preflight.py`, `supply.py` and `tools.py`, their tests, the sample film's template and declaration, `package.json`, `package-lock.json` and `NOTICE`.
 - The npm supply: `hyperframes`, `gsap` and the `undici` override out, `@napi-rs/canvas` 1.1.1 in; 102 packages leave the lock and 12 enter it, and no package of the lock runs an install script. The pinned browser, `puppeteer-core` and `@puppeteer/browsers` stay for the geometry check, the whole-turn gate, the cover and the player check.
 - Each film: its `package.json` and lock, its picture template, and a new render of its pictures. A released edition keeps its tag's engine and its bytes.
-- Out of scope: the derivation and its proofs, the qualification's pair comparison, the fault scan, the repair, the equivalence, the packaging, the geometry and player checks, narration and soundtrack.
+- Out of scope: the derivation and its proofs, the qualification's pair comparison, the fault scan, the repair, the equivalence, the packaging, the player check, narration and soundtrack; of the geometry check everything but where it takes its frame (design, decision 13).
 
 An independent review of 18 November 2026 found no high finding, 4 medium and 20 low; the design states what its repairs decided (decisions 6 and 9 to 12, Sources [S10]).
 

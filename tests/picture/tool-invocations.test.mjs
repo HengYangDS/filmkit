@@ -2,6 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -89,4 +90,15 @@ test("the geometry check refuses a malformed invocation before opening a browser
     ["--bogus"],
   ])
     assertRefused(GEOMETRY, args, usage);
+});
+
+test("the geometry check refuses a workspace that is no whole stage in one line, and writes no receipt", async () => {
+  const folder = await scratchFolder(),
+    receipt = join(folder, "receipt.json");
+  const result = invoke(GEOMETRY, [folder, receipt]);
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, "");
+  const said = `geometry-check: The stage's record ${join(folder, "stage.json")} is absent; run stage-picture again\n`;
+  assert.equal(result.stderr, said);
+  assert.equal(existsSync(receipt), false);
 });

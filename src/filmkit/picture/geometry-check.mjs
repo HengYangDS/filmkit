@@ -10,6 +10,7 @@ import { analysis } from "./rules/frame.mjs";
 import { inkLevel, readingLoad } from "./rules/ink.mjs";
 import { faintLabels, listTracker, nameRules } from "./rules/names.mjs";
 import { rowGaps } from "./rules/rows.mjs";
+import { frameContract, StageError } from "./stage-contract.mjs";
 
 /** Page instrumentation: record every painted path and fill in logical frame coordinates, and the size each text is
  * painted at on the logical frame, its font's size under the transform it is drawn in. */
@@ -278,26 +279,11 @@ const RULES = {
   rowGaps,
 };
 
-/** A stage's frame contract: its picture's width, height, seconds and frames a second, as the stage's record states
- * them (`filmkit.picture.rendering.stage_picture` writes the record, and the renderer draws from the same one). The
- * page sizes itself by its own attributes and states no rate. */
-export async function frameContract(workspace) {
-  let record = null;
-  try {
-    record = JSON.parse(await readFile(resolve(workspace, "stage.json"), "utf8"));
-  } catch {
-    // A record that is absent or holds no JSON states no contract.
-  }
-  const contract = ["width", "height", "duration", "fps"].map((name) => record?.[name]);
-  if (!contract.every((value) => typeof value === "number" && Number.isFinite(value) && value > 0))
-    throw Error("Workspace does not declare its frame contract");
-  return contract;
-}
-
 export async function inspectWorkspace(workspace, { step = 2 } = {}) {
+  // The frame is the stage's record's, with which its page agrees (`stage-contract.mjs`): the page states no rate.
+  const [width, height, duration, fps] = await frameContract(workspace);
   const entry = resolve(workspace, "index.html");
   const source = await readFile(entry, "utf8");
-  const [width, height, duration, fps] = await frameContract(workspace);
   const browser = await launchBrowser({
     args: ["--allow-file-access-from-files", "--no-sandbox"],
     defaultViewport: { width, height, deviceScaleFactor: 1 },
@@ -342,7 +328,8 @@ export function judged(report, gateRowGaps) {
 
 if (import.meta.main) {
   const USAGE =
-    "Usage: python -m filmkit.tools geometry-check <workspace> <receipt.json> [step-frames] [--gate-row-gaps]";
+    "Usage: python -m filmkit.tools geometry-check <workspace> <receipt.json> [step-frames] [--gate-row-gaps]\n" +
+    "<workspace> is a stage that stage-picture wrote: its page and its record, stage.json, which states the frame";
   // A malformed invocation stops before the browser opens, so it can never write a passing receipt.
   const refuse = (problem) => {
     console.error(`${problem}\n${USAGE}`);
@@ -364,7 +351,15 @@ if (import.meta.main) {
   const step = Number(every);
   if (!Number.isInteger(step) || step < 1)
     refuse(`The step is not a positive whole number of frames: ${every}`);
-  const report = await inspectWorkspace(workspace, { step });
+  let report = null;
+  try {
+    report = await inspectWorkspace(workspace, { step });
+  } catch (error) {
+    // A workspace that is no whole stage is refused in one line with status 1, before a browser opens or a receipt is written.
+    if (!(error instanceof StageError)) throw error;
+    console.error(`geometry-check: ${error.message}`);
+    process.exit(1);
+  }
   // The row gaps are always recorded. A film whose reviews hold its rows to the floor gates them; reviews of other
   // films have accepted closer names, such as the words of one spelled-out title, so the check does not gate them unasked.
   const gated = values["gate-row-gaps"];

@@ -7,12 +7,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { spanOf } from "../../src/filmkit/picture/frame-audit/marks.mjs";
-import {
-  frameContract,
-  inspectFilm,
-  instrument,
-  judged,
-} from "../../src/filmkit/picture/geometry-check.mjs";
+import { inspectFilm, instrument, judged } from "../../src/filmkit/picture/geometry-check.mjs";
 import {
   canvasStandIn,
   canvasSweep,
@@ -22,6 +17,7 @@ import { analysis } from "../../src/filmkit/picture/rules/frame.mjs";
 import { inkLevel, readingLoad } from "../../src/filmkit/picture/rules/ink.mjs";
 import { faintLabels, listTracker, nameRules } from "../../src/filmkit/picture/rules/names.mjs";
 import { rowGaps } from "../../src/filmkit/picture/rules/rows.mjs";
+import { frameContract, StageError } from "../../src/filmkit/picture/stage-contract.mjs";
 import { authoredTimeline, SAMPLE, scratchFolder } from "./sample-film.mjs";
 
 // Scripts run in a context keep their file name, so coverage attributes them to their sources.
@@ -341,27 +337,51 @@ test("the row gaps refuse only for a film that gates them", () => {
   );
 });
 
-test("the check takes a stage's frame contract from its record, and refuses a workspace whose record states none", async () => {
+test("a stage's frame is its record's, and a stage whose record or page states another is refused by name", async () => {
   const folder = await scratchFolder();
-  const refused = { message: "Workspace does not declare its frame contract" };
+  const record = join(folder, "stage.json");
+  const refused = (said) =>
+    assert.rejects(frameContract(folder), (error) => {
+      assert.ok(error instanceof StageError, String(error));
+      assert.ok(error.message.includes(said), error.message);
+      assert.ok(error.message.endsWith("; run stage-picture again"), error.message);
+      return true;
+    });
+  const page = (attributes) =>
+    writeFile(join(folder, "index.html"), `<div id="film" ${attributes}></div>`);
   // A stage's page sizes itself and states no rate, so the page alone is no contract.
-  const page = '<div id="film" data-width="3840" data-height="2160" data-duration="60"></div>';
-  await writeFile(join(folder, "index.html"), page);
-  await assert.rejects(frameContract(folder), refused);
+  await page('data-width="3840" data-height="2160" data-duration="60"');
+  await refused(`record ${record} is absent`);
+  await writeFile(record, "{");
+  await refused(`record ${record} holds no JSON (`);
   const whole = { width: 3840, height: 2160, duration: 60, fps: 60 };
   const short = [
-    null,
-    [],
-    { ...whole, fps: undefined },
-    { ...whole, fps: "60" },
-    { ...whole, duration: 0 },
+    [null, "width, height, duration, fps"],
+    [[], "width, height, duration, fps"],
+    [{ ...whole, fps: undefined }, "fps"],
+    [{ ...whole, fps: "60" }, "fps"],
+    [{ ...whole, duration: 0 }, "duration"],
+    [{ ...whole, width: 3840.5, fps: 59.94 }, "width, fps"],
   ];
-  for (const record of short) {
-    await writeFile(join(folder, "stage.json"), JSON.stringify(record));
-    await assert.rejects(frameContract(folder), refused, JSON.stringify(record));
+  for (const [stated, lacking] of short) {
+    await writeFile(record, JSON.stringify(stated));
+    await refused(`record ${record} states no whole positive ${lacking};`);
   }
-  await writeFile(join(folder, "stage.json"), "{");
-  await assert.rejects(frameContract(folder), refused);
-  await writeFile(join(folder, "stage.json"), JSON.stringify({ ...whole, edition: "zh" }));
+  await writeFile(record, JSON.stringify({ ...whole, edition: "zh" }));
   assert.deepEqual(await frameContract(folder), [3840, 2160, 60, 60]);
+  // A page left by another staging than the record's: the template's seconds, or a size that is not the record's.
+  await page('data-width="3840" data-height="2160" data-duration="1200"');
+  const entry = join(folder, "index.html");
+  await refused(`page ${entry} states a duration of 1200 where its record states 60`);
+  await page('data-width="3840" data-duration="60"');
+  await refused(`page ${entry} states no height where its record states 2160`);
+  // Only the film element states the page's frame: a figure in the stylesheet or the data before it is none of it.
+  const sound = '<div id="film" data-width="3840" data-height="2160" data-duration="60"></div>';
+  await writeFile(entry, `<style>[data-width="1920"] { color: red }</style>${sound}`);
+  assert.deepEqual(await frameContract(folder), [3840, 2160, 60, 60]);
+  await writeFile(
+    entry,
+    '<style>[data-width="3840"] {}</style><div data-height="2160" data-duration="60"></div>',
+  );
+  await refused(`page ${entry} holds no film element`);
 });
