@@ -4,6 +4,12 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+
+- The engine narrates with mlx-audio 0.6.6, from 0.6.4, and numpy 2.5.5. **A film that adopts this release narrates its takes anew:** from the same seed the model produces the same codes and another waveform, because mlx-audio 0.6.5 decodes with the speech tokenizer's sliding window. Its trim of decoded audio also keeps the frames whose first codebook id is 0, the fault the README describes under "Whole endings". Built on the supply of 0.23.0 and again on this one, the sample film's twenty takes keep their lengths and none keeps its samples, the aligner's word times move by up to a tenth of a second, and every gate of both editions passes on both. A film that keeps its takes holds `mlx-audio` at its present version in its own lock.
+- The engine renders with HyperFrames 0.9.64, from 0.9.46, and drives the browser with puppeteer-core 25.18.1. The browser build stays Chrome Headless Shell 152.0.7977.30, which 0.9.64 still declares, and `undici` stays overridden to 7.30.2. Rendered again on these inputs from the sound of the earlier build, nine of the sample film's twelve films and pictures decode to the same frames, 3,600 of 3,600; the Chinese uncaptioned picture, which the sample renders natively, and the two films made from it differ in 1,336 to 1,608 frames, the lowest at 59.76 dB.
+- The uv lock takes transformers 5.23.0, filelock 4.2.11, httpcore2 and httpx2 2.16.2 and regex 2026.11.15, and adds requests 2.34.2, urllib3 2.8.0, certifi 2026.10.23 and charset-normalizer 3.5.2, which mlx-audio 0.6.6 declares. Mise declares uv 0.13.9.
+
 ## [0.23.0] - 2026-11-18
 
 ### Added
