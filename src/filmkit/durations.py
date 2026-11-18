@@ -7,6 +7,11 @@ such as the count of narration processes. The code that does the work names
 a phase with `phase`, wherever it runs; outside a run a phase measures nothing. Work on another
 thread adds its seconds to the run it was given (`current`, `Run.add`).
 
+A record also states the host's 1-minute load average at the command's start and at its end
+(`host_load`), so that a slower command can be read against a busier host. No check reads it. A
+host that states no load average leaves both as null, and a record of an earlier engine holds
+none; the command prints nothing of the host for either.
+
 A record is build/evidence/editions/<code>/durations/<command>.json, the latest run of that
 command. It binds nothing and no record binds it: a duration differs from run to run, so it never
 stands in a record whose SHA-256 another record holds, and running a check again on unchanged
@@ -30,9 +35,9 @@ and the cover check (`filmkit.tools`), the verifier and the reproduction write r
 last two unless they are asked to be read-only.
 
 Usage: python -m filmkit.durations [--language zh|en|all] [--since <time>] [--json]
-Prints each selected edition's records in the order their commands started, each with its
-phases and settings, the sum of the seconds of the completed commands of its build, and last the
-time of the build.
+Prints each selected edition's records in the order their commands started, each with the
+host's load, its phases and settings, the sum of the seconds of the completed commands of its
+build, and last the time of the build with the range of the load its commands state.
 """
 
 from __future__ import annotations
@@ -41,6 +46,7 @@ import argparse
 import contextlib
 import contextvars
 import json
+import os
 import threading
 import time
 from datetime import UTC, datetime
@@ -60,15 +66,27 @@ FOLDER = "durations"
 # generates nothing, runs at any point of one; each writes a record of another name
 # (`filmkit.narration.narrate.record_name`).
 BUILD_START = "narrate"
+# The record's key for the host's 1-minute load average at a command's two ends.
+LOAD, ENDS = "load_1m", ("start", "end")
+
+
+def host_load() -> float | None:
+    """The host's 1-minute load average to two decimals, or None on a host that states none:
+    one without `os.getloadavg`, or one whose load average cannot be read."""
+    try:
+        return round(os.getloadavg()[0], 2)
+    except (AttributeError, OSError):
+        return None
 
 
 class Run:
-    """One command's run on one edition: when it started, the seconds of its phases, and the
-    settings its owner names as bearing on its time."""
+    """One command's run on one edition: when it started, the host's load then, the seconds of
+    its phases, and the settings its owner names as bearing on its time."""
 
     def __init__(self, code: str, command: str) -> None:
         self.code, self.command = code, command
         self.started_at = datetime.now(UTC)
+        self.load_at_start = host_load()
         self.phases: dict[str, float] = {}
         self.settings: dict[str, object] = {}
         self.failed = False
@@ -100,12 +118,14 @@ class Run:
             self.add(name, time.monotonic() - started)
 
     def record(self, *, completed: bool) -> dict:
-        """The run as its record states it, its start and its seconds to the millisecond."""
+        """The run as its record states it, its start and its seconds to the millisecond, with
+        the host's load at its start and at this moment, its end."""
         return {
             "command": self.command,
             "edition": self.code,
             "started_at": self.started_at.isoformat(timespec="milliseconds"),
             "seconds": round(time.monotonic() - self._started, 3),
+            LOAD: dict(zip(ENDS, (self.load_at_start, host_load()), strict=True)),
             "completed": completed,
             "phases": {name: round(seconds, 3) for name, seconds in self.phases.items()},
             "settings": dict(self.settings),
@@ -211,6 +231,20 @@ def running(found: list[dict]) -> float:
     return total
 
 
+def stated_load(record: dict) -> list[float]:
+    """The loads a record states, its start's before its end's: none for a record of an earlier
+    engine or of a host that states no load average."""
+    stated = record.get(LOAD) or {}
+    return [stated[end] for end in ENDS if stated.get(end) is not None]
+
+
+def load_text(record: dict) -> str:
+    """A record's load as its line prints it, `load 6.5 to 33.8`: one figure where both ends
+    print alike or only one is stated, and nothing where the record states none."""
+    printed = dict.fromkeys(f"{load:.1f}" for load in stated_load(record))
+    return "load " + " to ".join(printed) if printed else ""
+
+
 def lines(code: str, found: list[dict], since: str | None = None) -> list[str]:
     """An edition's records as the command prints them, in the order they started, with the sum
     of the completed commands of its build: those that started at or after `since`, or else at or
@@ -227,9 +261,11 @@ def lines(code: str, found: list[dict], since: str | None = None) -> list[str]:
         named = record.get("settings", {}).items()
         settings = ", ".join(f"{name} {value}" for name, value in named)
         state = "  earlier" if before else "" if record["completed"] else "  not completed"
+        load = load_text(record)
         listed.append(
             f"  {record['started_at']}  {record['command']:<{width}}  "
-            f"{record['seconds']:>9.1f} s{state}{'  (' + phases + ')' if phases else ''}"
+            f"{record['seconds']:>9.1f} s{state}{'  ' + load if load else ''}"
+            f"{'  (' + phases + ')' if phases else ''}"
             f"{'  [' + settings + ']' if settings else ''}"
         )
     if start is None:
@@ -242,14 +278,29 @@ def lines(code: str, found: list[dict], since: str | None = None) -> list[str]:
     return [*listed, total + left_out]
 
 
+def load_range(found: list[dict]) -> str:
+    """What the last line says of the host: the lowest and the highest load the counted commands
+    state at their starts and ends, and how many of them state none; nothing where none does."""
+    stated = [stated_load(record) for record in found]
+    loads = [load for ends in stated for load in ends]
+    if not loads:
+        return ""
+    silent = sum(1 for ends in stated if not ends)
+    return (
+        f"; the host's 1-minute load stood between {min(loads):.1f} and {max(loads):.1f} at "
+        f"their starts and ends{f' ({silent} of them state none)' if silent else ''}"
+    )
+
+
 def build_time(found: list[dict]) -> str:
     """The last line: the time of the build, which is the seconds during which one of the counted
-    commands was running, beside the sum of their seconds, which is more where two ran at once."""
+    commands was running, beside the sum of their seconds, which is more where two ran at once,
+    and the range of the host's load the commands state."""
     added = sum(record["seconds"] for record in found)
     return (
         f"build: one of the {len(found)} counted commands was running for {running(found):.1f} s; "
         f"their seconds add up to {added:.1f} s (commands that ran at the same time count once "
-        "in the first figure)"
+        f"in the first figure){load_range(found)}"
     )
 
 

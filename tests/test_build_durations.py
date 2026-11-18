@@ -15,19 +15,21 @@ def root(tmp_path, monkeypatch):
     return tmp_path.resolve()
 
 
-def record(code, command, started, seconds, completed=True):
-    repository.write(
-        f"build/evidence/editions/{code}/durations/{command}.json",
-        {
-            "command": command,
-            "edition": code,
-            "started_at": started,
-            "seconds": seconds,
-            "completed": completed,
-            "phases": {},
-            "settings": {},
-        },
-    )
+def record(code, command, started, seconds, completed=True, load=None):
+    """Write a duration record; one of an earlier engine unless `load` names the host's load at
+    its start and at its end."""
+    written = {
+        "command": command,
+        "edition": code,
+        "started_at": started,
+        "seconds": seconds,
+        "completed": completed,
+        "phases": {},
+        "settings": {},
+    }
+    if load is not None:
+        written["load_1m"] = dict(zip(("start", "end"), load, strict=True))
+    repository.write(f"build/evidence/editions/{code}/durations/{command}.json", written)
 
 
 def printed(capsys, *arguments) -> list[str]:
@@ -120,6 +122,37 @@ def test_commands_at_the_same_time_count_once_in_the_time_one_of_them_was_runnin
         "build: one of the 3 counted commands was running for 260.0 s; their seconds add up to "
         "260.0 s (commands that ran at the same time count once in the first figure)",
     ]
+
+
+BUILD = "build: one of the {} counted commands was running for {} s; their seconds add up to {} s "
+ONCE = "(commands that ran at the same time count once in the first figure)"
+
+
+@pytest.mark.usefixtures("root")
+def test_the_builds_time_states_the_range_of_the_load_its_counted_commands_state(capsys):
+    # Last week's repair under a busy host is no part of the build, and neither is the refusal.
+    record("zh", "repair-pictures", "2026-11-10T08:00:00+00:00", 600.0, load=(88.0, 91.5))
+    record("zh", "narrate", "2026-11-18T06:30:30+00:00", 76.0, load=(6.52, 9.1))
+    record("zh", "render-picture", "2026-11-18T06:33:07+00:00", 71.2, load=(12.4, 21.07))
+    record("zh", "package-film", "2026-11-18T06:40:56+00:00", 37.1, load=(31.2, 33.84))
+    record("zh", "verify", "2026-11-18T06:42:14+00:00", 12.0, completed=False, load=(40.0, 41.0))
+    stood = "; the host's 1-minute load stood between 6.5 and 33.8 at their starts and ends"
+    assert printed(capsys, "--language", "zh")[-1] == (
+        BUILD.format(3, "184.3", "184.3") + ONCE + stood
+    )
+    # A counted command that states no load is counted in the time and named beside the range.
+    record("zh", "check-picture", "2026-11-18T06:32:45+00:00", 1.5)
+    record("zh", "preflight", "2026-11-18T06:32:53+00:00", 0.9, load=(None, None))
+    assert printed(capsys, "--language", "zh")[-1] == (
+        BUILD.format(5, "186.7", "186.7") + ONCE + stood + " (2 of them state none)"
+    )
+
+
+@pytest.mark.usefixtures("root")
+def test_a_build_whose_records_state_no_load_prints_its_time_as_before(capsys):
+    record("en", "narrate", "2026-11-17T01:00:00+00:00", 60.0)
+    record("en", "render-picture", "2026-11-17T01:02:00+00:00", 170.0, load=(None, None))
+    assert printed(capsys, "--language", "en")[-1] == BUILD.format(2, "230.0", "230.0") + ONCE
 
 
 @pytest.mark.parametrize(

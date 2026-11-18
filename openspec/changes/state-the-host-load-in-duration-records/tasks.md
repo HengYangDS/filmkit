@@ -1,7 +1,7 @@
 ## 1. The record and the command
 
-- [ ] 1.1 Read the host's 1-minute load average at a run's start and at its end and state both in the duration record as `load_1m`, null on a host that states none (`durations.host_load`, `Run`); verify `tests/test_durations.py` (both readings, a refused command, a host whose average cannot be read and one without `os.getloadavg`).
-- [ ] 1.2 Print a record's load beside its seconds and the range of the counted commands' loads after the build's time, and nothing for a record that states none (`durations.load_text`, `lines`, `load_range`, `build_time`); verify `tests/test_durations.py` (a line with two figures, with one, after `not completed`, and of a record without the field) and `tests/test_build_durations.py` (the range, commands that state none, a build without a load).
+- [x] 1.1 Read the host's 1-minute load average at a run's start and at its end and state both in the duration record as `load_1m`, null on a host that states none (`durations.host_load`, `Run`); verify `tests/test_durations.py` (both readings, a refused command, a host whose average cannot be read and one without `os.getloadavg`).
+- [x] 1.2 Print a record's load beside its seconds and the range of the counted commands' loads after the build's time, and nothing for a record that states none (`durations.load_text`, `lines`, `load_range`, `build_time`); verify `tests/test_durations.py` (a line with two figures, with one, after `not completed`, and of a record without the field) and `tests/test_build_durations.py` (the range, commands that state none, a build without a load).
 
 ## 2. Acceptance
 
