@@ -109,7 +109,7 @@ Each decision states what it rests on, what was considered, why the option taken
 
 - `system` text is the operating system's. → The receipt states the version; a rebuild proof compares against the release with its floor; `portable` is there if a host must not matter.
 - The canvas package was six days old on the day of the spike, and its Skia revision and advisories were not read. → The engine's release-age rule holds it like any supply; `skia-canvas` is the fallback.
-- Edge antialiasing differs from the browser's on long horizontal edges. → Measured at 47.25 dB in the lowest of 216,000 frames; the owner sees the lowest frames before the first slice is admitted.
+- Edge antialiasing differs from the browser's on long horizontal edges. → Measured at 47.25 dB in the lowest of 216,000 frames; the owner was shown the spikes' lowest frames in a comparison page on 18 November 2026, and a film's edition drawn natively is released only after the owner has looked at that edition's lowest frames (the Change `draw-pictures-natively`, task 5.2).
 - The work 0.23.0 put into the capture path (the derived picture, the qualification, the ending of a renderer's process group) is removed by the first slice. → It serves the released editions' rebuilds until then, and the handling of requests to end stays for the narration's processes.
 - Declared scenes may not express every scene a film has. → Both forms stand side by side; no scene is rewritten for its own sake.
 
