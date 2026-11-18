@@ -39,4 +39,6 @@ This draft holds the intent in the repository. It has no specs or tasks: each sl
 - Each adopting film: its narration task becomes one command; its cast keeps the seeds the command wrote.
 - Out of scope: the films' texts and readings, which stay their owners'; the thresholds themselves; a change of voice, which the owner hears first; any change of a take's speed after it is made.
 
-Owner: the engine's maintainer. Next action: admit the first slice, the candidate's judgment as one function with the comparison by reading, which the measurement of 18 November prototyped (`judge.py`); then measure what a second and a third seed settle. Read again: 2026-11-22.
+The first slice is admitted and built as the Change `judge-and-converge-narration` (decisions 1, 2, 4 and 5): one judgment of a take with units compared by reading, and the commands `judge` and `converge`.
+
+Owner: the engine's maintainer. Next action: admit the selection over the whole edition (decision 3) as the second slice, measured against the 2.75 s that a settled edition with the chosen reference misses; then a reference's qualification (decision 8) as a command. Read again: 2026-11-22.
