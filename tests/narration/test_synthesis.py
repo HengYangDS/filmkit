@@ -96,6 +96,7 @@ def files(root) -> dict:
     return {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
 
 
+@pytest.mark.metal
 def test_local_narration_bounds_retained_gpu_buffer_cache(tmp_path, voice, monkeypatch):
     write_sources(tmp_path, {"01": ["判断要有依据。", "证据先行。"]})
     retained = []

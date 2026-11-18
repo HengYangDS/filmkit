@@ -58,12 +58,35 @@ def speech_runtime() -> bool:
 collect_ignore = [] if speech_runtime() else SPEECH_RUNTIME_MODULES
 
 
+def metal_evaluates() -> bool:
+    """Whether the speech runtime evaluates an array on the host's Metal device.
+
+    The runtime loads on a device that builds no compute pipeline: on 18 November 2026 the
+    paravirtual GPU of a virtual machine failed every evaluation, and the one test that evaluates
+    on the device failed there in two hosted proofs of a sound commit. A child process probes,
+    as for the load; a probe that does not end is a device that does not evaluate.
+    """
+    if collect_ignore:
+        return False
+    try:
+        probe = subprocess.run(
+            [sys.executable, "-c", "import mlx.core as mx; mx.eval(mx.zeros((1024,)) + 1)"],
+            capture_output=True,
+            check=False,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        return False
+    return probe.returncode == 0
+
+
 class HostTool(NamedTuple):
-    """A host tool that the tests marked with its marker run."""
+    """What a host must have for the tests marked with its marker to run."""
 
     name: str
     runs: str
     present: bool
+    missing: str = "is not on PATH"
 
 
 def rsync_3() -> bool:
@@ -77,7 +100,8 @@ def rsync_3() -> bool:
 # FFmpeg with libx264, ExifTool for the films' QuickTime keys, and rsync 3 for delivery, since
 # macOS's own rsync is openrsync. Tests
 # marked with a tool's marker run it and are skipped where it is not on PATH; the header and the
-# summary of every run name the tests it skips.
+# summary of every run name the tests it skips. A test that evaluates on the host's Metal device
+# is marked and skipped the same way where the device evaluates nothing.
 HOST_TOOLS = {
     "ffmpeg": HostTool(
         "host FFmpeg",
@@ -86,6 +110,12 @@ HOST_TOOLS = {
     ),
     "exiftool": HostTool("host ExifTool", "the host ExifTool", bool(shutil.which("exiftool"))),
     "rsync": HostTool("host rsync 3", "the host rsync 3", rsync_3()),
+    "metal": HostTool(
+        "host Metal evaluation",
+        "an evaluation on the host's Metal device",
+        metal_evaluates(),
+        "fails",
+    ),
 }
 host_skipped: dict[str, list[str]] = {marker: [] for marker in HOST_TOOLS}
 
@@ -100,11 +130,11 @@ def pytest_configure(config) -> None:
 
 
 def pytest_collection_modifyitems(items) -> None:
-    """Skip the tests that run a host tool where it is not on PATH."""
+    """Skip the tests that run a host tool where the host does not have it."""
     for marker, tool in HOST_TOOLS.items():
         if tool.present:
             continue
-        skip = pytest.mark.skip(reason=f"the {tool.name} is not on PATH")
+        skip = pytest.mark.skip(reason=f"the {tool.name} {tool.missing}")
         for item in items:
             if item.get_closest_marker(marker):
                 item.add_marker(skip)
