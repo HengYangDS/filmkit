@@ -22,7 +22,7 @@
 
 ## 4. Checks
 
-- [ ] 4.1 Run every command of `mise run check` as light work with warnings as errors on the slice's head; done when each passes and the suite measures light by both of the host's measures.
+- [x] 4.1 Run every command of `mise run check` as light work with warnings as errors on the slice's head; done when each passes and the suite measures light by both of the host's measures. On 18 November 2026, 17:27 to 17:31 CST, on the tree that holds this slice merged with `judge-and-converge-narration`: every command exit 0, `pytest -q -W error` 1,668 passed, the Node tests none failing; the process tree's CPU 33 % of one core on average with no two consecutive samples above 200 %, pytest's CPU time 160.5 s over 227.6 s.
 
 ## 5. Acceptance on a whole build
 
@@ -33,4 +33,4 @@
 
 ## 6. Documents
 
-- [ ] 6.1 State in the README what a film now provides (the canvas package, the template without a timeline engine, `FILMKIT_RENDER_SPANS`) and record the change in the Changelog; done when the Markdown check passes on both.
+- [x] 6.1 State in the README what a film now provides (the canvas package, the template without a timeline engine, `FILMKIT_RENDER_SPANS`) and record the change in the Changelog; done when the Markdown check passes on both. On 18 November 2026 both files hold the entries and pass the repository's Markdown check on that tree.
