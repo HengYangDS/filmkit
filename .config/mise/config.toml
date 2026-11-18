@@ -2,7 +2,13 @@ min_version = "2026.10.14"
 
 [settings]
 locked = true
-minimum_release_age = "0h"
+minimum_release_age = "72h"
+
+# npm reads this repository's own configuration, which holds npm's release age. npm treats
+# environment names case-insensitively, so its lower-case alias is removed.
+[env]
+npm_config_userconfig = false
+NPM_CONFIG_USERCONFIG = "{{ config_root }}/.config/npm/npmrc"
 
 # The repository's common verbs; the npm scripts and the frozen uv environment they call own the commands.
 [tasks.bootstrap]

@@ -28,6 +28,7 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 - A take of the thought that holds a declared term's reference occurrence is not compared with the take it would replace: once bound it is the standard, so it passes where it shows two formants.
 - `flow.take_flow` records the unmarked pause nearest its limit, of those within theirs, beside the longest.
 - `child_processes.run` takes the seconds it waits for a child that is asked to end; the default stays twice `STOP_SECONDS`.
+- Third-party supply is held to a release age of 72 hours, by each resolver's own configuration: `minimum_release_age = "72h"` in the Mise configuration, from `"0h"`, and `min-release-age=3` in `.config/npm/npmrc`, which the Mise environment hands to npm as its user configuration (`NPM_CONFIG_USERCONFIG`). Mise resolves no tool and npm no package version younger than three days; a version the configuration pins exactly and the lock holds installs as before (`mise install --locked`, `npm ci`). Under Mise, npm in this repository no longer reads a person's own `~/.npmrc`. uv's `exclude-newer` follows with a relock once every artifact of the uv lock is 72 hours old. No test or script holds the age.
 
 ### Removed
 
