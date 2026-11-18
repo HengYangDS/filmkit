@@ -119,6 +119,7 @@ Each decision states what it rests on, what was considered, why the option taken
 - Whether the audits take their text metrics from the canvas that draws the picture, which would retire the advance tables.
 - Whether hardware encoding or a read-back without a copy moves the one-process rate, which the encoder bounds today.
 - Which unit a film pins: the engine's release as today, or the engine with its canvas package's integrity in the film's lock.
+- Whether a draft drawn at the film's own size reads as the film does. A draft at 1920×1080 does not where text stands on half a draft pixel: both renderers set text on whole pixels, and in one released edition both drafts end a still run that the film holds over the limit [S15]. A native draft could be every sixth frame of the picture itself, drawn as the picture is; what that costs on a whole edition, and whether its scan then equals the film's, is not measured.
 
 ## Sources
 
@@ -138,3 +139,4 @@ Read or measured on 18 November 2026 unless a date is given. Paths under `build/
 - **[S11] `skia-canvas`:** [its npm registry entry](https://registry.npmjs.org/skia-canvas) (latest 4.0.1, MIT). Not installed and not measured.
 - **[S12] Yoga:** [the npm registry entry of `yoga-layout`](https://registry.npmjs.org/yoga-layout) (latest 3.2.1, MIT, published 13 December 2024) and [its site](https://www.yogalayout.dev/). Not installed and not measured.
 - **[S13] Speech models with a duration or a speed:** `build/evidence/faster-films-less-by-hand/figures/mlx-audio-duration-parameters.txt`, a search of the installed `mlx-audio` 0.6.6 for such parameters. No model was run.
+- **[S15] A draft against its film:** `build/evidence/draw-pictures-natively/drafts/label-step.md` and `report.md` beside it (18 November 2026): the ETHOS film's Chinese edition at `v2.0.1`, its drafts by the browser and by the native canvas and its released films at both sizes, one label's place read every 0.2 s from 844.8 to 846.4 s.
