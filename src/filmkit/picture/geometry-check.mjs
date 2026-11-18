@@ -278,13 +278,26 @@ const RULES = {
   rowGaps,
 };
 
+/** A stage's frame contract: its picture's width, height, seconds and frames a second, as the stage's record states
+ * them (`filmkit.picture.rendering.stage_picture` writes the record, and the renderer draws from the same one). The
+ * page sizes itself by its own attributes and states no rate. */
+export async function frameContract(workspace) {
+  let record = null;
+  try {
+    record = JSON.parse(await readFile(resolve(workspace, "stage.json"), "utf8"));
+  } catch {
+    // A record that is absent or holds no JSON states no contract.
+  }
+  const contract = ["width", "height", "duration", "fps"].map((name) => record?.[name]);
+  if (!contract.every((value) => typeof value === "number" && Number.isFinite(value) && value > 0))
+    throw Error("Workspace does not declare its frame contract");
+  return contract;
+}
+
 export async function inspectWorkspace(workspace, { step = 2 } = {}) {
   const entry = resolve(workspace, "index.html");
   const source = await readFile(entry, "utf8");
-  const attribute = (name) => Number(source.match(new RegExp(`data-${name}="([0-9.]+)"`))?.[1]);
-  const [width, height, duration, fps] = ["width", "height", "duration", "fps"].map(attribute);
-  if (![width, height, duration, fps].every(Number.isFinite))
-    throw Error("Workspace does not declare its frame contract");
+  const [width, height, duration, fps] = await frameContract(workspace);
   const browser = await launchBrowser({
     args: ["--allow-file-access-from-files", "--no-sandbox"],
     defaultViewport: { width, height, deviceScaleFactor: 1 },

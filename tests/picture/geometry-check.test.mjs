@@ -3,11 +3,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { spanOf } from "../../src/filmkit/picture/frame-audit/marks.mjs";
-import { inspectFilm, instrument, judged } from "../../src/filmkit/picture/geometry-check.mjs";
+import {
+  frameContract,
+  inspectFilm,
+  instrument,
+  judged,
+} from "../../src/filmkit/picture/geometry-check.mjs";
 import {
   canvasStandIn,
   canvasSweep,
@@ -17,7 +22,7 @@ import { analysis } from "../../src/filmkit/picture/rules/frame.mjs";
 import { inkLevel, readingLoad } from "../../src/filmkit/picture/rules/ink.mjs";
 import { faintLabels, listTracker, nameRules } from "../../src/filmkit/picture/rules/names.mjs";
 import { rowGaps } from "../../src/filmkit/picture/rules/rows.mjs";
-import { authoredTimeline, SAMPLE } from "./sample-film.mjs";
+import { authoredTimeline, SAMPLE, scratchFolder } from "./sample-film.mjs";
 
 // Scripts run in a context keep their file name, so coverage attributes them to their sources.
 const COMPOSITION = join(SAMPLE, "picture/film.js");
@@ -334,4 +339,29 @@ test("the row gaps refuse only for a film that gates them", () => {
     judged({ ...report, row_gaps: [], errors: [{ message: "x", t: 0 }] }, false).passed,
     false,
   );
+});
+
+test("the check takes a stage's frame contract from its record, and refuses a workspace whose record states none", async () => {
+  const folder = await scratchFolder();
+  const refused = { message: "Workspace does not declare its frame contract" };
+  // A stage's page sizes itself and states no rate, so the page alone is no contract.
+  const page = '<div id="film" data-width="3840" data-height="2160" data-duration="60"></div>';
+  await writeFile(join(folder, "index.html"), page);
+  await assert.rejects(frameContract(folder), refused);
+  const whole = { width: 3840, height: 2160, duration: 60, fps: 60 };
+  const short = [
+    null,
+    [],
+    { ...whole, fps: undefined },
+    { ...whole, fps: "60" },
+    { ...whole, duration: 0 },
+  ];
+  for (const record of short) {
+    await writeFile(join(folder, "stage.json"), JSON.stringify(record));
+    await assert.rejects(frameContract(folder), refused, JSON.stringify(record));
+  }
+  await writeFile(join(folder, "stage.json"), "{");
+  await assert.rejects(frameContract(folder), refused);
+  await writeFile(join(folder, "stage.json"), JSON.stringify({ ...whole, edition: "zh" }));
+  assert.deepEqual(await frameContract(folder), [3840, 2160, 60, 60]);
 });

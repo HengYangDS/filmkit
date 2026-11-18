@@ -23,6 +23,7 @@
 ## 4. Checks
 
 - [x] 4.1 Run every command of `mise run check` as light work with warnings as errors on the slice's head; done when each passes and the suite measures light by both of the host's measures. On 18 November 2026, 17:27 to 17:31 CST, on the tree that holds this slice merged with `judge-and-converge-narration`: every command exit 0, `pytest -q -W error` 1,668 passed, the Node tests none failing; the process tree's CPU 33 % of one core on average with no two consecutive samples above 200 %, pytest's CPU time 160.5 s over 227.6 s.
+- [x] 4.2 Have the geometry check take a stage's frame contract (width, height, seconds, frames a second) from the stage's record, which the renderer draws from, since the page states no rate once the browser renderer's attributes are gone; done when the check passes on a stage the engine writes and a test fails where the record states no contract. Found on 19 November 2026 by a rehearsal of the sample's picture task on the lane's head: the check refused every stage ("Workspace does not declare its frame contract"), and no test ran it on a stage the engine had made.
 
 ## 5. Acceptance on a whole build
 
