@@ -28,7 +28,7 @@
 
 - [ ] 5.1 Build the sample film on this slice as one host ticket and compare its films with the last build by the browser at every frame; done when `mise run sample:build` passes, the comparison states frame counts, identical frames and the lowest PSNR of each film, and the build's seconds stand beside the host's load and memory at its start and end.
 - [ ] 5.4 Draw the six released editions' drafts natively and read their still scans run by run against the limit; done when each edition's longest fine run of speech and every run within 0.5 s of the limit stand in a record with what was looked at in the frames, before a film adopts this engine (design, Risks).
-- [ ] 5.2 Show the owner the lowest frames of that comparison before the slice is released; done when the owner has answered.
+- [ ] 5.2 Show the owner the lowest frames of a whole edition drawn by the engine's own path against its release, as a page of pairs in the owner's review materials; done when the page stands, its every-frame figures are stated on it, and the owner is told that no film's edition on this engine is released before the owner has looked.
 - [ ] 5.3 Promote the slice's records to `build/evidence/draw-pictures-natively/` of the canonical checkout; done when every record the design's Sources name stands there.
 
 ## 6. Documents

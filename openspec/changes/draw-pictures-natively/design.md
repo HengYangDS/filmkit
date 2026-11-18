@@ -23,7 +23,7 @@ What the engine expects of a rendered picture, read in its sources [S2]:
 
 - Removing the derivation, its proofs, the fault scan, the repair or the qualification's comparison. They are the draft's decision 3 and a later slice.
 - Removing the browser from the supply. The geometry check, the whole-turn gate, the cover and the player check run it.
-- A new look. The slice is accepted against the last build by the browser, and the owner sees the lowest frames first (tasks 5.1 and 5.2).
+- A new look. The slice is accepted against the last build by the browser (task 5.1). The engine's release changes no released film, so it does not wait for the owner's eye; a film's edition drawn by this engine does: the owner is shown the lowest frames of a whole edition drawn by the engine's own path, and no such edition is released before the owner has looked (task 5.2). The owner was told of this reading on 18 November 2026 at 19:37 CST and said to go on as recommended; the spikes' lowest frames stood before the owner in a comparison page since that morning.
 
 ## Decisions
 
