@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-19
+
 ### Added
 
 - `python -m filmkit.narration.converge --language zh|en [--rounds 2] [--takes 3]` settles an edition's narration without a targets file, a phrase or a seed from a person. It narrates what is due, judges every thought's take by every line the film holds for a take, and for each refused thought generates a round's candidates at the audition's seeds (the segment's seed + k × 7919, k counted on from 11 across rounds), judges each by the same lines and chooses the accepted one with the widest margin from the lines that have one. It binds the choices into the cast's retakes as `audition apply` does, narrates and judges again, the selection's gates included, and then tries run-on takes. A thought that is still refused is named as not narratable as written, with what each candidate failed, and the command exits 1; no line is lowered. Its record, `convergence.json` beside the receipt, binds the receipt, the script and the cast by their digests and holds every candidate with its request's fingerprint. A run with nothing missing and nothing refused generates nothing and leaves the cast and the record as they are. A narration ended inside a thought leaves a request the engine refuses to replay: the next run names the file and starts nothing.
@@ -521,7 +523,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.23.1...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/HengYangDS/filmkit/compare/v0.23.1...v0.24.0
 [0.23.1]: https://github.com/HengYangDS/filmkit/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/HengYangDS/filmkit/compare/v0.22.3...v0.23.0
 [0.22.3]: https://github.com/HengYangDS/filmkit/compare/v0.22.2...v0.22.3
