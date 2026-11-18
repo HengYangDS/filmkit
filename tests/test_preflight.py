@@ -8,6 +8,7 @@ from importlib.metadata import version
 import pytest
 
 import filmkit.concepts as concepts
+import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.preflight as preflight
 import filmkit.produce as produce
@@ -49,8 +50,11 @@ def edition(tmp_path, monkeypatch):
     a passing draft scan and no earlier package."""
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
-    supported = {"name": "hyperframes", "version": picture_rendering.RENDERER_VERSION}
-    put(root / "node_modules" / picture_rendering.RENDERER_PACKAGE, supported)
+    supported = {
+        "name": picture_renderer.RENDERER_NAME,
+        "version": picture_renderer.RENDERER_VERSION,
+    }
+    put(root / "node_modules" / picture_renderer.RENDERER_PACKAGE, supported)
     shutil.copytree(COMPOSITION, root / picture_rendering.COMPOSITION)
     for path, source in picture_rendering.staged_members():
         if not (root / source).exists():
@@ -90,6 +94,11 @@ def edition(tmp_path, monkeypatch):
             "composition": {"sha256": composition},
             "limit_seconds": 3.5,
             "over_limit": [],
+            "drawn_by": {
+                "package": picture_renderer.RENDERER_NAME,
+                "version": picture_renderer.RENDERER_VERSION,
+                "text_renderer": picture_renderer.TEXT_RENDERER,
+            },
         },
     )
     put(

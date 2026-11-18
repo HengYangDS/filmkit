@@ -8,6 +8,7 @@ import pytest
 from test_faults import CAPTION, FRAGMENT, LABEL, SECONDS, encode
 
 import filmkit.picture.qualification as qualification
+import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
@@ -15,8 +16,8 @@ from filmkit.production import Edition
 
 pytestmark = pytest.mark.ffmpeg
 
-# The renderer version the fixture's film installs, which is the engine's.
-RENDERER = picture_rendering.RENDERER_VERSION
+# The canvas version the fixture's film installs, which is the engine's.
+RENDERER = picture_renderer.RENDERER_VERSION
 FRAMES = SECONDS * 60
 
 
@@ -44,11 +45,6 @@ def rendered(film_root, tmp_path, monkeypatch):
         film_root.queue(edition.picture, *files)
         picture_rendering.render_picture(edition, 60)
 
-    # The browser the renders run: a build of the test's own, named as a film names another.
-    browser = film_root.path.parent / "browser/chrome-headless-shell"
-    browser.parent.mkdir()
-    browser.write_text("a browser build")
-    monkeypatch.setenv("FILM_CHROMIUM_PATH", str(browser))
     return edition, film_root, renders
 
 
@@ -60,8 +56,8 @@ def test_two_renders_that_show_the_same_pass_and_the_second_is_removed(rendered,
     assert repository.read(edition.renderer_qualification) == record
     assert [*record] == [
         "renderer",
-        "browser",
-        "capture",
+        "pinned_build",
+        "drawn_alike",
         "stage_sha256",
         "first",
         "second",
@@ -78,13 +74,14 @@ def test_two_renders_that_show_the_same_pass_and_the_second_is_removed(rendered,
     assert (record["identical_frames"], record["first_differing_frame"]) == (FRAMES, None)
     assert (record["lowest_psnr_db"], record["lowest_psnr_frame"]) == (None, None)
     assert record["psnr_unmeasured"] is None
-    assert record["renderer"] == {"package": "hyperframes", "version": RENDERER}
-    # The record names the capture the two renders were made with, the sample film's own.
-    assert record["capture"] == "software"
+    assert record["renderer"] == film_root.canvas()
+    assert (record["renderer"]["version"], record["pinned_build"]) == (RENDERER, True)
+    # Both renders state one digest of their drawn frames.
+    assert record["drawn_alike"] is True
     first, second = record["first"], record["second"]
     assert first["sha256"] == repository.sha(edition.picture)
     assert (first["frames"], second["frames"]) == (FRAMES, FRAMES)
-    assert first["workers"] == second["workers"] == 8
+    assert first["drawn_sha256"] == second["drawn_sha256"] is not None
     # The comparison's report: the sampled frames against their floor, and every frame's scan.
     comparison = record["comparison"]
     assert (comparison["frames"], comparison["failing_frames"]) == (4, 0)
@@ -104,88 +101,110 @@ def test_two_renders_that_show_the_same_pass_and_the_second_is_removed(rendered,
     again = film_root.runs()[-1]["argv"]
     assert again[1] == str(edition.picture_stage)
     assert again[again.index("--output") + 1] == str(work / edition.picture.name)
+    # It was drawn in another count of spans than the first: one process against four.
+    assert again[again.index("--spans") + 1] == "1"
+    assert (first["spans"], second["spans"]) == (4, 1)
     # The delivered picture and its receipt are as they were.
     picture_rendering.validate_picture(edition)
 
 
-def test_the_record_states_the_renderer_and_the_browser_that_ran(rendered, monkeypatch):
+def test_the_record_states_the_canvas_that_ran(rendered):
     edition, film_root, renders = rendered
-    renders([CAPTION], [CAPTION], [CAPTION])
-    browser = film_root.path.parent / "browser/chrome-headless-shell"
-    # A browser named by the film, which is not the build the engine pins.
+    renders([CAPTION], [CAPTION])
     record = qualification.qualify_renderer(edition, 60)
-    assert record["browser"] == {
-        "executable": str(browser),
-        "sha256": repository.sha(browser),
-        "pinned_build": None,
-    }
-    # The pinned build is named when the executable that ran holds its bytes.
-    monkeypatch.setattr(picture_rendering, "BROWSER_SHA256", repository.sha(browser))
-    record = qualification.qualify_renderer(edition, 60)
-    product, version = picture_rendering.BROWSER
-    assert record["browser"]["pinned_build"] == f"{product}@{version}"
-    # The renderer's version is the installed package's, read when the qualification runs.
-    manifest = film_root.path / "node_modules" / picture_rendering.RENDERER_PACKAGE
-    manifest.write_text('{"name": "hyperframes", "version": "0.0.1"}')
+    assert record["renderer"] == film_root.canvas()
+    assert record["renderer"]["binary"]["sha256"] == picture_renderer.BINARY_SHA256
+    assert record["renderer"]["text_renderer"] == "system"
+    # The canvas's version is the installed package's, read when the qualification runs.
+    manifest = film_root.path / "node_modules" / picture_renderer.RENDERER_PACKAGE
+    manifest.write_text('{"name": "@napi-rs/canvas", "version": "0.0.1"}')
     runs = len(film_root.runs())
-    with pytest.raises(PictureError, match="The film installs HyperFrames 0.0.1"):
+    with pytest.raises(PictureError, match="The film installs @napi-rs/canvas 0.0.1"):
         qualification.qualify_renderer(edition, 60)
     assert len(film_root.runs()) == runs
 
 
-def test_a_picture_another_browser_drew_is_not_qualified_with_the_one_that_runs(rendered):
+def test_a_picture_another_canvas_build_drew_is_not_qualified_with_the_one_that_runs(rendered):
     edition, film_root, renders = rendered
     renders([CAPTION], [CAPTION])
-    browser = film_root.path.parent / "browser/chrome-headless-shell"
-    drew = repository.sha(browser)
-    # The browser that runs now is another build than the one the picture's receipt names.
-    browser.write_text("another browser build")
+    drew = picture_renderer.INTEGRITY[picture_renderer.RENDERER_NAME]
+    # The canvas that runs now is another build than the one the picture's receipt names.
+    film_root.installs("sha512-another-build")
     runs = len(film_root.runs())
     with pytest.raises(PictureError) as refused:
         qualification.qualify_renderer(edition, 60)
     assert str(refused.value) == (
-        f"The zh captioned picture's receipt names {browser} (SHA-256 {drew}), and the browser "
-        f"that runs now is {browser} (SHA-256 {repository.sha(browser)}): a qualification "
-        "compares two renders by one browser; render the picture again"
+        f"The zh captioned picture's receipt names @napi-rs/canvas {RENDERER} ({drew}), and the "
+        f"canvas the film installs now is @napi-rs/canvas {RENDERER} (sha512-another-build): a "
+        "qualification compares two renders by one canvas; render the picture again"
     )
     # Nothing was rendered and no record was written.
     assert len(film_root.runs()) == runs
     assert not edition.renderer_qualification.exists()
-    # A receipt that names no browser, as one of an earlier engine, is refused the same way.
-    receipt = repository.read(edition.rendered(True).receipt)
-    del receipt["browser"]
-    repository.write(edition.rendered(True).receipt, receipt)
-    with pytest.raises(PictureError, match="picture's receipt names no browser, and the"):
-        qualification.qualify_renderer(edition, 60)
 
 
-def test_a_picture_another_renderer_version_made_is_not_qualified_with_the_one_installed(
-    rendered,
-):
+def test_a_qualification_by_another_library_than_the_pinned_one_says_so(rendered):
+    edition, film_root, renders = rendered
+    # Both renders load one library, which is not the one the engine pins: the two are
+    # compared and pass, and the record says that the pinned build was not what ran.
+    loaded = film_root.loads(sha256="ee" * 32)
+    renders([CAPTION], [CAPTION])
+    record = qualification.qualify_renderer(edition, 60)
+    assert (record["verdict"], record["pinned_build"]) == ("pass", False)
+    assert record["renderer"]["binary"]["sha256"] == loaded["sha256"]
+
+
+def test_two_renders_by_different_libraries_are_not_qualified_as_one(rendered):
     edition, film_root, renders = rendered
     renders([CAPTION], [CAPTION])
-    # A render's receipt names the renderer version the film's packages install.
-    receipt = repository.read(edition.rendered(True).receipt)
-    assert receipt["renderer_version"] == RENDERER
-    # The picture's receipt names another version than the one installed now.
-    repository.write(edition.rendered(True).receipt, receipt | {"renderer_version": "0.9.45"})
+    # The second render's processes load another library than the first's did.
+    film_root.loads(sha256="ee" * 32)
     runs = len(film_root.runs())
     with pytest.raises(PictureError) as refused:
         qualification.qualify_renderer(edition, 60)
-    assert str(refused.value) == (
-        "The zh captioned picture's receipt names HyperFrames 0.9.45, and the renderer that "
-        f"runs now is HyperFrames {RENDERER}: a qualification compares two renders by one "
-        "renderer version; render the picture again"
-    )
-    # Nothing was rendered and no record was written.
+    # The refusal names both builds by what differs between them, and nothing is recorded.
+    said = str(refused.value)
+    assert f"native library {picture_renderer.BINARY_SHA256} and system text" in said
+    assert f"native library {'ee' * 32} and system text" in said
+    assert "a qualification compares two renders by one build" in said
+    assert len(film_root.runs()) == runs + 1
+    assert not edition.renderer_qualification.exists()
+
+
+def test_a_picture_another_renderer_made_is_refused_before_it_is_rendered_again(rendered):
+    edition, film_root, renders = rendered
+    renders([CAPTION], [CAPTION])
+    receipt = repository.read(edition.rendered(True).receipt)
+    assert receipt["renderer"]["version"] == RENDERER
+    # The picture's receipt names another version than the engine's, or no canvas at all, as
+    # the receipt of a browser's render does.
+    other = {**receipt["renderer"], "version": "1.0.0"}
+    runs = len(film_root.runs())
+    for drawn_by, named in ((other, "@napi-rs/canvas 1.0.0 with system text"), (None, "no native")):
+        repository.write(edition.rendered(True).receipt, receipt | {"renderer": drawn_by})
+        with pytest.raises(PictureError) as refused:
+            qualification.qualify_renderer(edition, 60)
+        assert str(refused.value).startswith(f"The picture's receipt names {named}")
+        assert f"@napi-rs/canvas {RENDERER} with system text" in str(refused.value)
     assert len(film_root.runs()) == runs
     assert not edition.renderer_qualification.exists()
-    # A receipt that names no renderer version, as one of an earlier engine, is refused too.
-    del receipt["renderer_version"]
-    repository.write(edition.rendered(True).receipt, receipt)
-    with pytest.raises(PictureError, match="receipt names no renderer version, and the"):
+
+
+def test_two_renders_that_drew_other_frames_are_refused(rendered):
+    edition, film_root, renders = rendered
+    renders([CAPTION], [CAPTION])
+    # The second render reports another digest of its drawn frames than the first.
+    (film_root.renderer.parent / "drawn").write_text("f" * 64)
+    with pytest.raises(PictureError, match="the two renders drew different frames"):
         qualification.qualify_renderer(edition, 60)
-    assert len(film_root.runs()) == runs
+    record = repository.read(edition.renderer_qualification)
+    assert (record["drawn_alike"], record["verdict"]) == (False, "refuse")
+    assert record["second"]["drawn_sha256"] == "f" * 64 != record["first"]["drawn_sha256"]
+    # The comparison of the encoded frames found nothing: the digest alone refuses.
+    assert len(record["findings"]) == 1
+    # The second render is kept beside its receipt for inspection.
+    work = repository.ROOT / qualification.WORK / "zh"
+    assert (work / edition.picture.name).is_file() and (work / "receipt.json").is_file()
 
 
 def test_a_failed_pass_over_every_frame_leaves_the_record_of_a_comparison_that_decided(
@@ -207,18 +226,6 @@ def test_a_failed_pass_over_every_frame_leaves_the_record_of_a_comparison_that_d
     assert record["psnr_unmeasured"] == "FFmpeg's PSNR pass exited with 1"
     printed = json.loads(capsys.readouterr().out.splitlines()[-1])
     assert printed["identical_frames"] is None and printed["verdict"] == "pass"
-
-
-def test_a_qualification_without_a_browser_is_refused_before_it_renders(rendered, monkeypatch):
-    edition, film_root, renders = rendered
-    renders([CAPTION])
-    # No browser is named, and the supply has installed none.
-    monkeypatch.delenv("FILM_CHROMIUM_PATH")
-    picture_rendering.supplied_browser().unlink()
-    runs = len(film_root.runs())
-    with pytest.raises(PictureError, match="No browser at .*chrome-headless-shell; run .*supply"):
-        qualification.qualify_renderer(edition, 60)
-    assert len(film_root.runs()) == runs
 
 
 def test_a_one_frame_fault_of_the_second_render_is_refused_by_its_frame(rendered, capsys):

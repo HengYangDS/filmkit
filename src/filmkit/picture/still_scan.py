@@ -227,8 +227,18 @@ def record_scan(movie: Path, timeline: Path, out: Path, limit: float = LIMIT_SEC
 
 
 def record_draft(edition: Edition, movie: Path, limit: float = LIMIT_SECONDS) -> dict:
-    """Scan an edition's draft against the edition's timeline into its draft record."""
-    return record_scan(movie, edition.timeline, edition.draft_stills, limit)
+    """Scan an edition's draft against the edition's timeline into its draft record, which
+    names what drew the draft as the draft's receipt does (`drawn_by`: the canvas package, its
+    version and its text renderer; none where the draft has no receipt). The scan's limits were
+    set on drafts a browser drew, and a renderer's frames fall otherwise at them, so a record
+    admits a render only by the renderer that drew its draft (`filmkit.preflight`)."""
+    record = record_scan(movie, edition.timeline, edition.draft_stills, limit)
+    receipt = edition.draft_receipt
+    drew = repository.read(receipt).get("renderer") if receipt.is_file() else None
+    named = ("package", "version", "text_renderer")
+    record["drawn_by"] = {key: drew.get(key) for key in named} if isinstance(drew, dict) else None
+    repository.write(edition.draft_stills, record)
+    return record
 
 
 def main(argv: list[str] | None = None) -> None:

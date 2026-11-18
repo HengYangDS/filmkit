@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-import filmkit.picture.rendering as picture_rendering
+import filmkit.picture.browser as picture_browser
 import filmkit.repository as repository
 import filmkit.supply as supply
 from filmkit.narration.snapshots import DOWNLOAD_RECORDS, Snapshot
@@ -22,7 +22,7 @@ def root(tmp_path, monkeypatch):
 
     def install(command, **_options):
         calls.append(("install", command))
-        path = picture_rendering.supplied_browser()
+        path = picture_browser.supplied_browser()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(browser)
 
@@ -37,7 +37,7 @@ def root(tmp_path, monkeypatch):
 
     monkeypatch.setattr(repository, "run", install)
     monkeypatch.setattr(supply, "snapshot_download", download)
-    monkeypatch.setattr(picture_rendering, "BROWSER_SHA256", repository.content_sha(browser))
+    monkeypatch.setattr(picture_browser, "BROWSER_SHA256", repository.content_sha(browser))
     snapshots = tuple(
         Snapshot(
             name,
@@ -56,7 +56,7 @@ def root(tmp_path, monkeypatch):
 def test_the_supply_installs_and_checks_the_browser_and_every_model(root, capsys):
     folder, calls = root
     supply.main([])
-    product, version = picture_rendering.BROWSER
+    product, version = picture_browser.BROWSER
     install = calls[0][1]
     assert install[0] == str(folder / "node_modules/.bin/browsers")
     assert install[1:] == [
@@ -76,6 +76,6 @@ def test_the_supply_installs_and_checks_the_browser_and_every_model(root, capsys
 
 @pytest.mark.usefixtures("root")
 def test_a_browser_build_of_other_bytes_is_refused(monkeypatch):
-    monkeypatch.setattr(picture_rendering, "BROWSER_SHA256", "0" * 64)
+    monkeypatch.setattr(picture_browser, "BROWSER_SHA256", "0" * 64)
     with pytest.raises(SupplyError, match="browser build differs from the pinned SHA-256"):
         supply.main([])

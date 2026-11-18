@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pytest
 
-import filmkit.picture.rendering as picture_rendering
+import filmkit.picture.browser as picture_browser
+import filmkit.picture.renderer as picture_renderer
 import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.film import FILM
@@ -80,7 +81,7 @@ def test_a_tool_runs_at_the_film_root_with_the_renderers_browser(
     monkeypatch.delenv("FILM_CHROMIUM_PATH", raising=False)
     assert tools.run("geometry-check", []) == 0
     shown = json.loads(capfd.readouterr().out)
-    assert shown == {"cwd": str(film), "browser": str(picture_rendering.supplied_browser())}
+    assert shown == {"cwd": str(film), "browser": str(picture_browser.supplied_browser())}
     monkeypatch.setenv("FILM_CHROMIUM_PATH", "/opt/chromium/chrome")
     assert tools.run("geometry-check", []) == 0
     assert json.loads(capfd.readouterr().out)["browser"] == "/opt/chromium/chrome"
@@ -131,16 +132,18 @@ def test_the_headless_audits_measure_text_by_the_films_faces(film, tmp_path, mon
 def test_another_renderer_version_refuses_before_any_tool_runs(tmp_path, monkeypatch):
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
-    manifest = root / "node_modules" / picture_rendering.RENDERER_PACKAGE
+    manifest = root / "node_modules" / picture_renderer.RENDERER_PACKAGE
     manifest.parent.mkdir(parents=True)
-    manifest.write_text(json.dumps({"name": "hyperframes", "version": "0.8.149"}))
-    pinned = re.escape(picture_rendering.RENDERER_VERSION)
-    with pytest.raises(PictureError, match=rf"HyperFrames 0\.8\.149.*HyperFrames {pinned}"):
+    manifest.write_text(json.dumps({"name": "@napi-rs/canvas", "version": "0.8.149"}))
+    pinned = re.escape(picture_renderer.RENDERER_VERSION)
+    with pytest.raises(PictureError, match=rf"@napi-rs/canvas 0\.8\.149.*@napi-rs/canvas {pinned}"):
         tools.run("geometry-check", [])
     manifest.unlink()
-    with pytest.raises(PictureError, match=rf"installs no HyperFrames.*HyperFrames {pinned}"):
+    with pytest.raises(
+        PictureError, match=rf"installs no @napi-rs/canvas.*@napi-rs/canvas {pinned}"
+    ):
         tools.run("frame-audit", [])
-    with pytest.raises(SystemExit, match=r"^motion-audit: The film installs no HyperFrames"):
+    with pytest.raises(SystemExit, match=r"^motion-audit: The film installs no @napi-rs/canvas"):
         tools.main(["motion-audit", "timeline.json"])
     assert not (root / "build").exists()
 

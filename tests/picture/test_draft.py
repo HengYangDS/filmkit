@@ -1,7 +1,8 @@
-"""The draft render: the edition's captioned picture staged afresh at 1080p, rendered at 10 fps in
-draft quality at a lower scheduling priority, and scanned into the record the pre-render check
+"""The draft render: the edition's captioned picture staged afresh at 1080p, drawn at 10 fps in
+one process at a lower scheduling priority, and scanned into the record the pre-render check
 reads."""
 
+import json
 import os
 import subprocess
 import sys
@@ -10,45 +11,35 @@ import numpy as np
 import pytest
 
 import filmkit.picture.draft as picture_draft
+import filmkit.picture.encoding as encoding
+import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.picture.still_scan as still_scan
 import filmkit.preflight as preflight
 import filmkit.repository as repository
-from filmkit.film import FILM
 from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
 from filmkit.specification import DURATION
 
 # A draft record and receipt that an earlier draft left, bound to the current inputs.
-EARLIER = {"over_limit": [], "limit_seconds": 3.5, "movie": {"path": "earlier.mp4"}}
+DREW = {"package": "@napi-rs/canvas", "version": "1.1.1", "text_renderer": "system"}
+EARLIER = {
+    "over_limit": [],
+    "limit_seconds": 3.5,
+    "movie": {"path": "earlier.mp4"},
+    "drawn_by": DREW,
+}
 
 
-@pytest.fixture(autouse=True)
-def no_declared_capture(monkeypatch):
-    """The film of these tests declares no capture, so it captures `fast`, the default; a test of
-    another capture declares it."""
-    picture = FILM.picture.model_copy(update={"capture": "fast"})
-    monkeypatch.setattr(picture_rendering, "FILM", FILM.model_copy(update={"picture": picture}))
-
-
-def lanes_command(stage, draft, capture="--experimental-fast-capture", browser="--browser-gpu"):
-    """The film lanes' draft.py command after the renderer's path."""
+def draft_command(stage, draft):
+    """The draft's command after the renderer's launcher: one process at 10 fps, the pictures'
+    encoding with a keyframe every two seconds, the host's text renderer."""
+    work = stage.with_name(stage.name + "-spans")
     return [
-        "render",
-        str(stage),
-        "--output",
-        str(draft),
-        "--fps",
-        "10",
-        "--quality",
-        "draft",
-        "--workers",
-        "8",
-        "--gpu",
-        browser,
-        "--no-low-memory-mode",
-        capture,
-        "--strict",
+        *["render", str(stage), "--output", str(draft), "--fps", "10", "--group", "20"],
+        *["--encoder", json.dumps(encoding.encoder(10)), "--text-renderer", "system"],
+        *["--spans", "1"],
+        *["--work", str(work), "--report", str(work.with_name(work.name + ".json"))],
     ]
 
 
@@ -77,7 +68,7 @@ def places(code="zh"):
     return work / code, work / f"{code}.mp4", receipt
 
 
-def test_a_draft_is_staged_afresh_and_rendered_as_the_lanes_render_it(film_root, monkeypatch):
+def test_a_draft_is_staged_afresh_and_drawn_in_one_process(film_root, monkeypatch):
     scanning(monkeypatch, 40, 0)
     stage, draft, receipt_path = places()
     retired = stage / "fonts/retired-font.otf"
@@ -90,12 +81,12 @@ def test_a_draft_is_staged_afresh_and_rendered_as_the_lanes_render_it(film_root,
     assert (record["start"], record["picture"]) == (0, "captioned")
     members = sorted(str(path.relative_to(stage)) for path in stage.rglob("*") if path.is_file())
     declared = [path for path, _ in picture_rendering.staged_members()]
-    assert members == sorted([*declared, "index.html", "stage.json"])
+    assert members == sorted([*declared, "film.json", "index.html", "stage.json"])
     receipt = repository.read(receipt_path)
     assert receipt["command"][:2] == ["nice", "-n"]
-    assert receipt["command"][3:] == [str(film_root.renderer), *lanes_command(stage, draft)]
-    assert [run["argv"] for run in film_root.runs()] == [lanes_command(stage, draft)]
-    assert (receipt["picture"], receipt["capture"], receipt["exit"]) == ("draft", "fast", 0)
+    assert receipt["command"][3:] == [str(film_root.renderer), *draft_command(stage, draft)]
+    assert [run["argv"] for run in film_root.runs()] == [draft_command(stage, draft)]
+    assert (receipt["picture"], receipt["spans"], receipt["exit"]) == ("draft", 1, 0)
     assert (receipt["timed_out"], receipt["deadline_seconds"]) == (False, 60)
     assert receipt["source_sha256"] == repository.sha(stage / "index.html")
     assert receipt["output_sha256"] == repository.sha(draft)
@@ -110,20 +101,6 @@ def test_the_draft_renders_at_niceness_10_or_the_callers_with_its_input_closed_i
     caller = os.getpriority(os.PRIO_PROCESS, 0)
     assert run["niceness"] == max(caller, 10)
     assert (run["stdin"], run["session_leader"]) == ("", True)
-
-
-@pytest.mark.parametrize(
-    ("capture", "browser"), [("screenshot", "--browser-gpu"), ("software", "--no-browser-gpu")]
-)
-def test_the_draft_honours_the_declared_capture(film_root, monkeypatch, capture, browser):
-    scanning(monkeypatch, 40, 0)
-    picture = FILM.picture.model_copy(update={"capture": capture})
-    monkeypatch.setattr(picture_rendering, "FILM", FILM.model_copy(update={"picture": picture}))
-    picture_draft.render_draft(Edition("en"), 60)
-    stage, draft, receipt_path = places("en")
-    off = lanes_command(stage, draft, "--experimental-fast-capture=false", browser)
-    assert [run["argv"] for run in film_root.runs()] == [off]
-    assert repository.read(receipt_path)["capture"] == capture
 
 
 @pytest.mark.ffmpeg
@@ -148,7 +125,16 @@ def test_the_draft_scan_lands_where_preflight_reads_it(film_root, tmp_path):
     composition = repository.sha(repository.ROOT / picture_rendering.COMPOSITION_SCRIPT)
     assert record["composition"]["sha256"] == composition
     assert (record["frames"], record["over_limit"]) == (40, [])
+    # The record names what drew the draft, as the draft's receipt does, and admits a render
+    # only by that renderer: a record of a browser's draft, which names none, does not.
+    assert record["drawn_by"] == DREW
     assert preflight.draft(edition) is None
+    for other in (None, {**DREW, "text_renderer": "portable"}, {**DREW, "version": "1.0.0"}):
+        repository.write(edition.draft_stills, {**record, "drawn_by": other})
+        assert preflight.draft(edition) == (
+            "build/evidence/editions/zh/draft-stills.json scanned a draft that another "
+            "renderer drew; render the draft again"
+        )
 
 
 @pytest.mark.parametrize(
@@ -161,7 +147,7 @@ def test_the_draft_scan_lands_where_preflight_reads_it(film_root, tmp_path):
 def test_a_draft_that_does_not_complete_writes_its_receipt_and_no_scan(
     film_root, monkeypatch, body, deadline, ends
 ):
-    monkeypatch.setattr(picture_rendering, "STOP_GRACE_SECONDS", 0.5)
+    monkeypatch.setattr(picture_renderer, "STOP_GRACE_SECONDS", 0.5)
     film_root.renderer.write_text(f"#!{sys.executable}\n{body}\n")
     scanning(monkeypatch, 40, 0)
     edition = Edition("zh")
@@ -193,9 +179,9 @@ def earlier(edition):
 def test_a_draft_refused_before_it_renders_leaves_no_earlier_record(film_root):
     edition = Edition("zh")
     earlier(edition)
-    manifest = film_root.path / "node_modules" / picture_rendering.RENDERER_PACKAGE
-    manifest.write_text('{"name": "hyperframes", "version": "0.0.1"}')
-    with pytest.raises(PictureError, match="installs HyperFrames 0.0.1"):
+    manifest = film_root.path / "node_modules" / picture_renderer.RENDERER_PACKAGE
+    manifest.write_text('{"name": "@napi-rs/canvas", "version": "0.0.1"}')
+    with pytest.raises(PictureError, match="installs @napi-rs/canvas 0.0.1"):
         picture_draft.render_draft(edition, 60)
     assert not edition.draft_stills.exists()
     assert not places()[2].exists()

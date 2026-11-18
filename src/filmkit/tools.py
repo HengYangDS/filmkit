@@ -5,7 +5,7 @@ folder, into build/runtime/tool-cache/filmkit/<version>/ below the film, replaci
 bytes differ from the package's, and runs the named tool from that copy with Node at the film's
 root: its imports resolve from the film's npm packages and its paths from the film. The tools
 check the film's picture and players, so each first refuses a renderer version other than the one
-the engine renders with, and a browser check runs the browser that the renderer uses. The frame,
+the engine renders with, and a browser check runs the browser the supply installs. The frame,
 motion and detail audits, the caption equivalence and the band audit measure text by the advance
 widths of the film's declared faces (`filmkit.picture.metrics`), which a run names to them in
 `FILMKIT_TEXT_METRICS` unless the caller names its own table.
@@ -40,10 +40,11 @@ from pathlib import Path
 
 import filmkit.child_processes as child_processes
 import filmkit.durations as durations
-import filmkit.picture.rendering as picture_rendering
+import filmkit.picture.browser as picture_browser
+import filmkit.picture.renderer as picture_renderer
 import filmkit.repository as repository
 from filmkit.picture import metrics
-from filmkit.picture.rendering import PictureError
+from filmkit.picture.errors import PictureError
 from filmkit.production import CODES
 
 # The engine's Node modules, which the package carries below this module's folder.
@@ -61,7 +62,7 @@ TOOLS = {
     "whole-turns": "picture/whole-turns.mjs",
 }
 # The copies, below the film's root, in a folder for each engine version.
-CACHE = picture_rendering.TOOL_CACHE / "filmkit"
+CACHE = picture_browser.TOOL_CACHE / "filmkit"
 # The runs a film's build makes from the command line, which alone write a duration record: the
 # tool with the words its arguments begin with, and the record's name. Every other run, of
 # another tool or of the player check in another mode, is taken for a run by hand.
@@ -128,7 +129,7 @@ def run(
     waits for its tool; while the tool starts and while it is being ended, a further request
     is deferred until the tool is held or has ended or been killed (`child_processes.held`).
     """
-    picture_rendering.require_renderer()
+    picture_renderer.require_renderer()
     node = shutil.which("node")
     if node is None:
         msg = "No node on PATH; run the tools in the film's Mise environment"
@@ -137,7 +138,7 @@ def run(
     variables = {
         **os.environ,
         **(environment or {}),
-        "FILM_CHROMIUM_PATH": str(picture_rendering.browser_path()),
+        "FILM_CHROMIUM_PATH": str(picture_browser.browser_path()),
     }
     if tool in MEASURING and metrics.VARIABLE not in variables:
         variables[metrics.VARIABLE] = str(metrics.current_table())

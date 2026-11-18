@@ -7,7 +7,7 @@
  * way the real-browser check samples them (geometry-check.mjs); a text stands at its anchor. `points` are the drawing
  * points in the painter's own coordinates, as the motion audit identifies a mark across frames: an arc gives the
  * corners of its circle, a text the corners of its box, and `toScreen` maps them to the screen. A stroke whose path
- * holds a whole turn the renderer's browser may paint without ink (wholeTurnAtRisk) carries each such arc in `turns`,
+ * holds a whole turn the checks' browser may paint without ink (wholeTurnAtRisk) carries each such arc in `turns`,
  * its exact start and end angles and the line of film.js that drew it, which whole-turns.mjs draws in that browser. The
  * stand-in measures a text's width by the advances of the film's declared faces when it is given them
  * (readTextMetrics), and otherwise by an estimate; geometry-check.mjs measures real metrics. */
@@ -114,7 +114,7 @@ export function canvasSweep(a0, a1, anticlockwise = false) {
 const TURN_SHORT = 1e-5,
   TURN_START = 1e-6;
 
-/** Whether the renderer's browser may paint no ink for arc(x, y, r, a0, a1, anticlockwise). Chrome Headless Shell
+/** Whether the checks' browser may paint no ink for arc(x, y, r, a0, a1, anticlockwise). Chrome Headless Shell
  * 152 computes a clockwise arc's end angle in single precision; through a whole turn or more from a start that is not
  * a whole number of turns, 64 of 4000 starts drew no ink for a whole turn and 13 of 1000 for every longer sweep, with
  * Metal and with SwiftShader alike. Starts at whole turns, anticlockwise arcs and ellipses from any start all drew.
@@ -330,6 +330,30 @@ export function canvasStandIn(deliver, faces = null, turned = () => null) {
  * a line in a scene's body, `scenes["NN"] = function`, or in a module the bundle places in a folder below `scenes/`,
  * as the path comments esbuild writes before each module name it (`// picture/film/scenes/p02/hard.js`). A paint
  * that no scene's own code drew takes the innermost line of film.js that drew it. */
+/** The scope a composition runs in outside a browser, for the audits and for the renderer (native-canvas.mjs): its
+ * `window`, and a document that holds the picture's canvas, which gives the one 2D context, and the film element
+ * whose width sets the resolution, nothing else. */
+export function compositionScope(window, context, width) {
+  const elements = {
+    picture: {
+      getContext(type) {
+        if (type !== "2d") throw TypeError(`The picture's canvas has no ${type} context`);
+        return context;
+      },
+    },
+    film: { dataset: { width: String(width) } },
+  };
+  return vm.createContext({
+    window,
+    document: {
+      getElementById(id) {
+        if (!Object.hasOwn(elements, id)) throw TypeError(`The document has no #${id}`);
+        return elements[id];
+      },
+    },
+  });
+}
+
 export function openComposition(timeline, { faces = null } = {}) {
   const composition = resolve(COMPOSITION),
     source = readFileSync(composition, "utf8");
@@ -365,26 +389,7 @@ export function openComposition(timeline, { faces = null } = {}) {
     const line = /film\.js:(\d+):\d+/.exec(trace.stack)?.[1];
     return line ? `film.js:${line}` : null;
   }
-  // The document holds the picture's canvas and the film element whose width sets the resolution, nothing else.
-  const ctx = canvasStandIn(deliver, faces, turned);
-  const elements = {
-    picture: {
-      getContext(type) {
-        if (type !== "2d") throw TypeError(`The headless canvas has no ${type} context`);
-        return ctx;
-      },
-    },
-    film: { dataset: { width: "1920" } },
-  };
-  const context = vm.createContext({
-    window,
-    document: {
-      getElementById(id) {
-        if (!Object.hasOwn(elements, id)) throw TypeError(`The headless document has no #${id}`);
-        return elements[id];
-      },
-    },
-  });
+  const context = compositionScope(window, canvasStandIn(deliver, faces, turned), 1920);
   vm.runInContext(source, context, { filename: composition });
   const palette = Object.freeze({ ...vm.runInContext("P", context) });
   const framed = vm.runInContext('typeof cameraOf === "function"', context);

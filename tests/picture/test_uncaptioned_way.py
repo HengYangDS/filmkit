@@ -7,12 +7,14 @@ import filmkit.media as media
 import filmkit.picture.derivation as derivation
 import filmkit.picture.equivalence as equivalence
 import filmkit.picture.faults as faults
+import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.produce as produce
 import filmkit.repository as repository
 from filmkit.film import FILM
 from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
+from filmkit.specification import DURATION, FPS
 
 
 def declaring(monkeypatch, capture: str) -> None:
@@ -29,7 +31,8 @@ def edition(film_root, monkeypatch):
     film_root.staged(edition)
     monkeypatch.setattr(media, "probe", lambda path: {})
     monkeypatch.setattr(media, "require_video", lambda *arguments, **options: {})
-    monkeypatch.setattr(media, "video_cadence", lambda *arguments: {"keyframes": []})
+    grid = list(range(0, DURATION * FPS, 2 * FPS))
+    monkeypatch.setattr(media, "video_cadence", lambda *arguments: {"keyframes": grid})
     derived = []
     monkeypatch.setattr(
         derivation, "derive_uncaptioned", lambda *arguments: derived.append(arguments)
@@ -57,7 +60,7 @@ def test_a_film_of_another_capture_gets_a_render_of_its_own_stage_without_asking
         f"the film declares {capture} capture, and a picture is derived only under software "
         "capture, which the engine's release qualifies"
     )
-    assert (receipt["picture"], receipt["capture"]) == ("uncaptioned", capture)
+    assert receipt["picture"] == "uncaptioned"
     assert not derivation.is_derived(receipt)
     # The receipt still validates as the render it is.
     picture_rendering.validate_picture_binding(edition, receipt, captions=False)
@@ -80,33 +83,29 @@ def test_a_film_of_software_capture_derives_and_native_still_renders(edition, mo
     }
 
 
-def test_a_render_receipt_names_the_browser_that_drew_the_picture(edition, tmp_path, monkeypatch):
-    edition, _, _ = edition
+def test_a_render_receipt_names_the_canvas_that_drew_the_picture(edition):
+    edition, film_root, _ = edition
     picture_rendering.render_picture(edition, 60)
-    pinned = picture_rendering.supplied_browser()
-    product, version = picture_rendering.BROWSER
-    assert repository.read(edition.render_receipt)["browser"] == {
-        "executable": repository.relative(pinned),
-        "sha256": repository.sha(pinned),
-        "pinned_build": f"{product}@{version}",
-    }
-    # Another browser, named by the film, is recorded as itself.
-    other = tmp_path / "another-browser"
-    other.write_text("another browser build")
-    monkeypatch.setenv("FILM_CHROMIUM_PATH", str(other))
+    drawn = film_root.canvas()
+    assert drawn["binary"]["sha256"] == picture_renderer.BINARY_SHA256
+    assert drawn["integrity"] == picture_renderer.INTEGRITY[picture_renderer.RENDERER_NAME]
+    assert repository.read(edition.render_receipt)["renderer"] == drawn
+    # Another build of that version, as the film's packages record it, is named as itself.
+    film_root.installs("sha512-another-build")
     picture_rendering.render_picture(edition, 60)
-    assert repository.read(edition.render_receipt)["browser"] == {
-        "executable": str(other),
-        "sha256": repository.sha(other),
-        "pinned_build": None,
-    }
+    receipt = repository.read(edition.render_receipt)
+    assert receipt["renderer"] == {**drawn, "integrity": "sha512-another-build"}
+    # So is another native library than the package's, as the render's processes report it.
+    film_root.installs()
+    loaded = film_root.loads(sha256="ee" * 32)
+    picture_rendering.render_picture(edition, 60)
+    binary = repository.read(edition.render_receipt)["renderer"]["binary"]
+    assert (binary["sha256"], binary["path"]) == ("ee" * 32, loaded["path"])
 
 
-def test_a_picture_drawn_by_another_browser_is_not_derived_from(edition, tmp_path, monkeypatch):
+def test_a_picture_drawn_by_another_canvas_build_is_not_derived_from(edition):
     edition, film_root, derived = edition
-    other = tmp_path / "another-browser"
-    other.write_text("another browser build")
-    monkeypatch.setenv("FILM_CHROMIUM_PATH", str(other))
+    film_root.installs("sha512-another-build")
     picture_rendering.render_picture(edition, 60)
     # The film declares software capture, and its captioned picture was not drawn by the pinned
     # build: the uncaptioned stage is rendered, and the receipt says why.
@@ -118,24 +117,37 @@ def test_a_picture_drawn_by_another_browser_is_not_derived_from(edition, tmp_pat
     ]
     statement = repository.read(edition.rendered(False).receipt)["uncaptioned"]
     assert statement["way"] == "rendered"
+    version = picture_renderer.RENDERER_VERSION
+    pinned = picture_renderer.INTEGRITY[picture_renderer.RENDERER_NAME]
     assert statement["reason"] == (
         "the captioned picture is no render by the pinned build that the engine's release "
-        "qualifies: it was drawn by another browser than the build the engine pins, "
-        f"{'@'.join(picture_rendering.BROWSER)} ({other})"
+        f"qualifies: it was drawn by @napi-rs/canvas {version} with the integrity "
+        f"sha512-another-build, and the engine pins @napi-rs/canvas {version} with {pinned}"
     )
-    # A captioned receipt that names no browser, as an earlier engine wrote it, derives nothing.
+    # A render whose processes loaded another native library than the pinned one derives
+    # nothing either, whatever npm recorded of the packages.
+    film_root.installs()
+    film_root.loads(sha256="ee" * 32)
+    picture_rendering.render_picture(edition, 60)
+    assert derivation.uncaptioned_way(edition)["way"] == "rendered"
+    assert f"with the SHA-256 {'ee' * 32}" in derivation.uncaptioned_way(edition)["reason"]
+    film_root.loads()
+    # A captioned receipt that names no canvas, as a browser's render wrote it, derives nothing,
+    # nor one whose text another renderer drew.
     receipt = repository.read(edition.render_receipt)
-    del receipt["browser"]
-    repository.write(edition.render_receipt, receipt)
+    repository.write(edition.render_receipt, {**receipt, "renderer": None})
     assert derivation.uncaptioned_way(edition) == {
         "way": "rendered",
         "reason": "the captioned picture is no render by the pinned build that the engine's "
-        "release qualifies: its receipt names no browser",
+        "release qualifies: its receipt names no canvas",
     }
     # Drawn by the pinned build, it is derived from.
-    monkeypatch.delenv("FILM_CHROMIUM_PATH")
+    film_root.installs()
     picture_rendering.render_picture(edition, 60)
     assert derivation.uncaptioned_way(edition)["way"] == "derived"
+    portable = repository.read(edition.render_receipt)
+    portable["renderer"]["text_renderer"] = "portable"
+    assert picture_renderer.unqualified(portable) == "its text was drawn by the portable renderer"
     uncaptioned()
     assert derived == [(edition, derivation.DEADLINE)]
 

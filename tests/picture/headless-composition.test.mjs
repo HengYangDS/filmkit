@@ -1,9 +1,8 @@
 /** Exercise the headless runtime both audits run the composition on: where it reads the composition, every authored
- * scene against both scripts, the paints it hands over, the canvas stand-in and the timeline engine. */
+ * scene against both scripts, the paints it hands over and the canvas stand-in. */
 import test from "node:test";
 import assert from "node:assert/strict";
-import vm from "node:vm";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,9 +15,6 @@ import {
   readTimeline,
 } from "../../src/filmkit/picture/headless-composition.mjs";
 import { authoredTimeline, SAMPLE, scratchFolder } from "./sample-film.mjs";
-
-// Scripts run in a context keep their file name, so coverage attributes them to their sources.
-const ENGINE = fileURLToPath(new URL("../../node_modules/gsap/dist/gsap.min.js", import.meta.url));
 
 test("the composition is the picture/film.js of the film the tool runs in", async () => {
   const film = await mkdtemp(join(tmpdir(), "film-root-")),
@@ -457,19 +453,4 @@ test("a composition opened with the declared faces measures its texts by them", 
     process.chdir(before);
     await rm(film, { recursive: true, force: true });
   }
-});
-
-test("the vendored timeline engine seeks a paused timeline as the composition drives it", async () => {
-  const scope = { console, setTimeout, clearTimeout };
-  vm.createContext(scope);
-  vm.runInContext(await readFile(ENGINE, "utf8"), scope, { filename: ENGINE });
-  const { gsap } = scope.window;
-  assert.equal(gsap.version, "3.15.1");
-  const playhead = { time: 0 };
-  const timeline = gsap.timeline({ paused: true });
-  timeline.to(playhead, { time: 1500, duration: 1500, ease: "none" }, 0);
-  timeline.seek(50);
-  assert.equal(playhead.time, 50);
-  timeline.kill();
-  gsap.ticker.sleep();
 });

@@ -5,11 +5,10 @@
   <meta name="viewport" content="width=1920, height=1080">
   <title>Sample Reel · From Sources to Film</title>
   <link rel="stylesheet" href="film.css">
-  <script src="gsap.min.js"></script>
 </head>
 <body>
-  <div id="film" data-composition-id="sample-reel" data-width="1920" data-height="1080" data-duration="1200" data-fps="60">
-    <canvas id="picture" class="clip" data-start="0" data-duration="1200" data-track-index="0" width="1920" height="1080"></canvas>
+  <div id="film" data-width="1920" data-height="1080" data-duration="1200">
+    <canvas id="picture" width="1920" height="1080"></canvas>
     <div class="font-probe">示例影片 Sample Reel</div>
     <div class="font-probe bold">示例影片 Sample Reel</div>
   </div>
@@ -20,19 +19,6 @@
       document.fonts.load('30px Sample'), document.fonts.load('700 30px SampleBold'),
       document.fonts.load('30px SampleLatin'), document.fonts.load('700 30px SampleLatinBold')
     ]).then(() => document.fonts.ready).then(() => window.renderFrame(0));
-    const playhead = {
-      value: 0,
-      get time() { return this.value; },
-      set time(value) {
-        this.value = value;
-        window.renderFrame(value);
-      }
-    };
-    const tl = gsap.timeline({ paused: true });
-    tl.to(playhead, { time: Number(document.getElementById("film").dataset.duration),
-      duration: Number(document.getElementById("film").dataset.duration), ease: "none" }, 0);
-    window.__timelines = window.__timelines || {};
-    window.__timelines["sample-reel"] = tl;
   </script>
 </body>
 </html>

@@ -29,12 +29,15 @@ THIRD-PARTY SOFTWARE AND MODELS
 The repository includes no third-party code. A build installs the following under their
 own licenses, which the licenses above do not cover:
 
-- HyperFrames 0.9.64, puppeteer-core 25.18.1 and @puppeteer/browsers 3.2.7, from npm,
-  under the Apache License 2.0, and undici 7.30.2, which `package.json` selects for
-  HyperFrames, from npm, under the MIT License;
-- GSAP 3.15.1, from npm, under its standard no-charge license
-  (https://gsap.com/standard-license); the build copies its minified script into each
-  staged picture document;
+- @napi-rs/canvas 1.1.1 and the binary package it loads on the host,
+  @napi-rs/canvas-darwin-arm64 1.1.1, from npm, which draw the pictures. The first ships
+  the MIT License as its LICENSE; the second states MIT in its manifest, ships no license
+  text, and describes itself as a canvas with a Skia backend. Its bill of materials
+  (sbom.cdx.json) lists 138 components and states a license for 129 of them; it states
+  none for the native library itself and lists no component for Skia, so this notice
+  names no license for Skia;
+- puppeteer-core 25.18.1 and @puppeteer/browsers 3.2.7, from npm, under the Apache
+  License 2.0, which run the checks that paint a picture or a player in a browser;
 - Chrome Headless Shell 152.0.7977.30, which the supply step installs, under the licenses
   of Chromium and its components;
 - mlx-audio 0.6.6 and MLX under the MIT License, with the other Python packages that

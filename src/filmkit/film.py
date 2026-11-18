@@ -218,10 +218,11 @@ class Picture(Declared):
     pictures (`filmkit.picture.draft`): `preflight` asks for that scan only of a film that
     declares them, since `check-picture` audits every frame.
 
-    `capture` is `fast`, the default, which turns the renderer's fast capture on as earlier
-    releases did; `screenshot`, which turns it off; or `software`, which draws the frames in the
-    browser's software rasterizer instead of the host's GPU and captures them by screenshot
-    (`filmkit.picture.rendering`).
+    `capture` is `fast`, the default, `screenshot` or `software`. It named how a browser
+    captured the frames while a browser drew them. No render reads it now: the engine draws on
+    a native canvas (`filmkit.picture.renderer`). It decides only how the uncaptioned picture is
+    made: derived from the captioned one under `software`, rendered from its own stage under
+    the others (`filmkit.picture.derivation.uncaptioned_way`).
     """
 
     fonts: tuple[str, ...] = Field(min_length=1)

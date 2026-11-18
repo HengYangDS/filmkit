@@ -9,6 +9,7 @@ from importlib.metadata import version
 
 import pytest
 
+import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
@@ -33,8 +34,11 @@ def edition(tmp_path, monkeypatch):
     with the real composition and a stand-in renderer that writes the picture it is given."""
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
-    supported = {"name": "hyperframes", "version": picture_rendering.RENDERER_VERSION}
-    put(root / "node_modules" / picture_rendering.RENDERER_PACKAGE, supported)
+    supported = {
+        "name": picture_renderer.RENDERER_NAME,
+        "version": picture_renderer.RENDERER_VERSION,
+    }
+    put(root / "node_modules" / picture_renderer.RENDERER_PACKAGE, supported)
     shutil.copytree(COMPOSITION, root / picture_rendering.COMPOSITION)
     for path, source in picture_rendering.staged_members():
         if not (root / source).exists():
@@ -55,15 +59,18 @@ def edition(tmp_path, monkeypatch):
     gates = {"composition_sha256": composition, "timeline_sha256": repository.sha(edition.timeline)}
     gates |= {"engine_version": version("filmkit"), **picture_rendering.face_bindings()}
     put(edition.picture_gates, {**gates, "verdict": "pass"})
-    fake = tmp_path / "hyperframes"
+    fake = tmp_path / "native-canvas"
     body = """
-        import sys
+        import json, sys
         with open(sys.argv[sys.argv.index("--output") + 1], "w") as picture:
             picture.write("rendered " + sys.argv[2])
+        said = {"frames": 1, "spans": 4, "text_renderer": "system", "drawn_sha256": "0" * 64}
+        with open(sys.argv[sys.argv.index("--report") + 1], "w") as report:
+            json.dump(said, report)
         """
     fake.write_text(f"#!{sys.executable}\n{textwrap.dedent(body)}")
     fake.chmod(0o755)
-    monkeypatch.setattr(picture_rendering, "RENDERER", fake)
+    monkeypatch.setattr(picture_renderer, "launcher", lambda: [str(fake)])
     return edition
 
 

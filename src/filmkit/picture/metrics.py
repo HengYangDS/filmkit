@@ -1,8 +1,8 @@
 """The advance widths of the faces a film's picture declares, for the headless audits.
 
 The composition measures its names in the browser with the faces `picture/film.css` declares; the
-headless audits lay it out on a canvas stand-in. This module reads each `@font-face` rule whose
-source is one of the film's declared fonts and records the face's units per em and the advance of
+headless audits lay it out on a canvas stand-in. This module takes each face the stylesheet
+declares from one of the film's declared fonts and records its units per em and the advance of
 every character its character map holds, in em. A face's most frequent advance is recorded once as
 its default, and only the other advances are listed, so a full CJK font's ideographs cost one
 entry. The table names the stylesheet's and the fonts' SHA-256; the stand-in reads it from the file
@@ -11,40 +11,25 @@ that `FILMKIT_TEXT_METRICS` names (headless-composition.mjs).
 
 from __future__ import annotations
 
-import re
 from collections import Counter
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from fontTools.ttLib import TTFont
 
 import filmkit.repository as repository
-from filmkit.film import FILM
-from filmkit.picture.rendering import STYLE, face_bindings
+from filmkit.picture import rendering
 
 # The variable that names the table to the headless audits.
 VARIABLE = "FILMKIT_TEXT_METRICS"
 # Where the engine writes the table, below the film's root.
 TABLE = Path("build/runtime/work/picture-gates/text-metrics.json")
 
-FACE_RULE = re.compile(r"@font-face\s*\{([^}]*)\}")
-FAMILY = re.compile(r"font-family\s*:\s*(['\"]?)([^;'\"]+)\1")
-SOURCE = re.compile(r"src\s*:\s*url\(\s*(['\"]?)([^'\")]+)\1\s*\)")
-
 
 def declared_faces() -> dict[str, str]:
-    """Each family the stylesheet declares from one of the film's fonts, with that font's path.
-
-    A rule whose first source is not a declared font, by its file name below fonts/, is left out:
-    its family keeps the stand-in's estimate.
-    """
-    fonts = {PurePosixPath(font).name: font for font in FILM.picture.fonts}
-    style = (repository.ROOT / STYLE).read_text(encoding="utf-8")
-    faces = {}
-    for rule in FACE_RULE.findall(style):
-        family, source = FAMILY.search(rule), SOURCE.search(rule)
-        if family and source and PurePosixPath(source.group(2)).name in fonts:
-            faces[family.group(2).strip()] = fonts[PurePosixPath(source.group(2)).name]
-    return faces
+    """Each family the stylesheet declares, with the path of the declared font it names: the
+    faces the renderer registers (`filmkit.picture.rendering.declared_faces`), read by the one
+    reader (`filmkit.picture.faces`), which refuses a rule it cannot hold the canvas to."""
+    return {face["family"]: face["font"] for face in rendering.declared_faces()}
 
 
 def face_advances(path: Path) -> dict:
@@ -65,7 +50,7 @@ def face_advances(path: Path) -> dict:
 def text_metrics() -> dict:
     """The table of the film's declared faces, with the digests of what it was read from."""
     return {
-        **face_bindings(),
+        **rendering.face_bindings(),
         "faces": {
             family: {"font": font, **face_advances(repository.ROOT / font)}
             for family, font in sorted(declared_faces().items())
@@ -81,7 +66,7 @@ def current_table() -> Path:
         recorded = repository.read(path)
         if {
             key: recorded.get(key) for key in ("stylesheet_sha256", "fonts_sha256")
-        } == face_bindings():
+        } == rendering.face_bindings():
             return path
     path.parent.mkdir(parents=True, exist_ok=True)
     repository.write(path, text_metrics())

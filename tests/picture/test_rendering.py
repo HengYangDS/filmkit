@@ -3,6 +3,7 @@
 import contextlib
 import json
 import os
+import platform
 import re
 import shutil
 import signal
@@ -14,7 +15,8 @@ from pathlib import Path
 
 import pytest
 
-import filmkit.media as media
+import filmkit.picture.encoding as encoding
+import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 from filmkit.film import FILM
@@ -38,10 +40,11 @@ PLACEHOLDERS = (
 RECEIPT_KEYS = [
     "picture",
     "command",
-    "capture",
-    "workers",
-    "browser",
-    "renderer_version",
+    "renderer",
+    "operating_system",
+    "spans",
+    "frames",
+    "drawn_sha256",
     "exit",
     "timed_out",
     "deadline_seconds",
@@ -65,8 +68,11 @@ def root(tmp_path, monkeypatch):
     """A repository root with both editions' current inputs and the real composition."""
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
-    supported = {"name": "hyperframes", "version": picture_rendering.RENDERER_VERSION}
-    put(root / "node_modules" / picture_rendering.RENDERER_PACKAGE, supported)
+    supported = {
+        "name": picture_renderer.RENDERER_NAME,
+        "version": picture_renderer.RENDERER_VERSION,
+    }
+    put(root / "node_modules" / picture_renderer.RENDERER_PACKAGE, supported)
     shutil.copytree(COMPOSITION, root / picture_rendering.COMPOSITION)
     for path, source in picture_rendering.staged_members():
         if not (root / source).exists():
@@ -110,36 +116,52 @@ def staged():
     return edition
 
 
+# What a stand-in renderer begins with: `report`, which writes the report the renderer command
+# names, as the renderer does once it has drawn every frame.
+# The native library a stand-in reports that it loaded: the pinned one.
+LOADED = {
+    "path": "/packages/@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node",
+    "sha256": picture_renderer.BINARY_SHA256,
+    "package": picture_renderer.BINARY_PACKAGE,
+    "version": picture_renderer.RENDERER_VERSION,
+}
+REPORT = """
+import json, sys
+def report(**facts):
+    said = {"frames": 1, "spans": 4, "text_renderer": "system", "drawn_sha256": "0" * 64}
+    said["binary"] = LOADED
+    with open(sys.argv[sys.argv.index("--report") + 1], "w") as file:
+        json.dump({**said, **facts}, file)
+""".replace("LOADED", json.dumps(LOADED))
+
+
 def renderer(folder, body):
-    """A stand-in renderer: an executable Python script that runs `body`."""
-    path = folder / "hyperframes"
-    path.write_text(f"#!{sys.executable}\n{textwrap.dedent(body)}")
+    """A stand-in renderer: an executable Python script that runs `body` after `REPORT`."""
+    path = folder / "native-canvas"
+    path.write_text(f"#!{sys.executable}\n{REPORT}{textwrap.dedent(body)}")
     path.chmod(0o755)
     return path
 
 
-@pytest.fixture(autouse=True)
-def no_declared_capture(monkeypatch):
-    """The film of these tests declares no capture, so it captures `fast`, the default; a test of
-    another capture declares it."""
-    picture = FILM.picture.model_copy(update={"capture": "fast"})
-    monkeypatch.setattr(picture_rendering, "FILM", FILM.model_copy(update={"picture": picture}))
-
-
 def render(monkeypatch, edition, fake, deadline):
-    """Render an edition with a stand-in in place of the locked renderer."""
-    monkeypatch.setattr(picture_rendering, "RENDERER", fake)
+    """Render an edition with a stand-in in place of the engine's renderer."""
+    monkeypatch.setattr(picture_renderer, "launcher", lambda: [str(fake)])
     picture_rendering.render_picture(edition, deadline)
 
 
 def completed_receipt(edition):
-    """A receipt of a completed render of the current stage, beside its picture, written before
-    receipts recorded their capture."""
+    """A receipt of a completed render of the current stage by the engine's renderer, beside its
+    picture."""
     stage, picture = edition.picture_stage, edition.picture
     put(picture, "rendered picture")
-    command = ["hyperframes", "render", str(stage), "--output", str(picture)]
+    drawn_by = {
+        "package": picture_renderer.RENDERER_NAME,
+        "version": picture_renderer.RENDERER_VERSION,
+        "text_renderer": picture_renderer.TEXT_RENDERER,
+    }
     return {
-        "command": [*command, "--experimental-fast-capture"],
+        "command": ["node", "native-canvas.mjs", "render", str(stage), "--output", str(picture)],
+        "renderer": drawn_by,
         "exit": 0,
         "timed_out": False,
         "source_sha256": repository.sha(stage / "index.html"),
@@ -158,20 +180,6 @@ def gone(pid, wait=5.0):
             return True
         time.sleep(0.05)
     return False
-
-
-def test_receipt_paths_name_their_place_below_any_checkout_root(tmp_path):
-    root = tmp_path / "restored"
-    picture = root / "build/artifacts/film/zh/sample-reel-final-picture.mp4"
-    elsewhere = "/elsewhere/checkout/build/artifacts/film"
-    assert picture_rendering.recorded_at(
-        f"{elsewhere}/zh/sample-reel-final-picture.mp4", picture, root
-    )
-    assert picture_rendering.recorded_at(str(picture), picture, root)
-    assert not picture_rendering.recorded_at(
-        f"{elsewhere}/en/sample-reel-final-picture.mp4", picture, root
-    )
-    assert not picture_rendering.recorded_at("sample-reel-final-picture.mp4", picture, root)
 
 
 @pytest.mark.parametrize("code", ["zh", "en"])
@@ -210,7 +218,7 @@ def test_a_stage_holds_exactly_the_declared_fonts_in_order(staged):
     stage = staged.picture_stage
     declared = [Path(font) for font in FILM.picture.fonts]
     binding = json.loads((stage / "stage.json").read_text())
-    fonts = [(member["path"], member["source"]) for member in binding["members"][3:]]
+    fonts = [(member["path"], member["source"]) for member in binding["members"][2:]]
     assert fonts == [(f"fonts/{font.name}", str(font)) for font in declared]
     assert sorted(path.name for path in (stage / "fonts").iterdir()) == sorted(
         font.name for font in declared
@@ -262,7 +270,7 @@ def test_the_document_refuses_a_template_pattern_it_does_not_find_exactly(root):
     for changed, pattern in (
         (text.replace('data-width="1920"', 'data-width="1600"'), 'data-width="1920"'),
         (text.replace("</body>", '<div id="film"></div></body>'), '<div id="film"'),
-        (text.replace('data-duration="1200" data-fps', "data-fps"), 'data-duration="1200"'),
+        (text.replace(' data-duration="1200"', ""), 'data-duration="1200"'),
     ):
         template.write_text(changed)
         with pytest.raises(PictureError, match=re.escape(repr(pattern))):
@@ -279,7 +287,10 @@ def test_a_completed_render_binds_only_the_current_stage(staged):
         {"timed_out": True},
         {"output_sha256": "0" * 64},
         {"output_path": "/elsewhere/build/artifacts/film/en/sample-reel-final-picture.mp4"},
-        {"command": ["hyperframes", "render", "/elsewhere/stage", "--output"]},
+        {"command": ["node", "native-canvas.mjs", "render", "/elsewhere/stage", "--output"]},
+        # A picture that a browser drew, whose receipt names no canvas.
+        {"renderer": None},
+        {"renderer": {**receipt["renderer"], "text_renderer": "portable"}},
     ):
         with pytest.raises(PictureError):
             picture_rendering.validate_picture_binding(edition, {**receipt, **change})
@@ -315,13 +326,25 @@ def test_a_changed_template_or_copied_member_refuses_the_stage(staged, root):
         picture_rendering.require_current_stage(edition, edition.picture_stage)
 
 
-def test_the_browser_is_the_supplied_one_unless_another_is_named(root, monkeypatch):
-    monkeypatch.delenv("FILM_CHROMIUM_PATH", raising=False)
-    supplied = "build/runtime/tool-cache/browsers/chrome-headless-shell/mac_arm-152.0.7977.30"
-    executable = "chrome-headless-shell-mac-arm64/chrome-headless-shell"
-    assert picture_rendering.browser_path() == root / supplied / executable
-    monkeypatch.setenv("FILM_CHROMIUM_PATH", "/opt/chromium/chrome")
-    assert picture_rendering.browser_path() == Path("/opt/chromium/chrome")
+def test_a_receipt_is_refused_for_what_it_lacks_and_by_that_name(staged):
+    edition = staged
+    receipt = completed_receipt(edition)
+    # A render that failed reports no text renderer: it is refused as a render that did not
+    # complete, not as another renderer's.
+    failed = {**receipt, "exit": 1, "renderer": {**receipt["renderer"], "text_renderer": None}}
+    with pytest.raises(PictureError, match="records no completed render of the staged document"):
+        picture_rendering.validate_picture_binding(edition, failed)
+    # A receipt that names no canvas, as a browser's render wrote it, is another renderer's,
+    # whether or not its stage is the current one.
+    for browsers in ({**receipt, "renderer": None}, {**receipt, "source_sha256": "0" * 64}):
+        browsers.pop("renderer") if browsers["renderer"] is None else None
+        named = "no native canvas" if "renderer" not in browsers else "no completed render"
+        with pytest.raises(PictureError, match=named):
+            picture_rendering.validate_picture_binding(edition, browsers)
+    # A completed render with another text renderer is refused by the renderer's name.
+    portable = {**receipt, "renderer": {**receipt["renderer"], "text_renderer": "portable"}}
+    with pytest.raises(PictureError, match="with portable text"):
+        picture_rendering.validate_picture_binding(edition, portable)
 
 
 def test_rendering_records_a_completed_render_that_binds(staged, root, tmp_path, monkeypatch):
@@ -329,7 +352,7 @@ def test_rendering_records_a_completed_render_that_binds(staged, root, tmp_path,
     fake = renderer(
         tmp_path,
         """
-        import json, os, sys
+        import os
         output = sys.argv[sys.argv.index("--output") + 1]
         with open(output, "w") as picture:
             picture.write("rendered picture")
@@ -337,47 +360,44 @@ def test_rendering_records_a_completed_render_that_binds(staged, root, tmp_path,
             "stdin": sys.stdin.read(),
             "session_leader": os.getsid(0) == os.getpid(),
             "cwd": os.getcwd(),
-            "environment": {key: os.environ.get(key) for key in (
-                "HYPERFRAMES_NO_TELEMETRY",
-                "DO_NOT_TRACK",
-                "HYPERFRAMES_NO_UPDATE_CHECK",
-                "HYPERFRAMES_NO_AUTO_INSTALL",
-                "HYPERFRAMES_BROWSER_PATH",
-                "HYPERFRAMES_FONT_CACHE_DIR",
-            )},
         }
         with open(sys.argv[0] + ".json", "w") as record:
             json.dump(observed, record)
+        report(frames=7, drawn_sha256="ab" * 32)
         """,
     )
-    monkeypatch.setenv("FILM_CHROMIUM_PATH", "/opt/chromium/chrome")
     render(monkeypatch, edition, fake, 60)
     receipt = repository.read(edition.render_receipt)
     assert list(receipt) == RECEIPT_KEYS
     stage, picture = edition.picture_stage, edition.picture
-    assert receipt["command"][:5] == [str(fake), "render", str(stage), "--output", str(picture)]
-    assert receipt["command"][5:7] == ["--fps", str(FPS)]
+    work = stage.with_name(stage.name + "-spans")
+    report = work.with_name(work.name + ".json")
+    # The engine's renderer on the stage: the pictures' frame rate, a keyframe every two
+    # seconds, the rate factor and four spans.
+    assert receipt["command"] == [
+        *[str(fake), "render", str(stage), "--output", str(picture), "--fps", str(FPS)],
+        *["--group", str(2 * FPS), "--encoder", json.dumps(encoding.encoder(FPS))],
+        *["--text-renderer", "system", "--spans", "4"],
+        *["--work", str(work), "--report", str(report)],
+    ]
     assert (receipt["exit"], receipt["timed_out"], receipt["deadline_seconds"]) == (0, False, 60)
-    # The renderer version the film's packages install, which is the engine's.
-    assert receipt["renderer_version"] == picture_rendering.RENDERER_VERSION
+    # The canvas the film's packages install, which is the engine's, and the text renderer, the
+    # spans, the frames and the digest that the renderer reported; its report is taken.
+    reported = {"text_renderer": "system", "binary": LOADED}
+    assert receipt["renderer"] == picture_renderer.drawn_by(reported)
+    assert receipt["renderer"]["binary"]["sha256"] == picture_renderer.BINARY_SHA256
+    assert receipt["renderer"]["version"] == picture_renderer.RENDERER_VERSION
+    assert receipt["operating_system"] == {
+        "system": platform.system(),
+        "release": platform.release(),
+        "macos": platform.mac_ver()[0] or None,
+    }
+    assert (receipt["spans"], receipt["frames"], receipt["drawn_sha256"]) == (4, 7, "ab" * 32)
+    assert not report.exists()
     assert receipt["source_sha256"] == repository.sha(stage / "index.html")
     assert receipt["output_sha256"] == repository.sha(picture)
     observed = json.loads(Path(f"{fake}.json").read_text(encoding="utf-8"))
-    assert observed == {
-        "stdin": "",
-        "session_leader": True,
-        "cwd": str(root),
-        # Telemetry, update checks and self-installs are off; the browser and font cache are
-        # the repository's own.
-        "environment": {
-            "HYPERFRAMES_NO_TELEMETRY": "1",
-            "DO_NOT_TRACK": "1",
-            "HYPERFRAMES_NO_UPDATE_CHECK": "1",
-            "HYPERFRAMES_NO_AUTO_INSTALL": "1",
-            "HYPERFRAMES_BROWSER_PATH": "/opt/chromium/chrome",
-            "HYPERFRAMES_FONT_CACHE_DIR": str(root / "build/runtime/tool-cache/hyperframes/fonts"),
-        },
-    }
+    assert observed == {"stdin": "", "session_leader": True, "cwd": str(root)}
     picture_rendering.validate_picture_binding(edition, receipt)
 
 
@@ -390,7 +410,7 @@ def test_rendering_refuses_a_failed_render_after_recording_it(staged, tmp_path, 
 
 
 def test_failed_rendering_stops_its_remaining_workers(staged, tmp_path, monkeypatch):
-    monkeypatch.setattr(picture_rendering, "STOP_GRACE_SECONDS", 0.5)
+    monkeypatch.setattr(picture_renderer, "STOP_GRACE_SECONDS", 0.5)
     worker = tmp_path / "worker.py"
     worker.write_text(
         textwrap.dedent(
@@ -427,10 +447,10 @@ def test_failed_rendering_stops_its_remaining_workers(staged, tmp_path, monkeypa
 def test_another_renderer_version_refuses_staging_and_rendering(
     staged, root, tmp_path, monkeypatch
 ):
-    manifest = root / "node_modules" / picture_rendering.RENDERER_PACKAGE
-    manifest.write_text(json.dumps({"name": "hyperframes", "version": "0.0.1"}))
-    pinned = re.escape(picture_rendering.RENDERER_VERSION)
-    versions = rf"installs HyperFrames 0\.0\.1; the engine renders with HyperFrames {pinned}"
+    manifest = root / "node_modules" / picture_renderer.RENDERER_PACKAGE
+    manifest.write_text(json.dumps({"name": "@napi-rs/canvas", "version": "0.0.1"}))
+    pinned = re.escape(picture_renderer.RENDERER_VERSION)
+    versions = rf"installs @napi-rs/canvas 0\.0\.1; the engine draws with @napi-rs/canvas {pinned}"
     with pytest.raises(PictureError, match=versions):
         picture_rendering.stage_picture(staged, None, DURATION, 3840, 2160)
     fake = renderer(tmp_path, "open(__file__ + '.ran', 'w').close()")
@@ -489,7 +509,7 @@ def test_rendering_refuses_a_stale_stage_before_running(staged, root, tmp_path, 
 def test_rendering_stops_the_whole_process_group_at_its_deadline(staged, tmp_path, monkeypatch):
     # The renderer ignores SIGTERM and its worker obeys it: the group is sent SIGTERM at
     # the deadline and SIGKILL after the grace, and neither process outlives the render.
-    monkeypatch.setattr(picture_rendering, "STOP_GRACE_SECONDS", 0.5)
+    monkeypatch.setattr(picture_renderer, "STOP_GRACE_SECONDS", 0.5)
     edition = staged
     worker = tmp_path / "worker.py"
     worker.write_text(
@@ -529,31 +549,3 @@ def test_rendering_stops_the_whole_process_group_at_its_deadline(staged, tmp_pat
     assert (tmp_path / "worker-terminated").exists()
     assert gone(int((tmp_path / "renderer.pid").read_text()))
     assert gone(int((tmp_path / "worker.pid").read_text()))
-
-
-def test_the_rendered_picture_meets_the_shared_video_contract(staged, monkeypatch):
-    edition = staged
-    repository.write(edition.render_receipt, completed_receipt(edition))
-    cover = {"codec_type": "video", "disposition": {"attached_pic": 1}, "width": 640}
-    video = {
-        "codec_type": "video",
-        "disposition": {"attached_pic": 0},
-        "nb_frames": str(DURATION * FPS),
-        "avg_frame_rate": "60/1",
-        "has_b_frames": 0,
-        "width": 3840,
-        "height": 2160,
-        "duration": f"{DURATION + 1e-7}",
-    }
-    probed = {"streams": [cover, video], "format": {"duration": f"{DURATION:.6f}"}}
-    cadence = []
-    monkeypatch.setattr(media, "probe", lambda _: probed)
-    monkeypatch.setattr(media, "video_cadence", lambda *arguments: cadence.append(arguments))
-    # The video stream is found by type behind a cover, and durations agree within 1e-6 s.
-    assert picture_rendering.validate_picture(edition)["exit"] == 0
-    assert cadence == [(edition.picture, DURATION * FPS, FPS)]
-    frames = str(DURATION * FPS - 1)
-    for change in ({"nb_frames": frames}, {"avg_frame_rate": "30/1"}, {"has_b_frames": 2}):
-        probed["streams"] = [cover, {**video, **change}]
-        with pytest.raises(media.MediaError, match="Video differs"):
-            picture_rendering.validate_picture(edition)

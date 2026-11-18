@@ -83,7 +83,9 @@ def test_each_film_reads_its_own_picture_unless_the_pair_is_derived(tmp_path, mo
     for kind, rendition in RENDITIONS.items():
         own = edition.rendered(rendition.captions).file
         assert derivation.film_source(edition, rendition) == (own, "0:v:0", rendition.video), kind
-    repository.write(uncaptioned.receipt, {"picture": "uncaptioned", "command": ["hyperframes"]})
+    repository.write(
+        uncaptioned.receipt, {"picture": "uncaptioned", "command": ["native-canvas.mjs"]}
+    )
     viewing = RENDITIONS["1080p-uncaptioned"]
     assert derivation.film_source(edition, viewing) == (uncaptioned.file, "0:v:0", viewing.video)
     # Of a derived pair, the 1080p uncaptioned film is painted and scaled from the captioned one.

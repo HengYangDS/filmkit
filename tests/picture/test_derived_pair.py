@@ -65,7 +65,8 @@ def pair(film_root, monkeypatch):
     picture_rendering.render_picture(edition, 60)
     monkeypatch.setattr(media, "probe", lambda path: {})
     monkeypatch.setattr(media, "require_video", lambda *arguments, **options: {})
-    monkeypatch.setattr(media, "video_cadence", lambda *arguments: {"keyframes": []})
+    grid = list(range(0, derivation.DURATION * derivation.FPS, 2 * derivation.FPS))
+    monkeypatch.setattr(media, "video_cadence", lambda *arguments: {"keyframes": grid})
     monkeypatch.setattr(derivation, "require_derived_media", lambda path: None)
     tools = Tools()
     monkeypatch.setattr(derivation.tools, "run", tools)
@@ -340,10 +341,16 @@ def test_edge_rows_measured_at_fewer_frames_than_the_film_holds_are_refused(pair
     assert not edition.rendered(False).file.exists()
 
 
+def restyled(root):
+    """Change the stylesheet and none of its faces."""
+    style = root / picture_rendering.STYLE
+    style.write_text(style.read_text() + "/* another style */")
+
+
 @pytest.mark.parametrize(
     ("change", "reason"),
     [
-        (lambda root: (root / picture_rendering.STYLE).write_text("/* another style */"), "stage"),
+        (restyled, "stage"),
         (lambda root: (root / picture_rendering.TEMPLATE).write_text("<html>"), "stage"),
         (lambda root: Edition("zh").soundtrack.write_text("another narration"), "soundtrack"),
     ],

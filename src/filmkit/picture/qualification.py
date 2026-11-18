@@ -3,32 +3,34 @@
 A derived uncaptioned picture (`filmkit.picture.derivation`) rests on one render, where a film's
 build used to render each stage twice and compare the two. What that comparison guarded
 against, a render that draws a fragment wrong for one frame, which only a twin shows, is proven
-for the renderer, the browser and the capture a film installs by `qualify_renderer`: it renders
+for the canvas a film installs by `qualify_renderer`: it renders
 the edition's current captioned stage a second time, with the pictures' settings, to a work
 file, and compares the two renders by the measure of a rendered pair
 (`filmkit.picture.equivalence.compare_renders`) with no row left out, the caption band being
-part of what must agree. It passes when that comparison finds nothing: no sampled frame beyond
+part of what must agree. The second render is drawn in another count of spans than the first,
+in one process where the first was drawn in several, so a composition that carries state from
+one frame to the next, which a span would start without, is seen by the digest over the whole
+film. It passes when the two renders state one digest of their drawn frames
+(`filmkit.picture.renderer`) and that comparison finds nothing: no sampled frame beyond
 the encoders' noise, no one-frame fault, no lasting difference, and as many frames in each.
 
-Two renders are not asked to decode alike. The renderer's hardware encode of one stage varies
-from run to run when the encoder is shared, on frames that are given to it alike, so identical
-decoded frames would refuse a whole film or a busy host for the encoder's variation and say
-nothing of the renderer's drawing. How many frames do decode identically, and the lowest PSNR of
-any frame, are recorded as facts that decide nothing, from one pass over both renders.
+Two renders are not asked to encode alike: the digest binds the drawn frames, and the encoded
+bytes are not compared. How many frames decode identically, and the lowest PSNR of any frame,
+are recorded as facts that decide nothing, from one pass over both renders.
 
-It runs under whatever capture the film declares, and its record names that capture. The sample
-film declares software capture, the one under which uncaptioned pictures are derived, and its
-build runs the qualification, so every engine release qualifies the renderer supply it pins for
-that capture.
+A native render reads no declared capture. The sample film's build runs the qualification, so
+every engine release qualifies the canvas build it pins.
 
 The record, build/evidence/editions/<code>/renderer-qualification.json, states what ran, not
-what the engine pins: the renderer's version as the film's npm packages install it, the browser
-executable the renders ran with its SHA-256 and, when those are the pinned build's bytes, that
-build's name, and the capture. It names both renders' SHA-256, worker counts and frames, holds
-the comparison's report and findings, and the frames that decode identically with the first
-that does not and the lowest PSNR of any frame. A finding raises `PictureError` after the record
-is written, and the second render is kept beside its receipt for inspection. A passing run
-removes it.
+what the engine pins: the canvas package, its version and the integrity the film's installed
+packages record for it, the native library the second render's processes loaded and the text
+renderer they ran, as that render's receipt names them, and `pinned_build`, whether that is the
+build the engine pins. Two renders by different builds are not qualified as one: the first
+render's receipt must name the same. It names both renders' SHA-256, spans, drawn digests and
+frames, says whether the digests are alike, holds the comparison's report and findings, and the
+frames that decode identically with the first that does not and the lowest PSNR of any frame. A
+finding raises `PictureError` after the record is written, and the second render is kept beside
+its receipt for inspection. A passing run removes it.
 
 Usage: python -m filmkit.produce qualify-renderer --language zh|en
 """
@@ -43,8 +45,8 @@ import filmkit.durations as durations
 import filmkit.picture.equivalence as equivalence
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
-from filmkit.picture import browser
-from filmkit.picture.rendering import PictureError
+from filmkit.picture import renderer
+from filmkit.picture.errors import PictureError
 from filmkit.specification import FPS
 
 if TYPE_CHECKING:
@@ -54,52 +56,36 @@ if TYPE_CHECKING:
 WORK = Path("build/runtime/work/renderer-qualification")
 
 
-def supply() -> dict:
-    """The renderer and the browser a render runs now: the installed package's version, and the
-    executable with its SHA-256 and the pinned build's name when it holds that build's bytes.
-    Refused for another renderer version than the engine's, or where no browser stands."""
-    rendering.require_renderer()
-    manifest = repository.node_modules() / rendering.RENDERER_PACKAGE
-    installed = json.loads(manifest.read_text())
-    drawn_by = browser.identity()
-    if drawn_by["sha256"] is None:
-        msg = f"No browser at {rendering.browser_path()}; run python -m filmkit.supply"
-        raise PictureError(msg)
-    return {
-        "renderer": {"package": installed["name"], "version": installed["version"]},
-        "browser": drawn_by,
-    }
+def build_of(drawn: dict) -> str:
+    """A canvas build as a refusal names it: the package's integrity and the loaded library."""
+    binary = drawn.get("binary") if isinstance(drawn.get("binary"), dict) else {}
+    return (
+        f"{drawn.get('package')} {drawn.get('version')} ({drawn.get('integrity')}) with the "
+        f"native library {binary.get('sha256')} and {drawn.get('text_renderer')} text"
+    )
 
 
-def qualify_renderer(edition: Edition, deadline: float = rendering.DEADLINE) -> dict:
+def other_count(first: object) -> int:
+    """The spans of a second render: one process where the first was drawn in several, two
+    where it was drawn in one."""
+    return 1 if isinstance(first, int) and first > 1 else 2
+
+
+def qualify_renderer(edition: Edition, deadline: float = renderer.DEADLINE) -> dict:
     """Render the edition's captioned stage again and compare the two renders by the measure of a
     rendered pair; the record. The captioned picture must be valid as it stands."""
-    ran = supply()
+    renderer.require_renderer()
     with durations.phase("validation"):
         first_receipt = rendering.validate_picture(edition)
-    # The record states one browser for both renders, so the first was drawn by the one that
-    # runs now: two builds are not qualified as one.
-    drew, runs = first_receipt.get("browser"), ran["browser"]
-    if not isinstance(drew, dict) or drew.get("sha256") != runs["sha256"]:
-        first = (
-            f"{drew.get('executable')} (SHA-256 {drew.get('sha256')})"
-            if isinstance(drew, dict)
-            else "no browser"
-        )
+    # The record states one canvas for both renders. What the film installs now is asked before
+    # the render, and what the second render loaded and ran after it.
+    drew, installs = first_receipt["renderer"], renderer.installed()
+    if any(drew.get(key) != value for key, value in installs.items()):
         msg = (
-            f"The {edition.code} captioned picture's receipt names {first}, and the browser "
-            f"that runs now is {runs['executable']} (SHA-256 {runs['sha256']}): a "
-            "qualification compares two renders by one browser; render the picture again"
-        )
-        raise PictureError(msg)
-    # Nor two renderer versions as one: the record states the installed one for both.
-    rendered_by, installed = first_receipt.get("renderer_version"), ran["renderer"]["version"]
-    if rendered_by != installed:
-        first = f"HyperFrames {rendered_by}" if rendered_by else "no renderer version"
-        msg = (
-            f"The {edition.code} captioned picture's receipt names {first}, and the renderer "
-            f"that runs now is HyperFrames {installed}: a qualification compares two renders "
-            "by one renderer version; render the picture again"
+            f"The {edition.code} captioned picture's receipt names {drew.get('package')} "
+            f"{drew.get('version')} ({drew.get('integrity')}), and the canvas the film installs "
+            f"now is {installs['package']} {installs['version']} ({installs['integrity']}): a "
+            "qualification compares two renders by one canvas; render the picture again"
         )
         raise PictureError(msg)
     rendered = edition.rendered(True)
@@ -107,16 +93,30 @@ def qualify_renderer(edition: Edition, deadline: float = rendering.DEADLINE) -> 
     work.mkdir(parents=True, exist_ok=True)
     again, receipt = work / rendered.file.name, work / "receipt.json"
     again.unlink(missing_ok=True)
-    command = rendering.renderer_command(rendered.stage, again, FPS, "looks")
+    drawn_in = other_count(first_receipt.get("spans"))
+    command = renderer.command(rendered.stage, again, FPS, drawn_in)
     with durations.phase("render"):
-        second_receipt = rendering.record_render(
+        second_receipt = renderer.record_render(
             command, rendered.stage, again, receipt, deadline, rendered.name
         )
+    ran = second_receipt["renderer"]
+    if renderer.build(ran) != renderer.build(drew):
+        msg = (
+            f"The {edition.code} captioned picture was drawn by {build_of(drew)}, and the second "
+            f"render by {build_of(ran)}: a qualification compares two renders by one build; "
+            "render the picture again"
+        )
+        raise PictureError(msg)
     compared = equivalence.compare_renders(rendered.file, again, work)
     frames, findings = compared["frames"], compared["findings"]
+    # Two draws of one stage are the same frames, by the renderer's digest of what it drew.
+    drawn = (first_receipt.get("drawn_sha256"), second_receipt.get("drawn_sha256"))
+    if drawn[0] != drawn[1]:
+        findings = [f"the two renders drew different frames ({drawn[0]}, {drawn[1]})", *findings]
     record = {
-        **ran,
-        "capture": second_receipt.get("capture"),
+        "renderer": ran,
+        "pinned_build": renderer.unqualified(second_receipt) is None,
+        "drawn_alike": drawn[0] == drawn[1],
         "stage_sha256": repository.sha(rendered.stage / "index.html"),
         "first": render_of(rendered.file, first_receipt, frames["first"]),
         "second": render_of(again, second_receipt, frames["second"]),
@@ -127,7 +127,7 @@ def qualify_renderer(edition: Edition, deadline: float = rendering.DEADLINE) -> 
         # Why those were not measured, when the pass that measures them failed.
         "psnr_unmeasured": compared["psnr_unmeasured"],
         "findings": findings,
-        "verdict": compared["verdict"],
+        "verdict": "refuse" if findings else "pass",
     }
     repository.write(edition.renderer_qualification, record)
     shown = {"verdict": record["verdict"], "findings": findings}
@@ -144,5 +144,11 @@ def qualify_renderer(edition: Edition, deadline: float = rendering.DEADLINE) -> 
 
 
 def render_of(path: Path, receipt: dict, frames: int) -> dict:
-    """One render as the record names it: its SHA-256, its worker count and its frames."""
-    return {"sha256": receipt["output_sha256"], "workers": receipt.get("workers"), "frames": frames}
+    """One render as the record names it: its SHA-256, its spans, the digest of its drawn frames
+    and its frames."""
+    return {
+        "sha256": receipt["output_sha256"],
+        "spans": receipt.get("spans"),
+        "drawn_sha256": receipt.get("drawn_sha256"),
+        "frames": frames,
+    }

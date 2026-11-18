@@ -39,7 +39,7 @@ import filmkit.child_processes as child_processes
 import filmkit.durations as durations
 import filmkit.picture.derivation as derivation
 import filmkit.picture.draft as draft
-import filmkit.picture.rendering as rendering
+import filmkit.picture.renderer as renderer
 from filmkit.captions import CaptionError
 from filmkit.captions.refresh import refresh_captions
 from filmkit.delivery.packaging import PackagingError, package_film, package_metadata
@@ -95,11 +95,11 @@ def render(edition: Edition, options: argparse.Namespace) -> object:
     picture for a film of the deriving capture, unless --native asks for a render of its own
     stage; rendered from that stage otherwise, its receipt saying why."""
     if not options.uncaptioned:
-        return render_picture(edition, deadline(options, rendering.DEADLINE), captions=True)
+        return render_picture(edition, deadline(options, renderer.DEADLINE), captions=True)
     way = derivation.uncaptioned_way(edition, native=options.native)
     if way["way"] == "derived":
         return derivation.derive_uncaptioned(edition, deadline(options, derivation.DEADLINE))
-    seconds = deadline(options, rendering.DEADLINE)
+    seconds = deadline(options, renderer.DEADLINE)
     return derivation.render_uncaptioned(edition, seconds, asked=options.native)
 
 
@@ -134,13 +134,13 @@ EDITION_ACTIONS: dict[str, Callable[[Edition, argparse.Namespace], object]] = {
         edition, captions=not options.uncaptioned
     ),
     "qualify-renderer": lambda edition, options: qualify_renderer(
-        edition, deadline(options, rendering.DEADLINE)
+        edition, deadline(options, renderer.DEADLINE)
     ),
     "compare-pictures": lambda edition, _: compare_pictures(edition),
     "repair-pictures": lambda edition, options: repair_pictures(
         edition,
         ATTEMPTS if options.attempts is None else options.attempts,
-        deadline(options, rendering.DEADLINE),
+        deadline(options, renderer.DEADLINE),
     ),
     "package-film": lambda edition, _: package_film(edition),
 }

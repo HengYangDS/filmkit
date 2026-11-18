@@ -1,13 +1,14 @@
 """Derive an edition's uncaptioned picture from its captioned one, and prove what that relies on.
 
-A picture is derived only for a film that declares `DERIVING_CAPTURE`, the software capture: a
-derived picture relies on the renderer drawing a stage the same way every time, which the engine
-qualifies for that capture at each release (`filmkit.picture.qualification`) and has seen fail
-in another: two renders of one stage drawn in the host's GPU with fast capture differed in 171
-of 3,600 frames (17 November 2026). `uncaptioned_way` says which way an edition's uncaptioned
-picture is made and why: derived under the software capture, and rendered from its own stage,
-as before derivation existed, under any other capture or when `--native` asks for it. Each
-receipt carries that answer as `uncaptioned`, and the comparison record repeats it.
+A picture is derived only for a film that declares `DERIVING_CAPTURE`, and only from a captioned
+picture that the canvas build the engine pins drew: a derived picture relies on the renderer
+drawing a stage the same way every time, which the engine qualifies for that build at each
+release (`filmkit.picture.qualification`). The declaration dates from the browser's renders,
+of which the software capture was the one a release qualified; no render reads it now.
+`uncaptioned_way` says which way an edition's uncaptioned picture is made and why: derived
+under that declaration from a picture of the pinned build, and rendered from its own stage
+under any other declaration, from any other build or when `--native` asks for it. Each receipt
+carries that answer as `uncaptioned`, and the comparison record repeats it.
 
 The uncaptioned picture is the captioned picture with the rows of its caption band painted in the
 ground: `derive_uncaptioned` encodes every frame of the valid captioned picture once more with
@@ -65,11 +66,12 @@ import filmkit.picture.ground as ground_rows
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
 import filmkit.tools as tools
-from filmkit.picture import browser
+from filmkit.picture import renderer
+from filmkit.picture.encoding import encoder
+from filmkit.picture.errors import PictureError
 from filmkit.picture.rendering import (
     COMPOSITION_SCRIPT,
     PICTURE_SIZE,
-    PictureError,
     require_receipt_picture,
     validate_picture,
 )
@@ -78,41 +80,12 @@ from filmkit.specification import DURATION, FPS
 if TYPE_CHECKING:
     from filmkit.production import Edition, Rendition
 
-# The capture under which the uncaptioned picture is derived: the one the engine's release
-# qualifies by rendering the sample film's stage twice.
+# The declared capture under which the uncaptioned picture is derived. It named the browser's
+# capture a release qualified; a release now qualifies the pinned canvas build.
 DERIVING_CAPTURE = "software"
 # The work of a derivation, below the film's root, in a folder for each edition.
 WORK = Path("build/runtime/work/derivation")
-# The derived picture's encoder: x264 with a keyframe forced every KEYFRAME_SECONDS, none at a
-# scene cut, and no B-frames. On a span of 7,200 UHD frames, with the band painted by colour and
-# x264's default B-frames, the encode took 20.7 s at rate factor 14, 21.0 s at 12 and 22.8 s at
-# 10, where the native render took 126 to 141 s, and stood above the band 59.5, 60.7 and 61.7 dB
-# on average from the native picture, 52.1, 53.5 and 52.6 dB at the lowest frame (17 November
-# 2026). Rate factor 12 is a decibel closer than 14 in the same time. No film delivered before
-# held a B-frame, the rendered pictures hold none, and no player was tried on a stream that
-# reorders its frames, so the derived picture holds none either: on that span's first 1,800
-# frames at rate factor 12 and two threads, 12.2 s and 5.1 MB without them against 14.2 s and
-# 3.7 MB with them, 60.0 against 59.9 dB on average and 55.4 against 53.1 dB at the lowest frame.
-KEYFRAME_SECONDS = 2
-RATE_FACTOR = 12
-ENCODER = (
-    "-c:v",
-    "libx264",
-    "-preset",
-    "veryfast",
-    "-crf",
-    str(RATE_FACTOR),
-    "-g",
-    str(KEYFRAME_SECONDS * FPS),
-    "-keyint_min",
-    str(KEYFRAME_SECONDS * FPS),
-    "-sc_threshold",
-    "0",
-    "-bf",
-    "0",
-    "-pix_fmt",
-    "yuv420p",
-)
+ENCODER = encoder(FPS)  # the pictures' encoding, at the films' frame rate
 # Seconds a derivation's encode may take.
 DEADLINE = 7200
 NATIVE = "render-picture --language {code} --uncaptioned --native"
@@ -128,7 +101,7 @@ class BandFault(PictureError):
 def uncaptioned_way(edition: Edition | None = None, *, native: bool = False) -> dict:
     """How an uncaptioned picture is made, `derived` or `rendered`, and why: by the request, by
     the film's declared capture and, for an edition whose captioned picture is rendered, by the
-    browser its receipt names, since a release qualifies the pinned build alone."""
+    canvas its receipt names, since a release qualifies the pinned build alone."""
     declared = rendering.FILM.picture.capture
     qualified = f"{DERIVING_CAPTURE} capture, which the engine's release qualifies"
     if native:
@@ -138,7 +111,7 @@ def uncaptioned_way(edition: Edition | None = None, *, native: bool = False) -> 
         return {"way": "rendered", "reason": reason + qualified}
     captioned = edition.rendered(True).receipt if edition else None
     drawn = repository.read(captioned) if captioned and captioned.is_file() else None
-    why = browser.unqualified(drawn) if drawn else None
+    why = renderer.unqualified(drawn) if drawn else None
     if why:
         reason = "the captioned picture is no render by the pinned build that the engine's release "
         return {"way": "rendered", "reason": f"{reason}qualifies: {why}"}
@@ -350,16 +323,9 @@ def derive(
 
 
 def require_derived_media(path: Path) -> None:
-    """Refuse a derived picture that is not the whole film at the pictures' frame, rate and size,
-    with a keyframe at every `KEYFRAME_SECONDS` and nowhere else."""
-    frames = DURATION * FPS
-    media.require_video(
-        media.probe(path), frames=frames, fps=FPS, size=PICTURE_SIZE, duration=DURATION
-    )
-    keyframes = media.video_cadence(path, frames, FPS)["keyframes"]
-    if keyframes != list(range(0, frames, KEYFRAME_SECONDS * FPS)):
-        msg = f"The derived picture's keyframes leave the {KEYFRAME_SECONDS} s grid: {path.name}"
-        raise PictureError(msg)
+    """Refuse a derived picture that is not the whole film on the pictures' keyframe grid
+    (`filmkit.picture.rendering.require_picture_media`)."""
+    rendering.require_picture_media(path, "derived", DURATION, PICTURE_SIZE)
 
 
 def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:

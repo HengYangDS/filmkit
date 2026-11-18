@@ -28,10 +28,10 @@ while True:
 # run ended.
 COMMAND = """
 import sys
-import filmkit.picture.rendering as rendering
-rendering.STOP_GRACE_SECONDS = float(sys.argv[2])
+import filmkit.picture.renderer as renderer
+renderer.STOP_GRACE_SECONDS = float(sys.argv[2])
 try:
-    rendering.run_renderer([sys.executable, "-B", sys.argv[1]], 120)
+    renderer.run_renderer([sys.executable, "-B", sys.argv[1]], 120)
 except BaseException as error:
     note("command-ended", how=type(error).__name__)
     raise

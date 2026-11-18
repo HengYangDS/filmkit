@@ -7,7 +7,7 @@ import sys
 import pytest
 from real_processes import gone
 
-import filmkit.picture.rendering as rendering
+import filmkit.picture.renderer as picture_renderer
 
 # Every test here has the deadline of a test that starts real processes, and their end.
 pytestmark = pytest.mark.usefixtures("processes")
@@ -31,13 +31,13 @@ time.sleep(60)
 def run(processes, tmp_path, monkeypatch):
     """Run a stand-in renderer that leaves a worker running and exits with the status given:
     what the run returned and the worker's process id."""
-    monkeypatch.setattr(rendering.repository, "ROOT", tmp_path)
+    monkeypatch.setattr(picture_renderer.repository, "ROOT", tmp_path)
     monkeypatch.setenv("NOTES", str(processes.notes))
     renderer, worker = processes.script("renderer", RENDERER), processes.script("worker", WORKER)
 
     def started(status: int):
         command = [sys.executable, "-B", str(renderer), str(worker), str(status)]
-        returned = rendering.run_renderer(command, 30)
+        returned = picture_renderer.run_renderer(command, 30)
         return returned, processes.noted("worker")["pid"]
 
     return started
@@ -51,13 +51,13 @@ def test_what_a_renderer_left_running_is_ended_whatever_its_exit(run, status):
 
 
 def test_the_renderer_is_not_reaped_before_its_group_is_stopped(run, monkeypatch):
-    stop, handed = rendering.child_processes.stop, []
+    stop, handed = picture_renderer.child_processes.stop, []
 
     def stopping(children, asking, **options):
         handed.extend(child.returncode for child in children)
         stop(children, asking, **options)
 
-    monkeypatch.setattr(rendering.child_processes, "stop", stopping)
+    monkeypatch.setattr(picture_renderer.child_processes, "stop", stopping)
     returned, worker = run(3)
     # Its return code was unknown when it was handed over: it had ended and was not reaped.
     assert handed == [None]

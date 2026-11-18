@@ -1,10 +1,10 @@
 """Install the browser build and the speech models the engine pins, below the tool cache.
 
-The supply is the only build step that reaches the network. The locked @puppeteer/browsers
-installs the browser build that the locked renderer pins, and huggingface_hub downloads each
-pinned model snapshot, from the mirror that HF_ENDPOINT names when it is set. Each is then
-checked against its pinned digests, so the build that follows reads only checked inputs and
-runs offline. Installing again keeps what is already in place.
+The supply is the only build step that reaches the network. The locked @puppeteer/browsers installs
+the browser build that the picture's and the players' checks run, and huggingface_hub downloads each
+pinned model snapshot, from the mirror that HF_ENDPOINT names when it is set. Each is then checked
+against its pinned digests, so the build that follows reads only checked inputs and runs offline.
+Installing again keeps what is already in place.
 
 Usage: python -m filmkit.supply
 """
@@ -17,7 +17,7 @@ from pathlib import Path
 
 from huggingface_hub import snapshot_download
 
-import filmkit.picture.rendering as picture_rendering
+import filmkit.picture.browser as picture_browser
 import filmkit.repository as repository
 from filmkit.narration.snapshots import ALIGNER, RECOGNIZER, VOICE, SnapshotError
 
@@ -35,16 +35,16 @@ class SupplyError(ValueError):
 
 def supply_browser() -> dict:
     """Install the pinned browser build and check its executable's SHA-256."""
-    product, version = picture_rendering.BROWSER
-    folder = repository.ROOT / picture_rendering.TOOL_CACHE / "browsers"
+    product, version = picture_browser.BROWSER
+    folder = repository.ROOT / picture_browser.TOOL_CACHE / "browsers"
     installer = [
         str(repository.node_modules() / BROWSER_INSTALLER),
         "install",
         f"{product}@{version}",
     ]
     repository.run([*installer, "--path", str(folder)], timeout=DEADLINE)
-    executable = picture_rendering.supplied_browser()
-    if not executable.is_file() or repository.sha(executable) != picture_rendering.BROWSER_SHA256:
+    executable = picture_browser.supplied_browser()
+    if not executable.is_file() or repository.sha(executable) != picture_browser.BROWSER_SHA256:
         msg = f"The {product}@{version} browser build differs from the pinned SHA-256"
         raise SupplyError(msg)
     return {"build": f"{product}@{version}", "executable": repository.relative(executable)}

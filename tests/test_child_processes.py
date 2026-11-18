@@ -510,8 +510,8 @@ def test_a_request_that_arrives_while_a_tool_starts_still_has_that_tool_asked_to
         def wait(self, timeout=None):
             return self.returncode
 
-    monkeypatch.setattr(tools.picture_rendering, "require_renderer", lambda: None)
-    monkeypatch.setattr(tools.picture_rendering, "browser_path", lambda: "no-browser")
+    monkeypatch.setattr(tools.picture_renderer, "require_renderer", lambda: None)
+    monkeypatch.setattr(tools.picture_browser, "browser_path", lambda: "no-browser")
     monkeypatch.setattr(tools.shutil, "which", lambda name: "node")
     monkeypatch.setattr(tools, "stage_tools", lambda: tmp_path)
     monkeypatch.setattr(tools, "TOOLS", {"standin": "standin.mjs"})

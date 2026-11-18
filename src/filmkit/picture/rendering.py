@@ -1,44 +1,36 @@
 """Stage, render and validate an edition's two pictures against their recorded inputs.
 
-A stage is one ignored workspace holding the renderer document, which inlines the edition's
-timeline and the composition's script and style into the composition's template, beside the
-copied timeline engine and fonts; its stage.json binds it to the current inputs. A render runs
-the locked HyperFrames renderer on the complete UHD stage with the supplied browser, telemetry,
-update checks and self-installs off, and records a receipt; validation binds the rendered
-picture to that receipt, the stage and the current inputs. Every render passes the browser and
-capture flags of the film's declared capture (`film.Picture.capture`) and its receipt records
-that mode; validation refuses a picture rendered in another mode, reading a receipt that records
-none by its command. Every render passes the renderer eight workers, or the count named for a
-measurement (`render_workers`), which its receipt records. A stage, render or receipt that
-differs from this contract raises `PictureError`, as does a film whose installed renderer is not
-the version the engine renders with.
+A stage is one ignored workspace: the picture's data (film.json: the edition's timeline with its
+render offset and edition), the composition's script and style, the declared fonts, and the document
+that inlines the same data, script and style into the composition's template for the checks that
+paint it in a browser; stage.json binds it to the current inputs. A render draws the complete UHD
+stage with the engine's renderer (`filmkit.picture.renderer`), a native canvas with no browser, and
+records a receipt; validation binds the picture to that receipt, the stage and the current inputs,
+and refuses another renderer's picture. What differs raises `PictureError`, as does a film whose
+installed canvas is not the engine's version. This module owns the stage, the render commands and
+the validation; what draws is the renderer's, which imports nothing from here.
 
-Each edition has two pictures (`production.Edition.rendered`): the captioned one, which draws
-the timeline's captions, and the uncaptioned one. The uncaptioned picture is derived from the
-captioned one (`filmkit.picture.derivation`) unless a native render is asked for; rendered, its
-document inlines the same timeline with no captions and it renders with the same settings to its
-own stage, file and receipt. Each
-stage record and receipt names its picture; one written before the uncaptioned picture existed
-names none, and its places bind it to the captioned picture.
+Each edition has two pictures (`production.Edition.rendered`), the captioned one and the
+uncaptioned one, which is derived from the captioned one (`filmkit.picture.derivation`) unless
+a native render is asked for; rendered, its data is the same timeline with no captions, drawn
+with the same settings to its own stage, file and receipt. Each stage record and receipt names
+its picture; one that names none is the captioned picture's.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import shutil
-import signal
-import subprocess
-from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import filmkit.child_processes as child_processes
 import filmkit.media as media
 import filmkit.repository as repository
 import filmkit.sources as sources
 from filmkit.film import FILM
+from filmkit.picture import encoding, faces, renderer
+from filmkit.picture.errors import PictureError
 from filmkit.production import RENDITIONS
 from filmkit.repository import content_sha, read, sha, write
 from filmkit.specification import DURATION, FPS
@@ -57,53 +49,8 @@ SOURCE_MANIFEST = sources.MANIFEST
 # The picture is rendered at the UHD master's frame; a stage may take either film's frame.
 PICTURE_SIZE = (RENDITIONS["uhd"].width, RENDITIONS["uhd"].height)
 STAGE_SIZES = {(rendition.width, rendition.height) for rendition in RENDITIONS.values()}
-# The timeline engine a stage copies, below the film's npm packages.
-TIMELINE_ENGINE = Path("gsap/dist/gsap.min.js")
-# Seconds a picture's render may take, and a renderer's process group has to exit after SIGTERM
-# before SIGKILL ends it.
-DEADLINE = 10800
-STOP_GRACE_SECONDS = 10
-# The locked renderer's command and package manifest, below the film's npm packages, and the
-# renderer version the engine renders with.
-RENDERER = Path(".bin/hyperframes")
-RENDERER_PACKAGE = Path("hyperframes/package.json")
-RENDERER_VERSION = "0.9.64"
-# The tools and models the supply task installs, below the repository root.
-TOOL_CACHE = Path("build/runtime/tool-cache")
-# The browser build that the locked renderer pins, as the supply task installs it, and the
-# SHA-256 of its executable.
-BROWSER = ("chrome-headless-shell", "152.0.7977.30")
-BROWSER_EXECUTABLE = "chrome-headless-shell-mac-arm64/chrome-headless-shell"
-BROWSER_SHA256 = "ed7c5c6aff7cc4dd88ee7746c0df97f08a454180b62b7063fc961ba42e10b6a1"
-# The renderer's browser flag and capture flag for each capture mode a film may declare. Each
-# sets the browser's rasterizer and the renderer's fast capture explicitly, so neither the
-# caller's environment nor the renderer's own default for the host and the worker count decides
-# how the frames are drawn and captured. `fast` and `screenshot` draw in the host's GPU;
-# `software` draws in the browser's software rasterizer (SwiftShader) and captures by screenshot.
-CAPTURE_FLAGS = {
-    "fast": ("--browser-gpu", "--experimental-fast-capture"),
-    "screenshot": ("--browser-gpu", "--experimental-fast-capture=false"),
-    "software": ("--no-browser-gpu", "--experimental-fast-capture=false"),
-}
-# The renderer's worker count, unless WORKERS_VARIABLE names another for a measurement. The
-# workers capture frames and one encoder reads them. On a whole film of 36,000 UHD frames, on a
-# host of 18 cores (17 November 2026, back to back in one ticket): alone with 8 workers 354.9 s,
-# the encoder keeping pace with the capture (350 s); alone with 16 workers 438.4 s, the capture
-# done in 255 s and the encoder then needing 179 s more. More workers capture faster and starve
-# the encoder. A span of 7,200 frames had shown 16 a tenth to a fifth faster; a span that starts
-# inside a film pays a start that hides the encoder's lag, so that reading did not hold for a
-# whole film. The count changes no frame. The renderer runs one render at a time for a user
-# account, and the engine renders one at a time: two stages at once, the renderer's own lock off,
-# took 739.8 s at 8 workers each where one alone took 354.9 s, and 862 s at 16 each.
-WORKERS_VARIABLE = "FILMKIT_RENDER_WORKERS"
-WORKERS = 8
-# The renderer's encoding by quality: the delivered pictures' at CRF 14, and the draft's at the
-# rate its quality sets.
-QUALITIES = {"looks": ("--quality", "looks", "--crf", "14"), "draft": ("--quality", "draft")}
-
-
-class PictureError(ValueError):
-    """A stage, render or receipt differs from what the picture's contract requires."""
+# The picture's data as the stage holds it for the renderer: what the document inlines.
+DATA = "film.json"
 
 
 def read_bound(path: str | Path) -> tuple[dict, str]:
@@ -176,6 +123,31 @@ def substitute(html: str, old: str, new: str, count: int = 1) -> str:
     return html.replace(old, new)
 
 
+def film_data(
+    edition: Edition, start: float, *, timeline: dict | None = None, captions: bool = True
+) -> str:
+    """The picture's data as JSON, the document's `window.FILM`: the timeline with its render
+    offset and edition, and with `captions` False no captions."""
+    data = dict(timeline) if timeline is not None else read(edition.timeline)
+    data["render_offset"] = start
+    data["edition"] = edition.code
+    if not captions:
+        data["captions"] = []
+    return json.dumps(data, ensure_ascii=False)
+
+
+def language(edition: Edition) -> str:
+    """The language tag an edition's picture is drawn in, in the document and on the canvas."""
+    return "en" if edition.code == "en" else "zh-CN"
+
+
+def declared_faces() -> list[dict]:
+    """The faces the film's stylesheet declares from its declared fonts
+    (`filmkit.picture.faces.held`): what the audits measure and the renderer registers."""
+    style = (repository.ROOT / STYLE).read_text(encoding="utf-8")
+    return faces.held(style, list(FILM.picture.fonts))
+
+
 def picture_html(
     edition: Edition,
     duration: int,
@@ -186,33 +158,25 @@ def picture_html(
     timeline: dict | None = None,
     captions: bool = True,
 ) -> str:
-    """Derive the exact native renderer document from current authored inputs.
+    """Derive the exact picture document from current authored inputs.
 
-    The template's language, duration and frame are set before the timeline, style and
-    script are inlined, so no substitution reaches inlined text. The uncaptioned picture's
-    document, with `captions` False, inlines the timeline with no captions.
+    The template's language, duration and frame are set before the data, style and script are
+    inlined, so no substitution reaches inlined text. The uncaptioned picture's document, with
+    `captions` False, inlines the timeline with no captions.
     """
-    data = dict(timeline) if timeline is not None else read(edition.timeline)
-    data["render_offset"] = start
-    data["edition"] = edition.code
-    if not captions:
-        data["captions"] = []
+    data = film_data(edition, start, timeline=timeline, captions=captions)
     style = (repository.ROOT / STYLE).read_text(encoding="utf-8")
     script = (repository.ROOT / COMPOSITION_SCRIPT).read_text(encoding="utf-8")
     html = (repository.ROOT / TEMPLATE).read_text(encoding="utf-8")
     for old, new, count in (
-        (
-            '<html lang="zh-CN">',
-            '<html lang="en">' if edition.code == "en" else '<html lang="zh-CN">',
-            1,
-        ),
-        ('data-duration="1200"', f'data-duration="{duration}"', 2),
+        ('<html lang="zh-CN">', f'<html lang="{language(edition)}">', 1),
+        ('data-duration="1200"', f'data-duration="{duration}"', 1),
         ('data-width="1920"', f'data-width="{width}"', 1),
         ('data-height="1080"', f'data-height="{height}"', 1),
         ('content="width=1920, height=1080"', f'content="width={width}, height={height}"', 1),
         ('width="1920" height="1080"', f'width="{width}" height="{height}"', 1),
         ('<div id="film"', f'<div style="width:{width}px;height:{height}px" id="film"', 1),
-        ("/* FILM_DATA */", "window.FILM=" + json.dumps(data, ensure_ascii=False) + ";", 1),
+        ("/* FILM_DATA */", "window.FILM=" + data + ";", 1),
         ('<link rel="stylesheet" href="film.css">', "<style>" + style + "</style>", 1),
         ('<script src="film.js"></script>', "<script>" + script + "</script>", 1),
     ):
@@ -220,39 +184,12 @@ def picture_html(
     return html
 
 
-def installed_renderer() -> str | None:
-    """The renderer version the film's npm packages install, or None where they state none."""
-    manifest = repository.node_modules() / RENDERER_PACKAGE
-    try:
-        return json.loads(manifest.read_text())["version"]
-    except (OSError, ValueError, KeyError, TypeError):
-        return None
-
-
-def require_renderer() -> None:
-    """Refuse a film whose npm packages install another renderer version than the engine's."""
-    installed = installed_renderer()
-    if installed != RENDERER_VERSION:
-        found = f"HyperFrames {installed}" if installed else "no HyperFrames"
-        msg = f"The film installs {found}; the engine renders with HyperFrames {RENDERER_VERSION}"
-        raise PictureError(msg)
-
-
-def npm_package(path: Path) -> Path:
-    """A file of the film's npm packages, as a path from the film's root."""
-    return Path(os.path.relpath(repository.node_modules() / path, repository.ROOT))
-
-
 def staged_members() -> tuple[tuple[str, Path], ...]:
-    """The members a stage copies beside its document: each place in the stage and its source.
-
-    Sources are paths from the film's root; the timeline engine's leaves the root when the
-    film's npm packages lie above it. The declared fonts follow below fonts/, in their order.
-    """
+    """The members a stage copies beside its data and document: each place in the stage and its
+    source, a path from the film's root. The declared fonts follow below fonts/, in their order."""
     return (
         ("film.js", COMPOSITION_SCRIPT),
         ("film.css", STYLE),
-        ("gsap.min.js", npm_package(TIMELINE_ENGINE)),
         *((f"fonts/{Path(font).name}", Path(font)) for font in FILM.picture.fonts),
     )
 
@@ -269,6 +206,11 @@ def copy_member(stage: Path, path: str, source: Path) -> dict:
     return {"source": str(source), "path": path, "sha256": digest}
 
 
+def staged_faces() -> list[dict]:
+    """The declared faces as a stage record names them: each family with its file's place."""
+    return [{"family": face["family"], "path": face["path"]} for face in declared_faces()]
+
+
 def stage_picture(
     edition: Edition,
     output: Path | None,
@@ -280,8 +222,10 @@ def stage_picture(
     captions: bool = True,
 ) -> None:
     """Materialize the authored picture, or with `captions` False the uncaptioned one, in one
-    ignored native render workspace: its own stage unless `output` names another."""
-    require_renderer()
+    ignored native render workspace: its own stage unless `output` names another. The record
+    names the faces the renderer registers, each family with its font's place in the stage, and
+    the language the picture is drawn in."""
+    renderer.require_renderer()
     if (
         not 1 <= duration <= DURATION
         or not 0 <= start <= DURATION - duration
@@ -295,11 +239,14 @@ def stage_picture(
         msg = "Derived renderer inputs belong to this repository's build owner"
         raise PictureError(msg)
     inputs, timeline = candidate_picture_inputs(edition)
+    drawn_with = staged_faces()
     document = picture_html(
         edition, duration, width, height, start, timeline=timeline, captions=captions
     )
+    data = film_data(edition, start, timeline=timeline, captions=captions)
     target.mkdir(parents=True, exist_ok=True)
     (target / "index.html").write_text(document, encoding="utf-8")
+    (target / DATA).write_text(data, encoding="utf-8")
     members = [copy_member(target, path, source) for path, source in staged_members()]
     write(
         target / "stage.json",
@@ -310,6 +257,8 @@ def stage_picture(
             "width": width,
             "height": height,
             "edition": edition.code,
+            "language": language(edition),
+            "faces": drawn_with,
             "picture": rendered.name,
             "script_sha256": inputs["script"]["sha256"],
             "template_sha256": sha(TEMPLATE),
@@ -345,8 +294,8 @@ def require_current_stage(edition: Edition, stage: Path, *, captions: bool = Tru
 
     The record must bind the current inputs, template, edition and picture, captioned or with
     `captions` False uncaptioned, over the whole duration at the UHD frame; the staged document
-    must be the one those sources derive now, and every copied member must match its record and
-    its source.
+    and data must be the ones those sources derive now, and every copied member must match its
+    record and its source.
     """
     record, document = stage / "stage.json", stage / "index.html"
     if not record.is_file() or not document.is_file():
@@ -361,6 +310,8 @@ def require_current_stage(edition: Edition, stage: Path, *, captions: bool = Tru
         "width": PICTURE_SIZE[0],
         "height": PICTURE_SIZE[1],
         "edition": edition.code,
+        "language": language(edition),
+        "faces": staged_faces(),
         "script_sha256": inputs["script"]["sha256"],
         "template_sha256": sha(TEMPLATE),
         "timeline_sha256": inputs["timeline"]["sha256"],
@@ -377,6 +328,10 @@ def require_current_stage(edition: Edition, stage: Path, *, captions: bool = Tru
     )
     if document.read_bytes() != derived.encode("utf-8"):
         msg = "The staged document differs from the one the current sources derive"
+        raise PictureError(msg)
+    data, held = film_data(edition, 0, timeline=timeline, captions=captions), stage / DATA
+    if not held.is_file() or held.read_bytes() != data.encode("utf-8"):
+        msg = "The stage's picture data differs from what the current sources derive"
         raise PictureError(msg)
     require_staged_members(binding.get("members"), stage)
     return binding
@@ -404,10 +359,9 @@ def require_receipt_places(receipt: dict, stage: Path, picture: Path) -> None:
     """Refuse a receipt unless it rendered this stage to this picture, whose bytes it records."""
     command = receipt.get("command") or []
     output = command[command.index("--output") + 1] if "--output" in command[:-1] else ""
+    staged = command[command.index("render") + 1] if "render" in command[:-1] else ""
     if not (
-        len(command) > 2
-        and command[1] == "render"
-        and recorded_at(command[2], stage, repository.ROOT)
+        recorded_at(staged, stage, repository.ROOT)
         and recorded_at(output, picture, repository.ROOT)
         and recorded_at(receipt.get("output_path", ""), picture, repository.ROOT)
     ):
@@ -416,76 +370,6 @@ def require_receipt_places(receipt: dict, stage: Path, picture: Path) -> None:
     if not picture.is_file() or receipt.get("output_sha256") != sha(picture):
         msg = "The rendered picture differs from its receipt"
         raise PictureError(msg)
-
-
-def stop_process_group(process: subprocess.Popen) -> None:
-    """End a renderer that has not been reaped and the rest of its process group, and reap it:
-    SIGTERM, then SIGKILL after the grace (`filmkit.child_processes.stop`, which holds a further
-    signal until the group has ended)."""
-    child_processes.stop([process], signal.SIGTERM, groups=True, seconds=STOP_GRACE_SECONDS)
-
-
-def supplied_browser() -> Path:
-    """The executable of the browser build that the supply task installs."""
-    product, version = BROWSER
-    browsers = repository.ROOT / TOOL_CACHE / "browsers"
-    return browsers / product / f"mac_arm-{version}" / BROWSER_EXECUTABLE
-
-
-def browser_path() -> Path:
-    """The browser renders and checks run: FILM_CHROMIUM_PATH, or the supplied build."""
-    named = os.environ.get("FILM_CHROMIUM_PATH")
-    return Path(named) if named else supplied_browser()
-
-
-def renderer_environment() -> dict[str, str]:
-    """The renderer's environment: the browser and a font cache of the repository's own.
-
-    Telemetry, update checks and self-installs are off.
-    """
-    return {
-        **os.environ,
-        "HYPERFRAMES_NO_TELEMETRY": "1",
-        "DO_NOT_TRACK": "1",
-        "HYPERFRAMES_NO_UPDATE_CHECK": "1",
-        "HYPERFRAMES_NO_AUTO_INSTALL": "1",
-        "HYPERFRAMES_BROWSER_PATH": str(browser_path()),
-        "HYPERFRAMES_FONT_CACHE_DIR": str(repository.ROOT / TOOL_CACHE / "hyperframes/fonts"),
-    }
-
-
-def run_renderer(command: list[str], deadline: float) -> tuple[int | None, bool]:
-    """Run the renderer to its exit or deadline: its exit status, and whether it timed out.
-
-    The renderer runs in its own session with its input closed, so stopping it reaches every
-    process it started. Its end is waited for without reaping it, so that its number is still
-    its own when what is left of its group is ended, which is done after every run: after a
-    failed exit that is its remaining workers. A wait that is cut short by a request to end, an
-    interrupt, SIGTERM or a hang-up, which is an exception while the renderer runs
-    (`filmkit.child_processes`), stops the group before the cause propagates, undisturbed by a
-    further request.
-    """
-    # From a first request to end until the renderer's group is ended, every further one is
-    # dropped: each stop lies inside the block that takes the requests.
-    with child_processes.terminable():
-        process = None
-        try:
-            # A request that arrives while the renderer starts waits until it is held here.
-            with child_processes.held():
-                process = subprocess.Popen(
-                    command,
-                    cwd=repository.ROOT,
-                    stdin=subprocess.DEVNULL,
-                    start_new_session=True,
-                    env=renderer_environment(),
-                )
-            timed_out = not child_processes.ended(process, deadline)
-        except BaseException:
-            if process is not None:
-                stop_process_group(process)
-            raise
-        stop_process_group(process)
-        return (None if timed_out else process.returncode), timed_out
 
 
 def face_bindings() -> dict:
@@ -526,113 +410,23 @@ def require_passing_gates(edition: Edition) -> None:
         raise PictureError(msg)
 
 
-def render_workers() -> int:
-    """The worker count a render passes: `WORKERS`, or what `WORKERS_VARIABLE` names for a
-    measurement, a positive whole number."""
-    named = os.environ.get(WORKERS_VARIABLE)
-    if not named:
-        return WORKERS
-    if not (named.isascii() and named.isdigit() and int(named) > 0):
-        msg = f"{WORKERS_VARIABLE} names {named!r}, which is no positive whole number of workers"
-        raise PictureError(msg)
-    return int(named)
-
-
-def command_workers(command: list[str]) -> int | None:
-    """The worker count a renderer command passes, or None when it passes none."""
-    if "--workers" not in command[:-1]:
-        return None
-    return int(command[command.index("--workers") + 1])
-
-
-def renderer_command(stage: Path, output: Path, fps: int, quality: str) -> list[str]:
-    """The locked renderer's command for a stage: the pictures' settings at a frame rate and a
-    quality of `QUALITIES`, with the browser and capture flags of the film's declared capture."""
-    browser, capture = CAPTURE_FLAGS[FILM.picture.capture]
-    return [
-        str(repository.node_modules() / RENDERER),
-        "render",
-        str(stage),
-        "--output",
-        str(output),
-        "--fps",
-        str(fps),
-        *QUALITIES[quality],
-        "--workers",
-        str(render_workers()),
-        "--gpu",
-        browser,
-        "--no-low-memory-mode",
-        capture,
-        "--strict",
-    ]
-
-
-def command_capture(command: list[str]) -> str | None:
-    """The capture mode a renderer command passes: the mode of its capture flag and its browser
-    flag, a command without a browser flag drawing in the host's GPU, as the renderer's own flag
-    default does on a host with one; None unless it passes exactly one capture flag of a mode."""
-    captures = {flags[1] for flags in CAPTURE_FLAGS.values() if flags[1] in command}
-    browser = "--no-browser-gpu" if "--no-browser-gpu" in command else "--browser-gpu"
-    passed = [mode for mode, flags in CAPTURE_FLAGS.items() if flags == (browser, *captures)]
-    return passed[0] if len(passed) == 1 else None
-
-
-def record_render(
-    command: list[str], stage: Path, output: Path, receipt: Path, deadline: float, picture: str
-) -> dict:
-    """Run a renderer command on a stage to its exit or deadline and write its receipt.
-
-    The receipt names the picture, the command, the capture and worker count it passes, the
-    browser that draws it (`filmkit.picture.browser`) and the renderer version the film's npm
-    packages install. A
-    render that does not exit 0 within its deadline, or whose stage changed meanwhile, raises
-    `PictureError` after its receipt is written.
-    """
-    from filmkit.picture import browser
-
-    source, drawn_by = sha(stage / "index.html"), browser.identity()
-    started = datetime.now(UTC)
-    exit_code, timed_out = run_renderer(command, deadline)
-    record = {
-        "picture": picture,
-        "command": command,
-        "capture": command_capture(command),
-        "workers": command_workers(command),
-        "browser": drawn_by,
-        "renderer_version": installed_renderer(),
-        "exit": exit_code,
-        "timed_out": timed_out,
-        "deadline_seconds": deadline,
-        "started_at": started.isoformat(),
-        "elapsed_seconds": (datetime.now(UTC) - started).total_seconds(),
-        "source_sha256": source,
-        "output_path": str(output),
-        "output_sha256": sha(output) if output.is_file() else None,
-    }
-    write(receipt, record)
-    print(json.dumps({key: record[key] for key in ("exit", "timed_out", "elapsed_seconds")}))
-    if exit_code != 0 or timed_out or source != sha(stage / "index.html"):
-        msg = "Native picture render did not complete from the current stage"
-        raise PictureError(msg)
-    return record
-
-
 def render_picture(edition: Edition, deadline: int, *, captions: bool = True) -> None:
-    """Run the locked renderer on the complete current stage and record its receipt.
+    """Run the engine's renderer on the complete current stage and record its receipt.
 
     With `captions` False it renders the uncaptioned picture, from its own stage to its own file
     and receipt, with the same settings. The edition's picture must have passed check-picture as
     it stands. At the deadline the renderer's process group is sent SIGTERM and, after
-    `STOP_GRACE_SECONDS`, SIGKILL. A render that does not exit 0 within its deadline, or whose
-    stage changed meanwhile, raises `PictureError` after its receipt is written.
+    `renderer.STOP_GRACE_SECONDS`, SIGKILL. A render that does not exit 0 within its deadline, or
+    whose stage changed meanwhile, raises `PictureError` after its receipt is written.
     """
-    require_renderer()
+    renderer.require_renderer()
     require_passing_gates(edition)
     rendered = edition.rendered(captions)
     require_current_stage(edition, rendered.stage, captions=captions)
-    command = renderer_command(rendered.stage, rendered.file, FPS, "looks")
-    record_render(command, rendered.stage, rendered.file, rendered.receipt, deadline, rendered.name)
+    command = renderer.command(rendered.stage, rendered.file, FPS, renderer.spans())
+    renderer.record_render(
+        command, rendered.stage, rendered.file, rendered.receipt, deadline, rendered.name
+    )
 
 
 def recorded_at(recorded: str, current: Path, root: Path) -> bool:
@@ -653,34 +447,9 @@ def require_receipt_picture(receipt: dict, rendered: Rendered) -> None:
         raise PictureError(msg)
 
 
-def receipt_capture(receipt: dict) -> str | None:
-    """The capture mode a receipt's command passes, which the mode it records must be.
-
-    A receipt written before receipts recorded their capture is read by its command alone.
-    """
-    passed = command_capture(receipt.get("command") or [])
-    recorded = receipt.get("capture", passed)
-    if recorded != passed:
-        asked = f"{passed} capture" if passed else "no capture flag"
-        msg = f"The render receipt records {recorded} capture, but its command passes {asked}"
-        raise PictureError(msg)
-    return passed
-
-
-def require_receipt_capture(receipt: dict) -> None:
-    """Refuse a receipt of another capture mode than the film declares."""
-    captured, declared = receipt_capture(receipt), FILM.picture.capture
-    if captured != declared:
-        msg = (
-            f"The picture was rendered with {captured or 'no'} capture; the film declares "
-            f"{declared} capture"
-        )
-        raise PictureError(msg)
-
-
 def validate_picture_binding(edition: Edition, receipt: dict, *, captions: bool = True) -> None:
     """Bind one complete native render, of the captioned picture or with `captions` False of the
-    uncaptioned one, to the exact staged current inputs and the declared capture; a derived
+    uncaptioned one, to the exact staged current inputs and the engine's renderer; a derived
     uncaptioned picture is bound by its derivation's receipt (`filmkit.picture.derivation`)."""
     if not captions and isinstance(receipt.get("derived"), dict):
         from filmkit.picture import derivation
@@ -688,24 +457,39 @@ def validate_picture_binding(edition: Edition, receipt: dict, *, captions: bool 
         return derivation.validate_binding(edition, receipt)
     rendered = edition.rendered(captions)
     require_receipt_picture(receipt, rendered)
+    # A receipt that names no canvas is another renderer's; one that names a canvas is asked
+    # first whether its render completed, since a render that failed reports no text renderer.
+    if not isinstance(receipt.get("renderer"), dict):
+        renderer.require_receipt_renderer(receipt)
     require_completed_receipt(receipt, rendered.stage)
+    renderer.require_receipt_renderer(receipt)
     require_current_stage(edition, rendered.stage, captions=captions)
     require_receipt_places(receipt, rendered.stage, rendered.file)
-    require_receipt_capture(receipt)
 
 
 def validate_picture(edition: Edition, *, captions: bool = True) -> dict:
-    """Bind the complete native capture, captioned or with `captions` False uncaptioned, to its
+    """Bind the complete rendered picture, captioned or with `captions` False uncaptioned, to its
     current authored input; a derived uncaptioned picture to its derivation's receipt."""
-    rendered, frames = edition.rendered(captions), DURATION * FPS
+    rendered = edition.rendered(captions)
     receipt = read(rendered.receipt)
     if not captions and isinstance(receipt.get("derived"), dict):
         from filmkit.picture import derivation
 
         return derivation.validate(edition, receipt)
     validate_picture_binding(edition, receipt, captions=captions)
-    media.require_video(
-        media.probe(rendered.file), frames=frames, fps=FPS, size=PICTURE_SIZE, duration=DURATION
-    )
-    media.video_cadence(rendered.file, frames, FPS)
+    require_picture_media(rendered.file, "rendered")
     return receipt
+
+
+def require_picture_media(
+    path: Path, made: str, duration: int = DURATION, size: tuple[int, int] = PICTURE_SIZE
+) -> None:
+    """Refuse a picture, `made` rendered or derived, that is not the whole film at the pictures'
+    frame, rate and size with a keyframe at every `encoding.KEYFRAME_SECONDS` and nowhere else."""
+    frames = duration * FPS
+    media.require_video(media.probe(path), frames=frames, fps=FPS, size=size, duration=duration)
+    keyframes = media.video_cadence(path, frames, FPS)["keyframes"]
+    if keyframes != list(range(0, frames, encoding.KEYFRAME_SECONDS * FPS)):
+        grid = f"{encoding.KEYFRAME_SECONDS} s grid"
+        msg = f"The {made} picture's keyframes leave the {grid}: {path.name}"
+        raise PictureError(msg)

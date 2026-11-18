@@ -1,8 +1,10 @@
 """Fixtures shared by the picture tests that stage and render.
 
 `film_root` is a film root with both editions' current inputs and the real composition, whose
-renderer is a stand-in: it records each run beside itself and writes the next file queued for its
-output, or a text naming the stage it rendered when none is queued.
+npm packages record the pinned canvas build and whose renderer is a stand-in: it records each
+run beside itself, writes the next file queued for its output, or a text naming the stage it
+rendered when none is queued, and reports the frames it drew, its text renderer and the native
+library it loaded as the renderer does: the pinned library unless `FilmRoot.loads` names another.
 """
 
 import json
@@ -15,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 from filmkit.production import Edition
@@ -25,9 +28,11 @@ COMPOSITION = repository.ROOT / picture_rendering.COMPOSITION
 # Each edition's one segment.
 TEXTS = {"zh": "先看数据。", "en": "Read the data."}
 # The stand-in renderer. Each run appends its arguments after its own path, its scheduling
-# priority, its input and whether it leads its own session to runs.jsonl beside it.
+# priority, its input and whether it leads its own session to runs.jsonl beside it. Its report
+# states a digest of the stage it was given, or the one the file `drawn` beside it holds, and the
+# native library the file `loaded.json` beside it names.
 STAND_IN = """
-import json, os, pathlib, sys
+import hashlib, json, os, pathlib, sys
 here = pathlib.Path(sys.argv[0]).parent
 output = pathlib.Path(sys.argv[sys.argv.index("--output") + 1])
 run = {
@@ -44,6 +49,16 @@ if queued:
     queued[0].replace(output)
 else:
     output.write_text("rendered " + sys.argv[2])
+drawn = here / "drawn"
+report = {
+    "frames": 1,
+    "spans": int(sys.argv[sys.argv.index("--spans") + 1]),
+    "text_renderer": sys.argv[sys.argv.index("--text-renderer") + 1],
+    "binary": json.loads((here / "loaded.json").read_text()),
+    "drawn_sha256": drawn.read_text() if drawn.exists()
+    else hashlib.sha256(sys.argv[2].encode()).hexdigest(),
+}
+pathlib.Path(sys.argv[sys.argv.index("--report") + 1]).write_text(json.dumps(report))
 """
 
 
@@ -92,6 +107,41 @@ class FilmRoot:
         for number, file in enumerate(files, last + 1):
             shutil.copyfile(file, folder / f"{number:03d}{file.suffix}")
 
+    def installs(self, integrity: str | None = None) -> None:
+        """Record what npm installed: the pinned canvas build, or the canvas package with the
+        integrity given, as another build of that version has."""
+        version = picture_renderer.RENDERER_VERSION
+        pinned = picture_renderer.INTEGRITY
+        name, binary = picture_renderer.RENDERER_NAME, picture_renderer.BINARY_PACKAGE
+        packages = {
+            f"node_modules/{name}": {"version": version, "integrity": integrity or pinned[name]},
+            f"node_modules/{binary}": {"version": version, "integrity": pinned[binary]},
+        }
+        put(self.path / "node_modules" / picture_renderer.INSTALLED, {"packages": packages})
+
+    def loads(self, sha256: str | None = None, package: str | None = None) -> dict:
+        """Have the stand-in report the native library it loaded: the pinned one of the pinned
+        binary package, or another by its SHA-256 or its package. The library as it reports it."""
+        loaded = {
+            "path": str(self.renderer.parent / "skia.node"),
+            "sha256": sha256 or picture_renderer.BINARY_SHA256,
+            "package": package or picture_renderer.BINARY_PACKAGE,
+            "version": picture_renderer.RENDERER_VERSION,
+        }
+        put(self.renderer.parent / "loaded.json", loaded)
+        return loaded
+
+    def canvas(self) -> dict:
+        """The canvas a receipt names for a run of the stand-in as things stand: what the film
+        installs, the library the stand-in reports with npm's record of its package, and the
+        engine's text renderer."""
+        return picture_renderer.drawn_by(
+            {
+                "text_renderer": picture_renderer.TEXT_RENDERER,
+                "binary": repository.read(self.renderer.parent / "loaded.json"),
+            }
+        )
+
     def runs(self) -> list[dict]:
         """The stand-in's runs, in order."""
         log = self.renderer.parent / "runs.jsonl"
@@ -105,8 +155,11 @@ def film_root(tmp_path, monkeypatch) -> FilmRoot:
     is the stand-in."""
     root = tmp_path.resolve() / "film"
     monkeypatch.setattr(repository, "ROOT", root)
-    supported = {"name": "hyperframes", "version": picture_rendering.RENDERER_VERSION}
-    put(root / "node_modules" / picture_rendering.RENDERER_PACKAGE, supported)
+    supported = {
+        "name": picture_renderer.RENDERER_NAME,
+        "version": picture_renderer.RENDERER_VERSION,
+    }
+    put(root / "node_modules" / picture_renderer.RENDERER_PACKAGE, supported)
     shutil.copytree(COMPOSITION, root / picture_rendering.COMPOSITION)
     for path, source in picture_rendering.staged_members():
         if not (root / source).exists():
@@ -122,14 +175,12 @@ def film_root(tmp_path, monkeypatch) -> FilmRoot:
             "soundtrack_sha256": repository.sha(edition.soundtrack),
         }
         put(edition.audio_assembly, assembly)
-    # The browser the supply installs, as a file whose bytes the engine pins here.
-    browser = put(picture_rendering.supplied_browser(), "the pinned browser build")
-    monkeypatch.setattr(picture_rendering, "BROWSER_SHA256", repository.sha(browser))
-    monkeypatch.delenv("FILM_CHROMIUM_PATH", raising=False)
-    renderer = tmp_path.resolve() / "renderer" / "hyperframes"
+    renderer = tmp_path.resolve() / "renderer" / "native-canvas"
     put(renderer, f"#!{sys.executable}\n{textwrap.dedent(STAND_IN)}").chmod(0o755)
-    monkeypatch.setattr(picture_rendering, "RENDERER", renderer)
+    monkeypatch.setattr(picture_renderer, "launcher", lambda: [str(renderer)])
     film = FilmRoot(root, renderer)
+    film.installs()
+    film.loads()
     for code in TEXTS:
         film.timeline(Edition(code))
     return film

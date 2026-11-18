@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 import filmkit.picture.derivation as derivation
+import filmkit.picture.encoding as encoding
 import filmkit.picture.ground as ground_rows
 import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
@@ -86,7 +87,7 @@ def test_a_derived_picture_holds_the_ground_in_its_band_and_every_frame(root):
     command = made["command"]
     assert command[command.index("-g") + 1] == command[command.index("-keyint_min") + 1] == "120"
     assert command[command.index("-sc_threshold") + 1] == "0"
-    assert derivation.RATE_FACTOR == 12
+    assert encoding.RATE_FACTOR == 12
     assert command[command.index("-crf") + 1] == "12"
     assert command[command.index("-preset") + 1] == "veryfast"
     assert command[command.index("-bf") + 1] == "0"

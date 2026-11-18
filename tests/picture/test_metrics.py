@@ -10,6 +10,7 @@ from fontTools.ttLib import TTFont
 import filmkit.picture.metrics as metrics
 import filmkit.repository as repository
 from filmkit.film import FILM
+from filmkit.picture.errors import PictureError
 from filmkit.picture.rendering import STYLE
 
 # The sample film, whose stylesheet and fonts the test film copies.
@@ -66,15 +67,17 @@ def test_the_table_holds_each_declared_face_by_its_font(film):
         assert width(face, text) == pytest.approx(advance_sum(film / face["font"], text))
 
 
-def test_a_face_whose_source_is_not_a_declared_font_keeps_the_estimate(film):
+def test_a_face_whose_source_is_not_a_declared_font_is_refused_by_its_name(film):
+    # The audits' table and the renderer take their faces from one reader, which leaves none out.
+    assert len(metrics.declared_faces()) == 4
     style = film / STYLE
     style.write_text(
         style.read_text(encoding="utf-8")
         + '\n@font-face { font-family: "Other"; src: url("fonts/other.ttf"); }\n',
         encoding="utf-8",
     )
-    assert "Other" not in metrics.declared_faces()
-    assert len(metrics.declared_faces()) == 4
+    with pytest.raises(PictureError, match="The face Other names fonts/other.ttf, which is none"):
+        metrics.declared_faces()
 
 
 def test_the_table_is_written_once_and_again_when_a_font_changes(film):

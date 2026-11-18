@@ -52,6 +52,7 @@ from pathlib import Path
 import filmkit.concepts as concepts
 import filmkit.delivery.packaging as packaging
 import filmkit.delivery.verification as verification
+import filmkit.picture.renderer as renderer
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
 import filmkit.review.clarity as review_clarity
@@ -129,7 +130,8 @@ def package(edition: Edition) -> str | None:
 
 
 def draft(edition: Edition) -> str | None:
-    """Whether the draft's still scan passed on the current timeline and composition."""
+    """Whether the draft's still scan passed on the current timeline and composition, on a
+    draft that the engine's renderer drew."""
     path, named = edition.draft_stills, repository.relative(edition.draft_stills)
     if not path.is_file():
         return f"no still scan of the 10 fps draft at {named}"
@@ -144,6 +146,13 @@ def draft(edition: Edition) -> str | None:
     other = [key for key, digest in current.items() if record.get(key, {}).get("sha256") != digest]
     if other:
         return f"{named} does not bind the current {' and '.join(other)}; scan a new draft"
+    draws = {
+        "package": renderer.RENDERER_NAME,
+        "version": renderer.RENDERER_VERSION,
+        "text_renderer": renderer.TEXT_RENDERER,
+    }
+    if record.get("drawn_by") != draws:
+        return f"{named} scanned a draft that another renderer drew; render the draft again"
     if record.get("over_limit"):
         runs, limit = len(record["over_limit"]), record.get("limit_seconds")
         return f"{named} finds {runs} still pictures over {limit} s of speech"

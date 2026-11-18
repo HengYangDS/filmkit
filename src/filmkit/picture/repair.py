@@ -38,7 +38,8 @@ import filmkit.picture.faults as faults
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
 from filmkit.media import MediaError
-from filmkit.picture.rendering import PictureError
+from filmkit.picture import renderer
+from filmkit.picture.errors import PictureError
 from filmkit.tools import ToolError
 
 if TYPE_CHECKING:
@@ -79,7 +80,7 @@ def current_record(edition: Edition) -> dict:
 def require_renderable(edition: Edition, named: dict[str, list[dict]]) -> None:
     """Refuse unless each named picture can be rendered as it stands: the renderer, the passing
     gate record and the picture's current stage that `render_picture` requires."""
-    rendering.require_renderer()
+    renderer.require_renderer()
     rendering.require_passing_gates(edition)
     for name in named:
         rendered = edition.rendered(name == "captioned")
@@ -178,7 +179,7 @@ def compare(edition: Edition) -> dict:
 
 
 def repair_pictures(
-    edition: Edition, attempts: int = ATTEMPTS, deadline: float = rendering.DEADLINE
+    edition: Edition, attempts: int = ATTEMPTS, deadline: float = renderer.DEADLINE
 ) -> dict:
     """Render again the pictures that hold the faults a refused comparison attributes, and
     compare after each attempt; the passing comparison record."""

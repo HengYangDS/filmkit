@@ -75,11 +75,12 @@ narrate.main(["--language", "zh"])
 RENDER = """
 import pathlib, sys
 import filmkit.child_processes as child_processes
-import filmkit.picture.rendering as rendering
-rendering.repository.ROOT = pathlib.Path(sys.argv[1])
+import filmkit.picture.rendering  # what reads the sample film at import, before the root moves
+import filmkit.picture.renderer as picture_renderer
+picture_renderer.repository.ROOT = pathlib.Path(sys.argv[1])
 renderer = [sys.executable, "-B", sys.argv[2], "renderer"]
 def render(edition=None, options=None):
-    return rendering.run_renderer(renderer, 120)
+    return picture_renderer.run_renderer(renderer, 120)
 if __name__ == "__main__":
     with child_processes.ending("render-picture: stopped by {request}"):
         render()
@@ -130,8 +131,8 @@ import filmkit.picture.gates as gates
 import filmkit.tools as tools
 tool = pathlib.Path(sys.argv[1])
 tools.repository.ROOT = tool.parent
-tools.picture_rendering.require_renderer = lambda: None
-tools.picture_rendering.browser_path = lambda: "no-browser"
+tools.picture_renderer.require_renderer = lambda: None
+tools.picture_browser.browser_path = lambda: "no-browser"
 tools.shutil.which = lambda name: sys.executable
 tools.stage_tools = lambda: tool.parent
 tools.TOOLS = {"standin": tool.name}
@@ -164,8 +165,8 @@ import filmkit.child_processes as child_processes
 import filmkit.tools as tools
 tool = pathlib.Path(sys.argv[1])
 tools.repository.ROOT = tool.parent
-tools.picture_rendering.require_renderer = lambda: None
-tools.picture_rendering.browser_path = lambda: "no-browser"
+tools.picture_renderer.require_renderer = lambda: None
+tools.picture_browser.browser_path = lambda: "no-browser"
 tools.shutil.which = lambda name: sys.executable
 tools.stage_tools = lambda: tool.parent
 tools.TOOLS = {"standin": tool.name}
