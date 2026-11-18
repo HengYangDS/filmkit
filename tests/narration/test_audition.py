@@ -21,86 +21,39 @@ def sha256(data: bytes | str) -> str:
     return hashlib.sha256(data.encode() if isinstance(data, str) else data).hexdigest()
 
 
-def take(
-    seed,
-    *,
-    natural=True,
-    heard=True,
-    differing=0,
-    end_ratio=0.1,
-    seconds=3.0,
-    quiet=True,
-    clip_quiet=None,
-    stops=(),
-    fluent=True,
-    terms=True,
-):
+def take(seed, *, failed=(), heard=True, end_ratio=0.1, seconds=3.0):
     return {
         "seed": seed,
-        "natural": natural,
-        "phrase_stops": None if stops is None else list(stops),
+        "failed": list(failed),
         "required_heard": heard,
-        "differing_units": differing,
         "end_ratio": end_ratio,
         "seconds": seconds,
-        "opens_quiet": quiet,
-        "clip_opens_quiet": quiet if clip_quiet is None else clip_quiet,
-        "fluent": fluent,
-        "terms_pass": terms,
     }
 
 
-def test_propose_ranks_only_qualified_takes():
+def test_propose_ranks_only_the_takes_no_line_of_the_judgment_refuses():
     takes = [
-        take(1, natural=False),
-        take(2, differing=1),
+        take(1, failed=["ending"], end_ratio=0.01),
+        take(2, failed=["units"], end_ratio=0.02),
         take(3, end_ratio=0.05),
         take(4, end_ratio=0.08, seconds=3.4),
-        take(5, heard=False, seconds=4.0),
+        take(5, failed=["pause"], seconds=4.0),
         take(6, end_ratio=0.09, seconds=2.8),
-        take(7, natural=False, seconds=2.0),
+        take(7, failed=["terms", "clarity"], seconds=2.0),
     ]
     assert narration_audition.propose(takes) == 3
     assert narration_audition.propose(takes, "slower") == 4
     assert narration_audition.propose(takes, "brisker") == 6
-    assert narration_audition.propose(takes[:1] + takes[4:5]) is None
+    # A take that a line refuses is never proposed, whatever the others fail.
+    assert narration_audition.propose([takes[0], takes[1], takes[4], takes[6]]) is None
 
 
-def test_propose_refuses_a_take_with_a_phrase_cut_inside_its_thought():
-    # A take whose phrase ends could not be aligned is not known to end them naturally.
-    stopped = {"end_sample": 24000, "final_fall_ms": 4.0}
-    takes = [take(1, end_ratio=0.05, stops=[stopped]), take(2, end_ratio=0.06, stops=None)]
-    assert narration_audition.propose(takes) is None
-    assert narration_audition.propose([*takes, take(3, end_ratio=0.08)]) == 3
-
-
-def test_propose_requires_a_recording_opening_thought_to_begin_in_quiet():
-    takes = [take(1, end_ratio=0.05, quiet=False), take(2, end_ratio=0.08)]
-    assert narration_audition.propose(takes) == 1
-    assert narration_audition.propose(takes, opens_recording=True) == 2
-    assert narration_audition.propose(takes[:1], opens_recording=True) is None
-
-
-def test_propose_accepts_an_opening_take_whose_clip_opens_in_its_released_onset():
-    # A take heard in its first 10 ms opens its recording when the assembly begins its clip in
-    # quiet, as it does by releasing a codec onset.
-    onset = take(1, end_ratio=0.05, quiet=False, clip_quiet=True)
-    assert narration_audition.propose([onset, take(2, end_ratio=0.08)], opens_recording=True) == 1
-
-
-def test_propose_prefers_fluent_takes_that_say_their_terms_like_the_reference():
-    # A take that halts 0.45 s where the script switches is proposed only while no other
-    # qualified take is fluent.
-    halting = take(1, end_ratio=0.05, fluent=False)
-    assert narration_audition.propose([halting, take(2, differing=1)]) == 2
-    assert narration_audition.propose([halting, take(3, natural=False)]) == 1
-    # So is a take that says a declared term unlike its reference.
-    misread = take(4, end_ratio=0.05, terms=False)
-    assert narration_audition.propose([misread, take(5, differing=2)]) == 5
-    # A take that passes both is proposed; where each passes only what another fails, none is.
-    assert narration_audition.propose([halting, misread, take(6, differing=3)]) == 6
-    assert narration_audition.propose([halting, misread]) is None
-    assert narration_audition.propose([halting, take(7, fluent=False, terms=False)]) == 1
+def test_propose_puts_a_take_that_holds_the_required_phrase_before_one_that_does_not():
+    # The phrase orders the qualified takes and qualifies none.
+    takes = [take(1, heard=False, end_ratio=0.01), take(2, end_ratio=0.2)]
+    assert narration_audition.propose(takes) == 2
+    assert narration_audition.propose(takes[:1]) == 1
+    assert narration_audition.propose([take(3, failed=["phrase"]), takes[0]]) == 1
 
 
 THOUGHTS = ["按及时性的标准，这次交付不合格。", "把调度窗口提前，是有权的人做的决定。"]
@@ -176,10 +129,14 @@ def test_apply_dry_run_leaves_the_cast_unchanged(tmp_path, cast, capsys):
 
 
 @pytest.fixture
-def auditioned(retained_group_record, monkeypatch):
-    """An English edition whose declared receipt holds one grouped, bound recording."""
+def auditioned(retained_group_record, declared, monkeypatch):
+    """An English edition whose declared receipt holds one grouped, bound recording.
+
+    The film declares no clarity floor, so no take is decoded for its clarity.
+    """
     root, record, plans, settings = retained_group_record
     monkeypatch.setattr(repository, "ROOT", root)
+    declared(clarity_minimum_db=None)
     record = {**record, "text_sha256": sha256(record["text"])}
     edition = Edition("en")
     section = {
@@ -438,7 +395,7 @@ def test_a_reference_the_receipt_does_not_hold_refuses_before_any_model_loads(
     assert not (auditioned["root"] / narration_audition.AUDITIONS).exists()
 
 
-def test_each_take_says_its_terms_against_the_vowel_of_the_receipts_reference(
+def test_a_take_of_the_thought_that_holds_a_terms_reference_is_not_held_to_the_take_it_replaces(
     auditioned, monkeypatch
 ):
     declare_term(monkeypatch, "26.2")
@@ -457,8 +414,8 @@ def test_each_take_says_its_terms_against_the_vowel_of_the_receipts_reference(
                 items=[Aligned("Second", 0.1, 0.5), Aligned("thought", 0.5, 1.0)]
             )
 
-    # The receipt's thought take and the quieter take say the vowel of the reference; the
-    # louder take another.
+    # The receipt's thought take and the quieter take say one vowel and the louder take
+    # another. Each take would itself be the reference once bound: neither is refused for it.
     def vowel(recording, _start, _end, _after=None):
         close = recording.mono.max() < 0.25
         return narration_terms.Vowel(250.0 if close else 650.0, 2750.0 if close else 2000.0, 6)
@@ -479,9 +436,38 @@ def test_each_take_says_its_terms_against_the_vowel_of_the_receipts_reference(
     folder = auditioned["root"] / narration_audition.AUDITIONS / "en"
     (row,) = json.loads((folder / "audition.json").read_text())
     said = [(take["terms_pass"], take["term_occurrences"]) for take in row["takes"]]
-    occurrence = {"term": "Second", "index": 0, "at": 0.1, "frames": 6}
-    same, opened = {"f1_ratio": 1.0, "f2_ratio": 1.0}, {"f1_ratio": 2.6, "f2_ratio": 0.727}
+    occurrence = {"term": "Second", "index": 0, "at": 0.1, "reference": True, "frames": 6}
     assert said == [
-        (True, [{**occurrence, "f1_hz": 250, "f2_hz": 2750, "passes": True} | same]),
-        (False, [{**occurrence, "f1_hz": 650, "f2_hz": 2000, "passes": False} | opened]),
+        (True, [{**occurrence, "f1_hz": 250, "f2_hz": 2750, "passes": True}]),
+        (True, [{**occurrence, "f1_hz": 650, "f2_hz": 2000, "passes": True}]),
     ]
+
+
+def test_a_take_says_its_terms_against_the_reference_of_another_thought(monkeypatch):
+    reference = film.TermReference(thought="26.2", index=1)
+    term = film.NarrationTerm(
+        term="Second", spoken="Second", ipa="ˈsɛkənd", reference={"en": reference}
+    )
+    forms = narration_terms.spoken_forms(term)
+    standard = narration_terms.Standard(
+        term, forms, reference, narration_terms.Vowel(250.0, 2750.0, 6)
+    )
+    words = [
+        {"text": "Second", "start": 0.1, "end": 0.5},
+        {"text": "thought", "start": 0.5, "end": 0.9},
+        {"text": "Second", "start": 1.0, "end": 1.4},
+        {"text": "time", "start": 1.4, "end": 1.8},
+    ]
+    opened = narration_terms.Vowel(650.0, 2000.0, 6)
+    monkeypatch.setattr(narration_terms, "first_vowel", lambda *_: opened)
+    # In another thought both occurrences are held to the reference's vowel and fail it.
+    other = narration_terms.take_terms([standard], words, None, "26.1")
+    assert [row["passes"] for row in other["term_occurrences"]] == [False, False]
+    assert other["terms_pass"] is False
+    # In the reference's own thought its occurrence is the standard to be, and the other is held.
+    own = narration_terms.take_terms([standard], words, None, "26.2")
+    assert [row["passes"] for row in own["term_occurrences"]] == [False, True]
+    assert [row.get("reference", False) for row in own["term_occurrences"]] == [False, True]
+    # A reference that shows no two formants is no reference: the gate asks two of it.
+    monkeypatch.setattr(narration_terms, "first_vowel", lambda *_: None)
+    assert narration_terms.take_terms([standard], words, None, "26.2")["terms_pass"] is False

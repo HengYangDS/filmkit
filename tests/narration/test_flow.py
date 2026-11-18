@@ -171,23 +171,34 @@ def test_an_exception_keeps_its_boundary_and_a_stale_one_is_refused():
 def test_a_take_records_its_longest_unmarked_pause_and_whether_it_is_fluent():
     words, recording = CLAUSES.words[:4], CLAUSES.recording
     take = flow.take_flow("en", "08.1", "We commit and check. ", words, recording, Flow())
+    longest = {
+        "thought": "08.1",
+        "left": "commit",
+        "right": "and",
+        "at": 0.8,
+        "pause_s": 0.36,
+        "marks": "",
+        "switch": False,
+        "limit_s": 0.4,
+    }
+    # Its longest pause is here also the one nearest its limit, of those within theirs.
     assert take == {
-        "longest_unmarked_pause": {
-            "thought": "08.1",
-            "left": "commit",
-            "right": "and",
-            "at": 0.8,
-            "pause_s": 0.36,
-            "marks": "",
-            "switch": False,
-            "limit_s": 0.4,
-        },
+        "longest_unmarked_pause": longest,
+        "nearest_unmarked_pause": longest,
         "fluent": True,
     }
     strict = Flow(unmarked_limit_s=0.3)
     halting = flow.take_flow("en", "08.1", "We commit and check. ", words, recording, strict)
     assert halting["fluent"] is False
-    assert flow.take_flow("en", "08.1", "Other words.", words, recording, Flow())["fluent"] is False
+    # The pause above its limit is the longest and is not one of those within their limits.
+    assert halting["longest_unmarked_pause"]["pause_s"] == 0.36
+    assert halting["nearest_unmarked_pause"]["pause_s"] < 0.3
+    missed = flow.take_flow("en", "08.1", "Other words.", words, recording, Flow())
+    assert missed == {
+        "longest_unmarked_pause": None,
+        "nearest_unmarked_pause": None,
+        "fluent": False,
+    }
 
 
 def test_the_flow_record_summarizes_pauses_by_their_marks():

@@ -33,7 +33,7 @@ from filmkit.captions.timing import caption_receipt_fields, timed_caption_cues
 from filmkit.film import FILM
 from filmkit.narration.selection import validate_aligned_recording
 from filmkit.narration.spoken_units import aligned_lookup
-from filmkit.narration.take_edges import ending
+from filmkit.narration.take_edges import ending, kept_ending
 from filmkit.narration.thought_groups import validate_group_inputs
 from filmkit.repository import read, run, sha, write
 from filmkit.soundtrack.clip_levels import chapter_gains, segment_gains
@@ -163,16 +163,19 @@ def _abrupt_thoughts(
     review reports them by. The assembly would fade such a take where its silence begins,
     which hides the cut but still swallows its last syllable.
     """
+
+    def natural(group: dict) -> bool:
+        with wave.open(str(repository.ROOT / group["path"])) as audio:
+            rate = audio.getframerate()
+            pcm = np.frombuffer(audio.readframes(audio.getnframes()), dtype="<i2")
+        return ending(pcm, rate)["natural"]
+
     abrupt = []
     for segment in segments:
         groups = records[segment["id"]].get("utterance_groups", {"records": []})["records"]
         for group in groups:
-            if group["index"] in releases[segment["id"]]:
-                continue
-            with wave.open(str(repository.ROOT / group["path"])) as audio:
-                rate = audio.getframerate()
-                pcm = np.frombuffer(audio.readframes(audio.getnframes()), dtype="<i2")
-            if not ending(pcm, rate)["natural"]:
+            released = group["index"] in releases[segment["id"]]
+            if not kept_ending(released, lambda group=group: natural(group)):
                 abrupt.append(f"{segment['id']}.{group['index']}")
     return abrupt
 

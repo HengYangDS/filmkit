@@ -1,19 +1,17 @@
 """Audition alternative takes of chosen thoughts and bind the selected seeds.
 
 audition synthesizes each target thought's spoken text from the narration receipt at
-seed + k * 7919, through the narration's own native ICL path and sampling, then
-measures how each take begins and ends and transcribes it. The pinned aligner places
-each take's first item and its phrase ends; the phrase ends followed by heard quiet are
-judged as its end is. A take qualifies when it ends naturally, cuts none of those phrase
-ends and its transcript contains the target's required phrase, and a thought that opens
-its recording qualifies only when its clip opens in quiet as the assembly begins it: in
-the take's own heard quiet or in its released codec onset. Each take also records its
-longest unmarked pause and the first vowel of every declared term it says (see flow and
-terms): a take with an unmarked pause above its limit, or a term said beyond its reference's
-bounds, is proposed only when no other qualified take passes that check, and no take is
-proposed when each passes only a check that another fails. The
-qualified take with the fewest differing units is proposed, ties going to the quietest
-ending or, with --prefer slower or brisker, to the longest or the shortest take. The
+seed + k * 7919, through the narration's own native ICL path and sampling
+(`filmkit.narration.candidates`), and measures and judges each take as every take is
+(`filmkit.narration.judgment`). A take qualifies when no line of that judgment refuses it:
+its length, its ending, its phrase ends, its opening where it opens its recording, its
+unmarked pauses, its declared terms, its units by reading and, where the film declares a line
+for a single thought, its clarity. That is the one definition of an acceptable take, which
+`filmkit.narration.judge` and `filmkit.narration.converge` hold too. Among qualified takes
+one whose transcript contains the target's required phrase is proposed before one that does
+not, and then the quietest ending or, with --prefer slower or brisker, the longest or the
+shortest take; these order the qualified takes and qualify none. A take records its
+differing units by unit beside those by reading. The
 receipt, by default the one the cast declares, must hold each thought's current text, so
 narrate edited segments first; its recordings, thoughts and narrator are checked before
 any model loads. Takes and proposals are written under
@@ -40,68 +38,46 @@ Paths are relative to the repository root.
 """
 
 import argparse
-import dataclasses
-import functools
 import json
-import wave
 
-import numpy as np
-from mlx_audio.audio_io import write
-from mlx_audio.stt.utils import load_model
-
-import filmkit.narration.flow as flow
+import filmkit.narration.candidates as candidates
 import filmkit.narration.group_generation as group_generation
+import filmkit.narration.judgment as judgment
 import filmkit.narration.terms as terms
 import filmkit.repository as repository
 from filmkit.film import FILM
-from filmkit.narration.alignment import verify_aligner
-from filmkit.narration.narrate import ALIGNER
-from filmkit.narration.pronunciation import pronunciation_contract
+from filmkit.narration.candidates import FIRST, bind
+from filmkit.narration.judgment import load_aligner
 from filmkit.narration.receipts import bound_records
-from filmkit.narration.recognition import heard_phrase, recognition_units, unit_distance
-from filmkit.narration.retakes import bind_proposals, thought_text
-from filmkit.narration.run_on import following_spoken_text, run_on_cut, thought_bounds
-from filmkit.narration.selection import validate_voice_record
-from filmkit.narration.spoken_units import AlignmentError, phrase_joins
-from filmkit.narration.take_edges import ending, opening, phrase_ends
-from filmkit.narration.thought_groups import validate_group_inputs
-from filmkit.narration.transcription import load_asr, transcribe
+from filmkit.narration.recognition import heard_phrase
+from filmkit.narration.run_on import following_spoken_text
+from filmkit.narration.transcription import load_asr
 from filmkit.production import CODES, Edition
 
 AUDITIONS = "build/runtime/work/auditions"
-STRIDE = 7919
 SUMMARY = (
     "seed",
+    "failed",
     "opens_quiet",
     "clip_opens_quiet",
     "natural",
     "required_heard",
     "differing_units",
+    "differing_units_by_reading",
     "seconds",
     "fluent",
     "terms_pass",
 )
 
 
-def propose(
-    takes: list[dict], prefer: str = "accurate", *, opens_recording: bool = False
-) -> int | None:
+def propose(takes: list[dict], prefer: str = "accurate") -> int | None:
     """The seed of the best qualified take, or None when no take qualifies.
 
-    A qualified take ends naturally and cuts none of its phrase ends; a take whose phrase ends
-    could not be aligned does not qualify. A thought that opens its recording qualifies only
-    with a take whose clip opens in quiet, as the assembly begins it: in the take's own heard
-    quiet or in its released onset.
+    A take qualifies when no line of the judgment refuses it (`judgment.judge`). Among the
+    qualified, a take whose transcript holds the required phrase comes first, and then the
+    preference decides.
     """
-    qualified = [
-        take
-        for take in takes
-        if take["natural"]
-        and take["phrase_stops"] == []
-        and take["required_heard"]
-        and (take["clip_opens_quiet"] or not opens_recording)
-    ]
-    qualified = _preferred(qualified)
+    qualified = [take for take in takes if not take["failed"]]
     if not qualified:
         return None
     tiebreak = {
@@ -109,22 +85,7 @@ def propose(
         "slower": lambda take: -take["seconds"],
         "brisker": lambda take: take["seconds"],
     }[prefer]
-    return min(qualified, key=lambda take: (take["differing_units"], tiebreak(take)))["seed"]
-
-
-def _preferred(qualified: list[dict]) -> list[dict]:
-    """The qualified takes that may be proposed, by their flow and the terms they say.
-
-    A take that fails the flow limits or a term's reference may be proposed only when no
-    other qualified take passes that check; where each take passes only a check that another
-    fails, none may.
-    """
-    fluent = [take for take in qualified if take["fluent"]]
-    sound = [take for take in qualified if take["terms_pass"]]
-    both = [take for take in fluent if take["terms_pass"]]
-    if both or (fluent and sound):
-        return both
-    return fluent or sound or qualified
+    return min(qualified, key=lambda take: (not take["required_heard"], tiebreak(take)))["seed"]
 
 
 def audition(
@@ -133,7 +94,7 @@ def audition(
     receipt_file: str | None = None,
     *,
     takes: int = 8,
-    first: int = 11,
+    first: int = FIRST,
     prefer: str = "accurate",
     name: str = "audition",
 ) -> None:
@@ -148,7 +109,7 @@ def audition(
     records = bound_records(
         receipt_file or cast["performance_recording"]["receipt"], edition.language
     )
-    chosen = _chosen(script, cast, records, targets)
+    chosen = judgment.checked(script, cast, records, targets)
     run_ons = {
         (record["id"], child["index"]): following_spoken_text(records, record["id"], child["index"])
         for record, child, (_, run_on) in chosen
@@ -158,7 +119,8 @@ def audition(
     model = group_generation.load_voice_model()
     asr = load_asr()
     aligner = load_aligner()
-    standards = _standards(code, references, aligner, edition.language)
+    bench = judgment.bench(code, references, asr=asr, aligner=aligner, film=FILM)
+    held = judgment.held(code, script)
     folder.mkdir(parents=True, exist_ok=True)
     rows = []
     for record, child, (phrase, _) in chosen:
@@ -176,25 +138,15 @@ def audition(
             "proposed_seed": None,
         }
         for k in range(first, first + takes):
-            seed = record["seed"] + k * STRIDE
-            audio, _ = group_generation.synthesize(
-                model,
-                child["spoken_text"] + (run_on or ""),
-                repository.ROOT / child["reference_audio"],
-                child["reference_text"],
-                child,
-                seed,
-            )
-            path = folder / f"{record['id']}-{child['index']:02d}-{seed}.wav"
+            seed = candidates.seed_at(record, k)
+            path = folder / f"{candidates.file_stem(record, child, seed)}.wav"
             thought = f"{record['id']}.{child['index']}"
-            judge = functools.partial(_spoken, code, thought, child["spoken_text"], standards)
-            heard = (aligner, asr, edition.language, child["spoken_text"], phrase, judge)
-            if run_on is None:
-                write(str(path), audio, model.sample_rate)
-                take = {"seed": seed, **_measured(path, *heard)}
-            else:
-                measured = _run_on_measured(path, audio, model, aligner, run_on, heard)
-                take = {"seed": seed, **measured}
+            measured = candidates.taken(model, path, child, thought, seed, run_on, bench)
+            take = {
+                "seed": seed,
+                **judgment.judge(measured, record["id"], child["index"], held),
+                "required_heard": heard_phrase(measured["heard"], phrase),
+            }
             row["takes"].append(take)
             stops = take["phrase_stops"]
             summary = {
@@ -205,7 +157,7 @@ def audition(
                 json.dumps({"segment": row["segment"], "index": row["index"], **summary}),
                 flush=True,
             )
-        row["proposed_seed"] = propose(row["takes"], prefer, opens_recording=child["index"] == 1)
+        row["proposed_seed"] = propose(row["takes"], prefer)
         if run_on is not None:
             row["proposed_run_on"] = next(
                 (take["run_on"] for take in row["takes"] if take["seed"] == row["proposed_seed"]),
@@ -245,152 +197,10 @@ def _targets(targets_file: str) -> dict[tuple[str, int], tuple[str, bool]]:
     return targets
 
 
-def _chosen(script: dict, cast: dict, records: list[dict], targets: dict) -> list[tuple]:
-    """The receipt's target thoughts, each checked against the script, its recording and cast.
-
-    Returns:
-        Each target's record, thought, and required phrase with whether it runs on.
-    """
-    chosen = [
-        (record, child, targets[record["id"], child["index"]])
-        for record in records
-        for child in record.get("utterance_groups", {}).get("records", [])
-        if (record["id"], child["index"]) in targets
-    ]
-    if len(chosen) != len(targets):
-        msg = "Every target must name a thought of the receipt"
-        raise ValueError(msg)
-    for record, child, _ in chosen:
-        if thought_text(script, record["id"], child["index"]) != child["text"]:
-            msg = (
-                f"{record['id']}.{child['index']}: the receipt does not hold the "
-                "current thought; narrate the segment before auditioning it"
-            )
-            raise ValueError(msg)
-    sections = {segment["id"]: segment for segment in script["segments"]}
-    for record in {record["id"]: record for record, _, _ in chosen}.values():
-        validate_group_inputs(record, root=repository.ROOT, section=sections[record["id"]])
-        validate_voice_record(record, cast)
-    return chosen
-
-
-def load_aligner() -> dict:
-    """Load the pinned forced aligner, which locates each take's phrase ends and run-on cut.
-
-    Returns:
-        The aligner's model and its verified identity.
-    """
-    folder = repository.ROOT / ALIGNER
-    return {"identity": verify_aligner(folder), "model": load_model(str(folder))}
-
-
-def _run_on_measured(path, audio: np.ndarray, model, aligner: dict, run_on: str, heard) -> dict:
-    """A run-on take cut in the quiet after its thought, measured as a take of the thought.
-
-    The whole take is retained beside the cut one, and its alignment locates the thought. A
-    take without heard quiet before its next words is measured whole and does not qualify.
-    """
-    _, _, language, spoken_text, *_ = heard
-    whole = path.with_name(f"{path.stem}-run-on.wav")
-    write(str(whole), audio, model.sample_rate)
-    with wave.open(str(whole)) as source:
-        pcm = np.frombuffer(source.readframes(source.getnframes()), dtype="<i2")
-    items = aligner["model"].generate(str(whole), text=spoken_text + run_on, language=language)
-    bounds = thought_bounds([dataclasses.asdict(item) for item in items.items], spoken_text, run_on)
-    cut = run_on_cut(pcm, model.sample_rate, *bounds)
-    taken = {
-        "thought_end": bounds[0],
-        "next_start": bounds[1],
-        "run_on_take": {
-            "path": str(whole.relative_to(repository.ROOT)),
-            "wav_sha256": repository.sha(whole),
-        },
-    }
-    if cut is None:
-        return {**_measured(whole, *heard), **taken, "natural": False, "run_on": None}
-    write(str(path), pcm[:cut], model.sample_rate)
-    return {
-        **_measured(path, *heard),
-        **taken,
-        "run_on": {"spoken_text": run_on, "cut_sample": cut},
-    }
-
-
-def _measured(
-    path, aligner: dict, asr, language: str, spoken_text: str, phrase: str, judge
-) -> dict:
-    """A written take's waveform hash, its opening, ending and phrase ends, and what was heard.
-
-    The take's alignment places its first item for the opening and its phrase ends, and `judge`
-    measures its flow and the terms it says from its samples and alignment.
-    """
-    with wave.open(str(path)) as source:
-        rate = source.getframerate()
-        pcm = np.frombuffer(source.readframes(source.getnframes()), dtype="<i2")
-    heard = transcribe(asr, path, language)
-    found = aligner["model"].generate(str(path), text=spoken_text, language=language)
-    items = [dataclasses.asdict(item) for item in found.items]
-    return {
-        "path": str(path.relative_to(repository.ROOT)),
-        "wav_sha256": repository.sha(path),
-        **opening(pcm, rate, items[0]["start_time"] if items else None),
-        **ending(pcm, rate),
-        "phrase_stops": _phrase_stops(pcm, rate, items, spoken_text),
-        "heard": heard,
-        "required_heard": heard_phrase(heard, phrase),
-        "differing_units": unit_distance(recognition_units(spoken_text), recognition_units(heard)),
-        **judge(pcm, rate, items),
-    }
-
-
-def _standards(code: str, references: list, aligner: dict, language: str) -> list:
-    """Each declared term's reference vowel, measured on the receipt's thought take that says it."""
-    standards = []
-    for term, forms, reference, child in references:
-        path = repository.ROOT / child["path"]
-        found = aligner["model"].generate(str(path), text=child["spoken_text"], language=language)
-        words = terms.said_after(
-            flow.timed([dataclasses.asdict(item) for item in found.items]), forms
-        )
-        vowel = None
-        if len(words) > reference.index:
-            word, after = words[reference.index]
-            vowel = terms.first_vowel(flow.Recording.read(path), word["start"], word["end"], after)
-        if vowel is None:
-            msg = f"{code}: the {term.term} reference {reference} shows no two formants on its take"
-            raise terms.TermError(msg)
-        standards.append(terms.Standard(term, forms, reference, vowel))
-    return standards
-
-
-def _spoken(code: str, thought: str, spoken_text: str, standards: list, pcm, rate, items) -> dict:
-    """A take's flow and the first vowels of the declared terms it says."""
-    words, recording = flow.timed(items), flow.Recording.of(pcm, rate)
-    return {
-        **flow.take_flow(code, thought, spoken_text, words, recording, FILM.narration.flow),
-        **terms.take_terms(standards, words, recording),
-    }
-
-
-def _phrase_stops(pcm, rate: int, items: list[dict], spoken_text: str):
-    """The take's phrase ends that it cuts, or None when its alignment misses its text."""
-    try:
-        joins = phrase_joins(spoken_text, items, [spoken_text])
-    except AlignmentError:
-        return None
-    ends = [round(items[join.left]["end_time"] * rate) for join in joins]
-    return [end for end in phrase_ends(pcm, rate, ends) if end["stops"]]
-
-
 def apply(code: str, proposals_file: str, *, dry_run: bool = False) -> dict:
     """Bind a proposals file into the edition's cast, writing it unless a dry run."""
-    edition = Edition(code)
-    script, cast = repository.read(edition.script), repository.read(edition.cast)
-    contract, _ = pronunciation_contract(script, edition.language)
     rows = json.loads((repository.ROOT / proposals_file).read_text())
-    cast, bound, skipped = bind_proposals(script, cast, rows, contract)
-    if not dry_run:
-        repository.write(edition.cast, cast)
+    bound, skipped = bind(code, rows, dry_run=dry_run)
     return {"language": code, "applied": bound, "skipped": skipped, "dry_run": dry_run}
 
 
@@ -410,7 +220,7 @@ def main(argv: list[str] | None = None) -> None:
         help='JSON file mapping "segment.index" to a required phrase',
     )
     trial.add_argument("--takes", type=int, default=8, help="Takes per thought")
-    trial.add_argument("--first", type=int, default=11, help="First seed multiple k")
+    trial.add_argument("--first", type=int, default=FIRST, help="First seed multiple k")
     trial.add_argument(
         "--prefer",
         choices=("accurate", "slower", "brisker"),

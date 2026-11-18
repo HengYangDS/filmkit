@@ -7,10 +7,15 @@ dies away rather than being cut.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from filmkit.soundtrack.pauses import opening_onset
 from filmkit.soundtrack.quiet import HEARD_QUIET_DBFS, clip_start
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # A voiced final syllable that falls from LOUD_DBFS to STOPPED_DBFS in under FALL_MS stops
 # inside the syllable instead of dying away; round-21 takes that a listener heard cut fell in
@@ -237,3 +242,17 @@ def opening(pcm: np.ndarray, rate: int, first_word: float | None = None) -> dict
         "onset_releasable": releasable,
         "clip_opens_quiet": clip_quiet,
     }
+
+
+def kept_ending(released: bool, natural: Callable[[], bool]) -> bool:
+    """Whether a thought take's ending is kept where it is joined.
+
+    A take whose join declares a release is kept however it ends; any other must end
+    naturally. `natural` is asked only then, so a released take need not be measured.
+    """
+    return released or bool(natural())
+
+
+def opens_recording(index: int) -> bool:
+    """Whether a thought opens its segment's recording, where the assembly begins its clip."""
+    return index == 1

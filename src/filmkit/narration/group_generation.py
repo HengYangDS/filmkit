@@ -148,6 +148,11 @@ def generate_native_groups(
     return audio, sum(child["native_chunks"] for child, _ in children), groups
 
 
+def too_short(frames: int, rate: int) -> bool:
+    """Whether a recording is too short to be a thought's take: one second or less."""
+    return frames <= rate
+
+
 def _planned_child(model, settings: dict, thought: dict, index: int, path: Path) -> PlannedChild:
     """Plan one thought: reuse its received recording, or refuse an unresolved one."""
     request = child_request(settings, thought, index)
@@ -187,7 +192,7 @@ def _record_child(model, planned: PlannedChild, settings: dict) -> tuple[dict, n
     native = len(audio)
     if run_on:
         audio = cut_run_on(audio, run_on["cut_sample"], model.sample_rate)
-    if audio.ndim != 1 or not np.isfinite(audio).all() or len(audio) <= model.sample_rate:
+    if audio.ndim != 1 or not np.isfinite(audio).all() or too_short(len(audio), model.sample_rate):
         msg = "Invalid native utterance recording"
         raise RuntimeError(msg)
     write(str(planned.wave), audio, model.sample_rate)

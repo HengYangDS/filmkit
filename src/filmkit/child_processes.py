@@ -446,12 +446,13 @@ def exit_status(child: subprocess.Popen) -> int | None:
         return child.poll()
 
 
-def run(command: list[str], *, cwd: Path) -> None:
+def run(command: list[str], *, cwd: Path, seconds: float = 2 * STOP_SECONDS) -> None:
     """Run one child to its end, taking the requests to end while it runs (`terminable`). A
     wait that is cut short, by a request or by a failure, asks the child to end (SIGTERM) and
-    waits for it before the cause goes on, twice as long as the child may itself wait for its
-    own children; an exit other than 0 raises `subprocess.CalledProcessError`, as
-    `subprocess.run` does with `check`."""
+    waits `seconds` for it before the cause goes on: twice as long as the child may itself
+    wait for its own children, unless the caller names a longer wait for a child whose
+    children run children of their own. An exit other than 0 raises
+    `subprocess.CalledProcessError`, as `subprocess.run` does with `check`."""
     child = None
     with terminable():
         try:
@@ -461,7 +462,7 @@ def run(command: list[str], *, cwd: Path) -> None:
             status = child.wait()
         except BaseException:
             if child is not None:
-                stop([child], signal.SIGTERM, seconds=2 * STOP_SECONDS)
+                stop([child], signal.SIGTERM, seconds=seconds)
             raise
     if status != 0:
         raise subprocess.CalledProcessError(status, command)

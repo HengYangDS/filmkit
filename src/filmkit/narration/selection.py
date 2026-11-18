@@ -115,7 +115,15 @@ def speech_refusals(
 
     Each segment's recording is measured with its own speech median and its aligned words.
     """
-    narrated = [
+    said = narrated(script, records, aligned)
+    return flow.gate(edition.code, said, FILM.narration.flow) + terms.refusals(
+        edition.code, FILM.narration.terms, said
+    )
+
+
+def narrated(script: dict, records: list[dict], aligned: dict[str, dict]) -> list[flow.Narrated]:
+    """Each segment's recording as the gates measure it: its display text and aligned words."""
+    return [
         flow.Narrated(
             segment["id"],
             segment["text"],
@@ -125,9 +133,6 @@ def speech_refusals(
         )
         for segment, record in zip(script["segments"], records, strict=True)
     ]
-    return flow.gate(edition.code, narrated, FILM.narration.flow) + terms.refusals(
-        edition.code, FILM.narration.terms, narrated
-    )
 
 
 def _check_recording(record: dict, segment: dict, contract: dict) -> None:

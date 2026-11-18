@@ -432,19 +432,29 @@ def receipt_references(
     return found
 
 
-def take_terms(standards: list[Standard], words: list[dict], recording: Recording) -> dict:
-    """Each occurrence of a declared term in a take of one thought, and whether all pass."""
+def take_terms(
+    standards: list[Standard], words: list[dict], recording: Recording, thought: str | None = None
+) -> dict:
+    """Each occurrence of a declared term in a take of one thought, and whether all pass.
+
+    A take of the thought that holds a term's reference occurrence says the reference itself:
+    once the take is bound, that occurrence is the standard the gate compares the others with.
+    It is not compared with the take it would replace and passes where it shows two formants,
+    as the gate asks of a reference.
+    """
     found = []
     for standard in standards:
         for index, (word, after) in enumerate(said_after(words, standard.forms)):
             vowel = first_vowel(recording, word["start"], word["end"], after)
+            reference = (thought, index) == (standard.reference.thought, standard.reference.index)
             found.append(
                 {
                     "term": standard.term.term,
                     "index": index,
                     "at": round(word["start"], 2),
-                    **(vowel.record(standard.vowel) if vowel else {}),
-                    "passes": vowel is not None and vowel.like(standard.vowel),
+                    **({"reference": True} if reference else {}),
+                    **(vowel.record(None if reference else standard.vowel) if vowel else {}),
+                    "passes": vowel is not None and (reference or vowel.like(standard.vowel)),
                 }
             )
     return {"term_occurrences": found, "terms_pass": all(row["passes"] for row in found)}

@@ -54,6 +54,7 @@ import filmkit.delivery.packaging as packaging
 import filmkit.delivery.verification as verification
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
+import filmkit.review.clarity as review_clarity
 import filmkit.sources as sources
 import filmkit.tools as tools
 from filmkit.captions.timing import READING_RATES, captions_above_rate
@@ -66,7 +67,7 @@ CURRENT = "current"
 # What the report says of a draft scan that the film does not declare.
 NO_DRAFTS = "not asked: the film declares no drafts"
 # What it says of thoughts under the clarity floor when the film declares no line for them.
-NO_THOUGHT_LINE = "not judged: the film declares no line for a single thought"
+NO_THOUGHT_LINE = review_clarity.NO_THOUGHT_LINE
 
 
 class PreflightError(ValueError):
@@ -206,22 +207,27 @@ def clarity(edition: Edition) -> str | None:
     if not edition.sound_gates.is_file():
         return "not judged: no sound gate record"
     measured = repository.read(edition.sound_gates)["clarity"]
-    line = round(measured["floor_db"] - margin, 2)
+    lines = review_clarity.thought_lines(edition.code, floor=measured["floor_db"], film=FILM)
+    line, declared = lines.line, lines.kept
     below = {row["id"]: row["cpp_db"] for row in measured["thoughts"] if row["below_floor"]}
-    declared = {e.thought for e in FILM.review.clarity_exceptions if e.edition == edition.code}
+    refused = {
+        name: value
+        for name, value in below.items()
+        if review_clarity.under_its_line(value, name, lines)
+    }
     held = f"the thought line of {line} dB"
     if not margin:
         held = f"the floor of {line} dB, to which the film holds every thought"
     found = [
         f"thought {name} reads {value} dB, under {held}"
-        for name, value in below.items()
+        for name, value in refused.items()
         if value < line
     ]
     found += [
         f"thought {name} reads {value} dB, under the floor of {measured['floor_db']} dB, and is"
         " not declared in review.clarity_exceptions"
-        for name, value in below.items()
-        if value >= line and name not in declared
+        for name, value in refused.items()
+        if value >= line
     ]
     found += [
         f"the declared thought {name} is stale: it does not read under the floor"

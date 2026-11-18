@@ -217,6 +217,50 @@ def report(samples: np.ndarray, timeline: dict, floor: float | None) -> dict:
     }
 
 
+# What is said of thoughts under the floor in a film that declares no line for a single thought.
+NO_THOUGHT_LINE = "not judged: the film declares no line for a single thought"
+
+
+class ThoughtLines(NamedTuple):
+    """What a film holds a single thought's clarity to in one edition.
+
+    The edition's floor; the line no thought may read under, the floor less
+    `review.clarity_thought_margin_db`, or None where the film declares no margin; and the
+    thoughts the film keeps between the two (`review.clarity_exceptions`).
+    """
+
+    floor: float | None
+    line: float | None
+    kept: frozenset
+
+
+def thought_lines(code: str, *, floor: float | None = None, film=None) -> ThoughtLines:
+    """The edition's lines for a single thought, from the film's floor or the one given."""
+    review = (film or FILM).review
+    if floor is None:
+        floor = (review.clarity_minimum_db or {}).get(code)
+    margin = review.clarity_thought_margin_db
+    return ThoughtLines(
+        floor,
+        None if floor is None or margin is None else round(floor - margin, 2),
+        frozenset(e.thought for e in review.clarity_exceptions if e.edition == code),
+    )
+
+
+def held_to(thought: str, lines: ThoughtLines) -> float:
+    """The value a thought may not read under: the line where the film keeps it, else the floor."""
+    return lines.line if thought in lines.kept else lines.floor
+
+
+def under_its_line(value: float | None, thought: str, lines: ThoughtLines) -> bool:
+    """Whether a thought's clarity is refused in a film that declares a line for a thought.
+
+    A thought the film keeps is held to the line and any other to the floor. A thought that
+    keeps no frame has no value and is not under a line, as the sound gate reads it.
+    """
+    return value is not None and value < held_to(thought, lines)
+
+
 def voice_clarity(code: str, soundtrack: Path, timeline: dict) -> dict:
     """An edition's clarity over its soundtrack, segments and thoughts, against its floor."""
     floor = (FILM.review.clarity_minimum_db or {}).get(code)

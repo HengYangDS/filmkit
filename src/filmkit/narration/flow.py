@@ -321,22 +321,35 @@ def refusals(code: str, judged: Judged) -> list[str]:
 def take_flow(
     code: str, thought: str, text: str, words: list[dict], recording: Recording, policy: Flow
 ) -> dict:
-    """How a take of one thought flows: its longest unmarked pause, and whether it is fluent.
+    """How a take of one thought flows: its unmarked pauses against their limits.
 
     A fluent take holds no unmarked pause above its limit that an exception does not keep; a
-    take whose alignment misses its text is not known to be fluent.
+    take whose alignment misses its text is not known to be fluent. Beside its longest unmarked
+    pause stands the one nearest its limit of those within theirs, as a share of that limit: a
+    short pause at a script switch can stand nearer its limit than a longer one elsewhere.
     """
     segment, number = thought.rsplit(".", 1)
     try:
         found = boundaries(Narrated(segment, text, [text], words, recording, int(number)))
     except AlignmentError:
-        return {"longest_unmarked_pause": None, "fluent": False}
+        return {"longest_unmarked_pause": None, "nearest_unmarked_pause": None, "fluent": False}
     unmarked = [boundary for boundary in found if limit(boundary, policy) is not None]
-    longest = max(unmarked, key=lambda boundary: boundary.pause_s, default=None)
+
+    def row(boundary: Boundary | None) -> dict | None:
+        if boundary is None:
+            return None
+        return {**dataclasses.asdict(boundary), "limit_s": limit(boundary, policy)}
+
+    def share(boundary: Boundary) -> float:
+        bound = limit(boundary, policy)
+        return (bound - boundary.pause_s) / bound
+
+    within = [boundary for boundary in unmarked if boundary.pause_s <= limit(boundary, policy)]
     return {
-        "longest_unmarked_pause": None
-        if longest is None
-        else {**dataclasses.asdict(longest), "limit_s": limit(longest, policy)},
+        "longest_unmarked_pause": row(
+            max(unmarked, key=lambda boundary: boundary.pause_s, default=None)
+        ),
+        "nearest_unmarked_pause": row(min(within, key=share, default=None)),
         "fluent": not judge(code, found, policy, whole=False).refused,
     }
 

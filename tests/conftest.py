@@ -34,7 +34,10 @@ from filmkit.narration.voice_model import MODEL, NATIVE_DECODER, REVISION
 SPEECH_RUNTIME_MODULES = [
     "narration/test_alignment.py",
     "narration/test_audition.py",
+    "narration/test_converge.py",
+    "narration/test_converge_edges.py",
     "narration/test_group_generation.py",
+    "narration/test_judgment.py",
     "narration/test_synthesis.py",
     "narration/test_synthesis_processes.py",
     "narration/test_transcription.py",
@@ -381,6 +384,16 @@ def dying(frames: int, rate: int = 24000) -> np.ndarray:
     envelope = np.concatenate([np.ones(frames - tail), np.exp(-np.arange(tail) / (0.03 * rate))])
     tone = np.sin(2 * np.pi * 180 * np.arange(frames) / rate) * 0.3 * envelope
     return (tone * 32767).astype(np.int16)
+
+
+@pytest.fixture
+def retained_records(tmp_path):
+    """Retain a recording from thought plans and their PCM, as often as a test narrates."""
+
+    def build(plans: list[dict], pcms: list[np.ndarray]) -> tuple[dict, dict]:
+        return retained_record(tmp_path, plans, pcms)
+
+    return build
 
 
 @pytest.fixture
