@@ -8,6 +8,22 @@ What the engine does today, read at `v0.23.0`. A mark such as [S2] names an entr
 - The films' takes were made with mlx-audio 0.5.8 and 0.6.4, whose trim of decoded audio cut 80 ms for each frame whose first codebook id is 0; mlx-audio 0.6.5 repairs it. How many of the 430 bound seeds answered that fault is not known. [S6]
 - Measured with the English reference chosen on 17 November 2026: first takes of all 263 English thoughts reach the clarity line where they hold sound; the DDWG film's speech is 4.1 % longer than its release's, and the shortest of six takes a thought brings that to 0.9 %. [S4]
 - One process narrates about 2.8 s of speech a second (twelve takes, one run); three processes took about a third less time than one on a whole edition; batches of four takes in one forward pass were no faster than single takes in that run. [S5] [S7]
+- First takes of a whole film, measured on 18 November 2026 (the essentials film at 1.0.2, 46 thoughts an edition, every thought from its cast's own seed, one narration a cell) [S11]:
+
+  | Edition and supply                             | Pass the lines the engine refuses a take for | Also at or above 18.0 dB | Refused mostly by |
+  | ---------------------------------------------- | -------------------------------------------- | ------------------------ | ----------------- |
+  | Chinese, mlx-audio 0.6.4                       | 35                                           | 31                       | endings (10)      |
+  | Chinese, mlx-audio 0.6.6                       | 42                                           | 37                       | clarity (6)       |
+  | English, mlx-audio 0.6.4                       | 41                                           | 6                        | clarity (40)      |
+  | English, mlx-audio 0.6.6                       | 40                                           | 10                       | clarity (33)      |
+  | English, the chosen reference, mlx-audio 0.6.6 | 43                                           | 43                       | phrase ends (2)   |
+
+  The trim's repair settles 8 of the 10 Chinese endings and no English one. The English edition's reference at that tag reads under the line whatever the seed: its released takes, chosen by auditions, still stand under 18.0 dB in 30 of 46 thoughts. Of the film's 81 hand-bound seeds, the released take is clearer than the first take in 72: on this film the seeds were bound for clarity, which a seed moves by tenths of a decibel and a reference by whole decibels.
+
+  The last row is the same edition narrated once with the reference the owner chose on 17 November 2026 and nothing else changed [S12]: every one of the 46 first takes stands at or above 18.0 dB (lowest 19.94, median 21.58), each thought 2.79 to 5.47 dB clearer than with the cast's reference; 43 pass every line the engine refuses a take for, and 40 of them hold no differing unit. The other three hold five between them: four are the recognizer's spellings of what the text says (`authors` for `author's`, `back test` for `backtest`, `check's` for `checks`) and one is a word heard as another (`in` for `and`). The speech is 4.3 % longer, 520.2 s against 498.9 s.
+
+- The recognizer's differing units in Chinese are homophones: in three sets of 46 takes, each of the 13 or 14 differing characters has the reading of the character the text holds (在 and 再, 它 and 他, 作 and 做, the particles 的 and 地). [S11]
+- A decode's difference alone, mlx-audio 0.6.4 against 0.6.6 from equal codes, changes the failing lines of 12 Chinese and 8 English thoughts of 46. [S11]
 
 ## Goals / Non-Goals
 
@@ -23,32 +39,33 @@ What the engine does today, read at `v0.23.0`. A mark such as [S2] names an entr
 - New thresholds, or a gate lowered for one thought.
 - A new voice. Another speech model is measured here and adopted elsewhere, after the owner has heard it.
 - Changing a take's speed after it is made, or changing a film's text.
+- A search over seeds for what a seed cannot give. Clarity that the reference lacks is the reference's to give (decision 8).
 
 ## Decisions
 
 Each decision states what it rests on, what was considered, why the option taken was chosen, where it applies, what would reopen it, and its sources.
 
-1. **Candidates for a thought are the normal path, in rounds.**
-   - **Rests on:** four thoughts in five carry a seed an audition bound; the audition's own design already generates, judges and proposes, for the thoughts a person names.
-   - **Considered:** (a) today's order: one take a thought, then auditions by hand for what is refused; (b) a fixed number of candidates for every thought; (c) rounds: a first round of a declared number of candidates a thought, then further rounds only for thoughts that hold no accepted candidate or that the edition's fit asks for, up to a declared budget.
-   - **Chosen because:** (c) spends takes where they are needed and needs no person to say where.
-   - **Applies to:** the narration command and the cast's declarations (the first round's count and the budget).
-   - **Reopened when:** on the supply that carries the trim's repair most thoughts are accepted on their first take; (a)'s order with the repair made automatic then costs less.
-   - **Sources:** [S2] [S3] [S6].
+1. **One take a thought first, then candidates by themselves for what a line refuses.**
+   - **Rests on:** on the supply that carries the trim's repair, 42 of 46 Chinese and 40 of 46 English first takes pass every line the engine refuses a take for; with the chosen English reference, 43 of 46; under mlx-audio 0.6.4 the films had bound a seed of their own to four thoughts in five, by hand.
+   - **Considered:** (a) today's order: one take a thought, then auditions a person runs for what is refused; (b) several candidates for every thought in a first round, which this draft first chose and its own measurement took back; (c) one take a thought, then rounds of candidates only for thoughts that hold no accepted take or that the edition's fit asks for, up to a declared budget, with no input from a person.
+   - **Chosen because:** (c) spends takes where a line asks for them, which the measurement puts at about one thought in ten, and needs no person to say where.
+   - **Applies to:** the narration command and the cast's declarations (a round's count and the budget).
+   - **Reopened when:** a film's first takes pass in fewer than half of its thoughts on a qualified reference; candidates for every thought then cost less than rounds.
+   - **Sources:** [S2] [S3] [S6] [S11] [S12].
 2. **A candidate is judged by the film's own gates, by the same code, when it is generated.**
    - **Rests on:** the audition qualifies a take by a part of what the assembly and the sound gate later hold, and by a phrase a person wrote.
-   - **Considered:** (a) the audition's qualification as it is; (b) the gates' own functions applied to each candidate, the required phrase replaced by the thought's recognized units and its judged ending; (c) a learned score of naturalness: not measured, and no gate of the films is stated in it.
-   - **Chosen because:** (b) leaves one definition of an acceptable take, so a candidate that is selected cannot be refused later by the line that selected it.
-   - **Applies to:** `narration/take_edges.py`, `flow.py`, `terms.py`, `recognition.py`, `review/clarity.py` as called by the command.
+   - **Considered:** (a) the audition's qualification as it is; (b) the gates' own functions applied to each candidate, the required phrase replaced by the thought's recognized units, compared by reading where the language has homophones, and its judged ending; (c) a learned score of naturalness: not measured, and no gate of the films is stated in it.
+   - **Chosen because:** (b) leaves one definition of an acceptable take, so a candidate that is selected cannot be refused later by the line that selected it. A count of differing characters cannot be that line in Chinese: every differing character measured was a homophone of the text's, so the comparison is by reading (`narration/readings.py` holds the readings), with the particles a speaker says alike taken as one.
+   - **Applies to:** `narration/take_edges.py`, `flow.py`, `terms.py`, `recognition.py`, `review/clarity.py` as called by the command; `recognition.py` gains the comparison by reading.
    - **Reopened when:** a gate can be judged only on the assembled soundtrack; that gate then stays where it is and the command reads its result in a second pass.
-   - **Sources:** [S3].
+   - **Sources:** [S3] [S11].
 3. **The selection is made over the whole edition and fits the runtime.**
    - **Rests on:** the fit of the DDWG film with the chosen English reference: closed by the shortest sound take of six a thought, where the audition breaks only ties by a take's whole length.
-   - **Considered:** (a) a choice thought by thought, with the pause limits adjusted by a person; (b) the audition ranking by kept speech (decision 23 of the draft `decide-before-heavy-work`); (c) one choice a thought over the edition: the runtime met with pauses inside the pause contract, then the fewest differing units, then the highest clarity, found exactly, since an edition holds at most some hundreds of thoughts and a few candidates each.
-   - **Chosen because:** (c) decides the fit where every thought's alternatives are known; (b) becomes its measure of a take's length.
+   - **Considered:** (a) a choice thought by thought, with the pause limits adjusted by a person; (b) the audition ranking by kept speech (decision 23 of the draft `decide-before-heavy-work`); (c) one choice a thought over the edition: the runtime met with pauses inside the pause contract, then the fewest units that differ by reading, then the widest margin above each line, found exactly, since an edition holds at most some hundreds of thoughts and a few candidates each.
+   - **Chosen because:** (c) decides the fit where every thought's alternatives are known; (b) becomes its measure of a take's length. The margin stands in the order because a verdict at a line is not stable: a decoder's change alone moved the failing lines of 20 of 92 thoughts.
    - **Applies to:** `soundtrack/fit.py` and the pause design, called by the command; the draft `decide-before-heavy-work`'s decision 23 is taken up here.
    - **Reopened when:** no selection exists within the budget for an edition; the report then names the seconds that are missing, which is a question of the film's length or text for its owner.
-   - **Sources:** [S4].
+   - **Sources:** [S4] [S11].
 4. **A thought that stays unsettled climbs a ladder that ends in the text.**
    - **Rests on:** the owner's line of 17 November 2026: every thought, segment and soundtrack at or above the clarity line, with no allowance.
    - **Considered:** (a) a declared exception for the thought; (b) more candidates without limit; (c) more candidates within the budget, then run-on takes as `narration/run_on.py` makes them, then a report that names the thought as not narratable as written, with each candidate's failed line.
@@ -77,6 +94,13 @@ Each decision states what it rests on, what was considered, why the option taken
    - **Applies to:** `sound-gates`; the sets as local evidence promoted with each release.
    - **Reopened when:** not applicable; a set grows with each finding.
    - **Sources:** [S10].
+8. **A reference voice is qualified on the film's own thoughts before the film narrates with it.**
+   - **Rests on:** the English editions: with the reference of their releases, 33 to 40 of 46 first takes and 30 of 46 auditioned takes stand under the clarity line; with the reference the owner chose on 17 November 2026, every first take that holds sound, of 263 thoughts, stands above it, and a whole edition narrated once with it holds no thought under the line, against 33 of 46 with the cast's reference on the same supply. That reference was derived, measured and compared by scripts outside any repository, and chosen by the owner's ear among candidates that already met the line.
+   - **Considered:** (a) a reference chosen by ear and found wanting by an edition's gates; (b) a command that narrates a panel of the film's thoughts with a candidate reference and reports what the edition's lines would say: clarity by thought, the share of first takes accepted, the speech's length against the runtime; the owner then hears only references that pass.
+   - **Chosen because:** (b) moves the largest cause of repeated narration to the cheapest point, before an edition is narrated, and leaves to the ear the one thing it alone decides, which voice.
+   - **Applies to:** a reference's qualification record, which the cast binds beside the reference's digest; `preflight` reads it.
+   - **Reopened when:** not applicable.
+   - **Sources:** [S4] [S8] [S11] [S12].
 
 ## Risks / Trade-offs
 
@@ -86,7 +110,9 @@ Each decision states what it rests on, what was considered, why the option taken
 
 ## Open Questions
 
-- How many thoughts are accepted on their first take with mlx-audio 0.6.6, on a whole edition. Not measured.
+- How many of the thoughts a first take leaves refused are settled by a second or a third seed. Not measured; it sets a round's count and the budget.
+- A first-take edition's fit to its runtime, its pause allocation and its sound gate: the assembly stops at the first abrupt ending, so none was reached, with the chosen reference either (one ending of 46). Its speech is 21.3 s longer in a 600 s edition, which the fit has to absorb.
+- The share of first takes accepted on the DDWG and ETHOS films, and in Chinese with a reference qualified this way. Not measured; the essentials film's English edition is [S12].
 - What a round costs on a whole edition, in one and in three processes, with the host's memory and load stated. Not measured.
 - Whether candidates in one batch are reproducible from their seeds and equal to single takes. One run of twelve takes compared throughput only.
 - Whether a model with a requested duration keeps a reference voice closely enough to be heard by the owner at all. No such model was run.
@@ -105,3 +131,5 @@ Read or measured on 18 November 2026 unless a date is given. Paths under `build/
 - **[S8] The clarity line:** the owner's decision of 17 November 2026, recorded in each film's local `build/evidence/next-edition/2026-11-17-owner-clarity/standard.md`.
 - **[S9] Speech models with a duration or a speed:** `build/evidence/faster-films-less-by-hand/figures/mlx-audio-duration-parameters.txt`. No model was run.
 - **[S10] The endings' calibration:** `build/evidence/ending-calibration/` and `build/evidence/gate-calibration/`, and the capability `narration-endings`.
+- **[S11] First takes of a whole film:** `build/evidence/let-narration-converge/voice-v2/report.md` with `tables.md`, `judge.py`, `run.sh`, `ticket.sh`, `tickets.txt`, `out/<supply>-<edition>/judge.json`, and `units-by-reading.py` with `units-by-reading.txt`. Subject: `ddwg-essentials-film` at `v1.0.2` in clones whose casts' retakes were emptied; the engine at `v0.23.0` (mlx-audio 0.6.4) and at the supply Change's moves (0.6.6). Three host tickets, 11:25 to 11:53 on 18 November 2026, the 1-minute load from 8 to 18, the swap at 6.3 to 6.5 GiB.
+- **[S12] First takes with the chosen English reference:** `build/evidence/let-narration-converge/voice-v3/report.md` with `tables-c.md`, `tables-c.py`, `run.sh`, `ticket.sh`, `tickets.txt` and `out/c-en/judge.json`. Subject: `ddwg-essentials-film` at `v1.0.2`, English edition, in a clone whose cast's retakes were emptied and whose reference was replaced by the chosen one; the engine at the supply Change's moves (mlx-audio 0.6.6). One host ticket, 13:10 to 13:14 on 18 November 2026, 237 s; the 1-minute load 10.8 to 14.8, the swap from 4.5 to 9.1 GiB with the pressure level at 2 when it ended.
