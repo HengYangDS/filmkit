@@ -6,5 +6,5 @@
 ## 2. Acceptance
 
 - [ ] 2.1 Run every command of `mise run check` with the suite's warnings as errors and the proof's static lint, the whole suite as the child of a host ticket; verify that each passes on the Change's head.
-- [ ] 2.2 State the field and the two places it is printed in the README's "How long a build takes" and in the Changelog; verify the repository's Markdown check on both files.
-- [ ] 2.3 Promote the records the design cites to `build/evidence/state-the-host-load-in-duration-records/` of the canonical checkout; done when `load-probe.py`, `load-probe.txt` and `build-time-requirements.txt` stand there.
+- [x] 2.2 State the field and the two places it is printed in the README's "How long a build takes" and in the Changelog; verify the repository's Markdown check on both files.
+- [x] 2.3 Promote the records the design cites to `build/evidence/state-the-host-load-in-duration-records/` of the canonical checkout; done when `load-probe.py`, `load-probe.txt` and `build-time-requirements.txt` stand there.
