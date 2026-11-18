@@ -7,7 +7,7 @@
  * firm marks and repeated members of each voiced frame, with whether a legible name stands at each, for its seat
  * check (src/filmkit/picture/seat-marks.mjs); BOUNDS=<file> writes each scene's drawn extent; BALANCE=<file> writes
  * each thought's lit offsets and band cover at the reviewers' two instants; TURNS=<file> writes each start and end of
- * the stroked whole turns the renderer's browser may paint without ink, for whole-turns.mjs to draw there.
+ * the stroked whole turns the checks' browser may paint without ink, for whole-turns.mjs to draw there.
  * FILMKIT_TEXT_METRICS=<file> names the
  * advance widths of the film's declared faces (filmkit.picture.metrics), by which the headless canvas measures text;
  * without it the canvas estimates text metrics (headless-composition.mjs). FILMKIT_WRAPPING=<file> names the film's
@@ -90,7 +90,7 @@ const contrast = readingLoad(film.palette),
   lists = listTracker(),
   faintSeen = faintLabels();
 
-/* Each stroked whole turn the renderer's browser may paint without ink (headless-composition.mjs wholeTurnAtRisk), by
+/* Each stroked whole turn the checks' browser may paint without ink (headless-composition.mjs wholeTurnAtRisk), by
  * its scene and the line that drew its arc, with its first and last frame and its first start, and each distinct start
  * and end of it with its own frames, which the TURNS file holds for whole-turns.mjs to draw in that browser. */
 const wholeTurns = new Map(),

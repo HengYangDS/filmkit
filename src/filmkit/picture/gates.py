@@ -270,14 +270,14 @@ MOTION_WORDS = {
 DECLARED_CUT = " at a declared cut that keeps its stage"
 
 
-# The remedy for a whole turn the renderer's browser may paint without ink: the same ring as an
+# The remedy for a whole turn the checks' browser may paint without ink: the same ring as an
 # ellipse from 0, its start the rotation.
 WHOLE_TURN = "ellipse(x, y, r, r, start, 0, 2 * Math.PI)"
 
 
 def turn_findings(draws: list[dict], painted: dict) -> tuple[list[str], list[str]]:
     """The gated and the recorded findings of the stroked whole turns the frame audit found, by
-    the renderer's browser's draws of each of their distinct starts and ends.
+    the checks' browser's draws of each of their distinct starts and ends.
 
     A line, a scene's line of film.js, is gated when the browser paints no ink for its turn from
     one of its starts, naming the frames of those starts, the first of them and how many fail, and
@@ -295,7 +295,7 @@ def turn_findings(draws: list[dict], painted: dict) -> tuple[list[str], list[str
         if undrawn:
             gated.append(
                 f"frame vanishing_arcs {scene}: {len(undrawn)} starts of the whole turn drawn at"
-                f" {where} were not drawn in the renderer's browser"
+                f" {where} were not drawn in the checks' browser"
             )
             continue
         failing = [d for d in drawn if not verdicts[(d["start"], d["end"])]]
@@ -308,12 +308,12 @@ def turn_findings(draws: list[dict], painted: dict) -> tuple[list[str], list[str
         )
         if failing:
             gated.append(
-                f"frame vanishing_arcs {named} no ink in the renderer's browser from"
+                f"frame vanishing_arcs {named} no ink in the checks' browser from"
                 f" {len(failing)} of its {len(drawn)} starts; draw it as {WHOLE_TURN}"
             )
         else:
             recorded.append(
-                f"frame whole_turns {named} in the renderer's browser from each of its"
+                f"frame whole_turns {named} in the checks' browser from each of its"
                 f" {len(drawn)} starts; the ellipse draws it from any start: {WHOLE_TURN}"
             )
     return gated, recorded

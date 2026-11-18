@@ -1,5 +1,5 @@
 """The picture gate's judgement of whole turns: a stroked clockwise arc through a whole turn from
-a start off a whole number of turns, which the renderer's browser drew from each of its starts,
+a start off a whole number of turns, which the checks' browser drew from each of its starts,
 refuses a scene's line it painted without ink from one of them and records every other."""
 
 import math
@@ -49,7 +49,7 @@ def test_whole_turns_the_browser_paints_are_recorded_and_refuse_nothing():
     assert gated == []
     assert recorded == [
         f"frame whole_turns {scene} {span} s: a clockwise arc through a whole turn from {start}"
-        f" rad, drawn at {line}, paints in the renderer's browser from each of its 1 starts;"
+        f" rad, drawn at {line}, paints in the checks' browser from each of its 1 starts;"
         f" the ellipse draws it from any start: {REMEDY}"
         for scene, span, start, line in (
             ("01", "9.13-24.27", "3.1416", "film.js:423 (picture/film/strokes.js)"),
@@ -71,7 +71,7 @@ def test_a_turning_ring_refuses_on_the_starts_the_browser_does_not_paint():
     gated, recorded = gates.turn_findings(rings, painted((1.0, 1.0), (FAILING, 0.0), (2.0, 1.0)))
     assert gated == [
         "frame vanishing_arcs 07 3.50-4.00 s: a clockwise arc through a whole turn from 1.9335"
-        " rad, drawn at film.js:88, paints no ink in the renderer's browser from 1 of its 3"
+        " rad, drawn at film.js:88, paints no ink in the checks' browser from 1 of its 3"
         f" starts; draw it as {REMEDY}"
     ]
     assert len(recorded) == 1 and recorded[0].startswith("frame whole_turns 08 9.00-9.50 s:")
@@ -81,6 +81,6 @@ def test_a_whole_turn_the_browser_did_not_draw_refuses():
     gated, recorded = gates.turn_findings([draw("02", "film.js:9", 0.5, 1.0, 2.0, 30)], painted())
     assert gated == [
         "frame vanishing_arcs 02: 1 starts of the whole turn drawn at film.js:9 were not drawn in"
-        " the renderer's browser"
+        " the checks' browser"
     ]
     assert recorded == []

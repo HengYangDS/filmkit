@@ -547,7 +547,7 @@ def test_the_browser_draws_each_whole_turn_once_and_a_start_without_ink_refuses(
     record = repository.read(Edition("zh").picture_gates)
     assert record["gated_findings"] == [
         "frame vanishing_arcs 05 12.40-30.10 s: a clockwise arc through a whole turn from 1.9335"
-        " rad, drawn at film.js:1234 (picture/film/marks.js), paints no ink in the renderer's"
+        " rad, drawn at film.js:1234 (picture/film/marks.js), paints no ink in the checks'"
         " browser from 1 of its 1 starts; draw it as ellipse(x, y, r, r, start, 0, 2 * Math.PI)"
     ]
     # The browser draws the whole turns once the frame audit, which lists them, has ended.

@@ -1,7 +1,7 @@
-/** Exercise how a whole turn the renderer's browser may paint without ink is found and judged: the stroked clockwise
+/** Exercise how a whole turn the checks' browser may paint without ink is found and judged: the stroked clockwise
  * arcs through a whole turn from a start that is not a whole number of turns, which the canvas stand-in records with
  * each stroke and the line of film.js that drew it, and the tool that draws each distinct start and end once in the
- * renderer's browser, here on a stand-in browser. */
+ * checks' browser, here on a stand-in browser. */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -37,7 +37,7 @@ test("a stroked clockwise arc through a whole turn from a start off a whole turn
     const { turns = [] } = paints.at(-1);
     return turns.map(({ start, sweep, origin }) => [start, +sweep.toFixed(6), origin]);
   };
-  // The renderer's browser computes a clockwise arc in single precision and can paint no ink for these.
+  // The checks' browser computes a clockwise arc in single precision and can paint no ink for these.
   assert.deepEqual(
     stroked(() => ctx.arc(100, 100, 24, 0.3, 0.3 + TURN)),
     [[0.3, 6.283185, "film.js:7"]],
@@ -163,7 +163,7 @@ function standInBrowser(asked) {
   };
 }
 
-test("each distinct start and end is drawn once in the renderer's browser and judged by its ink", async () => {
+test("each distinct start and end is drawn once in the checks' browser and judged by its ink", async () => {
   assert.deepEqual(distinctTurns(DRAWS), [
     [Math.PI, Math.PI + TURN],
     [FAILING, FAILING + TURN],

@@ -428,7 +428,7 @@ test("the frame audit reports each wrapped label with when it first rests and th
 });
 
 /* A composition whose scene 01 strokes a ring turning with time through a whole turn from its start, which the
- * renderer's browser may paint without ink, and beside it the same ring drawn as an ellipse from 0, which it paints. */
+ * checks' browser may paint without ink, and beside it the same ring drawn as an ellipse from 0, which it paints. */
 const TURNING = [
   '"use strict";',
   'const ctx = document.getElementById("picture").getContext("2d");',

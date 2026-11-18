@@ -1,4 +1,4 @@
-/** Draw each whole turn the frame audit found on a scratch canvas in the renderer's browser, and report whether it
+/** Draw each whole turn the frame audit found on a scratch canvas in the checks' browser, and report whether it
  * paints. The frame audit (frame-audit.mjs, TURNS) lists every stroked clockwise arc through a whole turn from a start
  * that is not a whole number of turns, with its exact start and end angles. Chrome Headless Shell 152 computes such an
  * arc's end angle in single precision and paints some of them without ink, which only that browser tells. Each

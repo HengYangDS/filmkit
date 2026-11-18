@@ -305,7 +305,7 @@ export function frameReport({
      * each spans and the rules its lines break. filmkit.picture.gates gates each break a film does not declare. */
     wrapped_labels: wrappedLabels,
     /* Every stroked clockwise arc through a whole turn from a start that is not a whole number of turns, which the
-     * renderer's browser may paint without ink, by scene and the line that drew it, with its module, its first and
+     * checks' browser may paint without ink, by scene and the line that drew it, with its module, its first and
      * last frame, its first start and sweep in radians, the frames that drew it and its distinct starts.
      * filmkit.picture.gates has each start drawn in that browser and refuses a line whose turn it paints no ink for. */
     whole_turns: wholeTurns.map((v) => ({
