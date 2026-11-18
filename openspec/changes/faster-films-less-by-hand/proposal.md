@@ -12,7 +12,7 @@ This draft holds the intent in the repository. It has no specs or tasks: each sl
 
 ## What Changes
 
-- **A picture is drawn by a native canvas, with no browser in the build.** The composition a film already has runs unchanged; its frames go from the canvas to the encoder. **BREAKING**: the browser, HyperFrames and the render path built round them leave the engine; a film's receipts name the canvas package in place of a browser.
+- **A picture is drawn by a native canvas, with no browser between the composition and the film.** The composition a film already has runs unchanged; its frames go from the canvas to the encoder. **BREAKING**: HyperFrames, GSAP and the render path built round a browser leave the engine; a film's receipts name the canvas package in place of a browser. The browser stays where a viewer meets one: the check that reads the delivered player pages back in a real browser.
 - **Both pictures are drawn from paints.** The uncaptioned picture is drawn with no captions instead of being derived from the captioned one, so the derivation and the proofs of its band leave.
 - **A renderer is qualified by frame hashes.** Two draws of one stage are equal byte for byte or the stage is refused; the second render, the every-frame pair measure, the one-frame fault scan and the repair leave with the fault they guard.
 - **The engine owns the drawing library.** The films' three copies become one module of the engine that a film imports. **BREAKING** for each film's `picture/film/`.
@@ -38,7 +38,7 @@ This draft holds the intent in the repository. It has no specs or tasks: each sl
 
 ## Impact
 
-- `src/filmkit/picture/` (rendering, browser, qualification, faults, repair, derivation, ground, equivalence, draft, metrics and the Node modules that launch a browser), `delivery/packaging.py`, the sample film, the supply (one npm package with a prebuilt binary in place of a pinned browser, HyperFrames and Puppeteer) and their tests.
+- `src/filmkit/picture/` (rendering, browser, qualification, faults, repair, derivation, ground, equivalence, draft, metrics and the Node modules that launch a browser), `delivery/packaging.py`, the sample film, the supply (one npm package with a prebuilt binary in place of HyperFrames and GSAP; the pinned browser and its driver stay for the player check) and their tests.
 - Each film: its `picture/film/` library, its tasks, its receipts. A released edition keeps its tag's engine and its bytes; its rebuild proof is not reopened.
 - Out of scope: the review's dimensions and floors, the films' texts and the chosen voices, the host's queue.
 
