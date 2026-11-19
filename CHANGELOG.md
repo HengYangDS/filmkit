@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-11-19
+
 ### Changed
 
 - Third-party supply is held to a release age of 24 hours, from 72: `minimum_release_age = "24h"` in the Mise configuration and `min-release-age=1` in `.config/npm/npmrc`. uv now holds the same age: `exclude-newer = "24 hours"` under `[tool.uv]` in `pyproject.toml`. The uv lock records the age as a span (`exclude-newer-span = "PT24H"`), not as the day it was written, and holds the packages and artifacts it held before. A version that a configuration pins exactly and a lock holds installs as before. No test or script holds the age.
@@ -527,7 +529,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.24.1...HEAD
+[0.24.1]: https://github.com/HengYangDS/filmkit/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/HengYangDS/filmkit/compare/v0.23.1...v0.24.0
 [0.23.1]: https://github.com/HengYangDS/filmkit/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/HengYangDS/filmkit/compare/v0.22.3...v0.23.0

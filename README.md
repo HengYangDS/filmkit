@@ -257,7 +257,7 @@ A film pins a release tag in its Python project and locks it:
 dependencies = ["filmkit"]
 
 [tool.uv.sources]
-filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.24.0" }
+filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.24.1" }
 ```
 
 Its `package.json` declares the npm packages the engine runs, at these versions: `@napi-rs/canvas` 1.1.1, which draws the pictures and which the engine checks before it stages, renders or runs a tool; and `puppeteer-core` 25.18.1 and `@puppeteer/browsers` 3.2.7, which drive and install the browser build of the checks.
