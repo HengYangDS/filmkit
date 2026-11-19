@@ -37,21 +37,26 @@ Report, before an expensive render, every input of the render and of the packagi
 
 ### Requirement: A draft's still scan binds what it judged
 
-The still scan SHALL record the film, the timeline and the composition it judged, each with its SHA-256, and given an edition SHALL judge that edition's draft against its timeline and write the edition's draft record.
+The still scan SHALL record the film, the timeline and the composition it judged, each with its SHA-256, and given an edition SHALL judge that edition's draft against its timeline and write the edition's draft record, which SHALL name the renderer that drew the draft as the draft's receipt names it. The pre-render check SHALL refuse a record of a draft that another renderer than the engine's drew.
 
 #### Scenario: An edition's draft
 
 - **WHEN** the scan runs with `--language en` on a rendered draft
-- **THEN** `build/evidence/editions/en/draft-stills.json` names the draft, the English timeline and the composition with their SHA-256
+- **THEN** `build/evidence/editions/en/draft-stills.json` names the draft, the English timeline and the composition with their SHA-256, and the canvas package, version and text renderer that drew the draft
 
 #### Scenario: A record from before a change
 
 - **WHEN** the composition changes after the draft is scanned
 - **THEN** the pre-render check names the draft record as not bound to the current composition
 
+#### Scenario: A record of a browser's draft
+
+- **WHEN** a film adopts this engine and keeps the draft record of a draft that a browser drew, which names no renderer
+- **THEN** the pre-render check refuses the record and asks for the draft to be rendered again
+
 ### Requirement: One command renders and scans an edition's draft
 
-`produce render-draft` SHALL stage the edition's captioned picture afresh at 1920x1080 over the whole film, render it at 10 fps in draft quality at niceness 10, or the caller's if higher, within its deadline, write a draft render receipt and scan the draft into the edition's draft record, the record that the pre-render check reads. It SHALL refuse a render that does not complete, scanning nothing, and a draft whose scan finds a still picture over the limit, after writing its record.
+`produce render-draft` SHALL stage the edition's captioned picture afresh at 1920x1080 over the whole film, draw it at 10 fps in one process at niceness 10, or the caller's if higher, within its deadline, write a draft render receipt and scan the draft into the edition's draft record, the record that the pre-render check reads. It SHALL refuse a render that does not complete, scanning nothing, and a draft whose scan finds a still picture over the limit, after writing its record.
 
 #### Scenario: A draft of the current picture
 
@@ -62,7 +67,7 @@ The still scan SHALL record the film, the timeline and the composition it judged
 #### Scenario: The draft renders at a lower priority
 
 - **WHEN** `render-draft` runs the renderer
-- **THEN** the renderer runs at niceness 10, or the caller's if higher, with the frame rate 10, the draft quality and otherwise the settings of the edition's picture
+- **THEN** the renderer runs at niceness 10, or the caller's if higher, with the frame rate 10, one span and otherwise the settings of the edition's picture
 
 #### Scenario: A stage left by an earlier draft
 
