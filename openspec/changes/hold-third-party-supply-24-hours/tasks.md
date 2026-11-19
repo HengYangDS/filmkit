@@ -6,4 +6,4 @@
 
 ## 2. Verification
 
-- [ ] 2.1 Run every command of the repository's check on the lane, the whole suite as the child of a host ticket; verify that each passes.
+- [x] 2.1 Run every command of the repository's check on the lane, the whole suite as the child of a host ticket; verify that each passes. On 19 November 2026 the release's whole check passed on `1e1cf7b` as the child of one host ticket, the suite with warnings as errors among its commands (check-full passed head 1e1cf7b 15:26:57).
