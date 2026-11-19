@@ -2,7 +2,7 @@ min_version = "2026.10.14"
 
 [settings]
 locked = true
-minimum_release_age = "72h"
+minimum_release_age = "24h"
 
 # npm reads this repository's own configuration, which holds npm's release age. npm treats
 # environment names case-insensitively, so its lower-case alias is removed.

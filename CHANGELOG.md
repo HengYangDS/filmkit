@@ -4,6 +4,10 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+
+- Third-party supply is held to a release age of 24 hours, from 72: `minimum_release_age = "24h"` in the Mise configuration and `min-release-age=1` in `.config/npm/npmrc`. uv now holds the same age: `exclude-newer = "24 hours"` under `[tool.uv]` in `pyproject.toml`. The uv lock records the age as a span (`exclude-newer-span = "PT24H"`), not as the day it was written, and holds the packages and artifacts it held before. A version that a configuration pins exactly and a lock holds installs as before. No test or script holds the age.
+
 ## [0.24.0] - 2026-11-19
 
 ### Added
