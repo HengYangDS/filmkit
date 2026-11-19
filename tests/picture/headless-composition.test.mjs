@@ -5,7 +5,6 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { spanOf } from "../../src/filmkit/picture/frame-audit/marks.mjs";
 import {
