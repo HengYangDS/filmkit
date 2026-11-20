@@ -40,13 +40,10 @@ import filmkit.durations as durations
 import filmkit.picture.derivation as derivation
 import filmkit.picture.draft as draft
 import filmkit.picture.renderer as renderer
-from filmkit.captions import CaptionError
 from filmkit.captions.refresh import refresh_captions
 from filmkit.delivery.packaging import PackagingError, package_film, package_metadata
 from filmkit.media import MediaError
-from filmkit.narration.selection import SelectionError, select
-from filmkit.narration.spoken_units import AlignmentError
-from filmkit.narration.thought_groups import RetainedUtteranceError
+from filmkit.narration.selection import select
 from filmkit.picture.draft import render_draft
 from filmkit.picture.equivalence import compare_pictures
 from filmkit.picture.gates import check_picture
@@ -62,12 +59,10 @@ from filmkit.preflight import PreflightError, admitted, preflight
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
 from filmkit.review.set_aside import require_set_aside
-from filmkit.soundtrack.assembly import AssemblyError, assemble
+from filmkit.soundtrack.assembly import assemble
+from filmkit.soundtrack.fit import REFUSALS as FIT_REFUSALS
 from filmkit.soundtrack.fit import VariantsError, fit, read_variants
 from filmkit.soundtrack.gates import check_sound
-from filmkit.soundtrack.level import LevelError
-from filmkit.soundtrack.pauses import PauseError
-from filmkit.soundtrack.policy import PausePolicyError
 from filmkit.specification import DURATION
 from filmkit.tools import ToolError
 
@@ -147,17 +142,12 @@ EDITION_ACTIONS: dict[str, Callable[[Edition, argparse.Namespace], object]] = {
 # The actions that take either of the edition's two pictures.
 PICTURE_ACTIONS = ("stage-picture", "render-picture", "validate-picture")
 # The refusals of the actions' owners, which end the command with the action's name and the
-# reason; any other exception keeps its traceback.
+# reason; any other exception keeps its traceback. Those of the selection and the assembly
+# up to the gap allocation are the ones the fit names for a caller that answers them
+# (`filmkit.soundtrack.fit.REFUSALS`).
 REFUSALS = (
-    SelectionError,
-    RetainedUtteranceError,
-    AlignmentError,
-    AssemblyError,
-    PausePolicyError,
+    *FIT_REFUSALS,
     VariantsError,
-    PauseError,
-    LevelError,
-    CaptionError,
     PictureError,
     ToolError,
     MediaError,

@@ -20,6 +20,11 @@ the assembly validates a pause policy before anything is decoded, and a field th
 policy does not read is refused. The fit judges no take: abrupt endings, pauses and terms stay
 with `assemble`.
 
+`asked` gives the same reports and refusals without printing or refusing, for a caller that
+decides by them, and `thought_pause_to_fit` states, for an edition that misses its runtime, the
+largest thought pause of the script's declared range under which it would fit: a reading of the
+film's own lever, which changes nothing.
+
 Usage: python -m filmkit.produce fit --language zh|en [--variants <file>]
 """
 
@@ -30,12 +35,17 @@ from typing import TYPE_CHECKING
 
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as assembly
+from filmkit.captions import CaptionError
+from filmkit.narration.selection import SelectionError
+from filmkit.narration.spoken_units import AlignmentError
+from filmkit.narration.thought_groups import RetainedUtteranceError
 from filmkit.soundtrack.level import LevelError
 from filmkit.soundtrack.pauses import PauseError
 from filmkit.soundtrack.policy import PausePolicyError, designed_pause_policy, segment_releases
 from filmkit.specification import RATE
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
     from filmkit.production import Edition
@@ -145,21 +155,129 @@ def measured(
     return report(name, allocation), refusal
 
 
-def fit(edition: Edition, variants: dict[str, dict] | None = None) -> list[dict]:
-    """Report how the edition's narration fits its runtime under the script's pause policy and
-    each variant; refused where the script's own policy does not fit."""
-    script = repository.read(edition.script)
-    designed = policies(script, variants or {})
+def _bound(script: dict, edition: Edition) -> tuple[list, dict, dict, dict]:
+    """The edition's selected recordings, bound to the script and decoded once."""
     segments = script["segments"]
     records, alignments = assembly.bound_recordings(script, edition)
-    decoded = assembly.decode_recordings(edition, segments, records)
-    bound = (segments, records, alignments, decoded)
-    reports, refusals = [], []
+    return segments, records, alignments, assembly.decode_recordings(edition, segments, records)
+
+
+def _each(
+    edition: Edition, variants: dict[str, dict] | None
+) -> Iterator[tuple[dict, Exception | None]]:
+    """Each policy's report with its refusal as it is measured, the script's own first."""
+    script = repository.read(edition.script)
+    designed = policies(script, variants or {})
+    bound = _bound(script, edition)
     for name, (policy, releases) in designed.items():
-        line, refusal = measured(name, policy, releases, bound)
+        yield measured(name, policy, releases, bound)
+
+
+# What reading an edition's fit may refuse: the binding of the selected recordings to the
+# script and the design of a policy. A caller that decides answers them as the edition's,
+# and the production command takes them among its own (`filmkit.produce.REFUSALS`).
+REFUSALS = (
+    SelectionError,
+    RetainedUtteranceError,
+    AlignmentError,
+    assembly.AssemblyError,
+    CaptionError,
+    PausePolicyError,
+    PauseError,
+    LevelError,
+)
+
+
+def asked(
+    edition: Edition, variants: dict[str, dict] | None = None
+) -> list[tuple[dict, Exception | None]]:
+    """Each policy's report with its refusal, the script's own first; nothing is printed, and
+    no policy's refusal is raised."""
+    return list(_each(edition, variants))
+
+
+def fit(edition: Edition, variants: dict[str, dict] | None = None) -> list[dict]:
+    """Report how the edition's narration fits its runtime under the script's pause policy and
+    each variant, each as it is measured; refused where the script's own policy does not fit."""
+    found = []
+    for line, refusal in _each(edition, variants):
         print(json.dumps(line, ensure_ascii=False), flush=True)
-        reports.append(line)
-        refusals.append(refusal)
-    if refusals[0] is not None:
-        raise refusals[0]
-    return reports
+        found.append((line, refusal))
+    if found[0][1] is not None:
+        raise found[0][1]
+    return [line for line, _ in found]
+
+
+# The step of the thought pauses that `thought_pause_to_fit` tries, in seconds.
+PAUSE_STEP = 0.01
+# The name under which the seconds that must stay free are stated: in that reading's answer,
+# and wherever a caller declares or records them.
+RESERVE = "reserve_seconds"
+
+
+def thought_pause_to_fit(edition: Edition, reserve: float = 0.0) -> dict:
+    """The largest declared-range thought pause that leaves `reserve` seconds free.
+
+    The pauses tried run in steps of 0.01 s up from the least of the script's
+    `thought_pause_range`, itself the first, to the last step that is not above its declared
+    thought pause, each as the script's policy with that thought pause, on the recordings
+    decoded once. A shorter pause leaves more of the runtime free, so the largest pause with
+    room is found by halving. A pause whose design is refused leaves no count and is taken as
+    room, so the halving may end on one, or on one the allocation refuses: the pauses under it
+    are then tried one by one, down to the first that fits, and a refusal between two pauses
+    that fit hides none. The pause named was counted, and so was the step above it, which has
+    no room or is refused. The last step has none above it: where the declared pause lies
+    between two steps, the last step lies under it, and the declared pause is not counted
+    here. The reading changes no file but the assembly's decode work files.
+
+    Returns:
+        The declared pause, its range and the reserve, with `fits_at_seconds`: the pause, as it
+        was counted, and the seconds it leaves free; or None with the pause tried last, the
+        seconds it leaves free where they were counted, and the refusal of its design or its
+        allocation where there is one.
+    """
+    script = repository.read(edition.script)
+    performance = script.get("voice_performance", {})
+    policy = designed_pause_policy(performance)
+    declared, (least, most) = policy["pauses"]["thought"], policy["thought_range"]
+    bound, found = _bound(script, edition), {}
+
+    def tried(step: int) -> tuple[float, float | None, str | None]:
+        if step not in found:
+            pause = least if step == 0 else round(least + step * PAUSE_STEP, 6)
+            pauses = {**performance["designed_pauses"], "thought": pause}
+            try:
+                variant = designed_pause_policy({**performance, "designed_pauses": pauses})
+                releases = segment_releases(variant, script["segments"])
+                line, refusal = measured(str(pause), variant, releases, bound)
+            except PausePolicyError as error:
+                line, refusal = {"free_seconds": None, "verdict": str(error)}, error
+            found[step] = (
+                pause,
+                line["free_seconds"],
+                None if refusal is None else line["verdict"],
+            )
+        return found[step]
+
+    def room(step: int) -> bool:
+        free = tried(step)[1]
+        return free is None or free >= reserve
+
+    said = {"declared_seconds": declared, "range_seconds": [least, most]}
+    said[RESERVE] = reserve
+    low, high = 0, int((declared - least) / PAUSE_STEP + 1e-9)
+    while room(low) and low < high:
+        middle = (low + high + 1) // 2
+        low, high = (middle, high) if room(middle) else (low, middle - 1)
+    for step in range(low, -1, -1):
+        pause, free, refusal = tried(step)
+        if free is not None and free >= reserve and refusal is None:
+            return {**said, "fits_at_seconds": pause, "free_seconds": free}
+    pause, free, refusal = tried(low)
+    return {
+        **said,
+        "fits_at_seconds": None,
+        "tried_seconds": pause,
+        "free_seconds": free,
+        "refusal": refusal,
+    }

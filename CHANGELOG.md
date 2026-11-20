@@ -4,6 +4,15 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- `filmkit.soundtrack.fit.asked` gives the reports of `produce fit` to a caller without printing or refusing, and `thought_pause_to_fit` reads the largest thought pause of the declared range that leaves a reserve free. `produce fit` prints and refuses as before, each policy as it is measured.
+
+### Changed
+
+- **Breaking for a script that goes on by the command's exit: `filmkit.narration.converge` exits 1 for a settled edition that misses its runtime.** When no thought is refused it selects the edition's recordings and counts them by the functions `produce select` and `produce fit` run. Its record `convergence.json` gains `fit`: the verdict (`fits`, `misses`, `refused`, `failed`), with the seconds free where the edition was counted, or why the count was not asked; `failed`, and a refusal of the selection, the binding, the decoding or the design, carry no seconds. For a miss the command's one line names the seconds missing and the largest thought pause of the script's `thought_pause_range`, in steps of 0.01 s up to the declared pause, under which the edition would fit, or says that no pause of the range fits; it applies nothing. What the selection or the assembly refuses for another reason ends the command with that reason, the record ended first: among them a file that is missing or cannot be read, a recording that is no WAV, and a decode that fails, whatever its cause, with FFmpeg's own last error line. Such an edition was refused by `produce select` or `produce assemble` before, one step later. A fault of the count that is no refusal of theirs keeps its traceback, after the record is ended with the verdict `failed`: among them an error that names no file by an absolute path, such as a decoder that is not installed.
+- A cast may declare `runtime_fit.reserve_seconds`, the seconds a settled edition must leave free to fit; a declaration that is no number of seconds from 0, and a script whose pause policy the assembly refuses, end `converge` in one line before it narrates.
+
 ## [0.25.0] - 2026-11-20
 
 ### Added

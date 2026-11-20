@@ -1,4 +1,6 @@
-"""What the tests of a narration's convergence share: its thoughts, seeds, records and checks.
+"""What the tests of a narration's convergence share: its thoughts, seeds, records and checks,
+and for the asking of a settled edition the command and its one line, which names the pause
+that the benches' contract declares (`fit_bench`).
 
 The module loads the convergence and with it the speech runtime, so only the test modules
 that are collected where that runtime loads import it; the fixtures that use it import it
@@ -7,6 +9,9 @@ when they are asked for (`conftest.py`: `studio`, `engine`).
 
 import json
 
+import pytest
+from fit_bench import PERFORMANCE, THOUGHT_PAUSE
+
 import filmkit.narration.converge as narration_converge
 import filmkit.repository as repository
 from filmkit.production import Edition
@@ -14,6 +19,10 @@ from filmkit.production import Edition
 RATE = 24000
 THOUGHTS = ("First thought.", " Second thought.")
 SEED = 1
+# What the command's one line for a miss begins with, and how it names the declared pause.
+MISS = "en: the settled narration misses its runtime by "
+LEAST, MOST = PERFORMANCE["thought_pause_range"]
+RANGE = f"declared at {THOUGHT_PAUSE} s in a range from {LEAST} to {MOST} s"
 
 
 def seed_of(k: int) -> int:
@@ -63,3 +72,15 @@ def thought_of(index: int) -> dict:
     """A thought's record in the edition's receipt."""
     receipt = repository.read(narration_converge.evidence_paths("en")["receipt"])
     return receipt["records"][0]["utterance_groups"]["records"][index - 1]
+
+
+def converge(*options: str) -> None:
+    narration_converge.main(["--language", "en", *options])
+
+
+def refused(*options: str) -> str:
+    """The one line that the command is refused with."""
+    with pytest.raises(SystemExit) as error:
+        converge(*options)
+    assert isinstance(error.value.code, str) and "\n" not in error.value.code
+    return error.value.code

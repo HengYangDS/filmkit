@@ -5,11 +5,13 @@ asked for: the tests that need no runtime are collected on a host that has none.
 """
 
 import dataclasses
+import json
 import signal
 import wave
 from pathlib import Path
 from types import SimpleNamespace
 
+import fit_bench
 import numpy as np
 import pytest
 
@@ -337,3 +339,63 @@ def engine(stand_ins, declared, voiced, monkeypatch, tmp_path):
     yield state
     mx.set_cache_limit(previous)
     mx.clear_cache()
+
+
+@pytest.fixture
+def bench(studio, voiced, monkeypatch):
+    """A count that stands in for the assembly's binding, decoding and measuring, for an
+    edition that a test narrates with `bench.begin(first takes)`, which declares what the
+    count reads.
+
+    The measure is `fit_bench.Count`, with its `free`, `joins`, `refusal` and `tried`. Beside
+    them `count.binding`, an exception, is what the binding of the recordings raises, and
+    `count.selecting` what the selection raises; `count.selected` and `count.bound` count the
+    questions.
+    """
+    import filmkit.narration.converge as narration_converge
+    import filmkit.narration.fitting as fitting
+    import filmkit.soundtrack.fit as soundtrack_fit
+
+    state = fit_bench.Count()
+    state.binding = state.selecting = None
+    state.selected = state.bound = 0
+    edition, paths = Edition("en"), narration_converge.evidence_paths("en")
+
+    def declare(**fields) -> None:
+        cast = repository.read(edition.cast)
+        cast["performance_recording"] = {
+            "receipt": paths["receipt"],
+            "alignment": paths["alignment"],
+        }
+        repository.write(edition.cast, cast)
+        script = repository.read(edition.script)
+        policy = {**script.get("voice_performance", fit_bench.PERFORMANCE), **fields}
+        repository.write(edition.script, {**script, "voice_performance": policy})
+
+    def select(asked: Edition) -> None:
+        state.selected += 1
+        if state.selecting:
+            raise state.selecting
+        print(json.dumps({"selected": 1, "seconds": 4.2}))
+
+    def bound(_script: dict, _edition: Edition) -> None:
+        state.bound += 1
+        if state.binding:
+            raise state.binding
+
+    def begin(first: list) -> None:
+        studio.begin(first)
+        declare()
+
+    monkeypatch.setattr(fitting, "select", select)
+    monkeypatch.setattr(soundtrack_fit, "_bound", bound)
+    monkeypatch.setattr(soundtrack_fit, "measured", state.measured)
+    state.declare, state.begin = declare, begin
+    return state
+
+
+@pytest.fixture
+def count(bench, voiced):
+    """A settled edition of two accepted takes, with the stand-in count."""
+    bench.begin([voiced(), voiced()])
+    return bench

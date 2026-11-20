@@ -36,6 +36,8 @@ SPEECH_RUNTIME_MODULES = [
     "narration/test_audition.py",
     "narration/test_converge.py",
     "narration/test_converge_edges.py",
+    "narration/test_converge_fit.py",
+    "narration/test_converge_fit_refusals.py",
     "narration/test_group_generation.py",
     "narration/test_judgment.py",
     "narration/test_synthesis.py",

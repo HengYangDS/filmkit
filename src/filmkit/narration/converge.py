@@ -17,6 +17,9 @@ The command needs no targets file, no phrase and no seed from a person:
    round. It does so for --rounds rounds, or until none is refused.
 4. For what is still refused it tries one round of run-on takes: the thought narrated on into
    the thought that follows it and cut in the quiet between them (`narration.run_on`).
+5. When no thought is refused it asks the assembly's own count whether the settled edition
+   fits its runtime (`filmkit.narration.fitting`): it selects the recordings and counts them
+   as `produce select` and `produce fit` do, replaces no take and changes no pause policy.
 
 The record, convergence.json beside the receipt, binds the receipt, the script and the cast it
 was made from and states the rounds and takes asked for. It holds for each thought that was
@@ -25,7 +28,13 @@ failed, each choice, and the take it has now. A thought that is still refused af
 candidates is named there as not narratable as written: no line is lowered for it, and the
 text or the film's declarations are its owner's to change. A thought first refused by the
 last narration, when no round is left, is named as refused with no candidate tried. The
-command then exits 1 and names each such thought with what each candidate failed.
+command then exits 1 and names each such thought with what each candidate failed. The record
+of an ended run holds its `fit`: the seconds the count leaves free, or why the count was not
+asked. The command also exits 1, with one line, for a settled edition that misses its runtime,
+naming the seconds missing and the largest thought pause of the script's declared range that
+would fit, which it does not apply, and for one that the selection or the assembly refuses for
+another reason, with that reason. A fault of the count that is no refusal keeps its traceback,
+after the record is ended with it.
 
 A run that changes nothing is a no-op: with nothing missing and nothing refused it narrates
 nothing and leaves the cast as it is, and a candidate whose recording a former run left in
@@ -51,6 +60,7 @@ import time
 
 import filmkit.child_processes as child_processes
 import filmkit.narration.candidates as candidates
+import filmkit.narration.fitting as fitting
 import filmkit.narration.group_generation as group_generation
 import filmkit.narration.judge as judge
 import filmkit.narration.judgment as judgment
@@ -278,8 +288,11 @@ def round_of(session, state, found, number, ks, *, run_on: bool) -> list[dict]:
     return proposals
 
 
-def write_record(code: str, found: dict, rows: list[dict], asked: dict, *, ended: bool) -> dict:
-    """Write the convergence record as the thoughts stand; only an ended run names the unsettled."""
+def write_record(
+    code: str, found: dict, rows: list[dict], asked: dict, *, ended: bool, fit: dict | None = None
+) -> dict:
+    """Write the convergence record as the thoughts stand; only an ended run names the unsettled
+    and holds `fit`, what the count said of the settled edition."""
     final = {row["thought"]: row for row in rows}
     unsettled = {}
     for name, row in final.items():
@@ -301,6 +314,7 @@ def write_record(code: str, found: dict, rows: list[dict], asked: dict, *, ended
         "bound": judge.bound(code),
         "thoughts": [found[name] for name in final if name in found],
         "unsettled": unsettled,
+        **({"fit": fit} if fit else {}),
     }
     repository.write(Edition(code).ear_first / RECORD, record)
     return record
@@ -310,12 +324,16 @@ def begin(code: str, asked: dict) -> None:
     """Say that a run is under way before its first effect: no thought is unsettled by it yet."""
     path = Edition(code).ear_first / RECORD
     former = repository.read(path) if path.is_file() else {"edition": code, "thoughts": []}
+    # A former run's fit is not this run's: nothing of the count is kept between runs.
+    former.pop("fit", None)
     repository.write(path, {**former, "state": "running", "asked": asked, "unsettled": {}})
 
 
 def converge(code: str, *, rounds: int = 2, takes: int = 3) -> dict:
-    """Run the rounds and the run-on round, and return the record the run ends with."""
+    """Run the rounds and the run-on round, ask the count, and return the record the run ends
+    with."""
     own_receipt(code)
+    reserve = fitting.declared(code)
     left = leftovers(code)
     if left:
         raise SystemExit(UNRESOLVED.format(code=code, files="\n".join(f"  {f}" for f in left)))
@@ -343,13 +361,27 @@ def converge(code: str, *, rounds: int = 2, takes: int = 3) -> dict:
             state = session.judge()
         name = RUN_ON if number == RUN_ON else f"round {number}"
         settled[name] = sum(1 for row in state[1] if not row["failed"])
-    record = write_record(code, found, state[1], asked, ended=True)
+    if any(row["failed"] for row in state[1]):
+        fit = fitting.not_asked(fitting.UNSETTLED)
+    else:
+        try:
+            fit = fitting.read(code, reserve)
+        except Exception as fault:
+            # A fault of the count is no refusal and keeps its traceback; the record of the
+            # thoughts, which are settled, is ended first.
+            write_record(
+                code, found, state[1], asked, ended=True, fit=fitting.failed(reserve, fault)
+            )
+            raise
+    record = write_record(code, found, state[1], asked, ended=True, fit=fit)
     counts = {
         "thoughts": len(state[1]),
         "settled_after": settled,
         "takes_generated": session.generated,
         "takes_found": session.reused,
         "unsettled": {name: verdict["failed"] for name, verdict in record["unsettled"].items()},
+        "fit": fitting.summary(fit),
+        **({"free_seconds": fit["free_seconds"]} if "free_seconds" in fit else {}),
     }
     report(code, step="converge", rounds=rounds, takes=takes, **counts)
     return record
@@ -387,6 +419,9 @@ def main(argv: list[str] | None = None) -> None:
         record = converge(options.language, rounds=options.rounds, takes=options.takes)
     if record["unsettled"]:
         raise SystemExit(said(options.language, record))
+    refused = fitting.said(options.language, record["fit"])
+    if refused:
+        raise SystemExit(refused)
 
 
 if __name__ == "__main__":
