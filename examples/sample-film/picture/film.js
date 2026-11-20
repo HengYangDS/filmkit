@@ -146,8 +146,12 @@ function tag(value, x, y, alpha) {
   text(value, x + TAG.dx, y + TAG.dy, { size: NOTE, color: P.muted, alpha, align: "left" });
 }
 
-/* The three sources stand together from the scene's start, each tagged with its kind of file, and light as one when
- * the narration names them; each card is named, then explained, as its words are said. */
+/* The middle source stands with the scene and the two beside it arrive together on a word of the film's first
+ * sentence, so the row opens from its centre and stays centred, and the picture moves under that sentence: three
+ * cards that stood from the scene's start left it still for the whole of it. Each card is tagged with its kind of
+ * file; the three light as one when the narration names them, and each is named, then explained, as its words are
+ * said. */
+const BESIDE = L("影片", "a film");
 const SOURCES = [
   [
     L("脚本", "Script"),
@@ -181,10 +185,11 @@ function sourcesScene(s, t, alpha) {
   const lit = alpha * shown(t, cue(s, L("源文件", "sources"), 0.5));
   SOURCES.forEach(([name, nameKey, note, noteKey, kind], i) => {
     const x = 350 + i * 440;
-    card(x, 420, 340, 170, alpha);
+    const here = alpha * (i === 1 ? 1 : shown(t, cue(s, BESIDE, 0.15)));
+    card(x, 420, 340, 170, here);
     outline(x, 420, 340, 170, lit, P.accent);
     const named = shown(t, cue(s, nameKey, 0.4 + 0.2 * i));
-    tag(kind, x, 420, alpha * (1 - named));
+    tag(kind, x, 420, here * (1 - named));
     text(name, x + 170, 495, { size: LABEL, alpha: alpha * named });
     text(note, x + 170, 550, {
       size: NOTE,
