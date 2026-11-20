@@ -8,7 +8,7 @@ Report, before an expensive render, every input of the render and of the packagi
 
 ### Requirement: A pre-render check names every stale or missing input
 
-`produce preflight` SHALL report at once, and refuse while any remains: a stage of either picture that is not its current UHD picture; a tracked cover other than the cover the current stage paints; an earlier film package record of the edition; a failing concept check; a picture gate record that has not passed on the current inputs; and, for a film that declares drafts, a draft still scan that is missing, finds a still picture over its limit or binds another timeline or composition.
+`produce preflight` SHALL report at once, and refuse while any remains: a stage of either picture that is not its current UHD picture; a tracked cover other than the cover the current stage paints; an earlier film package record of the edition; a failing concept check; a picture gate record that has not passed on the current inputs; and, for a film that declares drafts, a draft still scan that is missing, finds a still picture at the limit or does not answer as `final-film-scan` states.
 
 #### Scenario: Every input current
 
@@ -35,6 +35,26 @@ Report, before an expensive render, every input of the render and of the packagi
 - **WHEN** a film declares no drafts and holds no draft still scan
 - **THEN** the check reports that the draft scan is not asked and refuses nothing for it
 
+#### Scenario: A draft scanned with another limit
+
+- **WHEN** a draft record written with a limit of 99 s lists a still run with 3.9 s of speech and nothing over its own limit
+- **THEN** the check names the draft record as stating other rules than the engine's, with the record's limit and the engine's, and asks for a new draft scan
+
+#### Scenario: A draft record that lists no runs
+
+- **WHEN** a draft record lists its still runs in no form the scan writes, is cut short or lacks a field the scan writes
+- **THEN** the check names the record as one that cannot be read and asks for a new draft scan, with no error of its own
+
+#### Scenario: A draft record that contradicts itself
+
+- **WHEN** a draft record's list of still runs is empty and its runs at the limit still name a run
+- **THEN** the check names the record as one that cannot be trusted and asks for a new draft scan
+
+#### Scenario: A draft record of an earlier engine
+
+- **WHEN** a draft record states no rules and no frames of its phases, as an engine before this requirement wrote it
+- **THEN** the check names it as one that cannot be read, and `render-draft` draws and scans the draft again
+
 ### Requirement: A draft's still scan binds what it judged
 
 The still scan SHALL record the film, the timeline and the composition it judged, each with its SHA-256, and given an edition SHALL judge that edition's draft against its timeline and write the edition's draft record, which SHALL name the renderer that drew the draft as the draft's receipt names it. The pre-render check SHALL refuse a record of a draft that another renderer than the engine's drew.
@@ -56,7 +76,7 @@ The still scan SHALL record the film, the timeline and the composition it judged
 
 ### Requirement: One command renders and scans an edition's draft
 
-`produce render-draft` SHALL stage the edition's captioned picture afresh at 1920x1080 over the whole film, draw it at 10 fps in one process at niceness 10, or the caller's if higher, within its deadline, write a draft render receipt and scan the draft into the edition's draft record, the record that the pre-render check reads. It SHALL refuse a render that does not complete, scanning nothing, and a draft whose scan finds a still picture over the limit, after writing its record.
+`produce render-draft` SHALL stage the edition's captioned picture afresh at 1920x1080 over the whole film, draw it at 10 fps in one process at niceness 10, or the caller's if higher, within its deadline, write a draft render receipt and scan the draft into the edition's draft record, the record that the pre-render check reads. It SHALL refuse a render that does not complete, scanning nothing, a draft not read whole, and a draft with a still picture at the limit, after writing its record.
 
 #### Scenario: A draft of the current picture
 
@@ -81,8 +101,13 @@ The still scan SHALL record the film, the timeline and the composition it judged
 
 #### Scenario: A draft with a still picture
 
-- **WHEN** the draft holds a still picture over 3.5 s of speech
+- **WHEN** the draft holds a still picture with 3.5 s of speech or more
 - **THEN** the draft record lists it and `render-draft` refuses, naming its time and its speech
+
+#### Scenario: A draft whose decode ends early
+
+- **WHEN** the draft decodes to fewer frames than its timeline's seconds give at the scan's rate
+- **THEN** `render-draft` refuses, naming the frames read and the frames of the timeline's seconds, and the edition holds no draft record
 
 ### Requirement: The pre-render check asks for the sound gate and the geometry record
 
@@ -145,3 +170,12 @@ A film MAY declare a margin of zero or more under its clarity floor. `produce pr
 
 - **WHEN** a film declares no margin and its sound gate record lists thoughts under the floor
 - **THEN** the check reports that single thoughts are not judged and refuses nothing for them
+
+### Requirement: A draft's still scan settles nothing about the film
+
+A draft record SHALL admit an edition's render and nothing after it: no command SHALL read a draft record in place of the edition's film record, which the capability `final-film-scan` requires. A draft is drawn at half the size the film's picture is drawn at, and its scan can end a still run that the film holds whole.
+
+#### Scenario: A draft record beside no film record
+
+- **WHEN** an edition of a film that declares drafts holds a passing draft record and no film record
+- **THEN** the pre-render check reports the draft scan current, and the edition's film record is still required as `final-film-scan` states
