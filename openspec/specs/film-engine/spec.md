@@ -22,12 +22,22 @@ The engine SHALL build the film whose declaration `content/film.toml` lies in th
 
 ### Requirement: A film declares its parameters
 
-A film SHALL declare, in one declaration, its file prefix, delivery folder, entry page, source manifest, each edition's sources folder, cover and caption terms, the fonts its picture uses, and its review prompt, floors, scored dimensions and listening-plan readings. The engine SHALL refuse an invalid or incomplete declaration before any work, naming each failing field; a cover may be absent until the engine paints it.
+A film SHALL declare, in one declaration, its file prefix, delivery folder, entry page, source manifest, each edition's sources folder, cover and caption terms, the fonts its picture uses, and its review prompt, floors, scored dimensions and listening-plan readings. The engine SHALL refuse an invalid or incomplete declaration before any work, naming each failing field together with a key that an earlier release named otherwise; a cover may be absent until the engine paints it.
 
 #### Scenario: An invalid declaration refuses before work
 
 - **WHEN** the declaration omits an edition, names a font or another file that is missing other than a cover, gives a malformed file prefix or a review floor outside 0 to 100
 - **THEN** the engine refuses when it loads, before any synthesis, and names each failing field
+
+#### Scenario: Two problems of different kinds
+
+- **WHEN** the declaration still names its delivery folder by the key an earlier release used and gives a malformed file prefix
+- **THEN** one refusal names the renamed key and the file prefix, and the folder the renamed key carries is not reported as missing
+
+#### Scenario: Missing files and a player page together
+
+- **WHEN** a declaration whose fields load names a script that is missing and an edition's sources still hold a player page
+- **THEN** one refusal names both
 
 #### Scenario: The declared fonts are staged in their declared order
 
