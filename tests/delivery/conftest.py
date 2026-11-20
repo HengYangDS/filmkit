@@ -1,7 +1,9 @@
 """Fixtures of the delivery tests.
 
 `film` is a root whose delivery sources are small texts, beside an absent destination;
-`inputs` is one edition's inputs bound as the film verifier reads them.
+`inputs` is one edition's inputs bound as the film verifier reads them, and `editions` both
+editions' with the manifest of the pinned sources; `built` is that build reviewed and held by
+the film's own folder, for the tests of the release's writer (`release_build.Built`).
 """
 
 import json
@@ -11,6 +13,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+from release_build import Built
 
 import filmkit.delivery.folder as delivery_folder
 import filmkit.delivery.packaging as delivery_packaging
@@ -18,10 +21,13 @@ import filmkit.delivery.player as delivery_player
 import filmkit.delivery.verification as delivery_verification
 import filmkit.narration.selection as narration_selection
 import filmkit.narration.thought_groups as narration_thought_groups
+import filmkit.picture.derivation as picture_derivation
 import filmkit.picture.equivalence as picture_equivalence
 import filmkit.picture.rendering as picture_rendering
 import filmkit.production as production
 import filmkit.repository as repository
+import filmkit.review.record as review_record
+import filmkit.sources as sources
 import filmkit.specification as specification
 from filmkit.film import FILM
 
@@ -134,6 +140,29 @@ class Inputs:
         sha = repository.sha(self.edition.soundtrack)
         self.change(self.edition.audio_assembly, "soundtrack_sha256", value=sha)
 
+    def review(self, report: str | None = None) -> Path:
+        """Record a passing production review of the edition's current films, beside its report;
+        the record."""
+        edition, sha = self.edition, repository.sha
+        text = report or f"# Review of {edition.code}\n"
+        beside = write_input(edition.production_review.with_suffix(".md"), text)
+        record = {
+            "schema_version": review_record.SCHEMA_VERSION,
+            "language": edition.code,
+            "reviewer": "independent reviewer",
+            "media": [
+                {"path": repository.relative(film), "sha256": sha(film)} for film in edition.films
+            ],
+            "script_sha256": sha(self.root / edition.script),
+            "composition_sha256": sha(self.root / picture_rendering.COMPOSITION_SCRIPT),
+            "scores": dict.fromkeys(review_record.DIMENSIONS, 96),
+            "overall": 96.0,
+            "findings": [],
+            "human_listening": {"state": "performed"},
+            "report": {"path": repository.relative(beside), "sha256": sha(beside)},
+        }
+        return write_input(edition.production_review, record)
+
 
 def shorten(monkeypatch) -> None:
     """Verify films of DURATION seconds whose last CREDITS seconds are credits."""
@@ -192,9 +221,10 @@ def narration(inputs: Inputs, texts: dict[str, str]) -> None:
     write_input(edition.timeline, {"segments": segments, "captions": captions})
 
 
-def picture(inputs: Inputs) -> None:
+def picture(inputs: Inputs, *, derived: bool = False) -> None:
     """Both staged and rendered pictures, their render receipts and equivalence record, and the
-    captioned picture's geometry and shot plan."""
+    captioned picture's geometry and shot plan. With `derived` the uncaptioned picture's receipt
+    is a derivation's, which names no stage."""
     root, edition, sha = inputs.root, inputs.edition, repository.sha
     write_input(root / picture_rendering.COMPOSITION_SCRIPT, "/* film */")
     for captions in (True, False):
@@ -202,6 +232,8 @@ def picture(inputs: Inputs) -> None:
         write_input(rendered.stage / "index.html", f"<html>{rendered.name}</html>")
         write_input(rendered.file, f"{rendered.name} picture")
         receipt = {"picture": rendered.name, "output_sha256": sha(rendered.file)}
+        if derived and not captions:
+            receipt["derived"] = {"rows": [1872, 2048], "ground": {"y": 21, "u": 129, "v": 125}}
         write_input(rendered.receipt, receipt)
     equivalence = {
         **picture_equivalence.current_bindings(edition),
@@ -255,7 +287,9 @@ def packages(inputs: Inputs) -> None:
         {
             "path": edition.film(kind).name,
             "picture": edition.rendered(rendition.captions).name,
-            "source": edition.rendered(rendition.captions).file.name,
+            # The picture file the film read: its own, or of a derived pair's 1080p uncaptioned
+            # film the captioned one.
+            "source": picture_derivation.film_source(edition, rendition)[0].name,
         }
         for kind, rendition in production.RENDITIONS.items()
     ]
@@ -320,4 +354,46 @@ def inputs(tmp_path, monkeypatch) -> Inputs:
     narration(current, {"01": "数据先行。", "02": "交付在后。"})
     picture(current)
     packages(current)
+    return current
+
+
+@pytest.fixture
+def editions(inputs, monkeypatch) -> dict[str, Inputs]:
+    """Both editions' current bound inputs, each with its uncaptioned picture derived as the
+    films make theirs: `inputs` and the English edition's beside it, bound the same way, and the
+    manifest of the pinned sources, which no local clone checks."""
+    english = Inputs(inputs.root, production.Edition("en"), inputs.checked)
+    narration(english, {"01": "Data first.", "02": "Delivery after."})
+    for current in (inputs, english):
+        picture(current, derived=True)
+        packages(current)
+    monkeypatch.delenv(sources.CHECKOUT, raising=False)
+    pinned = {"path": "README.md", "sha256": repository.content_sha("# The source\n")}
+    write_input(
+        inputs.root / sources.MANIFEST,
+        {"repository": "https://example.test/source", "commit": "0" * 40, "members": [pinned]},
+    )
+    return {"zh": inputs, "en": english}
+
+
+@pytest.fixture
+def built(editions, tmp_path_factory, monkeypatch) -> Built:
+    """A reviewed, delivered build. The staging's check of a stage is a stand-in that records
+    what it was asked and refuses, in the staging's words, a document other than the one the
+    fixture's sources stage; the real check has its own tests."""
+    folder = tmp_path_factory.mktemp("host").resolve() / FILM.delivery_folder
+    monkeypatch.setenv(delivery_folder.ROOT_VARIABLE, str(folder.parent))
+    current = Built(repository.ROOT, folder, editions, VERSION)
+
+    def staged_now(edition, stage, *, captions=True):
+        current.asked.append((edition.code, stage, captions))
+        if (stage / "index.html").read_text() != f"<html>{edition.rendered(captions).name}</html>":
+            msg = "The staged document differs from the one the current sources derive"
+            raise picture_rendering.PictureError(msg)
+        return {}
+
+    monkeypatch.setattr(picture_rendering, "require_current_stage", staged_now)
+    for inputs in editions.values():
+        inputs.review()
+    current.deliver()
     return current

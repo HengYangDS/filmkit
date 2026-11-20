@@ -298,3 +298,43 @@ def test_the_players_readback_lies_where_a_delivery_keeps_it_or_where_it_is_told
         str(folder / f"player-{code}.png") for code in CODES
     ]
     assert {path: text for path, text in film.tree(root).items() if path in delivered} == delivered
+
+
+def test_a_folder_is_compared_with_the_builds_members_and_each_that_differs_is_named(film):
+    root, destination = film
+    plan = delivery_folder.plan(root)
+    # A folder that does not exist holds no member.
+    absent = delivery_folder.differing_members(root, destination)
+    assert absent == {path: "is missing" for _, path in plan}
+    for source, path in plan:
+        film.write(destination / path, source.read_text())
+    assert delivery_folder.differing_members(root, destination) == {}
+    # An entry beside the members is not the comparison's to name.
+    film.write(destination / "notes.txt", "notes\n")
+    film.write(destination / ".DS_Store", "finder\n")
+    assert delivery_folder.differing_members(root, destination) == {}
+    (destination / "zh/sample-reel-zh.srt").unlink()
+    film.write(destination / "en/sample-reel-en-uhd.mp4", "an earlier build\n")
+    # Other bytes of the same length differ too.
+    film.write(destination / "en/chapters.json", "CURRENT en/chapters.json\n")
+    assert delivery_folder.differing_members(root, destination) == {
+        "zh/sample-reel-zh.srt": "is missing",
+        "en/sample-reel-en-uhd.mp4": "holds other bytes",
+        "en/chapters.json": "holds other bytes",
+    }
+    # The comparison reads: the folder and the build hold what they held.
+    assert film.tree(root) == {
+        source.relative_to(root).as_posix(): f"current {path}\n" for source, path in plan
+    }
+    assert (destination / "notes.txt").read_text() == "notes\n"
+    # A member's place that holds a folder is named as no file, not as missing.
+    (destination / "zh/sample-reel-zh.vtt").unlink()
+    (destination / "zh/sample-reel-zh.vtt").mkdir()
+    assert delivery_folder.differing_members(root, destination)["zh/sample-reel-zh.vtt"] == (
+        "is no file"
+    )
+    # A member the build itself no longer holds is named as that, whatever the folder holds.
+    (root / "build/artifacts/film/index.html").unlink()
+    assert delivery_folder.differing_members(root, destination)["index.html"] == (
+        "has no file in the build"
+    )

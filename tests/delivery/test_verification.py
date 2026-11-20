@@ -67,6 +67,59 @@ def test_an_edition_is_qualified_as_its_four_current_films():
             delivery_verification.qualify(edition, files)
 
 
+@pytest.mark.usefixtures("unleveled")
+def test_the_bound_inputs_and_the_review_are_checked_without_the_decode(editions, monkeypatch):
+    class DecodedError(Exception):
+        """A film's media was asked for."""
+
+    def decode(*_arguments, **_options):
+        raise DecodedError
+
+    for name in (
+        *("probe", "require_video", "video_cadence"),
+        *("decoded_video_frames", "decoded_audio_frames"),
+    ):
+        monkeypatch.setattr(delivery_verification.media, name, decode)
+    monkeypatch.setattr(delivery_verification.spotlight, "imported", decode)
+    for code, inputs in editions.items():
+        edition = inputs.edition
+        inputs.review()
+        bound = delivery_verification.verify_bindings(edition)
+        assert list(bound) == ["sources", "narration", "picture", "package"]
+        assert bound["sources"]["documents"] == "not_checked"
+        assert bound["narration"]["soundtrack_sha256"] == repository.sha(edition.soundtrack)
+        assert bound["picture"]["picture_sha256"] == repository.sha(edition.picture)
+        assert bound["package"]["films"] == sorted(film.name for film in edition.films)
+        accepted = delivery_verification.verify_review(edition, edition.films)
+        assert accepted["path"] == f"build/evidence/editions/{code}/production-review.json"
+        # The verifier's command asks the same checks and then decodes the films.
+        with pytest.raises(DecodedError):
+            delivery_verification.qualify(edition, edition.films)
+
+
+@pytest.mark.usefixtures("qualified")
+def test_the_verifier_reports_the_bound_inputs_where_it_reported_them(monkeypatch):
+    edition = production.Edition("zh")
+    assert delivery_verification.verify_bindings(edition) == {
+        name: name for name in ("sources", "narration", "picture", "package")
+    }
+    # The command's report holds what the one check gives, in the phase it ran them in.
+    phases = []
+    monkeypatch.setattr(
+        delivery_verification, "verify_bindings", lambda _edition: {"bound": phases[-1]}
+    )
+    phase = delivery_verification.durations.phase
+
+    def named(name):
+        phases.append(name)
+        return phase(name)
+
+    monkeypatch.setattr(delivery_verification.durations, "phase", named)
+    report = delivery_verification.qualify(edition, edition.films, technical_only=True)
+    assert report["bound"] == "bindings"
+    assert phases == ["bindings", "media", "spotlight"]
+
+
 @pytest.mark.usefixtures("qualified")
 def test_the_command_prints_each_editions_report_and_writes_only_its_duration(tmp_path, capsys):
     films = [str(film) for code in production.CODES for film in production.Edition(code).films]

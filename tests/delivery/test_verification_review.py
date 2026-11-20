@@ -129,3 +129,25 @@ def test_a_film_that_accepts_notes_verifies_no_review_with_another_finding(
     monkeypatch.setattr(review_record, "ACCEPTED_SEVERITIES", ())
     with pytest.raises(VerificationError, match="unresolved note finding R1"):
         check(findings=[note])
+
+
+def test_an_edition_without_a_review_record_is_refused_in_one_line_by_name(
+    current_review, tmp_path
+):
+    _, _, files = current_review
+    edition = production.Edition("zh")
+    assert not edition.production_review.exists()
+    with pytest.raises(VerificationError) as refusal:
+        delivery_verification.verify_review(edition, files)
+    assert str(refusal.value) == (
+        "No review record build/evidence/editions/zh/production-review.json"
+    )
+    # The verifier's command reports such a refusal as "<language>: <reason>".
+    assert isinstance(refusal.value, delivery_verification.REFUSALS)
+    # A published record that is named and missing is refused by its own place.
+    published = tmp_path / "build/artifacts/release/sample-reel-zh-production-review.json"
+    with pytest.raises(VerificationError) as refusal:
+        delivery_verification.verify_review(edition, files, record=published)
+    assert str(refusal.value) == (
+        "No review record build/artifacts/release/sample-reel-zh-production-review.json"
+    )

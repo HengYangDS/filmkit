@@ -19,6 +19,10 @@ document recorded beside the captioned one's, or, published before the films wit
 existed, only each edition's two films with captions; the comparison then lists the rebuilt
 uncaptioned films as unpublished and compares the rest.
 
+`filmkit.delivery.release` writes the manifest and stages the published assets. The rules `load`
+holds a manifest to are also asked of a record that is not yet written (`check`), so that the
+writer asks them before it changes a file.
+
 The report goes to build/evidence/reproduction/report.json, and each edition's duration record
 of the comparison beside its evidence (`filmkit.durations`), unless --read-only is given; a
 comparison that does not pass exits with "<edition>: <asset>: <layer>" for each failing layer.
@@ -61,6 +65,8 @@ PACKAGING_TAGS = ("encoder", "creation_time", "com.apple.quicktime.creationdate"
 
 Digest = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 AssetName = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")]
+# A release's version as the manifest states it: three numbers, with no pre-release.
+Version = Annotated[str, StringConstraints(pattern=r"^\d+\.\d+\.\d+$")]
 # A tracked file's path below the root, each of its names an asset name.
 SourcePath = Annotated[
     str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*$")
@@ -91,7 +97,7 @@ class EditionRecord(Declared):
 class Release(Declared):
     """The release manifest: its version, editions' records, film-bound sources and assets."""
 
-    version: Annotated[str, StringConstraints(pattern=r"^\d+\.\d+\.\d+$")]
+    version: Version
     editions: dict[str, EditionRecord]
     # Each tracked file that no formatter rewrites and whose exact bytes the build of the
     # published films reads, with its SHA-256.
@@ -131,13 +137,13 @@ def checksums(release: Release) -> str:
     return "".join(f"{digest}  {name}\n" for name, digest in listed)
 
 
-def load() -> Release:
-    """The release manifest, refused unless it records exactly what the editions publish."""
-    try:
-        release = Release.model_validate_json((repository.ROOT / MANIFEST).read_bytes())
-    except ValidationError as error:
-        msg = f"{MANIFEST} is not a release manifest: {error}"
-        raise ReproductionError(msg) from None
+def check(release: Release) -> Release:
+    """A release record, refused unless it records exactly what the editions publish.
+
+    These are the rules `load` holds the manifest to, asked of a record that need not be written
+    yet, so that the release's writer (`filmkit.delivery.release`) asks them before it changes a
+    file. The record is returned as it was given.
+    """
     if set(release.editions) != set(production.CODES):
         msg = f"{MANIFEST} records the editions {sorted(release.editions)}"
         raise ReproductionError(msg)
@@ -174,6 +180,16 @@ def load() -> Release:
         msg = f"{MANIFEST}: {CHECKSUMS} differs from the assets it lists"
         raise ReproductionError(msg)
     return release
+
+
+def load() -> Release:
+    """The release manifest, refused unless it records exactly what the editions publish."""
+    try:
+        release = Release.model_validate_json((repository.ROOT / MANIFEST).read_bytes())
+    except ValidationError as error:
+        msg = f"{MANIFEST} is not a release manifest: {error}"
+        raise ReproductionError(msg) from None
+    return check(release)
 
 
 def changed_sources(release: Release) -> list[str]:

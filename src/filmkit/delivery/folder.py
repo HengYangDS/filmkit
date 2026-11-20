@@ -39,6 +39,9 @@ folder that holds entries and no entry page of an earlier delivery. A `FILMKIT_D
 that is no absolute path is refused too: joined as it stands it would name a folder below the
 working directory.
 
+The release's writer asks whether the film's own folder holds the build's members now
+(`differing_members`), which reads the folder and delivers nothing.
+
 The film verifier binds every member to its package records; the delivery task runs it first.
 A refusal before rsync leaves the destination unchanged and exits with status 1.
 
@@ -238,6 +241,30 @@ def plan(root: Path) -> list[tuple[Path, str]]:
         folder = root / edition.artifacts.relative_to(repository.ROOT)
         members.extend((folder / name, f"{code}/{name}") for name in names)
     return members
+
+
+def differing_members(root: Path, folder: Path) -> dict[str, str]:
+    """Each delivery member that a folder does not hold with the build's bytes, by its path
+    there, with what was found: it is missing, it is no file, as a folder in its place, it
+    holds other bytes, or the build has no file of it to compare with.
+
+    The comparison reads the folder as it stands now and no record of a delivery, which states
+    one moment: another checkout of the film delivers to the same folder. An entry beside the
+    members is the readback's to refuse, not this comparison's. A size that differs is told
+    before either file is hashed.
+    """
+    found = {}
+    for source, path in plan(root):
+        held = folder / path
+        if not held.is_file():
+            found[path] = "is no file" if held.exists() else "is missing"
+        elif not source.is_file():
+            found[path] = "has no file in the build"
+        else:
+            same_size = held.stat().st_size == source.stat().st_size
+            if not same_size or repository.sha(held) != repository.sha(source):
+                found[path] = "holds other bytes"
+    return found
 
 
 def rsync_version() -> str:

@@ -476,6 +476,47 @@ def test_an_inconsistent_manifest_is_refused(release, change, message):
         reproduction.load()
 
 
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda manifest: manifest["editions"].pop("en"), "records the editions"),
+        (
+            lambda manifest: manifest["assets"].pop(0),
+            "does not name every published asset of the editions",
+        ),
+        (
+            lambda manifest: manifest["editions"]["en"].pop("uncaptioned_stage_sha256"),
+            "uncaptioned picture's stage exactly when",
+        ),
+        (
+            lambda manifest: manifest["editions"]["zh"]["picture_floor_db"].update(
+                {"sample-reel-zh.srt": 30.0}
+            ),
+            "records a floor for an asset that is not a film",
+        ),
+        (
+            lambda manifest: manifest["assets"][-1].update(sha256="0" * 64),
+            "SHA256SUMS differs from the assets it lists",
+        ),
+    ],
+)
+def test_the_check_refuses_a_record_in_memory_as_load_refuses_it_on_disk(release, change, message):
+    path = release.root / reproduction.MANIFEST
+    manifest = json.loads(path.read_text())
+    # The record as it stands passes, and the check hands it back.
+    faithful = reproduction.Release.model_validate(manifest)
+    assert reproduction.check(faithful) is faithful
+    change(manifest)
+    path.write_text(json.dumps(manifest))
+    with pytest.raises(ReproductionError, match=message) as on_disk:
+        reproduction.load()
+    # The same record, not yet written: the check reads no manifest, and words it as `load` does.
+    path.unlink()
+    with pytest.raises(ReproductionError, match=message) as in_memory:
+        reproduction.check(reproduction.Release.model_validate(manifest))
+    assert str(in_memory.value) == str(on_disk.value)
+
+
 @pytest.mark.usefixtures("release")
 def test_each_edition_publishes_its_films_documents_cover_and_review():
     edition = production.Edition("en")

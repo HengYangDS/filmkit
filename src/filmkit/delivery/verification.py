@@ -382,6 +382,9 @@ def verify_review(
     passes and every sentence of the current timeline is judged (`filmkit.review.record`).
     """
     path = record or edition.production_review
+    if not path.is_file():
+        msg = f"No review record {repository.relative(path)}"
+        raise VerificationError(msg)
     review = repository.read(path)
     covered = {Path(item["path"]).name: item["sha256"] for item in review["media"]}
     current = {film.name: repository.sha(film) for film in files}
@@ -456,6 +459,16 @@ def verify_films(edition: production.Edition, files: list[Path], renditions: dic
     }
 
 
+def verify_bindings(edition: production.Edition) -> dict:
+    """The checks of an edition's bound inputs, which decode no film, as the report states them."""
+    return {
+        "sources": verify_sources(),
+        "narration": verify_narration(edition),
+        "picture": verify_picture(edition),
+        "package": verify_package(edition),
+    }
+
+
 def qualify(
     edition: production.Edition, files: list[Path], *, technical_only: bool = False
 ) -> dict:
@@ -474,12 +487,7 @@ def qualify(
         "language": edition.code,
     }
     with durations.phase("bindings"):
-        report |= {
-            "sources": verify_sources(),
-            "narration": verify_narration(edition),
-            "picture": verify_picture(edition),
-            "package": verify_package(edition),
-        }
+        report |= verify_bindings(edition)
     with durations.phase("media"):
         report |= verify_films(edition, sorted(files), renditions)
     with durations.phase("spotlight"):
