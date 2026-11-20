@@ -67,7 +67,31 @@ def test_the_actions_are_the_documented_ones_in_order():
         "compare-pictures",
         "repair-pictures",
         "package-film",
+        "scan-film",
     ]
+
+
+def test_scan_film_runs_the_scan_s_owner_and_records_how_long_it_took(monkeypatch):
+    calls = []
+    monkeypatch.setattr(produce.still_scan, "scan_film", calls.append)
+    produce.main(["scan-film", "--language", "en"])
+    assert calls == [production.Edition("en")]
+    record = repository.read("build/evidence/editions/en/durations/scan-film.json")
+    assert (record["command"], record["completed"]) == ("scan-film", True)
+
+
+def test_a_film_the_scan_refuses_ends_the_command_with_the_run_it_holds(monkeypatch):
+    def refuse(_edition):
+        msg = "The zh film holds a still picture with 3.5 s of speech or more: 1.00-5.00 s"
+        raise PictureError(msg)
+
+    monkeypatch.setattr(produce.still_scan, "scan_film", refuse)
+    with pytest.raises(SystemExit) as stopped:
+        produce.main(["scan-film", "--language", "zh"])
+    assert stopped.value.code == (
+        "scan-film: The zh film holds a still picture with 3.5 s of speech or more: 1.00-5.00 s"
+    )
+    assert not repository.read("build/evidence/editions/zh/durations/scan-film.json")["completed"]
 
 
 def test_an_edition_action_passes_its_options_to_its_owner(monkeypatch, tmp_path):

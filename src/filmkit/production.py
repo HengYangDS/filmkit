@@ -279,6 +279,12 @@ class Edition:
         return self.evidence / "draft-stills.json"
 
     @property
+    def film_stills(self) -> Path:
+        """The still scan of the edition's 1080p captioned film, bound to that film, the timeline
+        and the composition (`filmkit.picture.still_scan.scan_film`)."""
+        return self.evidence / "film-stills.json"
+
+    @property
     def draft_stage(self) -> Path:
         """The stage of the edition's 10 fps draft (`filmkit.picture.draft`)."""
         return repository.ROOT / "build/runtime/work/picture-draft" / self.code

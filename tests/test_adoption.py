@@ -12,7 +12,6 @@ import pytest
 
 import filmkit.adoption as adoption
 import filmkit.film as film
-import filmkit.produce as produce
 import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.picture import renderer
@@ -216,10 +215,6 @@ def test_the_command_prints_one_line_and_exits_by_its_findings(project, monkeypa
         adoption.main([])
     assert str(refusal.value).startswith("adoption: 1 finding")
     assert json.loads(capsys.readouterr().out)["findings"]["npm_packages"]
-
-
-def test_the_actions_read_from_the_command_are_the_commands_own():
-    assert adoption.engine_actions() == set(produce.EDITION_ACTIONS)
 
 
 def test_the_packaged_record_equals_what_the_repository_holds():

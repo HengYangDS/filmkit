@@ -69,10 +69,11 @@ def read(path: str | Path) -> dict:
 
 def read_entry(path: str | Path, fields: tuple[str, ...]) -> dict | None:
     """The JSON object at a path when it holds every field named, or None when the file cannot
-    be read, is no JSON object or lacks one of them, as a cache entry that was damaged does."""
+    be read, is no JSON object or lacks one of them, as a cache entry that was damaged does. A
+    body nested deeper than the reader can follow is one that cannot be read."""
     try:
         entry = json.loads((ROOT / path).read_text())
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
         return None
     return entry if isinstance(entry, dict) and all(field in entry for field in fields) else None
 

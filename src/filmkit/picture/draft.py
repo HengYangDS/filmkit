@@ -9,10 +9,11 @@ or the caller's niceness if that is higher, so that it yields to other work on t
 its deadline, and writes the draft's receipt beside the pictures'
 receipts (`Edition.draft_receipt`). The still scan then
 writes the edition's draft record (`still_scan.record_draft`), which `filmkit.preflight` requires
-before a render.
+before a render. That scan is an early warning: a draft can end a still run that the film holds
+whole, and the scan of the packaged film decides (`still_scan.scan_film`).
 
 A render that does not complete raises `PictureError` after its receipt is written and scans
-nothing; a draft that holds a still picture over the limit raises it after its record is written.
+nothing; a draft that holds a still picture at the limit raises it after its record is written.
 A draft needs no passing gate record: it shows how the picture looks before the gates pass.
 
 Usage: python -m filmkit.produce render-draft --language zh|en [--deadline <seconds>]
@@ -43,14 +44,6 @@ NICENESS = 10
 DEADLINE = 3600
 
 
-def still_pictures(record: dict) -> str:
-    """The still runs a draft record finds over its limit, each with its time and its speech."""
-    return "; ".join(
-        f"{run['start']:.2f}-{run['end']:.2f} s with {run['speech']:.2f} s of speech"
-        for run in record["over_limit"]
-    )
-
-
 def render_draft(edition: Edition, deadline: float = DEADLINE) -> dict:
     """Stage, render and scan the edition's draft; its draft record."""
     stage, draft = edition.draft_stage, edition.draft_picture
@@ -72,8 +65,10 @@ def render_draft(edition: Edition, deadline: float = DEADLINE) -> dict:
     print(json.dumps({"longest_fine_speech": longest, "over_limit": failing}))
     if failing:
         msg = (
-            f"The {edition.code} draft holds a still picture over {record['limit_seconds']} s of "
-            f"speech: {still_pictures(record)}; see {repository.relative(edition.draft_stills)}"
+            f"The {edition.code} draft holds a still picture with "
+            f"{still_scan.limit_words(record['limit_seconds'])}: "
+            f"{still_scan.still_pictures(record['over_limit'])}; see "
+            f"{repository.relative(edition.draft_stills)}"
         )
         raise PictureError(msg)
     return record

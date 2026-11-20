@@ -6,6 +6,7 @@ import shutil
 from importlib.metadata import version
 
 import pytest
+import still_records
 
 import filmkit.concepts as concepts
 import filmkit.picture.renderer as picture_renderer
@@ -87,20 +88,7 @@ def edition(tmp_path, monkeypatch):
             "verdict": "pass",
         },
     )
-    put(
-        edition.draft_stills,
-        {
-            "timeline": {"sha256": repository.sha(edition.timeline)},
-            "composition": {"sha256": composition},
-            "limit_seconds": 3.5,
-            "over_limit": [],
-            "drawn_by": {
-                "package": picture_renderer.RENDERER_NAME,
-                "version": picture_renderer.RENDERER_VERSION,
-                "text_renderer": picture_renderer.TEXT_RENDERER,
-            },
-        },
-    )
+    put(edition.draft_stills, still_records.draft_stills(edition))
     put(
         edition.sound_gates,
         {
@@ -197,8 +185,8 @@ def test_every_stale_input_is_named_at_once_and_refuses(edition, monkeypatch, ca
         "uncaptioned_stage: The staged document differs from the one the current sources derive; "
         "run stage-picture --uncaptioned",
         "picture_gate: The zh picture gate record binds another composition_sha256",
-        "draft_stills: build/evidence/editions/zh/draft-stills.json does not bind the current "
-        "composition; scan a new draft",
+        "draft_stills: build/evidence/editions/zh/draft-stills.json binds another composition; "
+        "scan a new draft",
         "concepts: 01: 复刻 is a counterexample of rebuild; 02: says no rendering of offline",
         "film_package: build/evidence/editions/zh/film-package.json binds other picture_sha256, "
         "uncaptioned_picture_sha256, caption_equivalence_sha256, soundtrack_sha256, cover_sha256, "
@@ -271,15 +259,26 @@ def test_a_film_that_declares_no_drafts_is_not_asked_for_a_draft_scan(edition, m
 
 
 def test_the_draft_scan_must_exist_and_pass(edition):
-    record = repository.read(edition.draft_stills)
-    put(edition.draft_stills, {**record, "over_limit": [{"start": 1, "end": 5, "speech": 3.9}]})
+    named = "build/evidence/editions/zh/draft-stills.json"
+    held = [{"start": 1, "end": 5, "speech": 3.9}]
+    record = still_records.draft_stills(edition, held)
+    put(edition.draft_stills, record)
     assert preflight.draft(edition) == (
-        "build/evidence/editions/zh/draft-stills.json finds 1 still pictures over 3.5 s of speech"
+        f"{named} finds 1 still pictures with 3.5 s of speech or more"
     )
+    # The record is read as the film's is (`tests/picture/test_still_record.py`): a draft
+    # scanned with a laxer limit, which calls nothing over its own, states other rules than the
+    # engine's, and a record that lists its runs in no form the scan writes cannot be read.
+    laxer = {"rules": {**record["rules"], "limit_seconds": 99}, "limit_seconds": 99}
+    put(edition.draft_stills, {**record, **laxer, "over_limit": []})
+    assert preflight.draft(edition) == (
+        f"{named} states other rules than the engine's: a limit of 99 s where the engine's is "
+        "3.5 s; scan a new draft"
+    )
+    put(edition.draft_stills, {**record, "fine": {"runs": [{"speech": "3.9"}]}})
+    assert preflight.draft(edition) == f"{named} cannot be read; scan a new draft"
     edition.draft_stills.unlink()
-    assert preflight.draft(edition) == (
-        "no still scan of the 10 fps draft at build/evidence/editions/zh/draft-stills.json"
-    )
+    assert preflight.draft(edition) == f"no still scan of the 10 fps draft at {named}"
 
 
 def test_a_missing_input_is_named_rather_than_raised(edition, monkeypatch):

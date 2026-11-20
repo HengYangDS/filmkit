@@ -14,8 +14,9 @@ with `PreflightError` while any remains:
   (`filmkit.delivery.packaging.stale_bindings`); set its films aside first
   (`filmkit.review.round set-aside`);
 - the draft, for a film that declares drafts (`picture.drafts`): the still scan of the edition's
-  10 fps draft (`Edition.draft_stills`), which must exist, find no still run over the limit and
-  bind the current timeline and composition;
+  10 fps draft (`Edition.draft_stills`), which must exist, list no still run at the limit and
+  bind the current timeline and composition; an early warning, since the scan of the film
+  itself decides once it is packaged (`filmkit.picture.still_scan.scan_film`);
 - the concepts: the film's words against its concept contract (`filmkit.concepts.check`);
 - the picture gate: a passing gate record bound to the current composition, timeline,
   stylesheet, fonts and engine (`filmkit.picture.rendering.require_passing_gates`);
@@ -54,6 +55,7 @@ import filmkit.delivery.packaging as packaging
 import filmkit.delivery.verification as verification
 import filmkit.picture.renderer as renderer
 import filmkit.picture.rendering as rendering
+import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
 import filmkit.review.clarity as review_clarity
 import filmkit.sources as sources
@@ -131,21 +133,21 @@ def package(edition: Edition) -> str | None:
 
 def draft(edition: Edition) -> str | None:
     """Whether the draft's still scan passed on the current timeline and composition, on a
-    draft that the engine's renderer drew."""
+    draft that the engine's renderer drew. The record is read by the reader of the film's
+    record (`still_scan.draft_record`): one that cannot be read, binds another timeline or
+    composition, states other rules than the engine's, did not read the whole draft or
+    contradicts itself admits no render."""
     path, named = edition.draft_stills, repository.relative(edition.draft_stills)
     if not path.is_file():
         return f"no still scan of the 10 fps draft at {named}"
-    record = repository.read(path)
     try:
-        current = {
-            "timeline": repository.sha(edition.timeline),
-            "composition": repository.sha(repository.ROOT / rendering.COMPOSITION_SCRIPT),
-        }
+        record = still_scan.draft_record(edition)
     except FileNotFoundError as error:
         return missing(error)
-    other = [key for key, digest in current.items() if record.get(key, {}).get("sha256") != digest]
-    if other:
-        return f"{named} does not bind the current {' and '.join(other)}; scan a new draft"
+    except rendering.PictureError as error:
+        return str(error)
+    except still_scan.NoAnswerError as error:
+        return f"{named} {error}; scan a new draft"
     draws = {
         "package": renderer.RENDERER_NAME,
         "version": renderer.RENDERER_VERSION,
@@ -153,10 +155,8 @@ def draft(edition: Edition) -> str | None:
     }
     if record.get("drawn_by") != draws:
         return f"{named} scanned a draft that another renderer drew; render the draft again"
-    if record.get("over_limit"):
-        runs, limit = len(record["over_limit"]), record.get("limit_seconds")
-        return f"{named} finds {runs} still pictures over {limit} s of speech"
-    return None
+    held = len(still_scan.over_limit(record))
+    return f"{named} finds {held} still pictures with {still_scan.limit_words()}" if held else None
 
 
 def concept_check() -> str | None:

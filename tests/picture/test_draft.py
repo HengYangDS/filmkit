@@ -9,6 +9,7 @@ import sys
 
 import numpy as np
 import pytest
+import still_records
 
 import filmkit.picture.draft as picture_draft
 import filmkit.picture.encoding as encoding
@@ -21,17 +22,11 @@ from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
 from filmkit.specification import DURATION
 
-# A draft record and receipt that an earlier draft left, bound to the current inputs.
+# What the engine's renderer names itself as in a draft's receipt and record.
 DREW = {
     "package": picture_renderer.RENDERER_NAME,
     "version": picture_renderer.RENDERER_VERSION,
     "text_renderer": picture_renderer.TEXT_RENDERER,
-}
-EARLIER = {
-    "over_limit": [],
-    "limit_seconds": 3.5,
-    "movie": {"path": "earlier.mp4"},
-    "drawn_by": DREW,
 }
 
 
@@ -60,9 +55,17 @@ def frames(moving, still):
 
 
 def scanning(monkeypatch, moving, still):
-    """Have the scan read these frames from any draft at either phase."""
+    """Have the scan read these frames from any draft at either phase, and after them frames
+    that keep moving to the end of the film's seconds: a draft is read whole."""
+
+    def read(_movie, _phase):
+        shown = frames(moving, still)
+        yield from shown
+        for k in range(DURATION * picture_draft.DRAFT_FPS - len(shown)):
+            yield np.roll(shown[0], 7 * (k + 1), axis=1)
+
     monkeypatch.setattr(still_scan, "frame_rate", lambda _movie: picture_draft.DRAFT_FPS)
-    monkeypatch.setattr(still_scan, "decode", lambda _movie, _phase: iter(frames(moving, still)))
+    monkeypatch.setattr(still_scan, "decode", read)
 
 
 def places(code="zh"):
@@ -111,11 +114,14 @@ def test_the_draft_renders_at_niceness_10_or_the_callers_with_its_input_closed_i
 def test_the_draft_scan_lands_where_preflight_reads_it(film_root, tmp_path):
     edition = Edition("zh")
     film_root.timeline(edition, words=[{"text": "先看", "start": 1.0, "end": 2.0}])
+    # The stand-in draft holds the film's seconds, as the timeline it is scanned against states
+    # them: its square moves for four seconds and then stands, under no speech.
+    whole = DURATION * picture_draft.DRAFT_FPS
     movie = tmp_path / "moving.mp4"
     grey = f"{still_scan.WIDTH}x{still_scan.HEIGHT}"
     encode = ["ffmpeg", "-v", "error", "-nostdin", "-f", "rawvideo", "-pix_fmt", "gray"]
     encode += ["-s", grey, "-r", "10", "-i", "-", "-c:v", "libx264", "-qp", "0", str(movie)]
-    pixels = b"".join(frame.tobytes() for frame in frames(40, 0))
+    pixels = b"".join(frame.tobytes() for frame in frames(40, whole - 40))
     subprocess.run(encode, input=pixels, check=True, capture_output=True, timeout=60)
     _, draft, _ = places()
     film_root.queue(draft, movie)
@@ -128,7 +134,7 @@ def test_the_draft_scan_lands_where_preflight_reads_it(film_root, tmp_path):
     assert record["timeline"]["sha256"] == repository.sha(edition.timeline)
     composition = repository.sha(repository.ROOT / picture_rendering.COMPOSITION_SCRIPT)
     assert record["composition"]["sha256"] == composition
-    assert (record["frames"], record["over_limit"]) == (40, [])
+    assert (record["frames"], record["over_limit"]) == (whole, [])
     # The record names what drew the draft, as the draft's receipt does, and admits a render
     # only by that renderer: a record of a browser's draft, which names none, does not.
     assert record["drawn_by"] == DREW
@@ -171,11 +177,7 @@ def test_a_draft_that_does_not_complete_writes_its_receipt_and_no_scan(
 def earlier(edition):
     """Leave an earlier draft's record, bound to the current timeline and composition, and its
     receipt."""
-    composition = repository.sha(repository.ROOT / picture_rendering.COMPOSITION_SCRIPT)
-    bound = {"timeline": {"sha256": repository.sha(edition.timeline)}}
-    repository.write(
-        edition.draft_stills, {**EARLIER, **bound, "composition": {"sha256": composition}}
-    )
+    repository.write(edition.draft_stills, still_records.draft_stills(edition))
     repository.write(places(edition.code)[2], {"picture": "draft", "exit": 0})
     assert preflight.draft(edition) is None
 
@@ -200,13 +202,32 @@ def test_a_draft_with_a_still_picture_is_recorded_and_refused(film_root, monkeyp
     film_root.timeline(edition, words=[{"text": "先看数据", "start": 1.0, "end": 5.0}])
     scanning(monkeypatch, 10, 50)
     named = (
-        "The zh draft holds a still picture over 3.5 s of speech: 0.90-5.90 s with 4.00 s of "
-        "speech; see build/evidence/editions/zh/draft-stills.json"
+        "The zh draft holds a still picture with 3.5 s of speech or more: 0.90-5.90 s with "
+        "4.00 s of speech; see build/evidence/editions/zh/draft-stills.json"
     )
     with pytest.raises(PictureError, match=f"^{named}$"):
         picture_draft.render_draft(edition, 60)
     record = repository.read(edition.draft_stills)
     assert record["over_limit"] == [{"start": 0.9, "end": 5.9, "speech": 4.0}]
     assert preflight.draft(edition) == (
-        "build/evidence/editions/zh/draft-stills.json finds 1 still pictures over 3.5 s of speech"
+        "build/evidence/editions/zh/draft-stills.json finds 1 still pictures with 3.5 s of speech "
+        "or more"
     )
+
+
+def test_the_limit_has_one_wording_which_the_draft_the_pre_render_check_and_the_scan_ask(
+    film_root, monkeypatch
+):
+    edition = Edition("zh")
+    film_root.timeline(edition, words=[{"text": "先看数据", "start": 1.0, "end": 5.0}])
+    scanning(monkeypatch, 10, 50)
+    # Worded otherwise in its one place (`still_scan.limit_words`), the limit reads so in the
+    # draft's refusal, in the pre-render check's answer and in the scan's own refusal.
+    monkeypatch.setattr(still_scan, "limit_words", lambda limit=None: f"<{limit}>")
+    with pytest.raises(PictureError, match="^The zh draft holds a still picture with <3.5>: "):
+        picture_draft.render_draft(edition, 60)
+    assert preflight.draft(edition) == (
+        "build/evidence/editions/zh/draft-stills.json finds 1 still pictures with <None>"
+    )
+    with pytest.raises(PictureError, match="^The zh film holds a still picture with <None>: "):
+        still_scan.refuse_still_pictures(edition, repository.read(edition.draft_stills))

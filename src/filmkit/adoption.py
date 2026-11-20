@@ -52,6 +52,8 @@ QUESTIONS = ("declaration", "npm_packages", "python_lock", "tasks", "template")
 # Where a film's Mise tasks stand, in the order Mise's own documentation lists the files.
 TASK_FILES = (".config/mise/config.toml", "mise.toml", ".mise.toml")
 PRODUCE = "filmkit.produce"
+# The folder that holds the engine's modules.
+PACKAGE = Path(__file__).parent
 # An engine module as a task's text names it after `-m`, whatever runs it.
 MODULE = re.compile(r"""(?<![\w.-])-m\s+["']?(filmkit(?:\.[A-Za-z_]\w*)*)(?=["'\s]|$)""")
 # Where one command of a task's text ends.
@@ -108,25 +110,82 @@ def held(root: Path, *names: str) -> Path | None:
     return None
 
 
-def engine_actions() -> set[str]:
-    """The actions `filmkit.produce` takes, read from the command's source: the command itself
-    cannot be imported before the film's declaration loads."""
-    source = Path(__file__).with_name("produce.py").read_text(encoding="utf-8")
-    for node in ast.walk(ast.parse(source)):
-        if (
-            isinstance(node, ast.AnnAssign)
-            and getattr(node.target, "id", None) == "EDITION_ACTIONS"
-            and isinstance(node.value, ast.Dict)
-        ):
-            keys = [key.value for key in node.value.keys if isinstance(key, ast.Constant)]
-            return {key for key in keys if isinstance(key, str)}
-    message = "filmkit.produce states no actions where the adoption command reads them"
+def module_path(module: str, package: Path = PACKAGE) -> Path:
+    """Where the engine holds one of its modules, the suffix of its file left to the caller."""
+    return package.joinpath(*module.split(".")[1:])
+
+
+def stores(tree: ast.Module) -> list[str]:
+    """Every name that a module's source binds by an assignment, once for each binding."""
+    found = (node for node in ast.walk(tree) if isinstance(node, ast.Name))
+    return [node.id for node in found if isinstance(node.ctx, ast.Store)]
+
+
+def stated(tree: ast.Module, name: str, where: str) -> ast.expr:
+    """What a module's source states under a name: the value of the one statement that binds
+    the name, at the module's top level. A name bound nowhere, more than once or below the top
+    level is refused: what it holds when the module has run cannot be read from the source."""
+    values = [
+        node.value
+        for node in tree.body
+        if isinstance(node, ast.Assign | ast.AnnAssign)
+        and node.value is not None
+        and [
+            getattr(target, "id", None)
+            for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+        ]
+        == [name]
+    ]
+    if values and stores(tree).count(name) == 1:
+        return values[0]
+    message = f"{where} states {name} in no one statement that the adoption command can read"
     raise LookupError(message)
+
+
+def action(key: ast.expr | None, modules: dict[str, Path]) -> str:
+    """The action that one key of the command's table names."""
+    match key:
+        case ast.Constant(value=str(name)):
+            return name
+        case ast.Attribute(value=ast.Name(id=owner), attr=name) if owner in modules:
+            source = ast.parse(modules[owner].read_text(encoding="utf-8"))
+            match stated(source, name, modules[owner].name):
+                case ast.Constant(value=str(value)):
+                    return value
+    form = ast.unparse(key) if key else "another table's entries"
+    message = f"{PRODUCE} names an action by {form}, which the adoption command cannot read"
+    raise LookupError(message)
+
+
+def engine_actions(command: Path = PACKAGE / "produce.py") -> set[str]:
+    """The actions `filmkit.produce` takes, read from the command's source: the command itself
+    cannot be imported before the film's declaration loads. The command states its table once,
+    at its top level, and names each action there by a string, or by a name that a module of
+    the engine states once as a string and that the command imports at its top level under a
+    name it binds nowhere else. Any other form of the table or of a key is refused, never left
+    out. What the command does to the table after stating it, and a name bound again by an
+    import or a definition, are not read: the engine's tests hold the command's own table to
+    this reading."""
+    source = ast.parse(command.read_text(encoding="utf-8"))
+    table = stated(source, "EDITION_ACTIONS", PRODUCE)
+    if not isinstance(table, ast.Dict):
+        message = f"{PRODUCE} states its actions in no table that the adoption command can read"
+        raise LookupError(message)
+    modules: dict[str, Path] = {}
+    for alias in (
+        alias for node in source.body if isinstance(node, ast.Import) for alias in node.names
+    ):
+        path = module_path(alias.name, command.parent).with_suffix(".py")
+        if alias.asname and alias.name.split(".")[0] == PACKAGE.name and path.is_file():
+            modules[alias.asname] = path
+    for name in stores(source):
+        modules.pop(name, None)
+    return {action(key, modules) for key in table.keys}
 
 
 def module_exists(module: str) -> bool:
     """Whether this engine holds a module that `python -m` can run."""
-    path = Path(__file__).parent.joinpath(*module.split(".")[1:])
+    path = module_path(module)
     return path.with_suffix(".py").is_file() or (path / "__main__.py").is_file()
 
 

@@ -18,9 +18,10 @@ every other action refuses them.
 A refusal by an action's owner exits with status 1 and "<action>: <reason>" on standard
 error. check-sound measures the assembled soundtrack with its refreshed captions and refuses a
 segment under the film's clarity floor, an abrupt or cut ending and a stopped phrase
-(`filmkit.soundtrack.gates`). Assembling a soundtrack and refreshing captions first refuse while
-a review round binds the edition's films and has not set them aside
-(`filmkit.review.set_aside.require_set_aside`).
+(`filmkit.soundtrack.gates`). scan-film scans the edition's packaged 1080p captioned film for
+still pictures under speech and writes its still scan record (`filmkit.picture.still_scan`).
+Assembling a soundtrack and refreshing captions first refuse while a review round binds the
+edition's films and has not set them aside (`filmkit.review.set_aside.require_set_aside`).
 Every action writes a duration record for its edition when it ends, named after the action and,
 for the uncaptioned picture, with `-uncaptioned` after it (`filmkit.durations`).
 The command owns no goal, approval, repository lifecycle, service or task state.
@@ -40,6 +41,7 @@ import filmkit.durations as durations
 import filmkit.picture.derivation as derivation
 import filmkit.picture.draft as draft
 import filmkit.picture.renderer as renderer
+import filmkit.picture.still_scan as still_scan
 from filmkit.captions.refresh import refresh_captions
 from filmkit.delivery.packaging import PackagingError, package_film, package_metadata
 from filmkit.media import MediaError
@@ -138,6 +140,7 @@ EDITION_ACTIONS: dict[str, Callable[[Edition, argparse.Namespace], object]] = {
         deadline(options, renderer.DEADLINE),
     ),
     "package-film": lambda edition, _: package_film(edition),
+    still_scan.SCAN_ACTION: lambda edition, _: still_scan.scan_film(edition),
 }
 # The actions that take either of the edition's two pictures.
 PICTURE_ACTIONS = ("stage-picture", "render-picture", "validate-picture")
