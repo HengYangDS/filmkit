@@ -480,31 +480,55 @@ def test_boundary_ratios_weigh_each_heard_boundary_against_the_quiet_beside_it()
     }
 
 
-def test_the_measured_sync_carries_its_continuity_and_binds_its_sources(root, put):
-    # The review reads unnamed speech, held pictures and seats from the measurements, and
-    # only from an audit of the current timeline drawn by the current composition.
+def test_the_measured_sync_is_the_report_the_picture_gate_judged(root, put):
+    # The review reads unnamed speech, held pictures and seats from the measurements, and only
+    # from the sync report that the gate record of the current timeline and composition binds.
     edition = Edition("zh")
     composition = put(root / picture_rendering.COMPOSITION_SCRIPT, "/* film */")
+    timeline = put(edition.timeline, {"segments": []})
     continuity = {"unnamed_speech": [], "held_over": [], "seats": []}
-    report = dict.fromkeys(picture_sync_audit.SUMMARY_KEYS, 0)
-    report |= {"findings": [], "continuity": continuity, "bound_timeline": {"sha256": "ab"}}
-    put(edition.picture_sync, report | {"composition_sha256": repository.sha(composition)})
-    measured = review_measurement.picture_sync(edition, "ab")
-    assert measured == {
-        **dict.fromkeys(picture_sync_audit.SUMMARY_KEYS, 0),
-        "findings": [],
-        "continuity": continuity,
+    judged = dict.fromkeys(picture_sync_audit.SUMMARY_KEYS, 0)
+    judged |= {"findings": [], "continuity": continuity}
+    report = put(root / "build/runtime/work/picture-gates/zh/sync.json", judged | {"judged": []})
+    record = {
+        "composition_sha256": repository.sha(composition),
+        "timeline_sha256": repository.sha(timeline),
+        "reports": {
+            "sync": {"path": repository.relative(report), "sha256": repository.sha(report)}
+        },
     }
-    with pytest.raises(
-        ReviewError, match="zh: the sync audit is not bound to the current timeline"
-    ):
-        review_measurement.picture_sync(edition, "cd")
-    for bound in ({}, {"composition_sha256": "0" * 64}):
-        put(edition.picture_sync, report | bound)
-        with pytest.raises(
-            ReviewError, match="zh: the sync audit is not bound to the current composition"
-        ):
-            review_measurement.picture_sync(edition, "ab")
+    put(edition.picture_gates, record)
+    # A gated edition is measured from the gate's report; no separate sync record exists.
+    assert not (edition.evidence / "picture-sync.json").exists()
+    assert review_measurement.picture_sync(edition) == judged
+
+    def refusal():
+        with pytest.raises(ReviewError) as refused:
+            review_measurement.picture_sync(edition)
+        return str(refused.value)
+
+    put(timeline, {"segments": [], "moved": True})
+    assert refusal() == "zh: the picture gate record is not bound to the current timeline"
+    put(timeline, {"segments": []})
+    put(composition, "/* another film */")
+    assert refusal() == "zh: the picture gate record is not bound to the current composition"
+    put(composition, "/* film */")
+    put(report, judged | {"judged": [], "tolerance": 0.5})
+    assert refusal() == "zh: the sync report differs from the one its gate record binds"
+    # A report cleared from the gate's work folder, a record that binds none and an edition that
+    # was never gated each refuse in one line that names the command to run.
+    report.unlink()
+    assert refusal() == (
+        "zh: missing build/runtime/work/picture-gates/zh/sync.json, the sync report its gate "
+        "record binds; run check-picture again"
+    )
+    put(edition.picture_gates, record | {"reports": {"motion": record["reports"]["sync"]}})
+    assert refusal() == "zh: the picture gate record binds no sync report; run check-picture again"
+    edition.picture_gates.unlink()
+    assert refusal() == (
+        "zh: missing build/evidence/editions/zh/picture-gates.json, the picture gate record; "
+        "run check-picture"
+    )
 
 
 @pytest.mark.usefixtures("root")

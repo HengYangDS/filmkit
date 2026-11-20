@@ -27,7 +27,8 @@ the entry page and both players back in a real browser from build/artifacts/film
 the members as the destination will, turning each player's captions off and on and playing all
 four of its films, and delivery refuses a page that fails, naming the page and its problems;
 its receipt is build/evidence/delivery/player-check.json, which the readback names with its
-SHA-256. A dry run reads no player.
+SHA-256. A dry run reads no player. A review round asks for the same readback of the same
+members into its own directory (`bind_players`, `read_bound_players`), with no delivery.
 
 A delivery empties its destination of whatever is no member, so it refuses, before anything is
 read back or changed and in a dry run too, a destination it must not fill (`refuse_unfit`): an
@@ -317,33 +318,60 @@ def check_players(binding: Path, receipt: Path) -> int:
     return tools.run("player-check", ["players", str(binding), str(receipt)])
 
 
-def read_players(root: Path, members: list[tuple[Path, str]]) -> dict:
-    """Read every page back from the members' sources, and refuse a page that fails."""
-    binding = {
+def bind_players(root: Path, members: list[tuple[Path, str]], binding: Path | None = None) -> Path:
+    """Write the members as the player check reads them from their sources, and return the
+    binding: the folder that holds them, the film's file prefix and duration, and each member's
+    path and SHA-256. It lies in the delivery's work folder unless another place is named."""
+    binding = binding or root / PLAYERS_BINDING
+    bound = {
         "destination": str(root / SOURCE),
         "film": dict(BOUND_FILM),
         "members": [{"path": path, "sha256": repository.sha(source)} for source, path in members],
     }
-    repository.write(root / PLAYERS_BINDING, binding)
-    (root / PLAYERS).unlink(missing_ok=True)
+    repository.write(binding, bound)
+    return binding
+
+
+def read_bound_players(
+    root: Path,
+    binding: Path,
+    receipt: Path | None = None,
+    *,
+    outcome: str = ", so nothing is delivered",
+) -> dict:
+    """Read every page of a written binding back in a real browser, and refuse a page that
+    fails. The receipt lies in the delivery's evidence unless another place is named; the check
+    writes one screenshot a player beside it, and holds the members to the binding's SHA-256
+    before and after it reads, so a binding written earlier is read as it was written. A refusal
+    says what follows from it for the caller, `outcome`: a delivery delivers nothing, and a
+    caller that delivers nothing, such as a review round, passes its own words or none."""
+    receipt = receipt or root / PLAYERS
+    receipt.unlink(missing_ok=True)
     try:
-        status = check_players(root / PLAYERS_BINDING, root / PLAYERS)
+        status = check_players(binding, receipt)
     except (PictureError, tools.ToolError) as error:
-        msg = f"The player check cannot run, so nothing is delivered: {error}"
+        msg = f"The player check cannot run{outcome}: {error}"
         raise DeliveryRefusedError(msg) from error
     if status != 0:
         failed = []
-        if (root / PLAYERS).is_file():
-            pages = repository.read(root / PLAYERS).get("pages", [])
+        if receipt.is_file():
+            pages = repository.read(receipt).get("pages", [])
             failed = [
                 f"{page['page']}: {'; '.join(page['problems'])}"
                 for page in pages
                 if page["verdict"] != "pass"
             ]
         reason = " | ".join(failed) or f"The player check exited with status {status}"
-        msg = f"The players fail their readback, so nothing is delivered: {reason}"
+        msg = f"The players fail their readback{outcome}: {reason}"
         raise DeliveryRefusedError(msg)
-    return {"receipt": str(PLAYERS), "sha256": repository.sha(root / PLAYERS)}
+    named = receipt.relative_to(root) if receipt.is_relative_to(root) else receipt
+    return {"receipt": str(named), "sha256": repository.sha(receipt)}
+
+
+def read_players(root: Path, members: list[tuple[Path, str]]) -> dict:
+    """Read every page back from the members' sources, and refuse a page that fails; the
+    binding and the receipt lie in the delivery's own places."""
+    return read_bound_players(root, bind_players(root, members))
 
 
 def deliver(

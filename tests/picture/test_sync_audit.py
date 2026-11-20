@@ -5,9 +5,7 @@ import re
 
 import pytest
 
-import filmkit.picture.rendering as picture_rendering
 import filmkit.picture.sync_audit as picture_sync_audit
-import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
 
 
@@ -361,28 +359,18 @@ def test_parts_are_judged_on_their_own_and_reports_are_deterministic(tmp_path):
     for name in ("first.json", "second.json"):
         out = tmp_path / name
         picture_sync_audit.main(
-            [
-                str(timeline_path),
-                str(trace_path),
-                "--out",
-                str(out),
-                "--bind",
-                str(timeline_path),
-                "--marks",
-                str(marks_path),
-            ]
+            [str(timeline_path), str(trace_path), "--out", str(out), "--marks", str(marks_path)]
         )
         outputs.append(out.read_text())
     assert outputs[0] == outputs[1]
     written = json.loads(outputs[0])
-    assert written["bound_timeline"] == {
-        "path": str(timeline_path),
-        "sha256": repository.sha(timeline_path),
-    }
-    # The trace comes from running the composition, so the report binds its script too.
-    composition = repository.ROOT / picture_rendering.COMPOSITION_SCRIPT
-    assert written["composition_sha256"] == repository.sha(composition)
     assert set(written["continuity"]) == {"unnamed_speech", "held_over", "seats", "caption_echoes"}
+    # A report binds nothing itself: the picture gate's record binds the report it judged to its
+    # timeline and composition, and the command has no option that would.
+    assert not {"bound_timeline", "composition_sha256"} & set(written)
+    with pytest.raises(SystemExit) as refused:
+        picture_sync_audit.main([str(timeline_path), str(trace_path), "--bind", str(timeline_path)])
+    assert refused.value.code == 2
 
 
 def test_words_that_do_not_cover_their_segment_text_are_refused():

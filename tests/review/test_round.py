@@ -1,15 +1,21 @@
-"""Exercise the review round: its command, the player-check binding and the records."""
+"""Exercise the review round's command and its records; `test_prepare` holds its preparation."""
 
 import json
-import re
+import os
+import shutil
+import subprocess
+import sys
 
 import pytest
 
 import filmkit.delivery.verification as delivery_verification
+import filmkit.film as film
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 import filmkit.review.files as review_files
+import filmkit.review.record as review_record
 import filmkit.review.round as review_round
+from filmkit.delivery.verification import VerificationError
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
 
@@ -24,45 +30,6 @@ def test_the_command_reports_only_its_own_refusals(put):
         review_round.main(["set-aside", "--round", "3", "--purpose", PURPOSE, "--dry-run"])
 
 
-def test_bind_names_the_language_entry_and_each_packaged_member(root, put):
-    put(root / "build/artifacts/film/index.html", "entry")
-    for code in CODES:
-        names = ["sample-reel-cover.png", f"sample-reel-{code}.srt", "index.html"]
-        for name in names:
-            put(root / "build/artifacts/film" / code / name, f"{code} {name}")
-        put(
-            Edition(code).viewing_package,
-            {"members": [{"path": name, "sha256": "recorded"} for name in names]},
-        )
-    assert review_round.bind(root / "binding.json") == {
-        "members": 15,
-        "binding": "binding.json",
-    }
-    binding = json.loads((root / "binding.json").read_text())
-    assert binding["destination"] == str(root / "build/artifacts/film")
-    assert [member["path"] for member in binding["members"]] == [
-        "index.html",
-        *[
-            f"{code}/{name}"
-            for code in CODES
-            for name in (
-                f"sample-reel-{code}-uhd.mp4",
-                f"sample-reel-{code}-1080p-captioned.mp4",
-                f"sample-reel-{code}-uhd-uncaptioned.mp4",
-                f"sample-reel-{code}-1080p-uncaptioned.mp4",
-                "sample-reel-cover.png",
-                f"sample-reel-{code}.srt",
-                "index.html",
-            )
-        ],
-    ]
-    for member in binding["members"]:
-        assert member["sha256"] == repository.sha(root / "build/artifacts/film" / member["path"])
-    (root / "build/artifacts/film/en/index.html").unlink()
-    with pytest.raises(ReviewError, match=re.escape("missing build/artifacts/film/en/index.html")):
-        review_round.bind(root / "binding.json")
-
-
 @pytest.mark.usefixtures("unleveled")
 def test_record_writes_reviews_that_verify_film_accepts(root, review, put, capsys):
     for code in CODES:
@@ -74,12 +41,8 @@ def test_record_writes_reviews_that_verify_film_accepts(root, review, put, capsy
         for film in Edition("en").films
     ]
     review(folder, "zh", findings=[{"id": "R5-1", "severity": "minor"}])
+    # A stated overall decides nothing: the record derives 96.0 from the scores.
     review(folder, "en", media=relative, overall=97.0)
-    with pytest.raises(
-        ReviewError, match=re.escape("en: reported overall 97.0 is not the mean 96.0")
-    ):
-        review_round.review_records(folder)
-    review(folder, "en", media=relative)
     put(Edition("zh").film("uhd"), "zh uhd changed")
     with pytest.raises(ReviewError, match="zh: reviewed media differ"):
         review_round.review_records(folder)
@@ -129,10 +92,144 @@ def test_record_writes_reviews_that_verify_film_accepts(root, review, put, capsy
         assert root / accepted["path"] == edition.production_review
 
 
-def test_record_requires_each_review_to_report_its_overall(root, review):
-    # The prompt asks for the overall score, so a review without one is incomplete.
+@pytest.mark.usefixtures("unleveled")
+def test_the_record_derives_the_overall_whatever_a_review_states(root, review, put):
+    # Round 42 of the DDWG film stated 99.3 for twelve scores whose mean is 99.25, which the
+    # engine rounds to 99.2; the record's overall is the engine's.
+    assert review_record.overall(dict(enumerate([99] * 9 + [100] * 3))) == 99.2
+    for code in CODES:
+        put(root / Edition(code).script, f"{code} script")
+    put(root / picture_rendering.COMPOSITION_SCRIPT, "composition")
     folder = root / "build/evidence/reviews/round-5"
     review(folder, "zh", overall=None)
+    review(folder, "en", overall=99.3)
+    records = review_round.review_records(folder)
+    assert [written.record["overall"] for written in records] == [96.0, 96.0]
+
+
+def reviewed_build(root, put):
+    """The scripts and the composition a record binds, and the round's directory."""
+    for code in CODES:
+        put(root / Edition(code).script, f"{code} script")
+    put(root / picture_rendering.COMPOSITION_SCRIPT, "composition")
+    return root / "build/evidence/reviews/round-5"
+
+
+@pytest.mark.usefixtures("unleveled")
+def test_a_film_that_accepts_notes_records_no_review_with_another_finding(
+    root, review, put, monkeypatch
+):
+    folder = reviewed_build(root, put)
+    monkeypatch.setattr(review_record, "ACCEPTED_SEVERITIES", ("note",))
+    note = {"id": "R5-0", "severity": "note"}
     review(folder, "en")
-    with pytest.raises(ReviewError, match="zh: a review reports its overall score"):
+    # Every score stands above the floor: the finding refuses, by its id and its severity.
+    for finding, named in (
+        ({"id": "R5-1", "severity": "minor"}, "minor finding R5-1"),
+        ({"id": "R5-2", "severity": "minro"}, "minro finding R5-2"),
+        ({"id": "R5-3"}, "finding R5-3 without a severity"),
+    ):
+        review(folder, "zh", findings=[note, finding])
+        with pytest.raises(ReviewError) as refusal:
+            review_round.review_records(folder)
+        assert str(refusal.value) == (
+            f"zh: the review holds what the film does not accept: {named}"
+        )
+    review(folder, "zh", findings=[note])
+    assert [written.record["findings"] for written in review_round.review_records(folder)] == [
+        [note],
+        [],
+    ]
+    # An empty list accepts no finding.
+    monkeypatch.setattr(review_record, "ACCEPTED_SEVERITIES", ())
+    with pytest.raises(ReviewError, match="does not accept: note finding R5-0"):
         review_round.review_records(folder)
+
+
+@pytest.mark.usefixtures("unleveled")
+def test_a_film_that_declares_no_severities_records_a_material_finding_the_verifier_refuses(
+    root, review, put, capsys
+):
+    # Without the list and without levels nothing in `record` names a severity: the review is
+    # recorded as before, and the verifier refuses the record as before.
+    assert review_record.ACCEPTED_SEVERITIES is None
+    folder = reviewed_build(root, put)
+    review(folder, "zh", findings=[{"id": "R5-1", "severity": "material"}])
+    review(folder, "en")
+    review_round.main(["record", "--round-dir", str(folder)])
+    assert [edition["material"] for edition in json.loads(capsys.readouterr().out)["editions"]] == [
+        1,
+        0,
+    ]
+    zh, en = Edition("zh"), Edition("en")
+    with pytest.raises(VerificationError) as refusal:
+        delivery_verification.verify_review(zh, sorted(zh.films))
+    assert str(refusal.value) == "Review records an unresolved material finding R5-1"
+    assert delivery_verification.verify_review(en, sorted(en.films))["overall"] == 96.0
+
+
+@pytest.mark.usefixtures("unleveled")
+def test_twelve_scores_with_the_mean_99_25_are_recorded_with_the_overall_99_2(
+    root, review, put, monkeypatch, capsys
+):
+    # The scores of the DDWG film's round 42, whose review stated 99.3: the written record
+    # holds the engine's rounding of their mean.
+    scores = {f"dimension_{number}": 99 if number < 9 else 100 for number in range(12)}
+    assert sum(scores.values()) / len(scores) == 99.25
+    monkeypatch.setattr(review_round, "DIMENSIONS", dict.fromkeys(scores, "asked"))
+    folder = reviewed_build(root, put)
+    for code in CODES:
+        review(folder, code, scores=scores, overall=99.3)
+    review_round.main(["record", "--round-dir", str(folder)])
+    printed = json.loads(capsys.readouterr().out)["editions"]
+    assert [edition["overall"] for edition in printed] == [99.2, 99.2]
+    for code in CODES:
+        record = json.loads(Edition(code).production_review.read_text())
+        assert (record["overall"], record["scores"]) == (99.2, scores)
+
+
+def test_a_declaration_s_accepted_severities_reach_the_record_through_the_loader(tmp_path, put):
+    # A film's own declaration file, read by the engine as a command reads it: nothing here
+    # sets the record's constant, so a record that ignored the declaration would fail this.
+    for _field, path in film.named_files(film.FILM):
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(repository.ROOT / path, tmp_path / path)
+    declared = (repository.ROOT / film.DECLARATION).read_text(encoding="utf-8")
+    assert "accepted_severities" not in declared
+    folder = tmp_path / "build/evidence/reviews/round-5"
+    media = []
+    for name in ("uhd", "1080p-captioned", "uhd-uncaptioned", "1080p-uncaptioned"):
+        path = put(tmp_path / f"build/artifacts/film/zh/sample-reel-zh-{name}.mp4", name)
+        media.append({"path": str(path), "sha256": repository.content_sha(name)})
+    scores = dict.fromkeys(review_record.DIMENSIONS, 96)
+    entry = {"media": media, "scores": scores, "findings": [{"id": "R5-1", "severity": "minor"}]}
+    put(folder / "review-zh.json", {"reviewer": "Reviewer", "editions": {"zh": entry}})
+    put(folder / "zh-review.md", "# zh review\n")
+
+    def recorded(declaration):
+        put(tmp_path / film.DECLARATION, declaration)
+        command = [sys.executable, "-m", "filmkit.review.round", "record", "--round-dir", folder]
+        environment = os.environ | {"FILMKIT_ROOT": str(tmp_path)}
+        ended = subprocess.run(
+            command,
+            cwd=tmp_path,
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=110,
+        )
+        return ended.returncode, ended.stderr.strip().splitlines()[-1]
+
+    accepting = declared.replace("[review]\n", '[review]\naccepted_severities = ["note"]\n', 1)
+    assert recorded(accepting) == (
+        1,
+        "record: zh: the review holds what the film does not accept: minor finding R5-1",
+    )
+    # The same film without the list is not refused for its minor finding: its levels are next.
+    assert recorded(declared) == (
+        1,
+        "record: zh: the review's levels do not pass: no verdict for level 信; no verdict for "
+        "level 达; no verdict for level 雅; finding R5-1 names no level",
+    )

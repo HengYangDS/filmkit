@@ -118,6 +118,13 @@ class Rendered:
         return "captioned" if self.captions else "uncaptioned"
 
 
+def review_report(record: Path) -> Path:
+    """The report of a review record: beside it and under its name, as Markdown. A round writes
+    the copy there, the verifier reads it there and a release publishes it from there, wherever
+    the record lies."""
+    return record.with_suffix(".md")
+
+
 @dataclass(frozen=True)
 class Edition:
     """Keep language-specific source, timing, media and evidence together."""
@@ -254,10 +261,6 @@ class Edition:
     def sound_gates(self) -> Path:
         """The record of the measures that check-sound took on the assembled soundtrack."""
         return self.evidence / "sound-gates.json"
-
-    @property
-    def picture_sync(self) -> Path:
-        return self.evidence / "picture-sync.json"
 
     @property
     def picture_gates(self) -> Path:

@@ -244,3 +244,57 @@ def test_the_player_check_runs_the_engines_tool_on_the_binding(monkeypatch, tmp_
     binding, receipt = tmp_path / "binding.json", tmp_path / "receipt.json"
     assert delivery_folder.check_players(binding, receipt) == 0
     assert calls == [("player-check", ["players", str(binding), str(receipt)])]
+
+
+def test_the_players_readback_lies_where_a_delivery_keeps_it_or_where_it_is_told(film, monkeypatch):
+    root, _ = film
+
+    def pictured(binding, receipt):
+        """Stand in for the player check: every page passes, and one screenshot a player lies
+        beside the receipt, as the check writes them."""
+        shots = [receipt.with_name(f"player-{code}.png") for code in CODES]
+        for shot in shots:
+            film.write(shot, f"{shot.name} of {binding.name}\n")
+        named = [{"path": str(shot), "sha256": repository.sha(shot)} for shot in shots]
+        film.write(receipt, json.dumps({"pass": True, "pages": [], "screenshots": named}))
+        return 0
+
+    monkeypatch.setattr(delivery_folder, "check_players", pictured)
+    plan = delivery_folder.plan(root)
+    # A delivery's readback lies where it does today: the binding in the delivery's work folder,
+    # the receipt and the screenshots beside it in the delivery's evidence.
+    receipt = root / delivery_folder.PLAYERS
+    assert delivery_folder.read_players(root, plan) == {
+        "receipt": str(delivery_folder.PLAYERS),
+        "sha256": repository.sha(receipt),
+    }
+    evidence = "build/evidence/delivery"
+    kept = {
+        "build/runtime/work/delivery/players.json",
+        *(f"{evidence}/{name}" for name in ("player-check.json", "player-en.png", "player-zh.png")),
+    }
+    sources = {source.relative_to(root).as_posix() for source, _ in plan}
+    assert set(film.tree(root)) == sources | kept
+    delivered = film.tree(root)
+    # A readback into another folder, as a review round asks for its own, writes the binding, the
+    # receipt and the screenshots there and changes nothing of the delivery's.
+    folder = root / "build/evidence/reviews/round-3"
+    binding, receipt = folder / "player-check-artifacts.json", folder / "player-check.json"
+    bound = delivery_folder.bind_players(root, plan, binding)
+    assert delivery_folder.read_bound_players(root, bound, receipt) == {
+        "receipt": "build/evidence/reviews/round-3/player-check.json",
+        "sha256": repository.sha(receipt),
+    }
+    assert sorted(path.name for path in folder.iterdir()) == [
+        "player-check-artifacts.json",
+        "player-check.json",
+        "player-en.png",
+        "player-zh.png",
+    ]
+    assert json.loads(binding.read_text()) == json.loads(
+        (root / delivery_folder.PLAYERS_BINDING).read_text()
+    )
+    assert [shot["path"] for shot in json.loads(receipt.read_text())["screenshots"]] == [
+        str(folder / f"player-{code}.png") for code in CODES
+    ]
+    assert {path: text for path, text in film.tree(root).items() if path in delivered} == delivered

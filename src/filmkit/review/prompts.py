@@ -16,7 +16,8 @@ A film that declares review levels gets prompts only when its template cites `{l
 states each level with what it asks and, under it, each of its dimensions with what that asks,
 and `{sentences}`, which names the file of the edition's sentences (`filmkit.review.sentences`)
 that the prompts write into the round's directory as sentences-<code>.json, each with its id,
-text and timeline times, for a verdict on every one. A film without levels fills neither.
+text and timeline times, for a verdict on every one. A film without levels fills neither. A
+template that cites a field the engine does not fill is refused, naming the field.
 
 A round after the first gives each finding of the previous round's reviews one disposition in a
 dispositions file: fixed, with the evidence that its reverification holds; declared, with the
@@ -28,6 +29,7 @@ the field.
 
 from __future__ import annotations
 
+import re
 import string
 from pathlib import Path
 
@@ -38,16 +40,28 @@ from filmkit.film import FILM
 from filmkit.narration.readings import plan_path
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
-from filmkit.review.files import cited, edition_review, present, round_findings, round_number
+from filmkit.review.files import (
+    cited,
+    edition_review,
+    present,
+    review_files,
+    round_findings,
+    round_number,
+)
 from filmkit.review.record import DIMENSIONS
 from filmkit.review.sentences import sentences
 
-# The round's own inputs that each reviewer prompt names.
-ROUND_INPUTS = (
-    "pronunciation-listening-plan.json",
-    "measurements.json",
-    "player-check-artifacts.json",
-)
+# The round's own inputs that each reviewer prompt names: the listening plan, the measurements
+# and the binding of the delivery members whose players were read back.
+LISTENING_PLAN = "pronunciation-listening-plan.json"
+MEASUREMENTS = "measurements.json"
+BINDING = "player-check-artifacts.json"
+ROUND_INPUTS = (LISTENING_PLAN, MEASUREMENTS, BINDING)
+# Each edition's files that the prompts write into the round's directory: its sentences, for a
+# film with levels, and its prompt.
+SENTENCES, PROMPT = "sentences-{code}.json", "prompt-{code}.md"
+# The fields that each edition's films and its sentences file fill.
+EDITION_FIELDS = ("media", "sentences")
 # The reviewer prompt, filled per edition: the str.format template the film declares.
 TEMPLATE = (repository.ROOT / FILM.review.prompt).read_text(encoding="utf-8")
 # How the prompt names an optional field that the film or a script does not declare.
@@ -127,18 +141,16 @@ def levels_text() -> str:
     return "\n".join(lines)
 
 
-def write_sentences(out_dir: Path) -> dict[str, str]:
-    """Write each edition's sentences into the round's directory, and each edition's
-    `{sentences}`: the file as the prompts cite it, or "none declared" without levels."""
+def edition_sentences() -> dict[str, list[dict]]:
+    """Each edition's sentences from its current timeline, for a film with levels; none for a
+    film without. An edition without a timeline is refused."""
     if FILM.review.levels is None:
-        return dict.fromkeys(CODES, NOT_DECLARED)
-    found = {}
-    for code in CODES:
-        path = out_dir / f"sentences-{code}.json"
-        rows = sentences(repository.read(Edition(code).timeline), code)
-        repository.write(path, {"edition": code, "sentences": rows})
-        found[code] = cited(path)
-    return found
+        return {}
+    timelines = present([Edition(code).timeline for code in CODES])
+    return {
+        code: sentences(repository.read(timeline), code)
+        for code, timeline in zip(CODES, timelines, strict=True)
+    }
 
 
 def declared_seconds(policy: dict, key: str) -> str:
@@ -198,11 +210,23 @@ def previous_review(previous: Path | None, code: str, findings: str) -> str:
     """The sentence that cites the previous round's review, or states that a round is the first."""
     if previous is None:
         return FIRST_ROUND
+    review, report = review_files(previous, code)
     return (
-        f"The previous review is in {cited(previous)}/{code}-review.md and "
-        f"{cited(previous)}/review-{code}.json ({findings}). Verify on these media whether each "
-        "repair landed, and judge everything independently."
+        f"The previous review is in {cited(report)} and {cited(review)} ({findings}). Verify on "
+        "these media whether each repair landed, and judge everything independently."
     )
+
+
+def changes_text(changes: Path | None) -> str:
+    """`{changes}`: the round's changes note, or nothing without one. A note that is missing or
+    is no UTF-8 text is refused by name."""
+    if changes is None:
+        return ""
+    try:
+        return present([changes])[0].read_text(encoding="utf-8").strip() + "\n"
+    except UnicodeDecodeError as error:
+        msg = f"{repository.relative(changes)} is not UTF-8 text: {error}"
+        raise ReviewError(msg) from None
 
 
 def prompt_context(out_dir: Path, previous: Path | None, changes: Path | None) -> dict:
@@ -228,7 +252,7 @@ def prompt_context(out_dir: Path, previous: Path | None, changes: Path | None) -
         "readings": " and ".join(cited(repository.ROOT / plan_path(code)) for code in CODES),
         "out": cited(out_dir),
         **({} if previous is None else {"previous": cited(previous)}),
-        "changes": "" if changes is None else changes.read_text().strip() + "\n",
+        "changes": changes_text(changes),
         "duration": specification.DURATION,
         "fps": specification.FPS,
         "rate": f"{specification.RATE / 1000:g}",
@@ -256,7 +280,7 @@ def previous_context(previous: Path | None, code: str) -> dict:
     """
     if previous is None:
         return {"previous_review": FIRST_ROUND, "findings": "", "scripts": ""}
-    review = present([previous / f"review-{code}.json", previous / f"{code}-review.md"])[0]
+    review = present(list(review_files(previous, code)))[0]
     found = edition_review(review, code)[1]["findings"]
     findings = f"findings: {finding_index(found)}" if found else "no findings"
     working = previous / code
@@ -300,14 +324,22 @@ def checked_dispositions(path: Path, previous: Path) -> tuple[int, dict[str, lis
     file is {"round": <n>, "findings": {<finding id>: <disposition>}} for that round, giving
     each finding of the round's reviews one disposition that holds its fields and no others; the
     refusal names each finding without one, each identifier the round does not hold and each
-    entry that is not a disposition.
+    entry that is not a disposition. A file that the engine's reader cannot decode as JSON, one
+    in another encoding or with a byte order mark among them, is refused by name: an author
+    writes it, so it is no fault of the engine's own records.
     """
     number = round_number(previous)
     if number is None:
         where = repository.relative(previous)
         msg = f"the previous round's directory {where} is not named round-<n>"
         raise ReviewError(msg)
-    record, where = repository.read(present([path])[0]), repository.relative(path)
+    where = repository.relative(path)
+    present([path])
+    try:
+        record = repository.read(path)
+    except ValueError as error:
+        msg = f"{where} is not JSON: {error}"
+        raise ReviewError(msg) from None
     if (
         not isinstance(record, dict)
         or set(record) != {"round", "findings"}
@@ -385,25 +417,22 @@ def stated_dispositions(previous: Path | None, path: Path | None) -> dict[str, s
     return {code: disposition_text(number, findings[code], entries) for code in CODES}
 
 
-def prompts(
+def read_round(
     previous: Path | None,
     out_dir: Path,
     changes: Path | None = None,
     dispositions: Path | None = None,
-) -> dict:
-    """Write each edition's independent reviewer prompt for one round.
+) -> tuple[dict[str, dict], dict[str, list[dict]]]:
+    """Each edition's template fields other than its films and its sentences file, and each
+    edition's sentences: everything of a round's prompts that only reading gives.
 
-    Each prompt names the exact packaged films with their SHA-256, the previous round's
-    review and its findings, or that the round is the first, the round's own inputs and the
-    policies the film declares. changes holds Markdown context bullets for this round, such
-    as the repairs since the previous review, and dispositions the disposition of each finding
-    of the previous round (`stated_dispositions`). The previous review is context to verify,
-    never a score to inherit. Nothing is written unless both editions' films, the previous
-    reviews when a previous round is named and the round's inputs exist, a first round's
-    template cites no previous review, a later round disposes of every previous finding, and the
-    review configuration keeps the concept contract the film declares (`contract_gaps`) and the
-    levels it declares (`level_gaps`). For a film with levels, each edition's sentences are
-    written beside the prompts (`write_sentences`).
+    A round's preparation asks this before it derives anything, and `prompts` before it writes
+    anything. Refused unless the review configuration keeps the concept contract the film
+    declares (`contract_gaps`) and the levels it declares (`level_gaps`), a first round's
+    template cites no previous review, a later round disposes of every previous finding
+    (`stated_dispositions`), the previous round holds each edition's review and report, the
+    changes note is text, the soundtracks declare one program level, the template cites no field
+    the engine does not fill, and each edition of a film with levels has its timeline.
     """
     gaps = contract_gaps(TEMPLATE, DIMENSIONS)
     if gaps:
@@ -422,30 +451,68 @@ def prompts(
         )
         raise ReviewError(msg)
     stated = stated_dispositions(previous, dispositions)
-    present([out_dir / name for name in ROUND_INPUTS])
     context = prompt_context(out_dir, previous, changes)
-    listed = write_sentences(out_dir)
-    texts = {}
+    fields = {}
     for code in CODES:
-        edition = Edition(code)
         other = next(name for name in CODES if name != code)
-        media = "\n".join(
-            f"- {film} (SHA-256 {repository.sha(film)})" for film in present(edition.films)
-        )
-        texts[code] = TEMPLATE.format(
+        fields[code] = {
             **context,
             **previous_context(previous, code),
-            dispositions=stated[code],
-            sentences=listed[code],
-            language=edition.language,
-            code=code,
-            other=other,
-            other_language=Edition(other).language,
+            "dispositions": stated[code],
+            "language": Edition(code).language,
+            "code": code,
+            "other": other,
+            "other_language": Edition(other).language,
+        }
+    # A field is filled by its first name: `{root.name}` asks for `root`, and `{}` for none.
+    filled = {*fields[CODES[0]], *EDITION_FIELDS}
+    named = {name for _, name, _, _ in string.Formatter().parse(TEMPLATE) if name is not None}
+    unknown = sorted(
+        name for name in named if re.split(r"[.\[]", name, maxsplit=1)[0] not in filled
+    )
+    if unknown:
+        cites = " and ".join(f"{{{name}}}" for name in unknown)
+        msg = f"{FILM.review.prompt} cites {cites}, which the engine does not fill"
+        raise ReviewError(msg)
+    return fields, edition_sentences()
+
+
+def prompts(
+    previous: Path | None,
+    out_dir: Path,
+    changes: Path | None = None,
+    dispositions: Path | None = None,
+) -> dict:
+    """Write each edition's independent reviewer prompt for one round.
+
+    Each prompt names the exact packaged films with their SHA-256, the previous round's
+    review and its findings, or that the round is the first, the round's own inputs and the
+    policies the film declares. changes holds Markdown context bullets for this round, such
+    as the repairs since the previous review, and dispositions the disposition of each finding
+    of the previous round (`stated_dispositions`). The previous review is context to verify,
+    never a score to inherit. Nothing is written unless everything that only reads passes
+    (`read_round`), the round's inputs exist and both editions' films are in place. For a film
+    with levels, each edition's sentences are then written into the round's directory as
+    sentences-<code>.json, and the prompts after them.
+    """
+    fields, rows = read_round(previous, out_dir, changes, dispositions)
+    present([out_dir / name for name in ROUND_INPUTS])
+    listed = {code: out_dir / SENTENCES.format(code=code) for code in rows}
+    texts = {}
+    for code in CODES:
+        media = "\n".join(
+            f"- {film} (SHA-256 {repository.sha(film)})" for film in present(Edition(code).films)
+        )
+        texts[code] = TEMPLATE.format(
+            **fields[code],
+            sentences=cited(listed[code]) if code in listed else NOT_DECLARED,
             media=media,
         )
+    for code, path in listed.items():
+        repository.write(path, {"edition": code, "sentences": rows[code]})
     written = []
     for code, text in texts.items():
-        path = out_dir / f"prompt-{code}.md"
+        path = out_dir / PROMPT.format(code=code)
         path.write_text(text)
         written.append(repository.relative(path))
     return {"prompts": written}

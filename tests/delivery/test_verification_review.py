@@ -103,3 +103,29 @@ def test_review_accepts_only_current_media_above_thresholds(current_review):
     files[0].write_text("re-encoded")
     with pytest.raises(VerificationError, match="current delivered edition"):
         check()
+
+
+@pytest.mark.usefixtures("unleveled")
+def test_a_film_that_accepts_notes_verifies_no_review_with_another_finding(
+    current_review, monkeypatch
+):
+    check, _, _ = current_review
+    # A film that does not declare the list accepts the minor finding its record holds.
+    assert review_record.ACCEPTED_SEVERITIES is None
+    assert check()["overall"] == 96.0
+    monkeypatch.setattr(review_record, "ACCEPTED_SEVERITIES", ("note",))
+    note = {"id": "R1", "severity": "note"}
+    assert check(findings=[note])["overall"] == 96.0
+    for finding, named in (
+        ({"id": "R2", "severity": "minor"}, "minor finding R2"),
+        ({"id": "R3", "severity": "minro"}, "minro finding R3"),
+        ({"id": "R4"}, "finding R4 without a severity"),
+        ({"severity": "material"}, "material finding"),
+    ):
+        with pytest.raises(VerificationError) as refusal:
+            check(findings=[note, finding])
+        assert str(refusal.value) == f"Review records an unresolved {named}"
+    # An empty list accepts no finding.
+    monkeypatch.setattr(review_record, "ACCEPTED_SEVERITIES", ())
+    with pytest.raises(VerificationError, match="unresolved note finding R1"):
+        check(findings=[note])

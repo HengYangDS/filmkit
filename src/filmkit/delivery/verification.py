@@ -377,9 +377,9 @@ def verify_review(
     """Accept only a current review of every delivered film above threshold.
 
     The record is the edition's own unless a published one is named. A review covers each
-    film by its name and bytes, and its report lies beside it under the same name. For a film
-    that declares review levels, every level passes and every sentence of the current timeline
-    is judged (`filmkit.review.record`).
+    film by its name and bytes, and its report lies beside it under the same name. It holds no
+    finding the film does not accept, and for a film that declares review levels every level
+    passes and every sentence of the current timeline is judged (`filmkit.review.record`).
     """
     path = record or edition.production_review
     review = repository.read(path)
@@ -407,8 +407,8 @@ def verify_review(
     ):
         msg = "Review scores are below the acceptance thresholds"
         raise VerificationError(msg)
-    if any(finding["severity"] == "material" for finding in review["findings"]):
-        msg = "Review records an unresolved material finding"
+    if refused := review_record.refused_findings(review["findings"]):
+        msg = "Review records an unresolved " + "; ".join(refused)
         raise VerificationError(msg)
     problems = review_record.level_problems(review, scores, review["findings"])
     if problems:
@@ -418,8 +418,7 @@ def verify_review(
     if problems:
         msg = "Review does not judge every sentence: " + "; ".join(problems)
         raise VerificationError(msg)
-    # The report lies beside its record wherever the record was placed.
-    report = path.with_suffix(".md")
+    report = production.review_report(path)
     if not report.is_file() or repository.sha(report) != review["report"]["sha256"]:
         msg = "Review report differs from its record"
         raise VerificationError(msg)

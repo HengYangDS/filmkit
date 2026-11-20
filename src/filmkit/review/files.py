@@ -2,7 +2,7 @@
 
 Each step of `filmkit.review.round` refuses a missing input with `ReviewError` before it moves or
 writes anything, and the reviewer prompts cite a path below the film's root as ROOT/<path>. A
-round's directory is round-<n> below `REVIEWS`, and n is the round's number.
+round's directory is round-<n> below `REVIEWS`, and n is the round's number, 0 or more.
 """
 
 from __future__ import annotations
@@ -37,6 +37,11 @@ def present(paths: list[Path]) -> list[Path]:
 
 
 def round_directory(number: int) -> Path:
+    """The directory of the round of that number, refused for a number below 0: no round's
+    directory bears such a name (`ROUND_NAME`), so no later step would find the round."""
+    if number < 0:
+        msg = f"a round's number is 0 or more, not {number}"
+        raise ReviewError(msg)
     return repository.ROOT / REVIEWS / f"round-{number}"
 
 
@@ -44,6 +49,12 @@ def round_number(directory: Path) -> int | None:
     """The number of the round whose directory this is, or None for a folder of another name."""
     name = ROUND_NAME.fullmatch(directory.name)
     return None if name is None else int(name[1])
+
+
+def review_files(directory: Path, code: str) -> tuple[Path, Path]:
+    """An edition's review and its report in a round's directory, under the names its reviewer
+    writes them: review-<code>.json and <code>-review.md. The one place the engine names them."""
+    return directory / f"review-{code}.json", directory / f"{code}-review.md"
 
 
 def edition_review(path: Path, code: str) -> tuple[dict, dict]:
@@ -59,14 +70,14 @@ def edition_review(path: Path, code: str) -> tuple[dict, dict]:
 def round_findings(directory: Path) -> dict[str, list[str]]:
     """Each edition's finding identifiers in a round's reviews, in the order its review gives them.
 
-    They are every `findings[].id` of each edition's review-<code>.json. Refused unless both
+    They are every `findings[].id` of each edition's review (`review_files`). Refused unless both
     reviews exist and each identifier names one finding, so that a disposition keyed by an
     identifier answers one finding.
     """
     findings = {
         code: [
             finding["id"]
-            for finding in edition_review(directory / f"review-{code}.json", code)[1]["findings"]
+            for finding in edition_review(review_files(directory, code)[0], code)[1]["findings"]
         ]
         for code in CODES
     }

@@ -459,12 +459,17 @@ export async function readPlayer(page, root, code, binding, screenshot) {
   return { ...verdict(path, [...problems, ...stopped]), ...read, track, cues, srt_cues };
 }
 
-/** Read the entry page and both players of the bound delivery, writing each player's screenshot beside the receipt. */
-export async function readDelivery(page, binding, receiptPath) {
+/** Read the entry page and both players of the bound delivery, writing each player's screenshot beside the receipt.
+ * `screenshots` takes each screenshot's path before its player is read: the one place a screenshot is named, so that
+ * the receipt can list what a read wrote also when the read stopped. A file of that name is removed there, so that a
+ * screenshot beside the receipt is this read's and never one an earlier check left. */
+export async function readDelivery(page, binding, receiptPath, screenshots = []) {
   const members = binding.members.map((member) => member.path);
   const pages = [await readEntry(page, binding.destination, members)];
   for (const code of Object.keys(LANGUAGES)) {
     const screenshot = join(dirname(receiptPath), `player-${code}.png`);
+    screenshots.push(screenshot);
+    await rm(screenshot, { force: true });
     pages.push(await readPlayer(page, binding.destination, code, binding, screenshot));
   }
   return pages;

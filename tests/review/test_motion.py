@@ -188,20 +188,34 @@ def test_a_gate_record_or_report_bound_to_other_inputs_is_refused(gated, put, ro
     ):
         review_motion.picture_motion(edition)
     report.unlink()
-    with pytest.raises(
-        ReviewError, match="missing build/runtime/work/picture-gates/zh/motion.json"
-    ):
+    # A report cleared from the gate's work folder, a record that binds none and an edition that
+    # was never gated each refuse in one line that names the command to run.
+    with pytest.raises(ReviewError) as refusal:
         review_motion.picture_motion(edition)
+    assert str(refusal.value) == (
+        "zh: missing build/runtime/work/picture-gates/zh/motion.json, the motion report its gate "
+        "record binds; run check-picture again"
+    )
+    put(edition.picture_gates, record | {"reports": {}})
+    with pytest.raises(ReviewError) as refusal:
+        review_motion.picture_motion(edition)
+    assert str(refusal.value) == (
+        "zh: the picture gate record binds no motion report; run check-picture again"
+    )
     edition.picture_gates.unlink()
-    with pytest.raises(ReviewError, match="missing build/evidence/editions/zh/picture-gates.json"):
+    with pytest.raises(ReviewError) as refusal:
         review_motion.picture_motion(edition)
+    assert str(refusal.value) == (
+        "zh: missing build/evidence/editions/zh/picture-gates.json, the picture gate record; "
+        "run check-picture"
+    )
 
 
 def test_the_edition_s_measurements_carry_its_motion_beside_its_sync(gated, monkeypatch):
     edition, _ = gated
     monkeypatch.setattr(review_measurement, "picture_sync", lambda *arguments: {"sync": True})
     monkeypatch.setattr(review_measurement, "picture_geometry", lambda *arguments: {"geometry": 1})
-    measured = review_measurement.picture_measures(edition, repository.sha(edition.timeline))
+    measured = review_measurement.picture_measures(edition)
     assert measured == {
         "picture": {"geometry": 1},
         "picture_sync": {"sync": True},

@@ -1,14 +1,24 @@
 """Prepare and record one independent review round of both editions.
 
 A round sets the packages of the previous build aside before the next render
-(`filmkit.review.set_aside`), binds the packaged members for the real-browser player check,
-writes each edition's reviewer prompt with the exact media hashes and the previous round's
-findings with the disposition of each, or states that the round is the first
-(`filmkit.review.prompts`), and records the finished reviews as the production reviews that
-`filmkit.delivery.verification` accepts. A round's directory defaults to
-build/evidence/reviews/round-<n>/. Setting aside and recording are planned and checked in full
-before anything moves or is written, and --dry-run stops after the plan. A refused input raises
-`ReviewError`, which each command reports as its refusal.
+(`filmkit.review.set_aside`), prepares its directory, build/evidence/reviews/round-<n>/, with
+one command, and records the finished reviews as the production reviews that
+`filmkit.delivery.verification` accepts.
+
+`prepare` writes what the round's reviewers read: the binding of the members a delivery would
+hold and the real-browser readback of their players (`filmkit.delivery.folder`), the listening
+plan (`filmkit.review.listening_plan`), the measurements (`filmkit.review.measurement`), the
+changes note and the dispositions it was given, and each edition's sentences and reviewer prompt
+with the exact media hashes and the previous round's findings with the disposition of each, or
+the statement that the round is the first (`filmkit.review.prompts`). It checks what it reads
+before it derives anything, writes the note and the dispositions first and the prompts last,
+and prepares a round again only while the round holds nothing but a preparation.
+
+Setting aside and recording are planned and checked in full before anything moves or is written,
+and --dry-run stops after the plan. A refused input raises `ReviewError`, which each command
+reports as its refusal in one line. `prepare` reports the same way the refusals of the owners
+it asks (`OWNER_REFUSALS`); a fault, such as a tool's failed process or a missing record of the
+engine's own, is not caught and shows in full.
 
 A reviewed round's packages are set aside by the round's reviews; an unreviewed build's, such as
 a preview the owner watched, with --unreviewed by the consumer folder that holds its films, under
@@ -20,9 +30,8 @@ Usage: python -m filmkit.review.round set-aside --round <n> --purpose <text>
        python -m filmkit.review.round set-aside --unreviewed --consumer <dir>
            (--round <n> | --label <label>) --purpose <text>
            [--language zh|en] [--without-picture [zh|en ...]] [--dry-run]
-       python -m filmkit.review.round bind --out <file>
-       python -m filmkit.review.round prompts --round <n>
-           [--previous <dir> --dispositions <file>] [--changes <file>] [--out-dir <dir>]
+       python -m filmkit.review.round prepare --round <n>
+           [--previous <dir> --dispositions <file>] [--changes <file>]
        python -m filmkit.review.round record --round-dir <dir> [--dry-run]
 """
 
@@ -35,24 +44,50 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
 
+import filmkit.delivery.folder as delivery_folder
+import filmkit.media as media
 import filmkit.repository as repository
+import filmkit.review.listening_plan as review_listening_plan
+import filmkit.review.measurement as review_measurement
 import filmkit.review.prompts as round_prompts
 import filmkit.review.record as review_record
 import filmkit.review.set_aside as set_aside
-from filmkit.delivery.packaging import BOUND_FILM
+import filmkit.soundtrack.level as soundtrack_level
+import filmkit.sources as sources
+import filmkit.tools as tools
+from filmkit.film import MATERIAL
+from filmkit.narration.spoken_units import AlignmentError
+from filmkit.picture.errors import PictureError
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
-from filmkit.production import CODES, Edition
+from filmkit.production import CODES, Edition, review_report
 from filmkit.review import ReviewError
-from filmkit.review.files import edition_review, present, round_directory
+from filmkit.review.files import edition_review, present, review_files, round_directory
 from filmkit.review.record import DIMENSIONS, SCHEMA_VERSION, overall
+
+# The round's files that a preparation names besides those the prompts name and write
+# (`filmkit.review.prompts`): the players' readback and the copies of the changes note and the
+# dispositions. The screenshots that the player check writes beside the readback are named by
+# the check alone, and the round reads their names from the readback (`listed_screenshots`).
+READBACK = "player-check.json"
+CHANGES, DISPOSITIONS = "changes.md", "dispositions.json"
+# The classes by which the owners a preparation asks refuse. `prepare` reports an exception of
+# one of them as the round's refusal in one line, and catches no other: any other exception is
+# a fault and shows in full. So this tuple is where a new owner's refusal is admitted.
+OWNER_REFUSALS = (
+    delivery_folder.DeliveryRefusedError,
+    tools.ToolError,
+    PictureError,
+    media.MediaError,
+    soundtrack_level.LevelError,
+    AlignmentError,
+    sources.SourceError,
+)
 
 HUMAN_LISTENING = (
     "Audio is scored from automated evidence: recognition, word timings, rate, the "
     "pause hierarchy, quiet edges, thought levels, endings and waveforms. Human "
     "listening is a separate acceptance after delivery and does not affect the scores."
 )
-# A reported overall score may differ from the mean of its scores by this much rounding.
-OVERALL_ROUNDING = 0.05
 
 
 class ProductionReview(NamedTuple):
@@ -63,66 +98,161 @@ class ProductionReview(NamedTuple):
     record: dict
 
 
-def bind(out: Path) -> dict:
-    """Bind the packaged delivery members for the real-browser player check.
+def listed_screenshots(round_dir: Path) -> list[str]:
+    """The names of the files that the round's readback lists as its screenshots, that lie in
+    the round's directory and that hold the bytes the readback lists.
 
-    The members are the neutral language entry and, for each edition, its four films and
-    the viewing package its package record names. Writes the destination, the film's file
-    prefix and duration, and each member's path and SHA-256, the shape the player check reads.
+    The readback is the one statement of what the player check wrote beside it, so the round
+    states no screenshot's name of its own. A round without a readback, a readback that is no
+    JSON and one that lists no screenshot name none. A listed file that lies elsewhere is not
+    the round's, and one whose SHA-256 is not the listed one is not the file the check wrote:
+    neither is a preparation's, so a readback that lists another file of the round, by hand or
+    by fault, has nothing removed. A readback of another shape, whose `screenshots` is no list
+    of entries that each hold a `path` and a `sha256`, is a fault of the engine's own record
+    and shows with its traceback.
     """
-    destination = repository.ROOT / "build/artifacts/film"
-    paths = ["index.html"]
-    for code in CODES:
-        edition = Edition(code)
-        viewing = repository.read(present([edition.viewing_package])[0])
-        paths += [f"{code}/{film.name}" for film in edition.films]
-        paths += [f"{code}/{member['path']}" for member in viewing["members"]]
-    present([destination / path for path in paths])
-    members = [{"path": path, "sha256": repository.sha(destination / path)} for path in paths]
-    repository.write(
-        out, {"destination": str(destination), "film": dict(BOUND_FILM), "members": members}
+    readback = repository.read_entry(round_dir / READBACK, ("screenshots",))
+    listed = [
+        (Path(shot["path"]), shot["sha256"]) for shot in (readback or {}).get("screenshots") or ()
+    ]
+    return [
+        path.name
+        for path, sha256 in listed
+        if delivery_folder.same_folder(path.parent, round_dir)
+        and path.is_file()
+        and repository.sha(path) == sha256
+    ]
+
+
+def prepared_names(round_dir: Path) -> list[str]:
+    """The name of every file of a preparation in a round's directory: the names the round
+    itself gives, whether a given run writes them or not, and the screenshots its readback
+    lists (`listed_screenshots`)."""
+    each = (round_prompts.SENTENCES, round_prompts.PROMPT)
+    return [
+        *round_prompts.ROUND_INPUTS,
+        READBACK,
+        CHANGES,
+        DISPOSITIONS,
+        *(name.format(code=code) for code in CODES for name in each),
+        *listed_screenshots(round_dir),
+    ]
+
+
+def given(path: Path | None) -> bytes | None:
+    """The bytes of a file the caller names, refused when it is missing; None when none is
+    named."""
+    return None if path is None else present([path])[0].read_bytes()
+
+
+def refuse_more_than_a_preparation(number: int, round_dir: Path) -> None:
+    """Refuse a round that holds an entry a preparation does not write, and one whose label
+    holds set-aside films.
+
+    A review, a reviewer's working folder or any other entry says that the round is under way:
+    preparing it again would change what its reviewers read. An entry that bears a prepared
+    file's name and is no file, a folder for one, is such an entry too, and so is an image that
+    the round's readback does not list (`prepared_names`). A set-aside under the round's label
+    moved the films its prompts named, so the films in place are another build's and the label
+    is taken: they are the next round's. Finder's `.DS_Store` is no entry, as in a delivery.
+    """
+    written = {*prepared_names(round_dir), delivery_folder.FINDER_METADATA}
+    held = sorted(round_dir.iterdir()) if round_dir.is_dir() else []
+    others = [entry.name for entry in held if entry.name not in written or not entry.is_file()]
+    if others:
+        msg = (
+            f"{repository.relative(round_dir)} holds {', '.join(others)}, which a preparation "
+            "does not write; a round is prepared again only while it holds nothing else"
+        )
+        raise ReviewError(msg)
+    aside = repository.ROOT / set_aside.SUPERSEDED / set_aside.round_label(number)
+    if aside.exists():
+        msg = (
+            f"the films of round {number} were set aside under its label, "
+            f"{repository.relative(aside)}; prepare round {number + 1}"
+        )
+        raise ReviewError(msg)
+
+
+def prepare(
+    number: int,
+    previous: Path | None = None,
+    changes: Path | None = None,
+    dispositions: Path | None = None,
+) -> dict:
+    """Prepare a round: write everything its reviewers read into its directory.
+
+    What only reads comes first, so that a refusal there changes no file and leaves a round
+    without a directory as it was. A round's number is 0 or more (`round_directory`). The
+    changes note and the dispositions are read, since either may be the round's own copy of an
+    earlier preparation. Then everything the prompts read is read and checked
+    (`filmkit.review.prompts.read_round`): the template's fields, the previous round's reviews,
+    reports and dispositions, a dispositions file that is no JSON being refused by name, the
+    note's text, the program levels and each edition's timeline. Then the films and the other
+    members a delivery would hold, and the round itself (`refuse_more_than_a_preparation`).
+
+    Every file of an earlier preparation is then removed (`prepared_names`), and the round is
+    written in this order: the copies of the note and the dispositions from what was read, the
+    binding of the delivery's members, the listening plan, the measurements, the real-browser
+    readback of the members' players with its screenshots, and each edition's sentences and
+    prompt. The copies come first: they may be the only ones, so they are back before anything
+    that can refuse. The measurements come before the browser starts, so what they refuse is
+    known first. The prompts come last: a round without prompts binds no film and starts no
+    reviewer, so a preparation that stops leaves nothing that can be taken for a round.
+    """
+    round_dir = round_directory(number)
+    copies = {CHANGES: given(changes), DISPOSITIONS: given(dispositions)}
+    round_prompts.read_round(previous, round_dir, changes, dispositions)
+    members = delivery_folder.plan(repository.ROOT)
+    present([source for source, _ in members])
+    refuse_more_than_a_preparation(number, round_dir)
+    for name in prepared_names(round_dir):
+        (round_dir / name).unlink(missing_ok=True)
+    kept = {name: round_dir / name for name, body in copies.items() if body is not None}
+    for name, copy in kept.items():
+        copy.parent.mkdir(parents=True, exist_ok=True)
+        copy.write_bytes(copies[name])
+    binding = delivery_folder.bind_players(
+        repository.ROOT, members, round_dir / round_prompts.BINDING
     )
-    return {"members": len(members), "binding": repository.relative(out)}
+    review_listening_plan.listening_plan(round_dir / round_prompts.LISTENING_PLAN)
+    review_measurement.write(round_dir / round_prompts.MEASUREMENTS)
+    delivery_folder.read_bound_players(repository.ROOT, binding, round_dir / READBACK, outcome="")
+    written = round_prompts.prompts(previous, round_dir, kept.get(CHANGES), kept.get(DISPOSITIONS))
+    return {"round": repository.relative(round_dir), "members": len(members), **written}
 
 
 def reviewed_scores(code: str, review: dict) -> dict:
-    """A review's scores in record order.
+    """A review's scores in record order, which must be exactly the declared dimensions.
 
-    They must be exactly the declared dimensions, and the review must report their mean
-    as its overall score.
+    The record derives its overall from them (`filmkit.review.record.overall`); an overall
+    that the review states is neither required nor compared.
     """
     if set(review.get("scores", {})) != set(DIMENSIONS):
         msg = f"{code}: a review scores exactly the declared dimensions"
         raise ReviewError(msg)
-    scores = {name: review["scores"][name] for name in DIMENSIONS}
-    mean, reported = overall(scores), review.get("overall")
-    if not isinstance(reported, int | float) or isinstance(reported, bool):
-        msg = f"{code}: a review reports its overall score"
-        raise ReviewError(msg)
-    if abs(reported - mean) > OVERALL_ROUNDING:
-        msg = f"{code}: reported overall {reported} is not the mean {mean}"
-        raise ReviewError(msg)
-    return scores
+    return {name: review["scores"][name] for name in DIMENSIONS}
 
 
 def review_records(round_dir: Path) -> list[ProductionReview]:
     """Each edition's production review record from a finished round, checked, not written.
 
-    Reads review-<code>.json and <code>-review.md from the round directory and derives
+    Reads each edition's review and report from the round directory (`review_files`) and derives
     the schema 2 record that the film verifier accepts beside a copy of the report: the
-    exact reviewed media, script and composition hashes, the declared scores and their
-    mean, every finding and the human-listening state. Both reviews must cover the
-    current delivered films, score exactly the declared dimensions and report their mean.
+    exact reviewed media, script and composition hashes, the declared scores and the
+    overall derived from them, every finding and the human-listening state. Both reviews must
+    cover the current delivered films and score exactly the declared dimensions.
     For a film that declares review levels, the record carries each level's verdict and each
     sentence's, and a review whose levels do not pass or that leaves a sentence unjudged is
-    refused (`filmkit.review.record`).
+    refused (`filmkit.review.record`). For a film that declares the severities a review may
+    hold, a review with a finding of any other severity or of none is refused, by the finding's
+    id and severity; a film that does not declare them records its review whatever its findings,
+    and the verifier judges them.
     """
     records = []
     for code in CODES:
         edition = Edition(code)
-        source, report = present(
-            [round_dir / f"review-{code}.json", round_dir / f"{code}-review.md"]
-        )
+        source, report = present(list(review_files(round_dir, code)))
         review, entry = edition_review(source, code)
         current = {
             repository.relative(film): repository.sha(film) for film in present(edition.films)
@@ -135,6 +265,11 @@ def review_records(round_dir: Path) -> list[ProductionReview]:
             msg = f"{code}: reviewed media differ from the current delivered films"
             raise ReviewError(msg)
         scores = reviewed_scores(code, entry)
+        if review_record.ACCEPTED_SEVERITIES is not None and (
+            refused := review_record.refused_findings(entry["findings"])
+        ):
+            msg = f"{code}: the review holds what the film does not accept: " + "; ".join(refused)
+            raise ReviewError(msg)
         problems = review_record.level_problems(entry, scores, entry["findings"])
         if problems:
             msg = f"{code}: the review's levels do not pass: " + "; ".join(problems)
@@ -167,7 +302,7 @@ def review_records(round_dir: Path) -> list[ProductionReview]:
                 "checklist": entry.get("human_listening_checklist", []),
             },
             "report": {
-                "path": repository.relative(target.with_name("production-review.md")),
+                "path": repository.relative(review_report(target)),
                 "sha256": repository.sha(report),
             },
             "source_review": {
@@ -183,7 +318,7 @@ def write_review_records(records: list[ProductionReview]) -> None:
     """Write each production review record beside a copy of its report."""
     for review in records:
         review.target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(review.report, review.target.with_name("production-review.md"))
+        shutil.copyfile(review.report, review_report(review.target))
         repository.write(review.target, review.record)
 
 
@@ -196,7 +331,7 @@ def record_report(records: list[ProductionReview], *, dry_run: bool) -> dict:
                 "language": review.record["language"],
                 "overall": review.record["overall"],
                 "minimum": min(review.record["scores"].values()),
-                "material": sum(f.get("severity") == "material" for f in review.record["findings"]),
+                "material": sum(f.get("severity") == MATERIAL for f in review.record["findings"]),
             }
             for review in records
         ],
@@ -228,17 +363,17 @@ def run_set_aside(options: argparse.Namespace) -> dict:
     return set_aside.set_aside_report(plans, dry_run=options.dry_run)
 
 
-def run_bind(options: argparse.Namespace) -> dict:
-    return bind(options.out.resolve())
-
-
-def run_prompts(options: argparse.Namespace) -> dict:
-    return round_prompts.prompts(
-        options.previous.resolve() if options.previous else None,
-        (options.out_dir or round_directory(options.round)).resolve(),
-        options.changes.resolve() if options.changes else None,
-        options.dispositions.resolve() if options.dispositions else None,
-    )
+def run_prepare(options: argparse.Namespace) -> dict:
+    try:
+        return prepare(
+            options.round,
+            options.previous.resolve() if options.previous else None,
+            options.changes.resolve() if options.changes else None,
+            options.dispositions.resolve() if options.dispositions else None,
+        )
+    except OWNER_REFUSALS as error:
+        # An owner's refusal is the round's, in one line whatever lines its own words hold.
+        raise ReviewError(" ".join(str(error).split())) from error
 
 
 def run_record(options: argparse.Namespace) -> dict:
@@ -295,10 +430,9 @@ def command_parser() -> argparse.ArgumentParser:
     set_aside_options(
         commands.add_parser("set-aside", help="move the previous build's packages aside")
     )
-    binding = commands.add_parser("bind", help="bind the packaged members for the player check")
-    binding.add_argument("--out", type=Path, required=True, metavar="FILE")
-    binding.set_defaults(run=run_bind)
-    prompt = commands.add_parser("prompts", help="write the round's reviewer prompts")
+    prompt = commands.add_parser(
+        "prepare", help="write the round's directory: its inputs, its readback and its prompts"
+    )
     prompt.add_argument("--round", type=int, required=True, metavar="N")
     prompt.add_argument(
         "--previous",
@@ -310,7 +444,7 @@ def command_parser() -> argparse.ArgumentParser:
         "--changes",
         type=Path,
         metavar="FILE",
-        help="Markdown context bullets: the repairs since the previous review",
+        help="Markdown context bullets: the repairs since the previous review; kept in the round",
     )
     prompt.add_argument(
         "--dispositions",
@@ -318,13 +452,7 @@ def command_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         help="the disposition of each finding of the previous round, as JSON; with --previous",
     )
-    prompt.add_argument(
-        "--out-dir",
-        type=Path,
-        metavar="DIR",
-        help="the round's directory (default build/evidence/reviews/round-N)",
-    )
-    prompt.set_defaults(run=run_prompts)
+    prompt.set_defaults(run=run_prepare)
     recorder = commands.add_parser(
         "record", help="record the round's reviews as production reviews"
     )

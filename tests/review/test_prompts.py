@@ -7,7 +7,6 @@ import pytest
 import filmkit.repository as repository
 import filmkit.review.prompts as review_prompts
 import filmkit.review.record as review_record
-import filmkit.review.round as review_round
 import filmkit.sources as sources
 import filmkit.specification as specification
 from filmkit.production import CODES, Edition
@@ -254,7 +253,7 @@ def round_inputs(root, put, monkeypatch):
 @pytest.mark.usefixtures("unleveled")
 def test_a_first_round_states_that_no_earlier_review_exists(root, put, monkeypatch):
     out = round_inputs(root, put, monkeypatch)
-    review_round.main(["prompts", "--round", "1"])
+    review_prompts.prompts(None, out)
     for code in CODES:
         text = (out / f"prompt-{code}.md").read_text()
         # A first round has no dispositions to state, so its prompts read as before.
@@ -331,22 +330,21 @@ def test_a_round_after_the_first_needs_the_dispositions_of_the_previous_findings
     review(previous, "en")
     fixed = {"disposition": "fixed", "evidence": "The card names all seven checks."}
     disposed = put(root / "dispositions.json", {"round": 0, "findings": {"R0-1": fixed}})
-    later = ["prompts", "--round", "1", "--previous", str(previous)]
     refusals = [
         (
-            later,
+            (previous, out),
             "--previous build/evidence/reviews/round-0 needs --dispositions <file>, a disposition "
             "of each of its findings",
         ),
         (
-            ["prompts", "--round", "1", "--dispositions", str(disposed)],
+            (None, out, None, disposed),
             "--dispositions needs --previous; a first round has no findings to dispose of",
         ),
     ]
-    for command, refusal in refusals:
-        with pytest.raises(SystemExit) as stopped:
-            review_round.main(command)
-        assert str(stopped.value) == f"prompts: {refusal}"
+    for given, refused in refusals:
+        with pytest.raises(ReviewError) as refusal:
+            review_prompts.prompts(*given)
+        assert str(refusal.value) == refused
     # The previous round's number is the n of its directory round-<n>.
     renamed = root / "build/evidence/reviews/recheck"
     previous.rename(renamed)
@@ -436,9 +434,7 @@ def test_each_edition_s_prompt_states_its_dispositions_in_three_groups(
         "EN0-1": {"disposition": "fixed", "evidence": "08.2 stands on one line."},
     }
     disposed = put(root / "dispositions.json", {"round": 0, "findings": findings})
-    review_round.main(
-        ["prompts", "--round", "1", "--previous", str(previous), "--dispositions", str(disposed)]
-    )
+    review_prompts.prompts(previous, out, dispositions=disposed)
     zh, en = ((out / f"prompt-{code}.md").read_text() for code in CODES)
     statement = (
         "- Dispositions of round 0's findings. Re-verify each fixed finding on these media by its "

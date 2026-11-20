@@ -8,6 +8,9 @@ from contact sheets: the counts of each kind of event, the findings and how many
 film declares, the fastest glide and flow of each scene and of the edition, and every finding
 with its time, scene and drawing line. The gate record must be bound to the current composition
 and timeline, the report must be the one the record binds, and it must judge every kind.
+
+`bound_report` is the one reader of a report through the gate's record: the measurement reads
+the gate's sync report by it as this module reads the motion report.
 """
 
 from __future__ import annotations
@@ -18,7 +21,6 @@ import filmkit.repository as repository
 from filmkit.picture.gates import MOTION_GATES as GATED
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
 from filmkit.review import ReviewError
-from filmkit.review.files import present
 
 if TYPE_CHECKING:
     from filmkit.production import Edition
@@ -40,29 +42,48 @@ KINDS = ("halts", "starts", "races", "pops", "jumps", "dash_snaps", "paces")
 MOTION_GATES = tuple(f"{name} " for name in GATED.values())
 
 
-def bound_report(edition: Edition) -> tuple[dict, dict]:
-    """The edition's gate record and its motion report, refused unless the record binds the
-    current composition and timeline and the report is the one it binds."""
-    record = repository.read(present([edition.picture_gates])[0])
+def bound_report(edition: Edition, name: str) -> tuple[dict, dict]:
+    """The edition's gate record and the report of that name it binds, `motion` or `sync`.
+
+    Refused unless the record binds the current composition and timeline and the report is the
+    one it binds. An edition that was never gated, a record that binds no such report and a
+    report cleared from the gate's work folder each refuse in one line that names the command
+    to run.
+    """
+    code = edition.code
+    if not edition.picture_gates.is_file():
+        where = repository.relative(edition.picture_gates)
+        msg = f"{code}: missing {where}, the picture gate record; run check-picture"
+        raise ReviewError(msg)
+    record = repository.read(edition.picture_gates)
     current = {
         "composition": repository.sha(repository.ROOT / COMPOSITION_SCRIPT),
         "timeline": repository.sha(edition.timeline),
     }
-    for name, sha in current.items():
-        if record.get(f"{name}_sha256") != sha:
-            msg = f"{edition.code}: the picture gate record is not bound to the current {name}"
+    for input_name, sha in current.items():
+        if record.get(f"{input_name}_sha256") != sha:
+            msg = f"{code}: the picture gate record is not bound to the current {input_name}"
             raise ReviewError(msg)
-    bound = record["reports"]["motion"]
-    report = present([repository.ROOT / bound["path"]])[0]
+    bound = record.get("reports", {}).get(name)
+    if bound is None:
+        msg = f"{code}: the picture gate record binds no {name} report; run check-picture again"
+        raise ReviewError(msg)
+    report = repository.ROOT / bound["path"]
+    if not report.is_file():
+        msg = (
+            f"{code}: missing {bound['path']}, the {name} report its gate record binds; "
+            "run check-picture again"
+        )
+        raise ReviewError(msg)
     if repository.sha(report) != bound["sha256"]:
-        msg = f"{edition.code}: the motion report differs from the one its gate record binds"
+        msg = f"{code}: the {name} report differs from the one its gate record binds"
         raise ReviewError(msg)
     return record, repository.read(report)
 
 
 def picture_motion(edition: Edition) -> dict:
     """The edition's motion: its counts, findings, declared findings, speeds and events."""
-    record, report = bound_report(edition)
+    record, report = bound_report(edition, "motion")
     followed = report.get("followed")
     if followed is None:
         msg = f"{edition.code}: the motion report follows no marks; run check-picture again"

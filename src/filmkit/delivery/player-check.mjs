@@ -21,7 +21,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
@@ -38,6 +38,10 @@ const USAGE =
 /* A film's file prefix: lowercase words joined by hyphens. */
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const DEADLINE = 300000;
+/* The signal that asks a check to end, which the engine's tools send. An interrupt is left to the
+ * browser's driver, which kills its browser and exits the process with status 130: the check then
+ * writes no receipt. */
+const ENDING = "SIGTERM";
 
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
@@ -132,7 +136,19 @@ export function compareImages(a, b) {
   };
 }
 
-async function readPlayers(browser, binding, receiptPath, report) {
+/** Each named screenshot that was written, with its SHA-256, as a receipt lists it. The read
+ * removes a file where it names its screenshot, so a file that stands under a name is the one this
+ * check wrote. */
+export async function writtenScreenshots(paths) {
+  const written = [];
+  for (const path of paths) {
+    const sha256 = await digestFile(path).catch(() => null);
+    if (sha256) written.push({ path, sha256 });
+  }
+  return written;
+}
+
+async function readPlayers(browser, binding, receiptPath, report, screenshots) {
   assert.deepEqual(
     await changedMembers(binding),
     [],
@@ -161,12 +177,7 @@ async function readPlayers(browser, binding, receiptPath, report) {
       request.abort();
     }
   });
-  report.pages = await readDelivery(page, binding, receiptPath);
-  for (const code of Object.keys(LANGUAGES)) {
-    const screenshot = join(dirname(receiptPath), `player-${code}.png`);
-    const sha256 = await digestFile(screenshot).catch(() => null);
-    if (sha256) report.screenshots.push({ path: screenshot, sha256 });
-  }
+  report.pages = await readDelivery(page, binding, receiptPath, screenshots);
   const failed = report.pages.filter((item) => item.verdict !== "pass").map((item) => item.page);
   assert.deepEqual(failed, [], "Pages failed their checks");
   assert.deepEqual(report.external_requests, []);
@@ -177,8 +188,36 @@ async function readPlayers(browser, binding, receiptPath, report) {
   await page.close();
 }
 
-/** Read the bound delivery's players back within an owned browser deadline and write the receipt. */
-export async function checkPlayers(bindingPath, receiptPath) {
+/** What ends a read that does not end by itself, in one place: `ended` rejects once `deadline` ms
+ * have passed or the process is asked to end (`ENDING`), which the report then names as its
+ * `signal`; `disarm()` takes both back. */
+function readEnd(report, deadline) {
+  let disarm;
+  const ended = new Promise((_, reject) => {
+    const timer = setTimeout(() => reject(Error("Owned browser deadline exceeded")), deadline);
+    const asked = (signal) => {
+      report.signal = signal;
+      reject(Error(`The check was asked to end by ${signal}`));
+    };
+    process.on(ENDING, asked);
+    disarm = () => {
+      clearTimeout(timer);
+      process.off(ENDING, asked);
+    };
+  });
+  return { ended, disarm };
+}
+
+/** Read the bound delivery's players back within an owned browser deadline and write the receipt.
+ * `launch` launches the browser and `deadline` is the read's time in ms. A read that throws, meets
+ * its deadline or is asked to end (`ENDING`) closes the same way: the browser is closed and the
+ * receipt written, listing what the read wrote. */
+export async function checkPlayers(
+  bindingPath,
+  receiptPath,
+  launch = launchBrowser,
+  deadline = DEADLINE,
+) {
   const binding = JSON.parse(await readFile(bindingPath, "utf8"));
   const report = {
     started_at: new Date().toISOString(),
@@ -193,36 +232,49 @@ export async function checkPlayers(bindingPath, receiptPath) {
     external_requests: [],
     screenshots: [],
   };
-  let browser, deadline;
+  // The screenshots' paths as the read names them, each before its player is read.
+  const screenshots = [];
+  let browser, end;
   try {
     const problems = bindingProblems(binding);
     if (problems.length) throw Error(`Not a delivery binding: ${problems.join("; ")}`);
-    browser = await launchBrowser({
+    browser = await launch({
       args: ["--autoplay-policy=no-user-gesture-required"],
       defaultViewport: { width: 1600, height: 1000, deviceScaleFactor: 1 },
     });
     report.browser_version = await browser.version();
-    const reading = readPlayers(browser, binding, receiptPath, report);
-    // A read still running at the deadline fails once its browser closes; that late failure is already reported.
+    end = readEnd(report, deadline);
+    const reading = readPlayers(browser, binding, receiptPath, report, screenshots);
+    // A read still running when it is ended fails once its browser closes; that late failure is
+    // already reported.
     reading.catch(() => {});
-    await Promise.race([
-      reading,
-      new Promise((_, reject) => {
-        deadline = setTimeout(() => reject(Error("Owned browser deadline exceeded")), DEADLINE);
-      }),
-    ]);
+    await Promise.race([reading, end.ended]);
     report.pass = true;
   } catch (error) {
     report.pass = false;
     report.error = String(error.stack ?? error);
   } finally {
-    clearTimeout(deadline);
     if (browser) await browser.close();
     report.browser_closed = true;
+    // Listed once the browser is closed, so that a read that stopped, met its deadline or was asked
+    // to end leaves no screenshot beside the receipt that the receipt does not name.
+    report.screenshots = await writtenScreenshots(screenshots);
     report.finished_at = new Date().toISOString();
     await writeFile(receiptPath, JSON.stringify(report, null, 2) + "\n");
+    // A signal is held off until the receipt is written.
+    end?.disarm();
   }
   return report;
+}
+
+/** Print a check's summary and end the process as the check ended: with status 0 for a pass and 1
+ * for a refusal, or, for a check that a signal ended, by that signal, now that its receipt is
+ * written. */
+export function endAs(report) {
+  const pages = report.pages.map((item) => `${item.page}: ${item.verdict}`);
+  console.log(JSON.stringify({ pass: report.pass, error: report.error, pages }));
+  process.exitCode = report.pass ? 0 : 1;
+  if (report.signal) process.kill(process.pid, report.signal);
 }
 
 /** Report a painted cover against the tracked cover's bytes. A painting without a tracked cover is uncompared and does
@@ -284,15 +336,7 @@ if (import.meta.main) {
   }
   const [command, ...args] = positionals;
   if (command === "players" && args.length === 2) {
-    const report = await checkPlayers(args[0], args[1]);
-    console.log(
-      JSON.stringify({
-        pass: report.pass,
-        error: report.error,
-        pages: report.pages.map((item) => `${item.page}: ${item.verdict}`),
-      }),
-    );
-    process.exitCode = report.pass ? 0 : 1;
+    endAs(await checkPlayers(args[0], args[1]));
   } else if (command === "cover" && args.length === 3) {
     const result = await paintCover(args[0], args[1], args[2]);
     console.log(JSON.stringify(result));

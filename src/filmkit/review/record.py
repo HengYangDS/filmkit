@@ -9,6 +9,10 @@ level: every level has a verdict, and passes only when every dimension it holds 
 and no material finding remains in it; every finding names its level, and every sentence of the
 edition (`filmkit.review.sentences`) has a verdict, `ok` or the ids of the findings that concern
 it. A film without levels keeps the overall and dimension floors alone.
+
+A film that declares the severities a review may hold (`review.accepted_severities`) is held to
+them by `refused_findings`, the one place that names the findings a review may not hold; a film
+that does not declare them keeps the one rule that no material finding remains.
 """
 
 from __future__ import annotations
@@ -16,7 +20,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import filmkit.repository as repository
-from filmkit.film import FILM
+from filmkit.film import FILM, MATERIAL
 from filmkit.review.sentences import sentences
 
 if TYPE_CHECKING:
@@ -31,11 +35,37 @@ DIMENSION_MINIMUM = FILM.review.dimension_minimum
 # The levels the review passes one by one, or None for a film that declares none.
 LEVELS = FILM.review.levels
 VERDICTS = ("pass", "fail")
+# The severities a review's findings may have, or None for a film that does not declare them.
+ACCEPTED_SEVERITIES = FILM.review.accepted_severities
 
 
 def overall(scores: dict[str, float]) -> float:
     """The record's overall score: the mean of its dimension scores to one decimal."""
     return round(sum(scores.values()) / len(scores), 1)
+
+
+def finding_name(finding: dict) -> str:
+    """A finding as a refusal names it: its severity, its id when it has one, and that it has no
+    severity when it has none."""
+    severity, name = finding.get("severity"), finding.get("id")
+    words = ["finding" if severity is None else f"{severity} finding"]
+    words += [] if name is None else [str(name)]
+    words += ["without a severity"] if severity is None else []
+    return " ".join(words)
+
+
+def refused_findings(findings: list[dict]) -> list[str]:
+    """The findings a review may not hold, each by its name (`finding_name`).
+
+    A film that declares the severities a review may hold refuses a finding of any other
+    severity, a misspelt one among them, and a finding of none; an empty list refuses every
+    finding. A film that does not declare them refuses a material finding and no other, and
+    its finding without a severity is a fault to see in full, as it was before the declaration
+    existed.
+    """
+    if ACCEPTED_SEVERITIES is None:
+        return [finding_name(f) for f in findings if f["severity"] == MATERIAL]
+    return [finding_name(f) for f in findings if f.get("severity") not in ACCEPTED_SEVERITIES]
 
 
 def level_problems(entry: dict, scores: dict[str, float], findings: list[dict]) -> list[str]:
@@ -67,7 +97,7 @@ def level_problems(entry: dict, scores: dict[str, float], findings: list[dict]) 
         problems += [
             f"{name} passes with material finding {finding['id']}"
             for finding in findings
-            if finding.get("severity") == "material" and finding.get("id") in held
+            if finding.get("severity") == MATERIAL and finding.get("id") in held
         ]
     for finding in findings:
         level = finding.get("level")

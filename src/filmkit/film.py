@@ -254,6 +254,8 @@ class Level(Declared):
 # graceful.
 LEVELS = ("信", "达", "雅")
 LevelName = Literal["信", "达", "雅"]
+# The severity of a finding that no review may hold, the one severity the engine names.
+MATERIAL = "material"
 
 
 # A thought by its segment and its number from 1, as "05.4".
@@ -281,6 +283,11 @@ class Review(Declared):
     itself, and such a film keeps none.
     The levels, 信, 达 and 雅 when the film declares them, each hold some of the dimensions,
     every dimension in exactly one; a review then passes level by level (`review.record`).
+    `accepted_severities` lists the severities a review's findings may have, as the film's
+    prompt defines them: a finding of any other severity, or of none, refuses the review, and an
+    empty list accepts no finding. The list never holds `material`, in any letter case, and
+    names no severity twice. A film that does not declare it keeps the engine's one rule, that
+    no material finding remains.
     """
 
     prompt: str
@@ -292,6 +299,25 @@ class Review(Declared):
     clarity_thought_margin_db: Annotated[float, Field(ge=0, le=6)] | None = None
     clarity_exceptions: tuple[ClarityException, ...] = ()
     levels: dict[LevelName, Level] | None = None
+    accepted_severities: tuple[Stated, ...] | None = None
+
+    @field_validator("accepted_severities")
+    @classmethod
+    def no_material_finding_accepted(
+        cls, severities: tuple[str, ...] | None
+    ) -> tuple[str, ...] | None:
+        """Refuse a list that holds `material`, however it is cased, or one severity twice."""
+        named = severities or ()
+        if any(name.casefold() == MATERIAL for name in named):
+            message = (
+                f"no review may hold a {MATERIAL} finding, so the list never holds `{MATERIAL}`"
+            )
+            raise ValueError(message)
+        twice = [name for name in dict.fromkeys(named) if named.count(name) > 1]
+        if twice:
+            message = f"review.accepted_severities names {', '.join(twice)} twice"
+            raise ValueError(message)
+        return severities
 
     @model_validator(mode="after")
     def thoughts_judged_against_a_declared_line(self) -> Review:

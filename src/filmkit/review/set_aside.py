@@ -31,7 +31,7 @@ from typing import NamedTuple
 import filmkit.repository as repository
 from filmkit.production import CODES, RENDITIONS, Edition
 from filmkit.review import ReviewError
-from filmkit.review.files import REVIEWS, edition_review, present, round_number
+from filmkit.review.files import REVIEWS, edition_review, present, review_files, round_number
 
 EXIT_CONDITION = "Retire after the successor delivery is accepted"
 # Below the film's root, the folder each set-aside label holds, with one folder per edition.
@@ -143,7 +143,7 @@ def plan_set_aside(
     plans = []
     for code in codes:
         target, sources = edition_members(round_label(number), code, picture=code in pictures)
-        review = review_dir / f"review-{code}.json"
+        review = review_files(review_dir, code)[0]
         bound = {item["sha256"] for item in edition_review(review, code)[1].get("media", [])}
         hashes = hashed(sources)
         if not all(hashes[film] in bound for film in built_films(Edition(code))):

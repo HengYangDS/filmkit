@@ -19,10 +19,10 @@ mark that stands in speech for more than 0.6 s before a name is legible at it. A
 whose aligned words do not spell its text raises `PictureError`.
 
 Usage: python -m filmkit.picture.sync_audit <timeline.json> <trace.tsv> [--out report.json]
-    [--tolerance 0.3] [--step 0.0333333] [--bind source-timeline.json] [--marks marks.tsv]
---step is the trace's sampling step, as given to frame-audit.mjs. --bind records the
-SHA-256 of the production timeline the audited timeline derives from, and of the
-composition script whose frames the trace samples.
+    [--tolerance 0.3] [--step 0.0333333] [--marks marks.tsv]
+--step is the trace's sampling step, as given to frame-audit.mjs. A report binds nothing itself:
+`check-picture` runs the same audit, and its gate record binds the report it judged to the
+timeline and the composition (`filmkit.picture.gates`).
 """
 
 from __future__ import annotations
@@ -34,7 +34,6 @@ import unicodedata
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import filmkit.repository as repository
 from filmkit.picture.label_matches import (
     english,
     exact_matches,
@@ -44,7 +43,7 @@ from filmkit.picture.label_matches import (
     units,
     words,
 )
-from filmkit.picture.rendering import COMPOSITION_SCRIPT, PictureError
+from filmkit.picture.rendering import PictureError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
@@ -532,9 +531,6 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--step", type=float, default=1 / 30, metavar="SECONDS", help="the trace's sampling step"
     )
-    parser.add_argument(
-        "--bind", metavar="FILE", help="the production timeline the audited timeline derives from"
-    )
     parser.add_argument("--marks", type=Path, metavar="FILE", help="the mark trace to judge")
     options = parser.parse_args(argv)
     timeline = json.loads(options.timeline.read_text(encoding="utf-8"))
@@ -547,10 +543,6 @@ def main(argv: list[str] | None = None) -> None:
     report["continuity"] = continuity(timeline, lines, options.step)
     if options.marks is not None:
         report["continuity"]["seats"] = seats(timeline, read_trace(options.marks), options.step)
-    if options.bind is not None:
-        bound = repository.sha(Path(options.bind).resolve())
-        report["bound_timeline"] = {"path": options.bind, "sha256": bound}
-        report["composition_sha256"] = repository.sha(repository.ROOT / COMPOSITION_SCRIPT)
     if options.out is not None:
         with options.out.open("w", encoding="utf-8") as handle:
             json.dump({**report, "judged": judged}, handle, ensure_ascii=False, indent=1)

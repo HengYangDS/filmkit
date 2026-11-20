@@ -121,7 +121,7 @@ def members(
         },
         f"{prefix}-cover.png": ("document", edition.artifacts / packaging.COVER_PNG),
         f"{prefix}-production-review.json": ("review", review),
-        f"{prefix}-production-review.md": ("review", review.with_suffix(".md")),
+        f"{prefix}-production-review.md": ("review", production.review_report(review)),
     }
 
 

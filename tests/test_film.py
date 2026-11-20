@@ -344,6 +344,29 @@ def test_review_levels_are_the_three_and_ask_something(declared):
         film.load(declared)
 
 
+def test_a_film_declares_the_severities_a_review_may_hold_and_never_material(declared):
+    # A film that does not declare the list keeps the engine's one rule.
+    assert film.FILM.review.accepted_severities is None
+    rewrite(declared, "[review]\n", '[review]\naccepted_severities = ["note"]\n')
+    assert film.load(declared).review.accepted_severities == ("note",)
+    # An empty list is declared too: it accepts no finding.
+    rewrite(declared, 'accepted_severities = ["note"]', "accepted_severities = []")
+    assert film.load(declared).review.accepted_severities == ()
+    stated = "accepted_severities = []"
+    # The list never holds `material`, however it is cased or padded, nor one severity twice.
+    for wrong, named in (
+        ('["note", "material"]', "`material`"),
+        ('["Material"]', "`material`"),
+        ('["note", " MATERIAL "]', "`material`"),
+        ('["note", "minor", "note"]', "names note twice"),
+    ):
+        rewrite(declared, stated, f"accepted_severities = {wrong}")
+        with pytest.raises(FilmError, match=r"review\.accepted_severities") as refusal:
+            film.load(declared)
+        assert named in str(refusal.value)
+        stated = f"accepted_severities = {wrong}"
+
+
 def identities() -> set[str]:
     """What names this film.
 

@@ -12,7 +12,8 @@ boundary, by the marks between its words, and the rate, pitch and level steps be
 thoughts are measured by `filmkit.narration.flow`, and each declared Latin-script term's first
 vowels by `filmkit.narration.terms`. The picture's motion, every mark followed as a viewer sees
 it move with its halts, starts, races and pops and the speeds a viewer meets, is reported from
-the motion report the edition's picture gate judged (`filmkit.review.motion`).
+the motion report the edition's picture gate judged, and the sound-picture sync from the sync
+report the same gate judged, each read through the gate's record (`filmkit.review.motion`).
 
 It loads no speech runtime, so it runs without a Metal device. Each measurement reads the
 current records it measures and refuses one that is not bound to the current timeline,
@@ -44,7 +45,6 @@ import filmkit.review.endings as review_endings
 import filmkit.review.motion as review_motion
 import filmkit.soundtrack.level as soundtrack_level
 from filmkit.film import FILM
-from filmkit.picture.rendering import COMPOSITION_SCRIPT
 from filmkit.picture.sync_audit import SUMMARY_KEYS
 from filmkit.review import ReviewError
 from filmkit.review.support import thought_spans, wav_frames
@@ -444,20 +444,16 @@ def recognition(edition: production.Edition) -> dict:
     }
 
 
-def picture_sync(edition: production.Edition, timeline_sha256: str) -> dict:
-    """The sound-picture sync audit (`filmkit.picture.sync_audit`) of the current timeline.
+def picture_sync(edition: production.Edition) -> dict:
+    """The sound-picture sync of the current picture, from the sync report its picture gate
+    judged (`filmkit.picture.sync_audit`).
 
     Its continuity checks list speech without a legible name, a previous picture held into
-    a thought, and the seats: marks that stand before their names. The audit must be bound
-    to the current timeline and to the composition script whose frames its trace samples.
+    a thought, and the seats: marks that stand before their names. The report is read through
+    the gate's record, which must bind the current timeline and composition and that report
+    (`filmkit.review.motion.bound_report`); the review runs no trace of its own.
     """
-    report = repository.read(edition.picture_sync)
-    if report.get("bound_timeline", {}).get("sha256") != timeline_sha256:
-        msg = f"{edition.code}: the sync audit is not bound to the current timeline"
-        raise ReviewError(msg)
-    if report.get("composition_sha256") != repository.sha(repository.ROOT / COMPOSITION_SCRIPT):
-        msg = f"{edition.code}: the sync audit is not bound to the current composition"
-        raise ReviewError(msg)
+    report = review_motion.bound_report(edition, "sync")[1]
     return {
         **{key: report[key] for key in SUMMARY_KEYS},
         "findings": report["findings"],
@@ -482,12 +478,12 @@ def picture_geometry(edition: production.Edition) -> dict:
     }
 
 
-def picture_measures(edition: production.Edition, timeline_sha256: str) -> dict:
+def picture_measures(edition: production.Edition) -> dict:
     """The picture's measurements: the real-browser geometry, the sound-picture sync and the
     motion, each bound to the edition's current picture."""
     return {
         "picture": picture_geometry(edition),
-        "picture_sync": picture_sync(edition, timeline_sha256),
+        "picture_sync": picture_sync(edition),
         "picture_motion": review_motion.picture_motion(edition),
     }
 
@@ -510,7 +506,7 @@ def measure_edition(code: str) -> dict:
     edition = production.Edition(code)
     timeline = repository.read(edition.timeline)
     timeline_sha256 = repository.sha(edition.timeline)
-    pictured = picture_measures(edition, timeline_sha256)
+    pictured = picture_measures(edition)
     heard = recognition(edition)
     assembly = repository.read(edition.audio_assembly)
     soundtrack = edition.soundtrack
@@ -569,6 +565,14 @@ def measure() -> dict:
     }
 
 
+def write(out: Path) -> dict:
+    """Measure both editions and write the measurements where a round keeps them."""
+    report = measure()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+    return report
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -580,13 +584,10 @@ def main(argv: list[str] | None = None) -> None:
     )
     options = parser.parse_args(argv)
     try:
-        report = measure()
+        report = write(options.out.resolve())
     except ReviewError as error:
         msg = f"measurement: {error}"
         raise SystemExit(msg) from None
-    out = options.out.resolve()
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     summary = {}
     for code, data in report["editions"].items():
         ratios = data["audio_structure"]["boundary_to_inner_quiet_ratio"]
