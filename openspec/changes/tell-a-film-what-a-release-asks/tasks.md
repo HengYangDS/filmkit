@@ -16,5 +16,5 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Run the command on the three films at their release tags and keep its output in `build/evidence/tell-a-film-what-a-release-asks/`: each gap the whole-edition trial met in tracked files is listed.
-- [ ] 4.2 The repository's check passes, and the sample film builds and verifies.
+- [x] 4.1 Run the command on the three films at their release tags and keep its output in `build/evidence/tell-a-film-what-a-release-asks/`: each gap the whole-edition trial met in tracked files is listed. On 20 November 2026 the command ran with the lane's source on the three films, each clean at its release tag: it exited 1 on each and named every gap the whole-edition trial met in tracked files, under the question that owns it (`command-on-the-films.txt`).
+- [x] 4.2 The repository's check passes, and the sample film builds and verifies. The release's whole check passed on `96e0649` as the child of one host ticket, the static lint and the suite with warnings as errors among its commands (check-full passed head 96e0649 10:59:27). The sample film was built and verified on 20 November 2026 as the child of a host ticket, in 238 s, on the tree the landed steps leave, before the release's version was set.
