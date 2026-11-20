@@ -145,9 +145,10 @@ Each decision states what it rests on, what was considered, why the option taken
     - **Rests on:** a film of 60 fps was decoded twice, once a phase, every frame of it each time, though a phase keeps one frame in six; a scan cost 96 to 126 s an edition at the loads measured [S3], and every edition's build now pays the step. A decode yields its frames in the film's order, so one process that keeps the frames of both phases yields one of each in turn [S1].
     - **Considered:** (a) a decode a phase, as before; (b) one FFmpeg process that keeps the frames of both phases, dealt to their phases in order; (c) two processes at once, which halves the wall seconds and not the work, on a host whose cores other builds share; (d) decoding less of each frame, by hardware or by keyframes, which changes which pixels or frames a phase reads.
     - **Chosen because:** (b) decodes the film once and changes nothing a phase reads: the same frames, through the same filter, in the same order. Its gain is not stated before it is measured on a whole film (`tasks.md` 5.2).
+    - **Measured:** on 20 November 2026, on the ETHOS film's released Chinese edition (9,000 frames a phase), in one host ticket at 1-minute loads of 6.5 to 10.6: the one decode read the film in 7.6 s and again in 9.1 s, the form of two decodes in 12.6 s, and all three gave the same frames and the same runs, each run's speech within 0.01 s. The gain is about a third of a reading that takes seconds. The 96 to 126 s above were read in jobs of launchd's throttled band [S13].
     - **Applies to:** `still_scan.decode` and `sampling` (the phases whose frames one decode keeps, as FFmpeg's select expression), `Stills` (both measures taken a frame at a time) and `phase_reports` (the dealing), in every form of the scan. Phases that select the same frames, as on a draft of 10 fps, read one report, as before.
     - **Reopened when:** a phase's report from the one decode differs from that of a decode of its own (the tests of `tests/picture/test_still_decode.py` on a stand-in for the FFmpeg process, `test_one_decode_reports_each_phase_as_a_decode_of_its_own_does` with FFmpeg, and the ticket's comparison on a released film), or the measurement shows no gain.
-    - **Sources:** [S1] [S3].
+    - **Sources:** [S1] [S3] [S13].
 
 ## Risks / Trade-offs
 
@@ -164,7 +165,7 @@ Each decision states what it rests on, what was considered, why the option taken
 - What `scan-film` itself reads on real films. Answered for two released editions on 20 November 2026 [S13]: the command refuses the ETHOS film's Chinese edition 2.0.1 with one run, from 842.70 to 847.40 s with 3.86 s of speech, and passes the essentials film's English edition 1.0.2, whose longest still run holds 3.06 s of speech (335.80 to 339.10 s). Four released editions are measured by the same scan through its general form [S3]. The DDWG film's two editions are read by the draft tickets of 19 November 2026, outside this Change.
 - Whether the sample film's two final films pass on this engine's head. `tasks.md` 2.1; decision 9 states what two earlier builds read.
 - Whether the delivery should require the pass of the whole verification, and not of the still scan alone. It asks none of the verifier's other bindings and relies on a film's task order; that predates this Change (decision 13).
-- How many cores the decode keeps busy, what the one decode takes against two (`tasks.md` 5.2), and what a scan costs on an edition of 1,500 s. Not measured.
+- How many cores the decode keeps busy, and what a scan costs on an edition of 1,500 s. Not measured. What the one decode takes against two is in decision 17: on an edition of 900 s a reading takes 7 to 13 s in the ordinary band, so a film's scan is light work and needs no host ticket.
 - Whether the verifier's own decode of the 1080p film could feed the scan, which would save a decode. Not looked into: the verifier decodes to count frames and reads no pixels today [S1].
 
 ## Sources
