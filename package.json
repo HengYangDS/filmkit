@@ -7,10 +7,12 @@
     "format:markdown": "prettier --no-config --no-editorconfig --ignore-path .gitignore --print-width 100 --prose-wrap preserve --no-error-on-unmatched-pattern --write AGENTS.md CHANGELOG.md CONTRIBUTING.md README.md 'openspec/changes/*/*.md' 'openspec/changes/*/specs/**/*.md'",
     "format:markdown:check": "prettier --no-config --no-editorconfig --ignore-path .gitignore --print-width 100 --prose-wrap preserve --no-error-on-unmatched-pattern --check AGENTS.md CHANGELOG.md CONTRIBUTING.md README.md 'openspec/changes/*/*.md' 'openspec/changes/*/specs/**/*.md'"
   },
-  "devDependencies": {
+  "dependencies": {
     "@napi-rs/canvas": "1.1.1",
     "@puppeteer/browsers": "3.2.7",
-    "prettier": "3.10.1",
     "puppeteer-core": "25.18.1"
+  },
+  "devDependencies": {
+    "prettier": "3.10.1"
   }
 }

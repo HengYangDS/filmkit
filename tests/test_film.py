@@ -99,6 +99,40 @@ def test_the_key_of_the_delivery_folder_through_0_22_3_is_refused_naming_the_new
         film.load(declared)
 
 
+def test_a_declaration_that_loads_has_no_problem(declared):
+    assert film.problems(declared) == []
+
+
+def test_a_declaration_is_refused_with_every_problem_it_holds(declared):
+    rewrite(declared, "\ndelivery_folder = ", "\ndocuments_folder = ")
+    rewrite(declared, f'slug = "{film.FILM.slug}"', 'slug = "Two Words"')
+    with pytest.raises(FilmError) as refusal:
+        film.load(declared)
+    text = str(refusal.value)
+    assert "declares documents_folder; the key is delivery_folder" in text
+    assert "slug" in text
+    # The renamed key is judged under its new name, so it hides no field and adds none.
+    assert "delivery_folder\n  Field required" not in text
+    assert len(film.problems(declared)) == 2
+
+
+def test_missing_files_and_a_player_page_are_named_together(declared):
+    (declared / film.FILM.editions["en"].sources / "film-script.json").unlink()
+    (declared / film.FILM.editions["zh"].sources / "player.html").write_text("<html></html>")
+    missing, copied = film.problems(declared)
+    assert "editions.en.sources" in missing
+    assert "player.html" in copied
+    with pytest.raises(FilmError) as refusal:
+        film.load(declared)
+    assert "editions.en.sources" in str(refusal.value) and "player.html" in str(refusal.value)
+
+
+def test_a_declaration_that_is_no_text_is_refused_as_no_declaration(declared):
+    (declared / film.DECLARATION).write_bytes(b"\xff\xfe not text")
+    (problem,) = film.problems(declared)
+    assert "is not a film declaration" in problem
+
+
 def test_an_unknown_field_refuses(declared):
     rewrite(declared, "[review]", 'title = "Another"\n\n[review]')
     with pytest.raises(FilmError, match="title"):

@@ -1,0 +1,69 @@
+{
+  "npm": {
+    "@napi-rs/canvas": {
+      "version": "1.1.1",
+      "integrity": "sha512-UyNspnx0rXclATMOBXiWgy1xtWUSUDm4UOO6+YO8xzyVKaZRpvK+SlJSCtRoSI9J/mEqklJiPYtroN1B+hgLXg=="
+    },
+    "@puppeteer/browsers": {
+      "version": "3.2.7",
+      "integrity": "sha512-B3C/v8OEEaJYcN1IzzgbPmt+GbFANr4Mf/NrqNuGk/dIchrv6quNqxgT+A6qE0Ge0MN95NjKUddcR1JMpYRMWA=="
+    },
+    "puppeteer-core": {
+      "version": "25.18.1",
+      "integrity": "sha512-C0wHOJHDfAggGBtN5uUfsJGpeSKtPL5jzhgQYDuz4XKeOG1FUkxeZI2M5yK7AUyrdHO+RgDuiCfjmOpcw3PYTA=="
+    }
+  },
+  "python": {
+    "annotated-doc": "0.0.6",
+    "annotated-types": "0.8.0",
+    "anyio": "4.16.0",
+    "certifi": "2026.10.23",
+    "cffi": "2.1.1",
+    "charset-normalizer": "3.5.2",
+    "click": "8.5.1",
+    "colorama": "0.4.6",
+    "filelock": "4.2.11",
+    "fsspec": "2026.9.0",
+    "h11": "0.16.0",
+    "hf-xet": "1.8.0",
+    "httpcore2": "2.16.2",
+    "httpx2": "2.16.2",
+    "httpx2-jsfetch": "1.0",
+    "huggingface-hub": "2.4.0",
+    "idna": "3.20",
+    "jinja2": "3.1.6",
+    "markdown-it-py": "4.3.0",
+    "markupsafe": "3.0.4",
+    "mdurl": "0.1.2",
+    "miniaudio": "1.73",
+    "mlx": "0.32.4",
+    "mlx-audio": "0.6.6",
+    "mlx-metal": "0.32.4",
+    "numpy": "2.5.5",
+    "packaging": "26.3",
+    "pillow": "13.0.0",
+    "pycparser": "3.12",
+    "pydantic": "2.14.3",
+    "pydantic-core": "2.50.4",
+    "pygments": "2.21.0",
+    "pypinyin": "0.55.0",
+    "pyyaml": "6.0.3",
+    "regex": "2026.11.15",
+    "requests": "2.34.2",
+    "rich": "15.0.0",
+    "safetensors": "0.8.0",
+    "scipy": "1.18.1",
+    "sentencepiece": "0.2.3",
+    "shellingham": "1.5.4",
+    "snowballstemmer": "3.1.1",
+    "sounddevice": "0.5.6",
+    "tokenizers": "0.23.3",
+    "tqdm": "4.70.1",
+    "transformers": "5.23.0",
+    "truststore": "0.10.5",
+    "typer": "0.29.1",
+    "typing-extensions": "4.16.0",
+    "typing-inspection": "0.4.5",
+    "urllib3": "2.8.0"
+  }
+}

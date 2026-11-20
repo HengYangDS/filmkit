@@ -71,13 +71,16 @@ def test_a_receipt_names_the_canvas_installed_and_the_library_loaded(film_root):
         "integrity": pinned[name],
     }
     loaded = film_root.loads()
+    # What npm recorded of the binary package, as the film's packages hold it.
+    held = json.loads((film_root.path / "node_modules" / picture_renderer.INSTALLED).read_text())
+    recorded = held["packages"][f"node_modules/{binary}"]["integrity"]
     drawn = picture_renderer.drawn_by({"text_renderer": "system", "binary": loaded})
     assert drawn == {
         **picture_renderer.installed(),
         "binary": {
             "package": binary,
             "version": version,
-            "integrity": pinned[binary],
+            "integrity": recorded,
             "path": loaded["path"],
             "sha256": picture_renderer.BINARY_SHA256,
         },
@@ -124,12 +127,11 @@ def test_a_library_that_is_not_the_pinned_one_is_named_as_itself_on_any_host(fil
 
 def test_the_pins_are_what_the_engines_own_packages_hold():
     # The repository's own packages, which the sample film builds with, are the pinned build:
-    # the integrity npm recorded, and the bytes of the native library its binary package holds.
+    # the integrity npm recorded of the canvas, and the bytes of the native library its binary
+    # package holds. That package's own integrity is the lock's alone: the engine pins none.
     name = picture_renderer.RENDERER_NAME
     assert picture_renderer.installed()["integrity"] == picture_renderer.INTEGRITY[name]
     held = repository.node_modules() / picture_renderer.BINARY_PACKAGE
-    recorded = picture_renderer.recorded(picture_renderer.BINARY_PACKAGE)
-    assert recorded["integrity"] == picture_renderer.INTEGRITY[picture_renderer.BINARY_PACKAGE]
     [library] = held.glob("*.node")
     assert repository.sha(library) == picture_renderer.BINARY_SHA256
 

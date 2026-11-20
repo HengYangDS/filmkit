@@ -4,6 +4,15 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- `python -m filmkit.adoption` lists what this release asks of a film's tracked files in one run, in any environment that holds the engine and before the film installs its npm packages, supplies or builds anything: the declaration's problems, the npm packages the engine runs and their integrity in the film's lock, the release the film pins and each Python package of the engine's runtime that its lock holds at another version (with the `constraint-dependencies` lines that close the difference), engine modules and actions its Mise tasks name that this engine does not have, tasks that render a picture while none asks `preflight` (the order of commands and their editions are not judged; a `filmkit.produce` command that holds a variable and names no action by a word is named as not compared, and readiness is then not judged), and each text of `picture/index.html` that staging would refuse, with any script or stylesheet staging does not inline. It needs no declaration that loads and exits 1 while a finding stands. What needs a build to judge, such as a caption above the reading rate, stays `preflight`'s. **A film that adopts a release runs it first.**
+
+### Changed
+
+- A declaration's refusal names more at once, where the load stopped at the first kind of problem: a key renamed since 0.22.3 is named together with each failing field, and, once the fields load, together with each missing file and a player page left in the sources.
+- The engine's `package.json` names the three packages it runs in a film under `dependencies` and its formatter under `devDependencies`. The installed engine carries a record of those packages' versions and integrity and of its runtime's Python versions (`filmkit/released.json`), which `mise run fix` writes and the tests hold to the manifest and the locks. An engine that holds no record it can read, or whose record does not state both the canvas's version and its integrity, ends in an error whose last line names the file and `python -m filmkit.released`, the command that writes it; a traceback precedes that line, at import of the renderer and from `python -m filmkit.adoption`. The renderer reads the canvas's version and integrity from that record, where it held them again as constants, and the README names the engine's `package.json` as the one place those versions are stated and restates no number.
+
 ## [0.24.1] - 2026-11-19
 
 ### Changed

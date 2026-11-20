@@ -29,7 +29,7 @@ import filmkit.media as media
 import filmkit.repository as repository
 import filmkit.sources as sources
 from filmkit.film import FILM
-from filmkit.picture import encoding, faces, renderer
+from filmkit.picture import encoding, faces, renderer, template
 from filmkit.picture.errors import PictureError
 from filmkit.production import RENDITIONS
 from filmkit.repository import content_sha, read, sha, write
@@ -43,8 +43,8 @@ COMPOSITION = Path("picture")
 # The composition's script, whose SHA-256 the packages and reviews record.
 COMPOSITION_SCRIPT = COMPOSITION / "film.js"
 # The renderer document's template and the style it inlines.
-TEMPLATE = COMPOSITION / "index.html"
-STYLE = COMPOSITION / "film.css"
+TEMPLATE = Path(template.TEMPLATE)
+STYLE = COMPOSITION / template.STYLESHEET
 SOURCE_MANIFEST = sources.MANIFEST
 # The picture is rendered at the UHD master's frame; a stage may take either film's frame.
 PICTURE_SIZE = (RENDITIONS["uhd"].width, RENDITIONS["uhd"].height)
@@ -168,18 +168,20 @@ def picture_html(
     style = (repository.ROOT / STYLE).read_text(encoding="utf-8")
     script = (repository.ROOT / COMPOSITION_SCRIPT).read_text(encoding="utf-8")
     html = (repository.ROOT / TEMPLATE).read_text(encoding="utf-8")
-    for old, new, count in (
-        ('<html lang="zh-CN">', f'<html lang="{language(edition)}">', 1),
-        ('data-duration="1200"', f'data-duration="{duration}"', 1),
-        ('data-width="1920"', f'data-width="{width}"', 1),
-        ('data-height="1080"', f'data-height="{height}"', 1),
-        ('content="width=1920, height=1080"', f'content="width={width}, height={height}"', 1),
-        ('width="1920" height="1080"', f'width="{width}" height="{height}"', 1),
-        ('<div id="film"', f'<div style="width:{width}px;height:{height}px" id="film"', 1),
-        ("/* FILM_DATA */", "window.FILM=" + data + ";", 1),
-        ('<link rel="stylesheet" href="film.css">', "<style>" + style + "</style>", 1),
-        ('<script src="film.js"></script>', "<script>" + script + "</script>", 1),
-    ):
+    # One text for each anchor of the template, in the anchors' order (`template.ANCHORS`).
+    texts = (
+        f'<html lang="{language(edition)}">',
+        f'data-duration="{duration}"',
+        f'data-width="{width}"',
+        f'data-height="{height}"',
+        f'content="width={width}, height={height}"',
+        f'width="{width}" height="{height}"',
+        f'<div style="width:{width}px;height:{height}px" id="film"',
+        "window.FILM=" + data + ";",
+        "<style>" + style + "</style>",
+        "<script>" + script + "</script>",
+    )
+    for (old, count), new in zip(template.ANCHORS, texts, strict=True):
         html = substitute(html, old, new, count)
     return html
 

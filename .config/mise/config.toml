@@ -35,8 +35,11 @@ run = [
 ]
 
 [tasks.fix]
-description = "Apply the Markdown formatter to the files it owns"
-run = "npm run format:markdown"
+description = "Apply the Markdown formatter to the files it owns and write the engine's record of what it was released on"
+run = [
+  "npm run format:markdown",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.released",
+]
 
 # The sample film's pipeline, run in its folder, where the engine finds the film; its npm packages
 # are this repository's. Only sample:supply reaches the network; HF_ENDPOINT names a Hugging Face

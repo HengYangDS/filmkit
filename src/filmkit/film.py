@@ -513,29 +513,59 @@ def copied_players(root: Path, film: Film) -> str | None:
     )
 
 
-def load(root: Path) -> Film:
-    """Read and check the declaration below a root, refusing it with each failing field."""
+def read(root: Path) -> tuple[Film | None, list[str]]:
+    """The declaration below a root and every problem it holds, the film None unless its fields
+    load.
+
+    A key renamed since 0.22.3 is a problem, and the fields are then judged as if it carried its
+    new name, so the rename hides no other field. The files the declaration names and a player
+    page left in its sources are judged only once the fields load.
+    """
     try:
         declared = tomllib.loads((root / DECLARATION).read_text(encoding="utf-8"))
-        if RENAMED_FOLDER in declared:
-            message = (
-                f"{DECLARATION} declares {RENAMED_FOLDER}; the key is delivery_folder, the name "
-                "of the film's folder below the delivery root, which is no longer ~/Documents"
-            )
-            raise FilmError(message)
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
+        return None, [f"{DECLARATION} is not a film declaration: {error}"]
+    found = []
+    if RENAMED_FOLDER in declared:
+        found.append(
+            f"{DECLARATION} declares {RENAMED_FOLDER}; the key is delivery_folder, the name "
+            "of the film's folder below the delivery root, which is no longer ~/Documents"
+        )
+        renamed = declared.pop(RENAMED_FOLDER)
+        declared.setdefault("delivery_folder", renamed)
+    try:
         film = Film.model_validate(declared)
-    except (OSError, tomllib.TOMLDecodeError, ValidationError) as error:
-        message = f"{DECLARATION} is not a film declaration: {error}"
-        raise FilmError(message) from error
+    except ValidationError as error:
+        return None, [*found, f"{DECLARATION} is not a film declaration: {error}"]
     named = named_files(film)
     missing = [f"{field}: {path}" for field, path in named if not (root / path).is_file()]
     if missing:
-        message = f"{DECLARATION} names missing files: {'; '.join(missing)}"
-        raise FilmError(message)
+        found.append(f"{DECLARATION} names missing files: {'; '.join(missing)}")
     copied = copied_players(root, film)
     if copied:
-        raise FilmError(copied)
+        found.append(copied)
+    return film, found
+
+
+def problems(root: Path) -> list[str]:
+    """Every problem of the declaration below a root; none when it loads."""
+    return read(root)[1]
+
+
+def load(root: Path) -> Film:
+    """Read and check the declaration below a root, refusing it with every problem it holds."""
+    film, found = read(root)
+    if found or film is None:
+        raise FilmError("\n".join(found))
     return film
 
 
-FILM = load(repository.ROOT)
+def __getattr__(name: str) -> Film:
+    """`FILM`, the film at the engine's root, loaded when a module first asks for it: a command
+    that reports a declaration's problems imports this module before the declaration loads."""
+    if name != "FILM":
+        message = f"module {__name__!r} has no attribute {name!r}"
+        raise AttributeError(message)
+    film = load(repository.ROOT)
+    globals()["FILM"] = film
+    return film

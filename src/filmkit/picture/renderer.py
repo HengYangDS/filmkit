@@ -43,6 +43,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import filmkit.child_processes as child_processes
+import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.picture import encoding
 from filmkit.picture.errors import PictureError
@@ -52,21 +53,17 @@ from filmkit.repository import sha, write
 # the version the engine draws with.
 RENDERER_NAME = "@napi-rs/canvas"
 RENDERER_PACKAGE = Path(RENDERER_NAME) / "package.json"
-RENDERER_VERSION = "1.1.1"
+# What the engine was released on states that package once (`filmkit.released`). An engine
+# whose record does not state it fails there when this module is imported: the last line of the
+# traceback names the record and the command that writes it.
+RELEASED = released.npm_package(RENDERER_NAME)
+RENDERER_VERSION = RELEASED["version"]
 # The package that holds the native library on the one platform a release qualifies.
 BINARY_PACKAGE = "@napi-rs/canvas-darwin-arm64"
-# The integrity npm records for the pinned version of each package, which is the one the
-# engine's own lock holds, and the SHA-256 of the native library that binary package holds.
-INTEGRITY = {
-    RENDERER_NAME: (
-        "sha512-UyNspnx0rXclATMOBXiWgy1xtWUSUDm4UOO6+YO8xzyVKaZRpvK+SlJSCtRoSI9J/"
-        "mEqklJiPYtroN1B+hgLXg=="
-    ),
-    BINARY_PACKAGE: (
-        "sha512-NrPTZWpu0ywOGdp9JBDi46gABUzDJK6IzlP7cOEwaAuVVFM8KRakUWk12RK3YQ/"
-        "Ea5FrNVTWUFTmkXVk4RfHqg=="
-    ),
-}
+# The integrity npm records for the pinned version of the canvas, as the record states it. The
+# binary package's own integrity is the lock's alone: the engine pins that package's native
+# library by its bytes, the SHA-256 below.
+INTEGRITY = {RENDERER_NAME: RELEASED["integrity"]}
 BINARY_SHA256 = "3300b17d4de4ad678e08f29d9016a8d16915afe4876c7097d292d48fd622ef70"
 # What npm records of the packages it installed, below the film's npm packages.
 INSTALLED = Path(".package-lock.json")

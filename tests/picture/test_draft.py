@@ -22,7 +22,11 @@ from filmkit.production import Edition
 from filmkit.specification import DURATION
 
 # A draft record and receipt that an earlier draft left, bound to the current inputs.
-DREW = {"package": "@napi-rs/canvas", "version": "1.1.1", "text_renderer": "system"}
+DREW = {
+    "package": picture_renderer.RENDERER_NAME,
+    "version": picture_renderer.RENDERER_VERSION,
+    "text_renderer": picture_renderer.TEXT_RENDERER,
+}
 EARLIER = {
     "over_limit": [],
     "limit_seconds": 3.5,

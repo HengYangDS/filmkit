@@ -27,6 +27,9 @@ from filmkit.specification import DURATION
 COMPOSITION = repository.ROOT / picture_rendering.COMPOSITION
 # Each edition's one segment.
 TEXTS = {"zh": "先看数据。", "en": "Read the data."}
+# What npm recorded of the binary package in the fixture's film: a stand-in, since the engine
+# pins that package's library by its bytes and no integrity of the package.
+BINARY_RECORDED = "sha512-as-npm-recorded-the-binary-package"
 # The stand-in renderer. Each run appends its arguments after its own path, its scheduling
 # priority, its input and whether it leads its own session to runs.jsonl beside it. Its report
 # states a digest of the stage it was given, or the one the file `drawn` beside it holds, and the
@@ -115,7 +118,7 @@ class FilmRoot:
         name, binary = picture_renderer.RENDERER_NAME, picture_renderer.BINARY_PACKAGE
         packages = {
             f"node_modules/{name}": {"version": version, "integrity": integrity or pinned[name]},
-            f"node_modules/{binary}": {"version": version, "integrity": pinned[binary]},
+            f"node_modules/{binary}": {"version": version, "integrity": BINARY_RECORDED},
         }
         put(self.path / "node_modules" / picture_renderer.INSTALLED, {"packages": packages})
 
