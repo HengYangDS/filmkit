@@ -41,6 +41,21 @@ def frames(moving, still, *, toggle=0):
     return out
 
 
+def decoding(monkeypatch, rate, read, decoded):
+    """Stand in for the decode of a film at `rate` fps: `read()` gives the frames each phase
+    reads, which one decode yields in the film's order, one of each distinct phase in turn.
+    `decoded` lists the phases each decode was asked for."""
+
+    def decode(_movie, phases=still_scan.PHASES[:1]):
+        decoded.append(tuple(phases))
+        distinct = len({phase % (rate // still_scan.FPS) for phase in phases})
+        for frame in read():
+            yield from [frame] * distinct
+
+    monkeypatch.setattr(still_scan, "frame_rate", lambda _movie: rate)
+    monkeypatch.setattr(still_scan, "decode", decode)
+
+
 def test_a_still_run_carries_the_speech_inside_it():
     report = still_scan.scan(frames(10, 30), timeline((1.5, 2.5), (2.6, 3.5)))
     assert report["fine"]["runs"] == [{"start": 0.9, "end": 3.9, "speech": 1.9}]
@@ -96,6 +111,25 @@ def test_the_worse_of_two_sampling_phases_decides():
     assert (both["phases"], both["phase_frames"]) == (2, [40, 40])
 
 
+def test_one_decode_s_frames_are_dealt_to_their_phases_in_turn(monkeypatch):
+    # The decode of a 60 fps film yields the frames of phase 0 and of phase 3 in turn. Here the
+    # first phase sees a square that stops and the second one that keeps moving.
+    still, moving = frames(10, 30), frames(40, 0)
+    turns = [frame for pair in zip(still, moving, strict=True) for frame in pair]
+    monkeypatch.setattr(still_scan, "frame_rate", lambda _movie: 60)
+    monkeypatch.setattr(still_scan, "decode", lambda _movie, _phases: iter(turns))
+    words = timeline((0.9, 3.9))
+    first, second = still_scan.phase_reports("film.mp4", words)
+    assert first == still_scan.scan(still, words)
+    assert second == still_scan.scan(moving, words)
+    assert (first["longest_fine_speech"], second["longest_fine_speech"]) == (3.0, 0)
+    # A film at 30 fps holds no frame 0.05 s after a sample: both phases select the same
+    # frames, the decode yields each once, and both read one report.
+    monkeypatch.setattr(still_scan, "frame_rate", lambda _movie: 30)
+    monkeypatch.setattr(still_scan, "decode", lambda _movie, _phases: iter(still))
+    assert still_scan.phase_reports("film.mp4", words) == [first, first]
+
+
 def test_a_scan_of_no_frames_is_refused():
     # A scan that read no frames has not judged the film, so it never passes it.
     with pytest.raises(still_scan.StillScanError, match="no frames"):
@@ -128,8 +162,33 @@ def test_each_phase_reads_ten_frames_a_second_at_any_frame_rate(tmp_path, rate):
         ],
         check=True,
     )
-    assert len(list(still_scan.decode(movie, 0))) == 20
-    assert len(list(still_scan.decode(movie, 1))) == 20
+    assert len(list(still_scan.decode(movie, (0,)))) == 20
+    assert len(list(still_scan.decode(movie, (1,)))) == 20
+    # One decode keeps the frames of both phases, where the film holds a frame between them.
+    assert len(list(still_scan.decode(movie, still_scan.PHASES))) == (40 if rate == 60 else 20)
+
+
+@pytest.mark.ffmpeg
+def test_one_decode_reports_each_phase_as_a_decode_of_its_own_does(tmp_path):
+    # A white square on black that jumps at frames 122 and 242 of a 60 fps film of six seconds:
+    # phase 3 samples frame 123 and sees each jump one sample before phase 0, which samples
+    # frame 126, so the two phases report different runs. Each phase's report from the one
+    # decode equals the report of that phase decoded alone.
+    movie = tmp_path / "jumping.mp4"
+    inputs = [
+        option
+        for source in ("color=black:size=480x270", "color=white:size=40x40")
+        for option in ("-f", "lavfi", "-i", f"{source}:rate=60:duration=6")
+    ]
+    jump = "[0][1]overlay=x='100+60*gte(t\\,2.03)+60*gte(t\\,4.03)':y=120"
+    command = ["ffmpeg", "-v", "error", *inputs, "-filter_complex", jump, "-pix_fmt", "yuv420p"]
+    subprocess.run([*command, str(movie)], check=True)
+    words = timeline((0.5, 5.5))
+    together = still_scan.phase_reports(movie, words)
+    apart = [still_scan.scan(still_scan.decode(movie, (phase,)), words) for phase in (0, 3)]
+    assert together == apart
+    assert [report["frames"] for report in together] == [60, 60]
+    assert together[0]["fine"]["runs"] != together[1]["fine"]["runs"]
 
 
 def test_the_scan_record_names_the_film_timeline_and_composition_it_judged(tmp_path, monkeypatch):
@@ -138,14 +197,11 @@ def test_the_scan_record_names_the_film_timeline_and_composition_it_judged(tmp_p
     (tmp_path / "picture").mkdir()
     (tmp_path / "picture/film.js").write_text("scenes = {};\n")
     repository.write("timeline.json", timeline((1.0, 1.5)))
-    monkeypatch.setattr(still_scan, "frame_rate", lambda _movie: 60)
     decoded = []
-    monkeypatch.setattr(
-        still_scan, "decode", lambda _movie, phase: decoded.append(phase) or iter(frames(40, 0))
-    )
+    decoding(monkeypatch, 60, lambda: frames(40, 0), decoded)
     still_scan.main(["film.mp4", "timeline.json", "--out", "scan.json"])
-    # A 60 fps film has frames between its samples, so each phase is decoded.
-    assert decoded == [0, 3]
+    # A 60 fps film has frames between its samples: one decode reads both phases' frames.
+    assert decoded == [(0, 3)]
     record = json.loads((tmp_path / "scan.json").read_text())
     assert record["movie"] == {
         "path": "film.mp4",
@@ -181,15 +237,13 @@ def test_an_edition_draft_is_scanned_against_its_timeline_into_its_record(tmp_pa
     (tmp_path / "picture/film.js").write_text("scenes = {};\n")
     edition = Edition("en")
     repository.write(edition.timeline, {**timeline((1.0, 1.5)), "duration": 4})
-    monkeypatch.setattr(still_scan, "frame_rate", lambda _movie: 10)
     decoded = []
-    monkeypatch.setattr(
-        still_scan, "decode", lambda _movie, phase: decoded.append(phase) or iter(frames(40, 0))
-    )
+    decoding(monkeypatch, 10, lambda: frames(40, 0), decoded)
     still_scan.main(["draft.mp4", "--language", "en"])
     record = json.loads(edition.draft_stills.read_text())
-    # A draft at the scan's own rate is decoded once for both phases, which the record still names.
-    assert (decoded, record["phases"]) == ([0], 2)
+    # A draft at the scan's own rate holds one frame for both phases, which the record still
+    # names with the frames each read.
+    assert (decoded, record["phases"], record["phase_frames"]) == ([(0, 3)], 2, [40, 40])
     assert record["timeline"] == {
         "path": "build/artifacts/film/en/timeline.json",
         "sha256": repository.sha(edition.timeline),
@@ -204,8 +258,8 @@ def test_an_edition_draft_is_scanned_against_its_timeline_into_its_record(tmp_pa
 def packaged(tmp_path, monkeypatch):
     """The Chinese edition's packaged 1080p captioned film below a test root, with its timeline
     of six seconds, four of them speech, and the composition. The film decodes to
-    `shown["frames"]`, sixty that keep moving unless a test sets others, and `decoded` lists each
-    phase that was decoded."""
+    `shown["frames"]` in each phase, sixty that keep moving unless a test sets others, and
+    `decoded` lists the phases of each decode."""
     monkeypatch.setattr(repository, "ROOT", tmp_path)
     edition = Edition("zh")
     film = edition.film("1080p-captioned")
@@ -215,10 +269,7 @@ def packaged(tmp_path, monkeypatch):
     (tmp_path / "picture/film.js").write_text("scenes = {};\n")
     repository.write(edition.timeline, {**timeline((1.0, 5.0)), "duration": 6})
     shown, decoded = {"frames": frames(60, 0)}, []
-    monkeypatch.setattr(still_scan, "frame_rate", lambda _movie: 60)
-    monkeypatch.setattr(
-        still_scan, "decode", lambda _movie, phase: decoded.append(phase) or iter(shown["frames"])
-    )
+    decoding(monkeypatch, 60, lambda: shown["frames"], decoded)
     return SimpleNamespace(edition=edition, film=film, shown=shown, decoded=decoded)
 
 
@@ -234,7 +285,7 @@ def rescanned(packaged):
     before = len(packaged.decoded)
     still_scan.scan_film(packaged.edition)
     still_scan.require_film_scan(packaged.edition)
-    return packaged.decoded[before:] == [0, 3]
+    return packaged.decoded[before:] == [(0, 3)]
 
 
 def test_a_film_that_keeps_moving_writes_its_record_and_meets_the_requirement(packaged, capsys):
@@ -245,8 +296,8 @@ def test_a_film_that_keeps_moving_writes_its_record_and_meets_the_requirement(pa
         "over_limit": 0,
         "scanned": True,
     }
-    # The final film runs at 60 fps, so both phases are decoded.
-    assert packaged.decoded == [0, 3]
+    # The final film runs at 60 fps: one decode reads both phases.
+    assert packaged.decoded == [(0, 3)]
     assert record == repository.read("build/evidence/editions/zh/film-stills.json")
     assert record["movie"] == {
         "path": f"build/artifacts/film/zh/{packaged.film.name}",
@@ -278,7 +329,7 @@ def test_a_film_that_stands_still_is_refused_at_its_scan_and_by_the_requirement(
 def test_a_second_scan_of_an_unchanged_film_decodes_nothing(packaged, capsys):
     still_scan.scan_film(packaged.edition)
     still_scan.scan_film(packaged.edition)
-    assert packaged.decoded == [0, 3]
+    assert packaged.decoded == [(0, 3)]
     first, second = map(json.loads, capsys.readouterr().out.splitlines())
     assert (first["scanned"], second["scanned"]) == (True, False)
     assert {**second, "scanned": True} == first
@@ -302,7 +353,7 @@ def test_a_second_scan_of_a_refused_film_refuses_again_from_its_record(packaged)
         with pytest.raises(PictureError) as refused:
             still_scan.scan_film(packaged.edition)
         assert str(refused.value) == HELD
-    assert packaged.decoded == [0, 3]
+    assert packaged.decoded == [(0, 3)]
 
 
 def change_film(packaged):
@@ -437,7 +488,7 @@ def test_a_record_that_contradicts_itself_is_not_trusted_and_the_film_is_scanned
     )
     with pytest.raises(PictureError) as refused:
         still_scan.scan_film(packaged.edition)
-    assert (str(refused.value), packaged.decoded) == (HELD, [0, 3, 0, 3])
+    assert (str(refused.value), packaged.decoded) == (HELD, [(0, 3), (0, 3)])
 
 
 def test_a_record_written_under_another_limit_is_refused_with_both_limits(packaged):
@@ -455,7 +506,7 @@ def test_a_record_written_under_another_limit_is_refused_with_both_limits(packag
     )
     with pytest.raises(PictureError) as refused:
         still_scan.scan_film(edition)
-    assert (str(refused.value), packaged.decoded) == (HELD, [0, 3, 0, 3])
+    assert (str(refused.value), packaged.decoded) == (HELD, [(0, 3), (0, 3)])
 
 
 def test_a_record_of_earlier_rules_is_refused_though_the_engine_s_version_stands(
@@ -472,10 +523,11 @@ def test_a_record_of_earlier_rules_is_refused_though_the_engine_s_version_stands
 
 
 def test_a_film_replaced_while_it_is_scanned_is_refused_and_leaves_no_record(packaged, monkeypatch):
-    def replaced(_movie, phase):
-        if phase == 3:
-            packaged.film.write_bytes(b"a film packaged meanwhile")
-        return iter(frames(60, 0))
+    def replaced(_movie, _phases):
+        for k, frame in enumerate(frames(60, 0)):
+            if k == 30:
+                packaged.film.write_bytes(b"a film packaged meanwhile")
+            yield from (frame, frame)
 
     # The record would bind bytes that no scan read. An earlier record of the film as it stood
     # does not outlive the scan either.
@@ -525,7 +577,7 @@ def test_a_missing_film_is_named_by_the_scan_and_by_the_requirement(packaged):
 def test_a_film_that_cannot_be_read_is_the_action_s_refusal_and_leaves_no_record(
     packaged, monkeypatch
 ):
-    def unreadable(_movie, _phase):
+    def unreadable(_movie, _phases):
         msg = "FFmpeg read no frames from the film (exit 1)"
         raise still_scan.StillScanError(msg)
 

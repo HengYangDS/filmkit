@@ -141,6 +141,13 @@ Each decision states what it rests on, what was considered, why the option taken
     - **Applies to:** `still_scan.draft_record`, which `preflight.draft` calls, and `still_scan.record_draft`, which refuses a draft that does not decode to its timeline's seconds and leaves no record. A draft binds no engine version: its record admits a render and nothing after it (decision 8). What drew the draft is asked by `preflight` as before (`drawn_by`).
     - **Reopened when:** a film's draft is scanned against another timeline than its edition's.
     - **Sources:** [S1] [S11].
+17. **One decode gives both phases their frames.**
+    - **Rests on:** a film of 60 fps was decoded twice, once a phase, every frame of it each time, though a phase keeps one frame in six; a scan cost 96 to 126 s an edition at the loads measured [S3], and every edition's build now pays the step. A decode yields its frames in the film's order, so one process that keeps the frames of both phases yields one of each in turn [S1].
+    - **Considered:** (a) a decode a phase, as before; (b) one FFmpeg process that keeps the frames of both phases, dealt to their phases in order; (c) two processes at once, which halves the wall seconds and not the work, on a host whose cores other builds share; (d) decoding less of each frame, by hardware or by keyframes, which changes which pixels or frames a phase reads.
+    - **Chosen because:** (b) decodes the film once and changes nothing a phase reads: the same frames, through the same filter, in the same order. Its gain is not stated before it is measured on a whole film (`tasks.md` 5.2).
+    - **Applies to:** `still_scan.decode` and `sampling` (the phases whose frames one decode keeps, as FFmpeg's select expression), `Stills` (both measures taken a frame at a time) and `phase_reports` (the dealing), in every form of the scan. Phases that select the same frames, as on a draft of 10 fps, read one report, as before.
+    - **Reopened when:** a phase's report from the one decode differs from that of a decode of its own (the tests of `tests/picture/test_still_decode.py` on a stand-in for the FFmpeg process, `test_one_decode_reports_each_phase_as_a_decode_of_its_own_does` with FFmpeg, and the ticket's comparison on a released film), or the measurement shows no gain.
+    - **Sources:** [S1] [S3].
 
 ## Risks / Trade-offs
 
@@ -148,7 +155,7 @@ Each decision states what it rests on, what was considered, why the option taken
 - The ETHOS film's Chinese edition cannot be verified on this engine as its picture stands. → That is the defect this Change exists to hold. Its film's record already names the scene [S4].
 - The scan's thresholds stand close to what encoders and renderers vary by: three of the largest differences between two drafts of one edition stood at 12 counted pixels against 13 and 15, and at 25 levels against 24 [S2]. A film just under the limit on one build may read just over it on the next. → The limit is not moved; a film that reads within a few tenths of it is a film to change. No margin is added without a case.
 - The sample film is such a film. By the scan, on 19 November 2026, its Chinese final film read 3.28 s in a browser's build and 3.32 s in a native canvas's (2.9 to 7.1 s and to 7.2 s), 0.18 s under the limit, and its English film 2.98 s in both (4.0 to 7.9 s) [S10]. → `tasks.md` 2.1 asks for 0.5 s under the limit on a build of this engine's head before the sample's package task scans its films (decision 9); the scene changes in this Change (decision 9, `tasks.md` 2.3), and the steps that follow wait for the reading.
-- A build pays 96 to 126 s an edition [S3]. → Once for each packaged film; decision 5.
+- A build paid 96 to 126 s an edition with a decode a phase [S3]; with one decode its seconds are not yet measured (decision 17). → Once for each packaged film; decision 5.
 - A change to any constant of the scan makes every film record stale, and so does an engine release. → That is what the two comparisons are for; the cost is one build step for each edition.
 - A record of the first form of this Change, or of the scan's general form before it, states no rules and no frames. → At the film record's place it is named as one that cannot be read, and `scan-film` writes a new one. No released engine wrote a film record. A draft record of an engine before this Change is named the same way by the pre-render check, and `render-draft` draws the draft again (decision 16).
 
@@ -157,7 +164,7 @@ Each decision states what it rests on, what was considered, why the option taken
 - What `scan-film` itself reads on real films. Answered for two released editions on 20 November 2026 [S13]: the command refuses the ETHOS film's Chinese edition 2.0.1 with one run, from 842.70 to 847.40 s with 3.86 s of speech, and passes the essentials film's English edition 1.0.2, whose longest still run holds 3.06 s of speech (335.80 to 339.10 s). Four released editions are measured by the same scan through its general form [S3]. The DDWG film's two editions are read by the draft tickets of 19 November 2026, outside this Change.
 - Whether the sample film's two final films pass on this engine's head. `tasks.md` 2.1; decision 9 states what two earlier builds read.
 - Whether the delivery should require the pass of the whole verification, and not of the still scan alone. It asks none of the verifier's other bindings and relies on a film's task order; that predates this Change (decision 13).
-- How many cores the two decodes keep busy, and what a scan costs on an edition of 1,500 s. Not measured.
+- How many cores the decode keeps busy, what the one decode takes against two (`tasks.md` 5.2), and what a scan costs on an edition of 1,500 s. Not measured.
 - Whether the verifier's own decode of the 1080p film could feed the scan, which would save a decode. Not looked into: the verifier decodes to count frames and reads no pixels today [S1].
 
 ## Sources

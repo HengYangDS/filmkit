@@ -5,10 +5,11 @@ the content band, rows 30-225, change by more than 24 levels from the frame befo
 coarser measure compares frames 0.2 s apart and calls a pair still when under 0.05 % of
 the band changes that much. Each run of still frames is reported with the speech it
 carries, from the timeline's aligned words. A 10 fps sample can land either side of a mark
-that moves for one frame, so the film is read twice, 0.05 s apart, and the worse reading
-decides. The specification allows no still picture with 3.5 s of speech or more; a run's
-speech is recorded cut to whole hundredths, so the recorded figure stands at the limit exactly
-when the measured one does.
+that moves for one frame, so the film is read at two phases, 0.05 s apart, and the worse reading
+decides; one decode gives both phases their frames (`decode`, `phase_reports`). The
+specification allows no still picture with 3.5 s of speech or more; a run's speech is recorded
+cut to whole hundredths, so the recorded figure stands at the limit exactly when the measured
+one does.
 
 A record names the film, the timeline and the composition script it judged, the composition as
 it stands when the scan runs, each with its SHA-256, the rules it was written under (`rules`)
@@ -161,19 +162,37 @@ def speech(words: np.ndarray, start: float, end: float) -> float:
     return min(float(within.sum()), end - start)
 
 
+class Stills:
+    """Both measures' still flags over grey frames at FPS, taken a frame at a time, so that the
+    frames of several phases can come from one decode."""
+
+    def __init__(self) -> None:
+        self.fine, self.coarse, self.count = [False], [False], 0
+        self.previous = self.key = None
+
+    def add(self, frame: np.ndarray) -> None:
+        band = frame[BAND].astype(np.int16)
+        if self.previous is not None:
+            self.fine.append(int((np.abs(band - self.previous) > LEVEL).sum()) <= FINE_PIXELS)
+        if self.count % 2 == 0:
+            if self.key is not None:
+                self.coarse.append(float((np.abs(band - self.key) > LEVEL).mean()) < COARSE_SHARE)
+            self.key = band
+        self.previous, self.count = band, self.count + 1
+
+
 def scan(frames: Iterable[np.ndarray], timeline: dict) -> dict:
     """Both measures over grey frames at FPS: each still run with the speech it carries."""
-    fine, coarse, previous, key = [False], [False], None, None
-    for k, frame in enumerate(frames):
-        band = frame[BAND].astype(np.int16)
-        if previous is not None:
-            fine.append(int((np.abs(band - previous) > LEVEL).sum()) <= FINE_PIXELS)
-        if k % 2 == 0:
-            if key is not None:
-                coarse.append(float((np.abs(band - key) > LEVEL).mean()) < COARSE_SHARE)
-            key = band
-        previous = band
-    if previous is None:
+    stills = Stills()
+    for frame in frames:
+        stills.add(frame)
+    return reported(stills, timeline)
+
+
+def reported(stills: Stills, timeline: dict) -> dict:
+    """What a scan reports of the frames it took: each still run with the speech it carries."""
+    fine, coarse = stills.fine, stills.coarse
+    if not stills.count:
         msg = "The scan read no frames, so it cannot judge the film"
         raise StillScanError(msg)
     words = aligned(timeline)
@@ -259,8 +278,18 @@ def frame_rate(movie: Path) -> int:
     return round(rate)
 
 
-def decode(movie: Path, phase: int = 0) -> Iterator[np.ndarray]:
-    """The movie's frames at FPS as 480x270 grey arrays, from its frame `phase` on.
+def sampling(every: int, phases: tuple[int, ...]) -> str:
+    """The frames a decode keeps, as FFmpeg's select expression: of every `every` frames, the
+    frame of each phase asked for."""
+    return "+".join(
+        f"eq(mod(n\\,{every})\\,{phase})" for phase in sorted({p % every for p in phases})
+    )
+
+
+def decode(movie: Path, phases: tuple[int, ...] = PHASES[:1]) -> Iterator[np.ndarray]:
+    """The movie's frames at FPS as 480x270 grey arrays, for each of `phases` from its frame of
+    that number on, in the film's order: one process decodes the film once and keeps the frames
+    of every phase asked for, so two phases' frames alternate.
 
     A 60 fps film is read at every sixth frame and a 10 fps draft at every frame, so its two
     phases differ only on a film fast enough to have a frame between its samples.
@@ -274,7 +303,7 @@ def decode(movie: Path, phase: int = 0) -> Iterator[np.ndarray]:
         str(movie),
         "-an",
         "-vf",
-        f"select='eq(mod(n\\,{every})\\,{phase % every})',{DECODE}",
+        f"select='{sampling(every, phases)}',{DECODE}",
         "-fps_mode",
         "passthrough",
         "-f",
@@ -294,11 +323,17 @@ def decode(movie: Path, phase: int = 0) -> Iterator[np.ndarray]:
 
 
 def phase_reports(film: Path, words: dict) -> list[dict]:
-    """Each phase's scan of a film. A movie at the scan's own rate holds no frame between its
-    samples, so both phases select the same frames and one decode serves both."""
-    if frame_rate(film) == FPS:
-        return [scan(decode(film, PHASES[0]), words)] * len(PHASES)
-    return [scan(decode(film, phase), words) for phase in PHASES]
+    """Each phase's scan of a film, from one decode: the frames come in the film's order, one
+    of each distinct phase in turn, and are dealt to their phases. Phases that select the same
+    frames read one report: a movie at the scan's own rate holds no frame between its samples."""
+    every = frame_rate(film) // FPS
+    offsets = [phase % every for phase in PHASES]
+    kept = sorted(set(offsets))
+    dealt = [Stills() for _ in kept]
+    for k, frame in enumerate(decode(film, PHASES)):
+        dealt[k % len(kept)].add(frame)
+    reports = dict(zip(kept, [reported(stills, words) for stills in dealt], strict=True))
+    return [reports[offset] for offset in offsets]
 
 
 def judged(movie: Path, timeline: Path, limit: float = LIMIT_SECONDS) -> dict:
