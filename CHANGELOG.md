@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-20
+
 ### Added
 
 - `python -m filmkit.adoption` lists what this release asks of a film's tracked files in one run, in any environment that holds the engine and before the film installs its npm packages, supplies or builds anything: the declaration's problems, the npm packages the engine runs and their integrity in the film's lock, the release the film pins and each Python package of the engine's runtime that its lock holds at another version (with the `constraint-dependencies` lines that close the difference), engine modules and actions its Mise tasks name that this engine does not have, tasks that render a picture while none asks `preflight` (the order of commands and their editions are not judged; a `filmkit.produce` command that holds a variable and names no action by a word is named as not compared, and readiness is then not judged), and each text of `picture/index.html` that staging would refuse, with any script or stylesheet staging does not inline. It needs no declaration that loads and exits 1 while a finding stands. What needs a build to judge, such as a caption above the reading rate, stays `preflight`'s. **A film that adopts a release runs it first.**
@@ -552,7 +554,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.24.1...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/HengYangDS/filmkit/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/HengYangDS/filmkit/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/HengYangDS/filmkit/compare/v0.23.1...v0.24.0
 [0.23.1]: https://github.com/HengYangDS/filmkit/compare/v0.23.0...v0.23.1
