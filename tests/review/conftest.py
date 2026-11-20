@@ -7,6 +7,7 @@ import json
 import pytest
 
 import filmkit.delivery.folder as delivery_folder
+import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
 import filmkit.review.files as review_files
 import filmkit.review.listening_plan as review_listening_plan
@@ -36,9 +37,11 @@ def put():
 @pytest.fixture
 def root(tmp_path, monkeypatch):
     """A repository root holding both packaged editions as tiny stand-in files: each edition's
-    four films, its package record and both pictures."""
+    four films, its package record and both pictures. Each edition's 1080p captioned film
+    passes the requirement of its still scan, which the scan's own tests cover."""
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
+    monkeypatch.setattr(still_scan, "require_film_scan", lambda _edition: {})
     for code in CODES:
         edition = Edition(code)
         pictures = (edition.picture, edition.rendered(captions=False).file)

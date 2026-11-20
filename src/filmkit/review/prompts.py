@@ -7,6 +7,11 @@ pause, level and clarity policies the film declares, and the previous round's re
 declares a concept contract gets prompts only when its template cites the contract and the
 reading occurrence plans and its dimensions score concept fidelity.
 
+No round is prepared for films the engine's own measure refuses: the checks that only read
+(`read_round`) ask each edition's passing still scan of its 1080p captioned film
+(`filmkit.picture.still_scan.require_film_scan`, whose record `produce scan-film` writes), so a
+round is not spent on a film that the delivery's verification would refuse afterwards.
+
 `{previous_review}` states the previous round's review, its findings and that each repair is to
 be verified, or, for a film's first production review, that no earlier production review exists;
 it cites no previous review then. A template may instead cite `{previous}` and `{findings}`
@@ -33,6 +38,7 @@ import re
 import string
 from pathlib import Path
 
+import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
 import filmkit.sources as sources
 import filmkit.specification as specification
@@ -429,10 +435,12 @@ def read_round(
     A round's preparation asks this before it derives anything, and `prompts` before it writes
     anything. Refused unless the review configuration keeps the concept contract the film
     declares (`contract_gaps`) and the levels it declares (`level_gaps`), a first round's
-    template cites no previous review, a later round disposes of every previous finding
-    (`stated_dispositions`), the previous round holds each edition's review and report, the
-    changes note is text, the soundtracks declare one program level, the template cites no field
-    the engine does not fill, and each edition of a film with levels has its timeline.
+    template cites no previous review, each edition's 1080p captioned film holds its passing
+    still scan (`still_scan.require_film_scan`, whose refusal is raised as that owner's own), a
+    later round disposes of every previous finding (`stated_dispositions`), the previous round
+    holds each edition's review and report, the changes note is text, the soundtracks declare
+    one program level, the template cites no field the engine does not fill, and each edition
+    of a film with levels has its timeline.
     """
     gaps = contract_gaps(TEMPLATE, DIMENSIONS)
     if gaps:
@@ -450,6 +458,8 @@ def read_round(
             "round's template cites {previous_review}"
         )
         raise ReviewError(msg)
+    for code in CODES:
+        still_scan.require_film_scan(Edition(code))
     stated = stated_dispositions(previous, dispositions)
     context = prompt_context(out_dir, previous, changes)
     fields = {}

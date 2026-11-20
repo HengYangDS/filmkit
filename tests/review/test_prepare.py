@@ -7,9 +7,11 @@ from pathlib import Path
 
 import pytest
 from preparing import PREPARED, ROUND, names, prepare, refusal, tree
+from still_records import REQUIRE_FILM_SCAN
 
 import filmkit.delivery.folder as delivery_folder
 import filmkit.media as media
+import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
 import filmkit.review.files as review_files
 import filmkit.review.measurement as review_measurement
@@ -28,10 +30,22 @@ PROMPTED = (("sentences", "json"), ("prompt", "md"))
 
 
 def test_prepare_writes_the_round_of_a_ready_build_and_its_prompts_last(
-    root, put, ready, previous, capsys
+    root, put, ready, previous, capsys, monkeypatch
 ):
+    asked = []
+
+    def passing(edition):
+        asked.append(edition.code)
+        return {}
+
+    monkeypatch.setattr(still_scan, "require_film_scan", passing)
     changes = put(root / "notes/changes.md", "- Repairs: 07.6 names all seven checks.\n")
     folder = prepare(*previous, "--changes", changes)
+    # Each edition's still scan is asked twice, in the editions' order. The requirement is one
+    # of the checks that only read, and a preparation asks those before it derives anything
+    # and again when the prompts are written, from the round's own copies of the note and the
+    # dispositions.
+    assert asked == [*CODES, *CODES]
     bound = ["changes.md", "dispositions.json", "player-check-artifacts.json"]
     planned = sorted([*bound, "pronunciation-listening-plan.json"])
     measured = sorted([*planned, "measurements.json"])
@@ -125,6 +139,32 @@ def test_prepare_refuses_what_it_reads_before_it_derives_anything(root, review, 
     # Nothing was derived, and the round's directory does not exist.
     assert ready == []
     assert not folder.exists()
+
+
+def test_a_film_without_its_passing_still_scan_is_refused_and_leaves_no_directory(
+    ready, monkeypatch
+):
+    folder = review_files.round_directory(ROUND)
+    # Below this root no edition holds a record, and the scan's own requirement says so.
+    monkeypatch.setattr(still_scan, "require_film_scan", REQUIRE_FILM_SCAN)
+    assert refusal() == "prepare: The zh film has no still scan record; run scan-film"
+    assert (ready, folder.exists()) == ([], False)
+    asked = []
+
+    def held(edition):
+        asked.append(edition.code)
+        if edition.code == "en":
+            msg = "The en film holds a still picture with 3.5 s of speech or more: 1.00-5.00 s"
+            raise PictureError(msg)
+        return {}
+
+    # Both editions are asked before anything is derived: the second's refusal is the round's.
+    monkeypatch.setattr(still_scan, "require_film_scan", held)
+    assert refusal() == (
+        "prepare: The en film holds a still picture with 3.5 s of speech or more: 1.00-5.00 s"
+    )
+    assert asked == list(CODES)
+    assert (ready, folder.exists()) == ([], False)
 
 
 def test_a_preparation_that_stops_while_it_derives_refuses_in_one_line_and_leaves_no_prompt(

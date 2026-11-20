@@ -2,6 +2,8 @@
 
 package-film refuses to extend a package bound to changed inputs, and the next render would
 overwrite the pictures in place. Setting aside renames each edition's films and package record,
+the scan record of its 1080p captioned film where one stands (a build of an engine before that
+scan holds none), whatever it says: it is the films' scan record and stays with them,
 and its rendered pictures unless that edition keeps them (when the successor's render has
 already replaced them, or when the next build does not replace them), within the volume into
 build/artifacts/film/superseded/<label>/<code>/, and records them in manifest.json with their
@@ -92,6 +94,7 @@ def edition_members(label: str, code: str, *, picture: bool) -> tuple[Path, list
     sources = [
         *built_films(edition),
         edition.film_package,
+        *([edition.film_stills] if edition.film_stills.is_file() else []),
         *(built_pictures(edition) if picture else []),
     ]
     present(sources)

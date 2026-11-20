@@ -252,6 +252,25 @@ def test_a_build_packaged_before_the_films_without_captions_is_set_aside_with_it
     assert not any(film.exists() for code in CODES for film in Edition(code).films)
 
 
+def test_the_still_scan_record_of_a_build_s_films_is_set_aside_with_them(root, review, put):
+    # The record is the films' scan record, whatever it says: it moves with them, and no reader
+    # is asked of it here. Left behind, it would stand at the place of the next build's record.
+    # An edition whose build holds no such record sets none aside.
+    put(Edition("zh").film_stills, {"movie": {"sha256": "the film's"}})
+    reviews = root / "build/evidence/reviews/round-4"
+    for code in CODES:
+        review(reviews, code)
+    plans = review_set_aside.plan_set_aside(4, PURPOSE, reviews, pictures=())
+    assert [[path.name for path in plan.sources] for plan in plans] == [
+        [*films("zh"), "film-package.json", "film-stills.json"],
+        [*films("en"), "film-package.json"],
+    ]
+    review_set_aside.move_aside(plans)
+    aside = root / "build/artifacts/film/superseded/round-4/zh/film-stills.json"
+    assert json.loads(aside.read_text()) == {"movie": {"sha256": "the film's"}}
+    assert not Edition("zh").film_stills.exists()
+
+
 def test_the_rounds_whose_prompts_bind_an_edition_s_films_hold_them_until_set_aside(
     root, review, put, monkeypatch
 ):

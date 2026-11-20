@@ -24,9 +24,10 @@ the edition's 1080p captioned film against its timeline into the edition's film 
 (`Edition.film_stills`), which also names the engine that scanned. `film_record` reads it for
 the film, the timeline, the composition and the engine as they stand; `scan-film` scans again
 whenever it does not answer, so the command a refusal names repairs any record.
-`require_film_scan` is the one owner of whether an edition passes: it refuses an edition whose
-record does not answer, saying why and naming `scan-film`, or whose film holds a still run at
-the limit. A record that answers is not decoded again.
+`require_film_scan` is the one owner of whether an edition passes: the delivery's verification,
+the delivery and a review round's preparation call it, and it refuses an edition whose record
+does not answer, saying why and naming `scan-film`, or whose film holds a still run at the
+limit. A record that answers is not decoded again.
 
 A draft's scan is an early warning and settles nothing about the film. A draft is drawn at half
 the size the film's picture is drawn at, and text is set on whole pixels of the size it is drawn

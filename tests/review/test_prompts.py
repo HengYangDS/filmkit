@@ -3,12 +3,15 @@
 import re
 
 import pytest
+from still_records import REQUIRE_FILM_SCAN
 
+import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
 import filmkit.review.prompts as review_prompts
 import filmkit.review.record as review_record
 import filmkit.sources as sources
 import filmkit.specification as specification
+from filmkit.picture.errors import PictureError
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
 
@@ -269,6 +272,32 @@ def test_a_first_round_states_that_no_earlier_review_exists(root, put, monkeypat
     )
     review_prompts.prompts(None, out)
     assert "floors the film declares: none declared." in (out / "prompt-zh.md").read_text()
+
+
+@pytest.mark.usefixtures("unleveled")
+def test_the_reading_checks_ask_each_edition_s_passing_still_scan(root, put, monkeypatch):
+    out = round_inputs(root, put, monkeypatch)
+    # Below this root no edition holds a record, and the scan's own requirement says so, in its
+    # own class: the reading wraps no owner's refusal.
+    monkeypatch.setattr(still_scan, "require_film_scan", REQUIRE_FILM_SCAN)
+    with pytest.raises(PictureError) as refused:
+        review_prompts.read_round(None, out)
+    assert str(refused.value) == "The zh film has no still scan record; run scan-film"
+    asked = []
+
+    def held(edition):
+        asked.append(edition.code)
+        if edition.code == "en":
+            msg = "The en film holds a still picture with 3.5 s of speech or more: 1.00-5.00 s"
+            raise PictureError(msg)
+        return {}
+
+    # Both editions are asked, and the prompts, which ask the reading first, write nothing.
+    monkeypatch.setattr(still_scan, "require_film_scan", held)
+    with pytest.raises(PictureError, match="The en film holds a still picture with 3.5 s"):
+        review_prompts.prompts(None, out)
+    assert asked == list(CODES)
+    assert not [*out.glob("prompt-*.md"), *out.glob("sentences-*.json")]
 
 
 @pytest.mark.usefixtures("unleveled")

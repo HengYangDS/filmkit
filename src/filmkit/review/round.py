@@ -186,10 +186,11 @@ def prepare(
     without a directory as it was. A round's number is 0 or more (`round_directory`). The
     changes note and the dispositions are read, since either may be the round's own copy of an
     earlier preparation. Then everything the prompts read is read and checked
-    (`filmkit.review.prompts.read_round`): the template's fields, the previous round's reviews,
-    reports and dispositions, a dispositions file that is no JSON being refused by name, the
-    note's text, the program levels and each edition's timeline. Then the films and the other
-    members a delivery would hold, and the round itself (`refuse_more_than_a_preparation`).
+    (`filmkit.review.prompts.read_round`): the template's fields, each edition's passing still
+    scan, the previous round's reviews, reports and dispositions, a dispositions file that is no
+    JSON being refused by name, the note's text, the program levels and each edition's
+    timeline. Then the films and the other members a delivery would hold, and the round itself
+    (`refuse_more_than_a_preparation`).
 
     Every file of an earlier preparation is then removed (`prepared_names`), and the round is
     written in this order: the copies of the note and the dispositions from what was read, the

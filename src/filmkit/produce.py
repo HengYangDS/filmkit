@@ -19,9 +19,10 @@ A refusal by an action's owner exits with status 1 and "<action>: <reason>" on s
 error. check-sound measures the assembled soundtrack with its refreshed captions and refuses a
 segment under the film's clarity floor, an abrupt or cut ending and a stopped phrase
 (`filmkit.soundtrack.gates`). scan-film scans the edition's packaged 1080p captioned film for
-still pictures under speech and writes its still scan record (`filmkit.picture.still_scan`).
-Assembling a soundtrack and refreshing captions first refuse while a review round binds the
-edition's films and has not set them aside (`filmkit.review.set_aside.require_set_aside`).
+still pictures under speech and writes the record that the delivery's verification and a
+review round's preparation require (`filmkit.picture.still_scan`). Assembling a soundtrack and
+refreshing captions first refuse while a review round binds the edition's films and has not set
+them aside (`filmkit.review.set_aside.require_set_aside`).
 Every action writes a duration record for its edition when it ends, named after the action and,
 for the uncaptioned picture, with `-uncaptioned` after it (`filmkit.durations`).
 The command owns no goal, approval, repository lifecycle, service or task state.
