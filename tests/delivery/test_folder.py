@@ -2,13 +2,17 @@
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
+from still_records import REQUIRE_FILM_SCAN
 
 import filmkit.delivery.folder as delivery_folder
+import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
 from filmkit.delivery.folder import DeliveryRefusedError
+from filmkit.picture.errors import PictureError
 from filmkit.production import CODES
 
 
@@ -117,6 +121,58 @@ def test_a_dry_run_reports_the_changes_and_writes_nothing(film):
     assert "zh/sample-reel-zh-uhd.mp4" in "\n".join(report["changes"])
     assert not destination.exists()
     assert not (root / delivery_folder.READBACK).exists()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_an_edition_whose_film_holds_no_passing_still_scan_is_not_delivered(
+    film, monkeypatch, dry_run
+):
+    # Delivery asks the scan's own requirement of each edition before rsync changes anything, in
+    # a dry run too, whether or not a task ran the verifier first: `package-film` and then this
+    # command would otherwise deliver a film that was never scanned.
+    root, destination = film
+    monkeypatch.setattr(repository, "ROOT", root)
+    monkeypatch.setattr(still_scan, "require_film_scan", REQUIRE_FILM_SCAN)
+    monkeypatch.setattr(delivery_folder, "run", lambda *_: pytest.fail("the delivery ran rsync"))
+    with pytest.raises(DeliveryRefusedError) as refused:
+        delivery_folder.deliver(root, destination, dry_run=dry_run)
+    assert str(refused.value) == "The zh film has no still scan record; run scan-film"
+    assert not destination.exists()
+
+
+def test_the_delivery_asks_the_scan_of_every_edition(film, monkeypatch):
+    # Asking the first edition alone would deliver the second unscanned.
+    root, destination = film
+    asked = []
+
+    def require(edition):
+        asked.append(edition.code)
+        if edition.code == CODES[-1]:
+            msg = f"The {edition.code} film has no still scan record; run scan-film"
+            raise PictureError(msg)
+
+    monkeypatch.setattr(still_scan, "require_film_scan", require)
+    monkeypatch.setattr(delivery_folder, "run", lambda *_: pytest.fail("the delivery ran rsync"))
+    with pytest.raises(DeliveryRefusedError) as refused:
+        delivery_folder.deliver(root, destination)
+    assert asked == list(CODES)
+    assert str(refused.value) == f"The {CODES[-1]} film has no still scan record; run scan-film"
+    assert not destination.exists()
+
+
+def test_a_root_that_is_not_the_film_the_command_runs_in_is_refused(film, tmp_path, monkeypatch):
+    # The scan's requirement reads the records of the film the command runs in: the members of
+    # another root would be delivered on that film's scans.
+    root, destination = film
+    elsewhere = tmp_path / "another-film"
+    shutil.copytree(root, elsewhere)
+    monkeypatch.setattr(delivery_folder, "run", lambda *_: pytest.fail("the delivery ran rsync"))
+    with pytest.raises(DeliveryRefusedError) as refused:
+        delivery_folder.deliver(elsewhere, destination, dry_run=True)
+    assert str(refused.value) == (
+        f"The delivery reads the still scans of the film at {root}, not {elsewhere}"
+    )
+    assert not destination.exists()
 
 
 def test_missing_sources_refuse_before_any_change(film):

@@ -4,6 +4,7 @@ import pytest
 
 import filmkit.delivery.reproduction as reproduction
 import filmkit.delivery.verification as delivery_verification
+import filmkit.picture.still_scan as picture_still_scan
 import filmkit.production as production
 import filmkit.repository as repository
 
@@ -14,6 +15,7 @@ def verifying(tmp_path, monkeypatch):
     monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
     for name in ("sources", "narration", "picture", "package", "spotlight", "review"):
         monkeypatch.setattr(delivery_verification, f"verify_{name}", lambda *_, n=name: n)
+    monkeypatch.setattr(picture_still_scan, "require_film_scan", lambda _edition: "still_scan")
     monkeypatch.setattr(
         delivery_verification, "verify_media", lambda _edition, path, _rendition: path.name
     )

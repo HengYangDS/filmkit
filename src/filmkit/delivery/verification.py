@@ -1,7 +1,8 @@
 """Verify delivered film editions against their current authored inputs.
 
 The checks cover the pinned canonical sources, narration custody, both rendered pictures and
-the record that they differ only by their captions, package bindings, the film's version that
+the record that they differ only by their captions, package bindings, the still scan of the
+1080p captioned film (`filmkit.picture.still_scan.require_film_scan`), the film's version that
 the films and pages name, complete media decoding of all four films, the keywords and authors
 Spotlight imports from each film where the host has `mdimport`, and the recorded review
 thresholds.
@@ -38,6 +39,7 @@ import filmkit.narration.thought_groups as narration_thought_groups
 import filmkit.picture.derivation as picture_derivation
 import filmkit.picture.equivalence as picture_equivalence
 import filmkit.picture.rendering as picture_rendering
+import filmkit.picture.still_scan as picture_still_scan
 import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.review.record as review_record
@@ -460,12 +462,17 @@ def verify_films(edition: production.Edition, files: list[Path], renditions: dic
 
 
 def verify_bindings(edition: production.Edition) -> dict:
-    """The checks of an edition's bound inputs, which decode no film, as the report states them."""
+    """The checks of an edition's bound inputs, which decode no film, as the report states them.
+
+    The still scan of the 1080p captioned film is one of them: its requirement reads the scan's
+    record, so every caller of this function asks it.
+    """
     return {
         "sources": verify_sources(),
         "narration": verify_narration(edition),
         "picture": verify_picture(edition),
         "package": verify_package(edition),
+        "still_scan": picture_still_scan.require_film_scan(edition),
     }
 
 

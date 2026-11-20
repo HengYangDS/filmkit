@@ -43,6 +43,9 @@ The release's writer asks whether the film's own folder holds the build's member
 (`differing_members`), which reads the folder and delivers nothing.
 
 The film verifier binds every member to its package records; the delivery task runs it first.
+Of the films it copies, delivery itself asks one thing, in a dry run too: each edition's passing
+still scan (`filmkit.picture.still_scan.require_film_scan`), so that no order of commands
+delivers a film the scan has not passed.
 A refusal before rsync leaves the destination unchanged and exits with status 1.
 
 Usage: python -m filmkit.delivery.folder [--destination DIR] [--dry-run]
@@ -59,6 +62,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.delivery.packaging import BOUND_FILM, LANGUAGE_INDEX, viewing_members
@@ -407,13 +411,24 @@ def deliver(
     """Replace the destination's delivery with the current members and read it back. The report
     states the destination and the rule that gave it, which is the caller's naming of the folder
     unless `rule` says otherwise. A destination that must not be filled is refused first, in a
-    dry run too (`refuse_unfit`)."""
+    dry run too (`refuse_unfit`), and so is an edition whose 1080p captioned film does not
+    hold its passing still scan, by the scan's own requirement and reason. That requirement
+    reads the records of the film the command runs in (`repository.ROOT`), so a `root` that is
+    another folder is refused: its members' scans would be asked of another film."""
     refuse_unfit(root, destination, rule)
     members = plan(root)
     missing = [path for source, path in members if not source.is_file()]
     if missing:
         msg = f"Missing delivery sources: {', '.join(missing)}"
         raise DeliveryRefusedError(msg)
+    if root.resolve() != repository.ROOT.resolve():
+        msg = f"The delivery reads the still scans of the film at {repository.ROOT}, not {root}"
+        raise DeliveryRefusedError(msg)
+    try:
+        for code in CODES:
+            still_scan.require_film_scan(Edition(code))
+    except PictureError as error:
+        raise DeliveryRefusedError(str(error)) from error
     version = rsync_version()
     if not version.startswith(RSYNC_3):
         msg = f"rsync 3 is required to deliver, as Homebrew installs it; PATH holds {version}"

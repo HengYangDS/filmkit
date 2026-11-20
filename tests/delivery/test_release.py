@@ -33,6 +33,13 @@ def test_a_moved_soundtrack_refuses_as_the_verifier_words_it(built):
     assert unchanged_refusal(built) == "en: Narration custody differs from the current script"
 
 
+def test_an_edition_without_its_film_s_still_scan_refuses_as_the_scan_words_it(built):
+    # The still scan's requirement is one of the bound inputs the verifier gives, so the writer
+    # asks it with them and states no requirement of its own.
+    built.editions["en"].edition.film_stills.unlink()
+    assert unchanged_refusal(built) == "en: The en film has no still scan record; run scan-film"
+
+
 def test_a_stale_uncaptioned_stage_of_a_derived_picture_refuses_naming_edition_and_picture(built):
     edition = built.editions["zh"].edition
     receipt = repository.read(edition.rendered(captions=False).receipt)

@@ -5,14 +5,16 @@ import json
 import pytest
 
 import filmkit.delivery.verification as delivery_verification
+import filmkit.picture.still_scan as picture_still_scan
 import filmkit.production as production
 import filmkit.repository as repository
 from filmkit.delivery.verification import VerificationError
 
 
 @pytest.fixture
-def qualified(tmp_path, monkeypatch):
-    """Every check of an edition replaced by a marker of its call."""
+def checked(tmp_path, monkeypatch):
+    """Every check of an edition that the verifier owns replaced by a marker of its call, below
+    an empty root."""
     monkeypatch.setattr(repository, "ROOT", tmp_path)
     for name in ("sources", "narration", "picture", "package", "spotlight"):
         monkeypatch.setattr(delivery_verification, f"verify_{name}", lambda *_, n=name: n)
@@ -28,6 +30,25 @@ def qualified(tmp_path, monkeypatch):
     )
 
 
+@pytest.fixture
+def qualified(checked, monkeypatch):
+    """Every check of an edition replaced by a marker of its call, the requirement of the film's
+    still scan among them, which the scan owns."""
+    monkeypatch.setattr(picture_still_scan, "require_film_scan", lambda _edition: "still_scan")
+
+
+@pytest.mark.usefixtures("checked")
+@pytest.mark.parametrize("scope", [["--technical-only"], []])
+def test_an_edition_without_its_film_s_still_scan_is_refused_in_either_scope(scope, capsys):
+    # The root holds no record, so the scan's own requirement refuses, and the command reports
+    # it as it reports every owner's refusal.
+    films = [str(film) for film in production.Edition("en").films]
+    with pytest.raises(SystemExit) as stopped:
+        delivery_verification.main(["--read-only", *scope, "--language", "en", *films])
+    assert stopped.value.code == "en: The en film has no still scan record; run scan-film"
+    assert capsys.readouterr().out == ""
+
+
 @pytest.mark.usefixtures("qualified")
 def test_an_edition_is_qualified_as_its_four_current_films():
     edition = production.Edition("en")
@@ -41,6 +62,7 @@ def test_an_edition_is_qualified_as_its_four_current_films():
         "narration",
         "picture",
         "package",
+        "still_scan",
         "media",
         "media_seconds",
         "spotlight",
@@ -48,6 +70,7 @@ def test_an_edition_is_qualified_as_its_four_current_films():
         "limits",
     ]
     assert (report["verdict"], report["scope"], report["language"]) == ("pass", "acceptance", "en")
+    assert report["still_scan"] == "still_scan"
     assert report["media"] == [
         ("sample-reel-en-1080p-captioned.mp4", (1920, 1080)),
         ("sample-reel-en-1080p-uncaptioned.mp4", (1920, 1080)),
@@ -85,11 +108,14 @@ def test_the_bound_inputs_and_the_review_are_checked_without_the_decode(editions
         edition = inputs.edition
         inputs.review()
         bound = delivery_verification.verify_bindings(edition)
-        assert list(bound) == ["sources", "narration", "picture", "package"]
+        assert list(bound) == ["sources", "narration", "picture", "package", "still_scan"]
         assert bound["sources"]["documents"] == "not_checked"
         assert bound["narration"]["soundtrack_sha256"] == repository.sha(edition.soundtrack)
         assert bound["picture"]["picture_sha256"] == repository.sha(edition.picture)
         assert bound["package"]["films"] == sorted(film.name for film in edition.films)
+        # The still scan's requirement is one of them, answered from the film's record.
+        scanned = edition.film(picture_still_scan.SCANNED_FILM).name
+        assert bound["still_scan"]["film"] == scanned
         accepted = delivery_verification.verify_review(edition, edition.films)
         assert accepted["path"] == f"build/evidence/editions/{code}/production-review.json"
         # The verifier's command asks the same checks and then decodes the films.
@@ -101,7 +127,7 @@ def test_the_bound_inputs_and_the_review_are_checked_without_the_decode(editions
 def test_the_verifier_reports_the_bound_inputs_where_it_reported_them(monkeypatch):
     edition = production.Edition("zh")
     assert delivery_verification.verify_bindings(edition) == {
-        name: name for name in ("sources", "narration", "picture", "package")
+        name: name for name in ("sources", "narration", "picture", "package", "still_scan")
     }
     # The command's report holds what the one check gives, in the phase it ran them in.
     phases = []

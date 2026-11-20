@@ -25,9 +25,10 @@ def tree(folder: Path) -> dict[str, str]:
 
 
 @pytest.fixture
-def placed(tmp_path, monkeypatch):
+def placed(tmp_path, monkeypatch, passing_scans):
     """Place a film whose members are small texts at a root of the test's choosing, with the
-    files a checkout holds beside them; reading a player or running any command fails the test."""
+    files a checkout holds beside them; reading a player or running any command fails the test.
+    Each edition's film passes its still scan, so a destination's refusal is what is read."""
 
     def refuse(*arguments, **options):
         pytest.fail(f"the delivery went on to {arguments[:1]}")

@@ -1,11 +1,14 @@
 """Fixtures of the delivery tests.
 
 `film` is a root whose delivery sources are small texts, beside an absent destination;
-`inputs` is one edition's inputs bound as the film verifier reads them, and `editions` both
+`inputs` is one edition's inputs bound as the film verifier reads them, the still scan of its
+1080p captioned film among them (`Inputs.scan_film`), and `editions` both
 editions' with the manifest of the pinned sources; `built` is that build reviewed and held by
 the film's own folder, for the tests of the release's writer (`release_build.Built`).
 """
 
+import contextlib
+import io
 import json
 import wave
 from dataclasses import dataclass, field
@@ -24,6 +27,7 @@ import filmkit.narration.thought_groups as narration_thought_groups
 import filmkit.picture.derivation as picture_derivation
 import filmkit.picture.equivalence as picture_equivalence
 import filmkit.picture.rendering as picture_rendering
+import filmkit.picture.still_scan as picture_still_scan
 import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.review.record as review_record
@@ -33,6 +37,9 @@ from filmkit.film import FILM
 
 # The verified films last two seconds, the last of them credits.
 DURATION, CREDITS = 2, 1
+# The seconds the edition's timeline states, which is what the still scan reads a film's length
+# from: long enough to hold the still run of the film the scan's requirement was written for.
+SCANNED = 900
 # The film's version, which the bound root's VERSION holds.
 VERSION = "1.3.0"
 
@@ -75,12 +82,22 @@ class Folder(NamedTuple):
 
 
 @pytest.fixture
-def film(tmp_path, monkeypatch) -> Folder:
+def passing_scans(monkeypatch) -> None:
+    """Stand in for the requirement of the still scan that delivery asks of each edition's
+    1080p captioned film: every film passes, as the scan's own tests cover."""
+    monkeypatch.setattr(picture_still_scan, "require_film_scan", lambda _edition: {})
+
+
+@pytest.fixture
+def film(tmp_path, monkeypatch, passing_scans) -> Folder:
     """A root whose current members are small texts, and an absent destination.
 
-    The players' real-browser readback passes every page, as its own tests read real pages.
+    The players' real-browser readback passes every page, as its own tests read real pages, and
+    each edition's film passes its still scan (`passing_scans`).
     """
     folder = Folder(tmp_path / "root", tmp_path / "Movies" / FILM.delivery_folder)
+    # The delivery asks the still scans of the film the command runs in, which is this root.
+    monkeypatch.setattr(repository, "ROOT", folder.root)
     for source, path in delivery_folder.plan(folder.root):
         write_input(source, f"current {path}\n")
     monkeypatch.setattr(delivery_folder, "check_players", passing_players)
@@ -163,6 +180,26 @@ class Inputs:
         }
         return write_input(edition.production_review, record)
 
+    def scan_film(self, *runs: dict) -> None:
+        """Write the still scan record of the edition's 1080p captioned film as `scan-film`
+        writes it, bound to the film, the timeline, the composition and the engine as they
+        stand. The film's frames are not decoded: the scan reads a report that lists the given
+        still runs, and a refusal of a run at the limit is left to the record's readers."""
+        self.edition.film_stills.unlink(missing_ok=True)
+        longest = max((run["speech"] for run in runs), default=0)
+        report = {
+            "fps": picture_still_scan.FPS,
+            "frames": SCANNED * picture_still_scan.FPS,
+            "fine": {"rule": picture_still_scan.FINE_RULE, "runs": list(runs)},
+            "coarse": {"rule": picture_still_scan.COARSE_RULE, "runs": []},
+            "longest_fine_speech": longest,
+        }
+        phases = [report] * len(picture_still_scan.PHASES)
+        with pytest.MonkeyPatch.context() as patch, contextlib.redirect_stdout(io.StringIO()):
+            patch.setattr(picture_still_scan, "phase_reports", lambda *_: phases)
+            with contextlib.suppress(picture_rendering.PictureError):
+                picture_still_scan.scan_film(self.edition)
+
 
 def shorten(monkeypatch) -> None:
     """Verify films of DURATION seconds whose last CREDITS seconds are credits."""
@@ -213,12 +250,13 @@ def narration(inputs: Inputs, texts: dict[str, str]) -> None:
             "program_level": level,
         },
     )
-    segments = [{"id": key, "text": text} for key, text in texts.items()]
+    segments = [{"id": key, "text": text, "words": []} for key, text in texts.items()]
     captions = [
         {"start": 0.1, "end": 0.5, "text": "数据先行。"},
         {"start": 0.6, "end": 0.9, "text": "交付在后。"},
     ]
-    write_input(edition.timeline, {"segments": segments, "captions": captions})
+    timeline = {"segments": segments, "captions": captions, "duration": SCANNED}
+    write_input(edition.timeline, timeline)
 
 
 def picture(inputs: Inputs, *, derived: bool = False) -> None:
@@ -332,7 +370,8 @@ def packages(inputs: Inputs) -> None:
 
 @pytest.fixture
 def inputs(tmp_path, monkeypatch) -> Inputs:
-    """The Chinese edition's current bound inputs, for short films.
+    """The Chinese edition's current bound inputs, for short films, the passing still scan of
+    its 1080p captioned film among them.
 
     The narration and render validators record their calls instead of reading recordings
     and renders, which their own tests cover.
@@ -354,19 +393,22 @@ def inputs(tmp_path, monkeypatch) -> Inputs:
     narration(current, {"01": "数据先行。", "02": "交付在后。"})
     picture(current)
     packages(current)
+    current.scan_film()
     return current
 
 
 @pytest.fixture
 def editions(inputs, monkeypatch) -> dict[str, Inputs]:
     """Both editions' current bound inputs, each with its uncaptioned picture derived as the
-    films make theirs: `inputs` and the English edition's beside it, bound the same way, and the
-    manifest of the pinned sources, which no local clone checks."""
+    films make theirs: `inputs` and the English edition's beside it, bound the same way, each
+    with the passing still scan of its film as it then stands, and the manifest of the pinned
+    sources, which no local clone checks."""
     english = Inputs(inputs.root, production.Edition("en"), inputs.checked)
     narration(english, {"01": "Data first.", "02": "Delivery after."})
     for current in (inputs, english):
         picture(current, derived=True)
         packages(current)
+        current.scan_film()
     monkeypatch.delenv(sources.CHECKOUT, raising=False)
     pinned = {"path": "README.md", "sha256": repository.content_sha("# The source\n")}
     write_input(

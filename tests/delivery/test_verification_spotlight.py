@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 import filmkit.delivery.verification as delivery_verification
+import filmkit.picture.still_scan as picture_still_scan
 import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.specification as specification
@@ -90,6 +91,7 @@ def verify(tmp_path, monkeypatch):
     monkeypatch.setattr(repository, "ROOT", tmp_path)
     for name in ("sources", "narration", "picture", "package", "media", "review"):
         monkeypatch.setattr(delivery_verification, f"verify_{name}", lambda *_: {})
+    monkeypatch.setattr(picture_still_scan, "require_film_scan", lambda _edition: {})
     tools = tmp_path / "bin"
     tools.mkdir()
     monkeypatch.setenv("PATH", str(tools))

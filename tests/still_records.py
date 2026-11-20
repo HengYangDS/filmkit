@@ -1,6 +1,7 @@
-"""A draft's still scan record as the scan writes it, for the tests that need one standing
-without a scan: the pre-render check reads a draft's record by the reader of the film's record,
-which takes no record on less than the scan's shape."""
+"""What tests of several folders share of the still scan. A draft's record as the scan writes
+it, for the tests that need one standing without a scan: the pre-render check reads a draft's
+record by the reader of the film's record, which takes no record on less than the scan's shape.
+And the scan's own requirement, for a test that asks it where a fixture stands in for it."""
 
 import filmkit.picture.renderer as renderer
 import filmkit.picture.rendering as rendering
@@ -13,6 +14,10 @@ DREW = {
     "version": renderer.RENDERER_VERSION,
     "text_renderer": renderer.TEXT_RENDERER,
 }
+# The scan's own requirement as the engine defines it. A folder's fixtures may replace it by one
+# that passes; a test that asks the requirement itself puts this one back. It is read when a
+# test module imports this one, which is before any fixture runs.
+REQUIRE_FILM_SCAN = still_scan.require_film_scan
 
 
 def draft_stills(edition, runs=()) -> dict:
