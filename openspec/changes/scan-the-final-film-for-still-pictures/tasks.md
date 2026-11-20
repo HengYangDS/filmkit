@@ -10,7 +10,7 @@
 ## 2. The sample film
 
 - [ ] 2.1 Read the two final 1080p captioned films of a sample build of this engine's head by the scan before the next task lands (`sample-scan.sh` of the Change's evidence; light, two films of 60 s); done when each edition's longest still run stands in `build/evidence/scan-the-final-film-for-still-pictures/sample-readings/`, read from a build whose composition is the head's with 600 frames a phase, and reads at least 0.5 s under the limit (3.0 s or less). An edition that reads closer has its scene changed and is read again before 2.2; 2.3 changed the sample's first scene before this reading.
-- [ ] 2.2 Run `scan-film` for each edition in the sample's package task, right after `package-film`; verify `tests/test_sample_tasks.py`.
+- [x] 2.2 Run `scan-film` for each edition in the sample's package task, right after `package-film`; verify `tests/test_sample_tasks.py`.
 - [x] 2.3 Before 2.1's reading, change the sample film's first scene so that its picture moves under its first sentence: the middle source stands with the scene and the two beside it arrive together on a word of that sentence (`examples/sample-film/picture/film.js`, `sourcesScene`); verify the whole Node suite and the sample's picture steps before its first render, both editions (stages, geometry check, cover, `check-picture`, the draft with its scan).
 
 ## 3. The gates

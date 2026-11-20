@@ -106,13 +106,15 @@ run = [
 ]
 
 [tasks."sample:package"]
-description = "Package each sample edition's viewing members and its four films"
+description = "Package each sample edition's viewing members and its four films, and scan its 1080p captioned film for still pictures under speech"
 dir = "{{config_root}}/examples/sample-film"
 run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce package-metadata --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce package-film --language zh",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce scan-film --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce package-metadata --language en",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce package-film --language en",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.produce scan-film --language en",
 ]
 
 [tasks."sample:verify"]
