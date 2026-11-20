@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-20
+
 ### Added
 
 - `filmkit.soundtrack.fit.asked` gives the reports of `produce fit` to a caller without printing or refusing, and `thought_pause_to_fit` reads the largest thought pause of the declared range that leaves a reserve free. `produce fit` prints and refuses as before, each policy as it is measured.
@@ -574,7 +576,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.25.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/HengYangDS/filmkit/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/HengYangDS/filmkit/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/HengYangDS/filmkit/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/HengYangDS/filmkit/compare/v0.23.1...v0.24.0
