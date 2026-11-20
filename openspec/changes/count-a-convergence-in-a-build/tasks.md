@@ -9,5 +9,5 @@
 
 ## 3. Acceptance
 
-- [ ] 3.1 Run every command of `mise run check` and the proof's static lint on the lane's head; verify that each passes.
-- [ ] 3.2 Run the convergence on the sample film's English edition after a sample build, as the child of a host ticket since it loads the judgment's models, and print the durations; verify that `build/evidence/count-a-convergence-in-a-build/sample.txt` holds a `converge` record that is counted in the edition's sum after the narration that stands.
+- [x] 3.1 Run every command of `mise run check` and the proof's static lint on the lane's head; verify that each passes. The release's whole check passed on `0dc1e05` as the child of one host ticket, the static lint and the suite with warnings as errors among its commands (check-full passed head 0dc1e05 13:23:32).
+- [x] 3.2 Run the convergence on the sample film's English edition after a sample build, as the child of a host ticket since it loads the judgment's models, and print the durations; verify that `build/evidence/count-a-convergence-in-a-build/sample.txt` holds a `converge` record that is counted in the edition's sum after the narration that stands. On 20 November 2026 the convergence ran on the built sample's English edition as the child of a host ticket, in 6 s, on the tree the landed steps leave, its `openspec/` texts apart; the edition's durations hold its `converge` record, counted in the sum after the narration that stands (`sample.txt`).
