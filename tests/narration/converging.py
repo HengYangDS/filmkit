@@ -8,10 +8,12 @@ when they are asked for (`conftest.py`: `studio`, `engine`).
 """
 
 import json
+from pathlib import Path
 
 import pytest
 from fit_bench import PERFORMANCE, THOUGHT_PAUSE
 
+import filmkit.durations as durations
 import filmkit.narration.converge as narration_converge
 import filmkit.repository as repository
 from filmkit.production import Edition
@@ -62,6 +64,17 @@ def placed(record: dict, *, gap: float = 0.0) -> list[tuple[str, float, float]]:
 
 def record_of(code: str = "en") -> dict:
     return repository.read(Edition(code).ear_first / narration_converge.RECORD)
+
+
+def duration_path(code: str = "en") -> Path:
+    """Where the edition's convergence writes its duration record, as the run that writes it
+    names it."""
+    return durations.Run(code, narration_converge.COMMAND).path
+
+
+def duration_of(code: str = "en") -> dict:
+    """The duration record of the edition's convergence."""
+    return repository.read(duration_path(code))
 
 
 def counts(capsys) -> dict:

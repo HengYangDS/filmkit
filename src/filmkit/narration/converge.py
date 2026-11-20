@@ -44,8 +44,12 @@ the running narration is ended first, and the record, which says `running` from 
 first effect on, names no thought as unsettled. A narration ended between two thoughts is
 taken up by the next run, which narrates what the cast holds. One ended inside a thought
 leaves that thought's request started and unresolved, which the engine refuses to replay; the
-next run names the file and stops until it is inspected and removed. The command writes no
-duration record of its own; each narration it starts writes the narration's.
+next run names the file and stops until it is inspected and removed. The command writes the
+duration record `converge` when it ends (`filmkit.durations`), with the seconds of its
+narrations, its judgments, its candidates and its count of the runtime as phases; the record
+says that it completed only where the edition ends settled and is not refused. A run that is
+refused before its first effect writes none (`admitted`). Each narration
+it starts still writes the narration's own record, which a build's sum does not add again.
 
 Usage: python -m filmkit.narration.converge --language zh|en [--rounds 2] [--takes 3]
 """
@@ -59,6 +63,7 @@ import sys
 import time
 
 import filmkit.child_processes as child_processes
+import filmkit.durations as durations
 import filmkit.narration.candidates as candidates
 import filmkit.narration.fitting as fitting
 import filmkit.narration.group_generation as group_generation
@@ -73,6 +78,8 @@ from filmkit.production import CODES, Edition
 
 WORK = "build/runtime/work/convergence"
 RECORD = "convergence.json"
+# The name of the command's duration record, which `filmkit.durations` starts a build at.
+COMMAND = durations.CONVERGENCE
 RUN_ON = "run-on"
 NOT_NARRATABLE = "not narratable as written"
 UNTRIED = "refused by the last narration, with no round left: no candidate was tried"
@@ -146,7 +153,8 @@ def narrate(code: str) -> None:
     """
     started = time.monotonic()
     command = [sys.executable, "-B", "-m", "filmkit.narration.narrate", "--language", code]
-    child_processes.run(command, cwd=repository.ROOT, seconds=4 * child_processes.STOP_SECONDS)
+    with durations.phase("narration"):
+        child_processes.run(command, cwd=repository.ROOT, seconds=4 * child_processes.STOP_SECONDS)
     report(code, step="narration", seconds=round(time.monotonic() - started, 1))
 
 
@@ -170,10 +178,11 @@ class Session:
     def judge(self) -> tuple[list[dict], list[dict], judgment.Bench, judgment.Held]:
         """Judge the current receipt's thoughts; the term standards follow its takes."""
         started = time.monotonic()
-        records = judge.current(self.code)
-        bench, held = judgment.studio(self.code, records, models=self.models)
-        self.models = (bench.asr, bench.aligner)
-        rows = judge.judged(self.code, records, bench, held)["thoughts"]
+        with durations.phase("judgment"):
+            records = judge.current(self.code)
+            bench, held = judgment.studio(self.code, records, models=self.models)
+            self.models = (bench.asr, bench.aligner)
+            rows = judge.judged(self.code, records, bench, held)["thoughts"]
         refused = sum(1 for row in rows if row["failed"])
         report(
             self.code, step="judge", refused=refused, seconds=round(time.monotonic() - started, 1)
@@ -213,14 +222,15 @@ class Session:
         return row
 
 
-def entries(code: str, rows: list[dict]) -> dict[str, dict]:
-    """A former record's entries for thoughts whose spoken text still stands."""
-    path = Edition(code).ear_first / RECORD
+def entries(former: dict, rows: list[dict]) -> dict[str, dict]:
+    """The entries of the record that a former run left (`left`, its one reader) for thoughts
+    whose spoken text still stands. An entry that lacks its thought or its spoken text, or
+    names its thought by a list or an object, raises `KeyError` or `TypeError`, which `left`
+    asks for before a run opens."""
     spoken = {row["thought"]: row["spoken_sha256"] for row in rows}
-    former = repository.read(path)["thoughts"] if path.is_file() else []
     return {
         entry["thought"]: entry
-        for entry in former
+        for entry in former["thoughts"]
         if spoken.get(entry["thought"]) == entry["spoken_sha256"]
     }
 
@@ -320,37 +330,81 @@ def write_record(
     return record
 
 
-def begin(code: str, asked: dict) -> None:
-    """Say that a run is under way before its first effect: no thought is unsettled by it yet."""
+def left(code: str) -> dict:
+    """The record that a former run left, or the one a first run begins from: the record's one
+    reader. Refused in one line where what stands in the record's place, a folder included, is
+    no JSON object with its thoughts, or holds thoughts that the run cannot take up.
+
+    What the run can take up is asked of the run's own reader of those thoughts (`entries`),
+    with no thought of this run to compare: it reads every entry's thought and spoken text all
+    the same, so this check states no shape of an entry beside the reader.
+    """
     path = Edition(code).ear_first / RECORD
-    former = repository.read(path) if path.is_file() else {"edition": code, "thoughts": []}
+    if not path.exists():
+        return {"edition": code, "thoughts": []}
+    former = repository.read_entry(path, ("thoughts",))
+    taken = former is not None
+    if taken:
+        try:
+            entries(former, [])
+        except (KeyError, TypeError):
+            taken = False
+    if not taken:
+        msg = (
+            f"{code}: the record that a former run left cannot be read: "
+            f"{repository.relative(path)} is no JSON object whose thoughts each name their "
+            "thought and its spoken text; inspect and remove it, then run the command again"
+        )
+        raise SystemExit(msg)
+    return former
+
+
+def begin(code: str, asked: dict, former: dict) -> None:
+    """Say that a run is under way before its first effect: no thought is unsettled by it yet.
+    `former` is the record that a former run left (`left`)."""
     # A former run's fit is not this run's: nothing of the count is kept between runs.
     former.pop("fit", None)
-    repository.write(path, {**former, "state": "running", "asked": asked, "unsettled": {}})
+    record = {**former, "state": "running", "asked": asked, "unsettled": {}}
+    repository.write(Edition(code).ear_first / RECORD, record)
 
 
-def converge(code: str, *, rounds: int = 2, takes: int = 3) -> dict:
-    """Run the rounds and the run-on round, ask the count, and return the record the run ends
-    with."""
+def admitted(code: str) -> tuple[float, dict]:
+    """What refuses a run before its first effect, each in its own words; then what a run takes
+    from these checks: the reserve that the edition's cast declares, and the record that a
+    former run left. The cast's receipt is the convergence's own, the reserve and the script's
+    pause policy can be read, no narration left a request started, and the former record can
+    be read (`left`).
+
+    The command asks this before it opens its run (`main`), so that such a refusal writes no
+    duration record and leaves the record of the convergence that narrated the standing build.
+    """
     own_receipt(code)
     reserve = fitting.declared(code)
-    left = leftovers(code)
-    if left:
-        raise SystemExit(UNRESOLVED.format(code=code, files="\n".join(f"  {f}" for f in left)))
+    started = leftovers(code)
+    if started:
+        files = "\n".join(f"  {file}" for file in started)
+        raise SystemExit(UNRESOLVED.format(code=code, files=files))
+    return reserve, left(code)
+
+
+def converge(code: str, reserve: float, former: dict, *, rounds: int = 2, takes: int = 3) -> dict:
+    """Run the rounds and the run-on round, ask the count, and return the record the run ends
+    with. `reserve` and `former` are what the checks gave the caller (`admitted`)."""
     asked = {"rounds": rounds, "takes": takes}
-    begin(code, asked)
+    begin(code, asked, former)
     if narration_due(code):
         narrate(code)
     session = Session(code)
     state = session.judge()
-    found = entries(code, state[1])
+    found = entries(former, state[1])
     settled = {"first take": sum(1 for row in state[1] if not row["failed"])}
     for number in [*range(1, rounds + 1), RUN_ON]:
         if not any(row["failed"] for row in state[1]):
             break
         count = rounds if number == RUN_ON else number - 1
         ks = range(FIRST + count * takes, FIRST + (count + 1) * takes)
-        proposals = round_of(session, state, found, number, ks, run_on=number == RUN_ON)
+        with durations.phase("candidates"):
+            proposals = round_of(session, state, found, number, ks, run_on=number == RUN_ON)
         # The candidates are recorded before a narration that a request to end may cut short.
         write_record(code, found, state[1], asked, ended=False)
         if proposals:
@@ -365,7 +419,8 @@ def converge(code: str, *, rounds: int = 2, takes: int = 3) -> dict:
         fit = fitting.not_asked(fitting.UNSETTLED)
     else:
         try:
-            fit = fitting.read(code, reserve)
+            with durations.phase("count"):
+                fit = fitting.read(code, reserve)
         except Exception as fault:
             # A fault of the count is no refusal and keeps its traceback; the record of the
             # thoughts, which are settled, is ended first.
@@ -414,12 +469,19 @@ def main(argv: list[str] | None = None) -> None:
     options = parser.parse_args(argv)
     if options.rounds < 0 or options.takes < 1:
         parser.error("--rounds is 0 or more and --takes is 1 or more")
+    code = options.language
     stopped = "The convergence was stopped by {request}; what it was running was ended with it"
+    # The run is measured inside the block that answers a request to end, so that its record
+    # is written before the command leaves; an edition that ends unsettled, missed or refused
+    # is a run that did not complete.
     with child_processes.ending(stopped):
-        record = converge(options.language, rounds=options.rounds, takes=options.takes)
-    if record["unsettled"]:
-        raise SystemExit(said(options.language, record))
-    refused = fitting.said(options.language, record["fit"])
+        checked = admitted(code)
+        with durations.run(code, COMMAND) as run:
+            record = converge(code, *checked, rounds=options.rounds, takes=options.takes)
+            unsettled = record["unsettled"]
+            refused = said(code, record) if unsettled else fitting.said(code, record["fit"])
+            if refused:
+                run.fail()
     if refused:
         raise SystemExit(refused)
 

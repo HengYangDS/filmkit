@@ -24,6 +24,11 @@ narration do not write: the sum covers the commands that completed and started a
 that, and `--since` names another start, for a build that keeps its narration or narrates its
 segments by the synthesis command itself, which writes no record. Records that started
 earlier are listed, marked as earlier and left out, and the last line says what was summed.
+A convergence (`filmkit.narration.converge`, the record `converge`) narrates an edition more
+than once, each narration its child, and each replaces the record `narrate`. Where the latest
+whole narration started within a convergence's run, the build begins with that convergence:
+the sum counts the convergence, and the narration is listed as inside it and not added again.
+A convergence that did not complete is not counted, and its narration then is.
 A command run twice in a build counts once, by its latest run. A sum adds each command's
 seconds, so two commands that ran at the same time, such as two editions' renders, count in full.
 The time of the build is therefore the last line's first figure: the seconds during which at
@@ -49,7 +54,7 @@ import json
 import os
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import filmkit.repository as repository
@@ -66,6 +71,10 @@ FOLDER = "durations"
 # generates nothing, runs at any point of one; each writes a record of another name
 # (`filmkit.narration.narrate.record_name`).
 BUILD_START = "narrate"
+# The command that runs an edition's whole narrations as its children, with its judgments and
+# its candidates between them (`filmkit.narration.converge`): a build whose narration started
+# within its run began with it.
+CONVERGENCE = "converge"
 # The record's key for the host's 1-minute load average at a command's two ends.
 LOAD, ENDS = "load_1m", ("start", "end")
 
@@ -194,11 +203,43 @@ def records(code: str) -> list[dict]:
     )
 
 
+def narration(found: list[dict]) -> dict | None:
+    """An edition's latest whole narration, the command `BUILD_START`; None where no such
+    record stands."""
+    whole = [record for record in found if record["command"] == BUILD_START]
+    return max(whole, key=lambda record: datetime.fromisoformat(record["started_at"]), default=None)
+
+
+def convergence(found: list[dict]) -> dict | None:
+    """The convergence that ran an edition's latest whole narration: the command `CONVERGENCE`
+    within whose run, its last second included, that narration started; None where the
+    narration ran by itself, as it does after an earlier convergence."""
+    whole = narration(found)
+    if whole is None:
+        return None
+    at = datetime.fromisoformat(whole["started_at"])
+    for record in found:
+        began = datetime.fromisoformat(record["started_at"])
+        ended = began + timedelta(seconds=record["seconds"])
+        if record["command"] == CONVERGENCE and began <= at <= ended:
+            return record
+    return None
+
+
 def build_start(found: list[dict]) -> str | None:
-    """When an edition's build began: the start of its latest whole narration, the command
-    `BUILD_START`; None where no such record stands."""
-    starts = [record["started_at"] for record in found if record["command"] == BUILD_START]
-    return max(starts, key=datetime.fromisoformat, default=None)
+    """When an edition's build began: the start of its latest whole narration, or of the
+    convergence that ran it; None where no whole narration is recorded."""
+    first = convergence(found) or narration(found)
+    return first and first["started_at"]
+
+
+def inside(found: list[dict], since: str | None = None) -> dict | None:
+    """The whole narration that a sum does not add again: the latest, where the convergence
+    that ran it is itself counted, so completed and started no earlier than `since`."""
+    ran = convergence(found)
+    if ran is None or not ran["completed"] or earlier([ran], since)[0]:
+        return None
+    return narration(found)
 
 
 def earlier(found: list[dict], start: str | None) -> list[bool]:
@@ -209,12 +250,32 @@ def earlier(found: list[dict], start: str | None) -> list[bool]:
     return [datetime.fromisoformat(record["started_at"]) < began for record in found]
 
 
+# What a record's line says of a record that the sum leaves out (`states`).
+INSIDE, EARLIER, NOT_COMPLETED = "inside the convergence", "earlier", "not completed"
+
+
+def states(found: list[dict], since: str | None = None) -> list[str]:
+    """Each record's state in its edition's build, which began at `since` or else at its latest
+    whole narration or the convergence that ran it: `INSIDE` for the narration that a counted
+    convergence ran (`inside`), `EARLIER` for a record that started before the build did,
+    `NOT_COMPLETED` for a command that did not complete, and nothing for one the sum counts."""
+    old, held = earlier(found, since or build_start(found)), inside(found, since)
+
+    def state(record: dict, before: bool) -> str:
+        if record is held:
+            return INSIDE
+        if before:
+            return EARLIER
+        return "" if record["completed"] else NOT_COMPLETED
+
+    return [state(record, before) for record, before in zip(found, old, strict=True)]
+
+
 def counted(found: list[dict], since: str | None = None) -> list[dict]:
-    """The records an edition's sum covers: the completed commands of its build, which began at
-    `since` or else at its latest whole narration."""
-    old = earlier(found, since or build_start(found))
-    kept = zip(found, old, strict=True)
-    return [record for record, before in kept if record["completed"] and not before]
+    """The records an edition's sum covers: those of no state that leaves a record out
+    (`states`)."""
+    said = zip(found, states(found, since), strict=True)
+    return [record for record, state in said if not state]
 
 
 def running(found: list[dict]) -> float:
@@ -248,31 +309,33 @@ def load_text(record: dict) -> str:
 def lines(code: str, found: list[dict], since: str | None = None) -> list[str]:
     """An edition's records as the command prints them, in the order they started, with the sum
     of the completed commands of its build: those that started at or after `since`, or else at or
-    after its latest whole narration. A record that started earlier is marked and left out, and
-    the last line says what the sum covers."""
+    after its latest whole narration or the convergence that ran it. A record that started
+    earlier is marked and left out, as is the narration inside a counted convergence, and the
+    last line says what the sum covers."""
     if not found:
         return [f"{code}: no duration record"]
-    start = since or build_start(found)
-    old = earlier(found, start)
+    start, said = since or build_start(found), states(found, since)
     width = max(len(record["command"]) for record in found)
     listed = [f"{code}:"]
-    for record, before in zip(found, old, strict=True):
+    for record, state in zip(found, said, strict=True):
         phases = ", ".join(f"{name} {seconds:.1f}" for name, seconds in record["phases"].items())
         named = record.get("settings", {}).items()
         settings = ", ".join(f"{name} {value}" for name, value in named)
-        state = "  earlier" if before else "" if record["completed"] else "  not completed"
         load = load_text(record)
         listed.append(
             f"  {record['started_at']}  {record['command']:<{width}}  "
-            f"{record['seconds']:>9.1f} s{state}{'  ' + load if load else ''}"
+            f"{record['seconds']:>9.1f} s{'  ' + state if state else ''}"
+            f"{'  ' + load if load else ''}"
             f"{'  (' + phases + ')' if phases else ''}"
             f"{'  [' + settings + ']' if settings else ''}"
         )
     if start is None:
         covered = "(no whole narration is recorded, so every record counts)"
     else:
-        covered = f"since {'' if since else 'the narration started at '}{start}"
-    left_out = f"; {sum(old)} earlier records are not counted" if any(old) else ""
+        first = "convergence" if convergence(found) else "narration"
+        covered = f"since {'' if since else f'the {first} started at '}{start}"
+    old = said.count(EARLIER)
+    left_out = f"; {old} earlier records are not counted" if old else ""
     summed = [record["seconds"] for record in counted(found, since)]
     total = f"  sum of the {len(summed)} commands completed {covered}: {sum(summed):.1f} s"
     return [*listed, total + left_out]

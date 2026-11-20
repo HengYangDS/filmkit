@@ -2,6 +2,7 @@
 of the assembly's count, what it says of a miss, and what it leaves."""
 
 import json
+from pathlib import Path
 
 import pytest
 from converging import (
@@ -10,6 +11,8 @@ from converging import (
     RANGE,
     converge,
     counts,
+    duration_of,
+    duration_path,
     record_of,
     refused,
     seed_of,
@@ -26,12 +29,123 @@ from filmkit.specification import RATE
 
 
 def kept() -> dict[str, bytes]:
-    """Every file below the film's root with its bytes."""
+    """Every file below the film's root with its bytes, but the duration records: a duration
+    differs from run to run, and no record binds it."""
     return {
         path.relative_to(repository.ROOT).as_posix(): path.read_bytes()
         for path in sorted(repository.ROOT.rglob("*"))
-        if path.is_file()
+        if path.is_file() and path.parent != duration_path().parent
     }
+
+
+def test_the_convergence_s_duration_record_says_whether_the_edition_ended_fit(count):
+    converge()
+    record = duration_of()
+    assert (record["command"], record["completed"]) == ("converge", True)
+    # Nothing was due and nothing refused: the run judged and counted.
+    assert [*record["phases"]] == ["judgment", "count"]
+    # It is the one duration record that the command writes.
+    assert [*duration_path().parent.iterdir()] == [duration_path()]
+    # A miss, and an edition with room that the allocation refuses, did not complete.
+    count.free = -0.1
+    assert refused().startswith(MISS)
+    assert (duration_of()["completed"], [*duration_of()["phases"]]) == (
+        False,
+        ["judgment", "count"],
+    )
+    count.free, count.refusal = 0.8, "The gaps cannot hold the runtime that is left"
+    assert refused().startswith("en: the settled narration is refused by the assembly: ")
+    assert duration_of()["completed"] is False
+
+
+# What may stand in the place of a former run's record that no run can go on from: its text,
+# or None for a folder.
+DAMAGED = {
+    "a former record that is no JSON": "{",
+    "a former record whose thoughts are a number": '{"thoughts": 3}',
+    "a former record whose thoughts are null": '{"thoughts": null}',
+    "a former record whose thoughts are a text": '{"thoughts": "26.2"}',
+    "a former thought that is an empty object": '{"thoughts": [{}]}',
+    "a former thought without its spoken text": '{"thoughts": [{"thought": "26.2"}]}',
+    "a former thought whose name is a list": (
+        '{"thoughts": [{"thought": ["26.2"], "spoken_sha256": "0"}]}'
+    ),
+    "a folder in the former record's place": None,
+}
+
+
+def staged(refusal: str) -> str:
+    """Stage what refuses a convergence before its first effect; what its refusal begins with."""
+    edition, paths = Edition("en"), narration_converge.evidence_paths("en")
+    cast, script = repository.read(edition.cast), repository.read(edition.script)
+    if refusal == "a negative reserve":
+        repository.write(edition.cast, {**cast, "runtime_fit": {"reserve_seconds": -0.1}})
+        return "en: the cast's runtime_fit declares reserve_seconds, a number of seconds from 0"
+    if refusal == "a refused pause policy":
+        del script["voice_performance"]["thought_pause_range"]
+        repository.write(edition.script, script)
+        return "en: the script's pause policy is refused: thought_pause_range requires"
+    if refusal == "another receipt":
+        declared = {**cast["performance_recording"], "receipt": "elsewhere/receipt.json"}
+        repository.write(edition.cast, {**cast, "performance_recording": declared})
+        return "en: the cast declares the receipt elsewhere/receipt.json, and a convergence"
+    if refusal in DAMAGED:
+        former = edition.ear_first / narration_converge.RECORD
+        former.unlink()
+        if DAMAGED[refusal] is None:
+            former.mkdir()
+        else:
+            former.write_text(DAMAGED[refusal])
+        return "en: the record that a former run left cannot be read: "
+    repository.write(f"{paths['folder']}/26/26-02.request.json", {"state": "started"})
+    return "en: a narration was ended inside a thought and left its request started"
+
+
+@pytest.mark.parametrize(
+    "refusal",
+    [
+        "a negative reserve",
+        "a refused pause policy",
+        "another receipt",
+        *DAMAGED,
+        "a leftover request",
+    ],
+)
+def test_a_convergence_refused_before_its_first_effect_writes_no_duration_record(count, refusal):
+    record = duration_path()
+    # The convergence that narrated the standing build wrote its record.
+    converge()
+    standing = record.read_bytes()
+    begins = staged(refusal)
+    with pytest.raises(SystemExit) as refusing:
+        converge()
+    assert str(refusing.value).startswith(begins)
+    # The refusal leaves that record byte for byte, and writes none where none stands.
+    assert record.read_bytes() == standing
+    record.unlink()
+    with pytest.raises(SystemExit, match="^en: "):
+        converge()
+    assert not record.exists()
+
+
+def test_the_former_record_is_read_among_the_checks_and_by_nothing_in_the_run(count, monkeypatch):
+    converge()
+    checked = narration_converge.admitted("en")
+    read = {"read": repository.read, "read_entry": repository.read_entry}
+
+    def unread(reader):
+        def reading(path, *more):
+            if Path(path).name == narration_converge.RECORD:
+                pytest.fail("the former record is read inside the run")
+            return reader(path, *more)
+
+        return reading
+
+    for name, reader in read.items():
+        monkeypatch.setattr(repository, name, unread(reader))
+    # The run goes on from the record that the checks read, and reads the file no second time.
+    ended = narration_converge.converge("en", *checked)
+    assert (ended["state"], ended["fit"]["verdict"]) == ("ended", "fits")
 
 
 def test_a_settled_edition_that_fits_states_the_seconds_free(count, studio, capsys):
@@ -274,7 +388,7 @@ def test_a_run_ended_while_it_counts_leaves_its_record_running_and_the_next_run_
     assert record_of()["fit"]["verdict"] == "fits"
     count.binding = child_processes.Terminated(15)
     with pytest.raises(child_processes.Terminated):
-        narration_converge.converge("en")
+        narration_converge.converge("en", *narration_converge.admitted("en"))
     # The record says that a run is under way and holds no fit, the former run's neither. The
     # selection's records are whole, as the selection writes them.
     record = record_of()

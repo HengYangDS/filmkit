@@ -63,6 +63,21 @@ def test_the_sum_covers_what_started_at_or_after_the_latest_whole_narration(caps
         "  sum of the 3 commands completed since the narration started at "
         "2026-11-17T01:00:00+00:00: 1039.5 s; 2 earlier records are not counted"
     )
+    # An edition without a convergence prints, byte for byte, what it printed before a
+    # convergence wrote a record.
+    assert lines == [
+        "zh:",
+        "  2026-11-10T08:00:00+00:00  repair-pictures      600.0 s  earlier",
+        "  2026-11-16T09:00:00+00:00  narrate-06-07         80.0 s  earlier",
+        "  2026-11-17T01:00:00+00:00  narrate               99.0 s",
+        "  2026-11-17T01:05:00+00:00  check-picture         40.5 s",
+        "  2026-11-17T01:06:00+00:00  render-picture       900.0 s",
+        "  2026-11-17T01:30:00+00:00  package-film          12.0 s  not completed",
+        "  sum of the 3 commands completed since the narration started at "
+        "2026-11-17T01:00:00+00:00: 1039.5 s; 2 earlier records are not counted",
+        "build: one of the 3 counted commands was running for 1039.5 s; their seconds add up "
+        "to 1039.5 s (commands that ran at the same time count once in the first figure)",
+    ]
 
 
 @pytest.mark.usefixtures("root")
@@ -153,6 +168,82 @@ def test_a_build_whose_records_state_no_load_prints_its_time_as_before(capsys):
     record("en", "narrate", "2026-11-17T01:00:00+00:00", 60.0)
     record("en", "render-picture", "2026-11-17T01:02:00+00:00", 170.0, load=(None, None))
     assert printed(capsys, "--language", "en")[-1] == BUILD.format(2, "230.0", "230.0") + ONCE
+
+
+CONVERGED = "  sum of the {} commands completed since the convergence started at {}: {} s"
+NARRATED = "  sum of the {} commands completed since the narration started at {}: {} s"
+
+
+@pytest.mark.usefixtures("root")
+def test_a_build_starts_at_the_convergence_that_ran_its_narration_and_counts_it_once(capsys):
+    # Last week's repair; a convergence of 343 s whose last narration took 41 s; a render.
+    record("en", "repair-pictures", "2026-11-10T08:00:00+00:00", 600.0)
+    record("en", "converge", "2026-11-19T01:00:00+00:00", 343.0)
+    record("en", "narrate", "2026-11-19T01:04:40+00:00", 41.0)
+    record("en", "render-picture", "2026-11-19T01:06:00+00:00", 200.0)
+    assert printed(capsys, "--language", "en") == [
+        "en:",
+        "  2026-11-10T08:00:00+00:00  repair-pictures      600.0 s  earlier",
+        "  2026-11-19T01:00:00+00:00  converge             343.0 s",
+        "  2026-11-19T01:04:40+00:00  narrate               41.0 s  inside the convergence",
+        "  2026-11-19T01:06:00+00:00  render-picture       200.0 s",
+        CONVERGED.format(2, "2026-11-19T01:00:00+00:00", "543.0")
+        + "; 1 earlier records are not counted",
+        BUILD.format(2, "543.0", "543.0") + ONCE,
+    ]
+    # A start named after the convergence's leaves the convergence out and counts the narration.
+    lines = printed(capsys, "--language", "en", "--since", "2026-11-19T01:04:00+00:00")
+    assert lines[2].endswith("343.0 s  earlier") and lines[3].endswith("41.0 s")
+    assert lines[5] == (
+        "  sum of the 2 commands completed since 2026-11-19T01:04:00+00:00: 241.0 s; "
+        "2 earlier records are not counted"
+    )
+
+
+@pytest.mark.usefixtures("root")
+def test_a_narration_after_an_earlier_convergence_starts_the_build(capsys):
+    # The edition converged in yesterday's build and is narrated whole today.
+    record("en", "converge", "2026-11-18T01:00:00+00:00", 343.0)
+    record("en", "narrate", "2026-11-19T01:00:00+00:00", 99.0)
+    record("en", "render-picture", "2026-11-19T01:06:00+00:00", 200.0)
+    lines = printed(capsys, "--language", "en")
+    assert lines[1].endswith("343.0 s  earlier") and lines[2].endswith("99.0 s")
+    assert lines[4] == (
+        NARRATED.format(2, "2026-11-19T01:00:00+00:00", "299.0")
+        + "; 1 earlier records are not counted"
+    )
+    # A convergence's run holds its last second and nothing after it.
+    record("en", "narrate", "2026-11-18T01:05:43+00:00", 99.0)
+    assert durations.build_start(durations.records("en")) == "2026-11-18T01:00:00+00:00"
+    record("en", "narrate", "2026-11-18T01:05:43.001+00:00", 99.0)
+    assert durations.build_start(durations.records("en")) == "2026-11-18T01:05:43.001+00:00"
+
+
+@pytest.mark.usefixtures("root")
+def test_a_convergence_that_needed_no_narration_is_counted_after_the_narration_that_stands(
+    capsys,
+):
+    record("en", "narrate", "2026-11-19T01:00:00+00:00", 99.0)
+    record("en", "converge", "2026-11-19T01:02:00+00:00", 30.0)
+    record("en", "render-picture", "2026-11-19T01:06:00+00:00", 200.0)
+    lines = printed(capsys, "--language", "en")
+    assert lines[1].endswith("99.0 s") and lines[2].endswith("30.0 s")
+    assert lines[4:] == [
+        NARRATED.format(3, "2026-11-19T01:00:00+00:00", "329.0"),
+        BUILD.format(3, "329.0", "329.0") + ONCE,
+    ]
+
+
+@pytest.mark.usefixtures("root")
+def test_a_narration_inside_a_convergence_that_did_not_complete_is_still_counted(capsys):
+    # The convergence settled every thought and the edition missed its runtime: the command
+    # did not complete and is not counted, so its narration is added once, as before.
+    record("en", "converge", "2026-11-19T01:00:00+00:00", 343.0, completed=False)
+    record("en", "narrate", "2026-11-19T01:04:40+00:00", 41.0)
+    record("en", "render-picture", "2026-11-19T01:06:00+00:00", 200.0)
+    lines = printed(capsys, "--language", "en")
+    assert lines[1].endswith("343.0 s  not completed") and lines[2].endswith("41.0 s")
+    assert lines[4] == CONVERGED.format(2, "2026-11-19T01:00:00+00:00", "241.0")
 
 
 @pytest.mark.parametrize(
