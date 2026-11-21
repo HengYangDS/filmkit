@@ -49,3 +49,4 @@ jobs:
           name: verification-${{ matrix.os }}
           path: build/evidence/ci/verification.json
           if-no-files-found: error
+          retention-days: 14

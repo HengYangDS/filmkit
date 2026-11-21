@@ -1,17 +1,27 @@
 ## 1. Runtime
 
-- [ ] 1.1 Replace the 0.2.0-beta.10 declaration in `.config/mise/config.toml` with the one published
+- [x] 1.1 Replace the 0.2.0-beta.10 declaration in `.config/mise/config.toml` with the one published
       with 0.2.0-beta.11, checked against the release's `SHA256SUMS` and asset digests, and lock it
       again with native `mise lock`; done when the lock holds 0.2.0-beta.11 for every platform it
       held 0.2.0-beta.10 for, no 0.2.0-beta.10 entry remains and it keeps `lockfile_version = 3`.
-- [ ] 1.2 Bind the repository family to the 0.2.0-beta.11 runtime with the locked console's
+      The release's declaration (sha256 `af619718…`) replaced the table and its comment; `mise lock`
+      kept `lockfile_version = 3`, changed only `http:ethos`, and holds 0.2.0-beta.11 for the same
+      platform entries, each checksum equal to `SHA256SUMS`.
+- [x] 1.2 Bind the repository family to the 0.2.0-beta.11 runtime with the locked console's
       `hook install`, keeping 0.2.0-beta.10 as the rollback; done when `ethos status` reports the
-      lane ready under the 0.2.0-beta.11 runtime.
-- [ ] 1.3 Regenerate both pipelines from the 0.2.0-beta.11 common model with
+      lane ready under the 0.2.0-beta.11 runtime. CURRENT names the 0.2.0-beta.11 runtime
+      `8c663b10…` and ROLLBACK the 0.2.0-beta.10 runtime `526c2eba…`; with this Change named,
+      `ethos status` reports the lane ready.
+- [x] 1.3 Regenerate both pipelines from the 0.2.0-beta.11 common model with
       `ethos lane project --apply` after the bind, since no proof or commit refuses the old files;
       done when `ethos lane project --check --json` reports both projections conforming and the
-      change adds only the 14-day retention lines.
-- [ ] 1.4 Record the move under Changed in the Changelog; done when the repository check passes.
+      change adds only the 14-day retention lines. The check first reported
+      `generated_projection_drift` for both pipelines; the applied preview added one
+      `retention-days: 14` line to the GitHub workflow and two `expire_in: 14 days` lines to the
+      GitLab pipeline, and the check now reports both conforming.
+- [x] 1.4 Record the move under Changed in the Changelog; done when the repository check passes. The
+      Unreleased section records the move under Changed; the check's commands, run one at a time
+      (235 Node tests, 2,085 Python tests, the Markdown check), pass.
 
 ## 2. Release
 

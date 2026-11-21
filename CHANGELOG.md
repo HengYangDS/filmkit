@@ -4,6 +4,11 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+
+- The repository runs ETHOS 0.2.0-beta.11 instead of 0.2.0-beta.10, and the hosted jobs keep their
+  CI artifacts for 14 days.
+
 ## [0.26.0] - 2026-11-20
 
 ### Added
