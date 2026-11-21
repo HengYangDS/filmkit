@@ -25,10 +25,13 @@
 
 ## 2. Release
 
-- [ ] 2.1 Prepare 0.26.1 in `VERSION`, the Changelog and the README's install line, after the lane's
+- [x] 2.1 Prepare 0.26.1 in `VERSION`, the Changelog and the README's install line, after the lane's
       other Changes are committed; done when `VERSION` reads 0.26.1, the Changelog has the dated
       0.26.1 section holding the lane's moves, the README's install line names `v0.26.1`, and the
-      repository check passes.
+      repository check passes. `VERSION` reads 0.26.1, the Changelog has the dated 0.26.1 section
+      with the lane's moves (ETHOS 0.2.0-beta.11, Mise 2026.11.10, the 14-day retention) and its
+      compare link, and the README's install line names `v0.26.1`; after `mise run bootstrap`, the
+      check's commands, run one at a time, pass: 235 Node tests and 2,085 Python tests.
 
 ## Workflow follow-up
 

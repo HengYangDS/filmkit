@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-11-21
+
 ### Changed
 
 - The repository runs ETHOS 0.2.0-beta.11 instead of 0.2.0-beta.10, the hosted GitHub job installs
@@ -581,7 +583,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.26.1...HEAD
+[0.26.1]: https://github.com/HengYangDS/filmkit/compare/v0.26.0...v0.26.1
 [0.26.0]: https://github.com/HengYangDS/filmkit/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/HengYangDS/filmkit/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/HengYangDS/filmkit/compare/v0.24.0...v0.24.1
