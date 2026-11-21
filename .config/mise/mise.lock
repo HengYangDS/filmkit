@@ -2,6 +2,47 @@
 
 lockfile_version = 3
 
+[[tools."github:vale-cli/vale"]]
+version = "3.27.0"
+backend = "github:vale-cli/vale"
+specifiers = ["3.27.0"]
+
+[tools."github:vale-cli/vale"."platforms.linux-arm64"]
+checksum = "sha256:dcaee812fd892c5750702d16ed348a1f7113be57c73cf36fe9e016c789cae6e2"
+url = "https://github.com/vale-cli/vale/releases/download/v3.27.0/vale_3.27.0_Linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/vale-cli/vale/releases/assets/740781556"
+provenance = "github-attestations"
+
+[tools."github:vale-cli/vale"."platforms.linux-arm64-musl"]
+checksum = "sha256:dcaee812fd892c5750702d16ed348a1f7113be57c73cf36fe9e016c789cae6e2"
+url = "https://github.com/vale-cli/vale/releases/download/v3.27.0/vale_3.27.0_Linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/vale-cli/vale/releases/assets/740781556"
+provenance = "github-attestations"
+
+[tools."github:vale-cli/vale"."platforms.linux-x64"]
+checksum = "sha256:c80d62f6bce87b81843ac5b512a26e63213927b957adba0a64fc594570da2000"
+url = "https://github.com/vale-cli/vale/releases/download/v3.27.0/vale_3.27.0_Linux_64-bit.tar.gz"
+url_api = "https://api.github.com/repos/vale-cli/vale/releases/assets/740781554"
+provenance = "github-attestations"
+
+[tools."github:vale-cli/vale"."platforms.linux-x64-musl"]
+checksum = "sha256:c80d62f6bce87b81843ac5b512a26e63213927b957adba0a64fc594570da2000"
+url = "https://github.com/vale-cli/vale/releases/download/v3.27.0/vale_3.27.0_Linux_64-bit.tar.gz"
+url_api = "https://api.github.com/repos/vale-cli/vale/releases/assets/740781554"
+provenance = "github-attestations"
+
+[tools."github:vale-cli/vale"."platforms.macos-arm64"]
+checksum = "sha256:91bcd6352a832e5995a61dde73ee6367c5006669c6efa4091e0404ec8d7dd7e3"
+url = "https://github.com/vale-cli/vale/releases/download/v3.27.0/vale_3.27.0_macOS_arm64.tar.gz"
+url_api = "https://api.github.com/repos/vale-cli/vale/releases/assets/740781550"
+provenance = "github-attestations"
+
+[tools."github:vale-cli/vale"."platforms.windows-x64"]
+checksum = "sha256:26e61cc58ac4180866d068dc2325d2625560c8cc518de7e7b5523211a5ab0cbc"
+url = "https://github.com/vale-cli/vale/releases/download/v3.27.0/vale_3.27.0_Windows_64-bit.zip"
+url_api = "https://api.github.com/repos/vale-cli/vale/releases/assets/740781617"
+provenance = "github-attestations"
+
 [[tools."http:ethos"]]
 version = "0.2.0-beta.11"
 backend = "http:ethos"

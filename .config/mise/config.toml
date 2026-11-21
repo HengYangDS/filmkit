@@ -138,11 +138,14 @@ run = [
 ]
 
 # The ETHOS gates resolve these only from this lock, never from PATH: Node for the picture checks,
-# Python and uv for the suite. Python stays on the 3.12 line that the films select.
+# Python and uv for the suite. Python stays on the 3.12 line that the films select. Vale applies
+# the register check's style (`filmkit.register`) at the version ETHOS pins; the engine's record
+# of what it was released on states it.
 [tools]
 node = "26.13.1"
 python = "3.12.16"
 uv = "0.13.9"
+"github:vale-cli/vale" = "3.27.0"
 
 # The ETHOS release declaration as published with v0.2.0-beta.11.
 [tools."http:ethos"]
