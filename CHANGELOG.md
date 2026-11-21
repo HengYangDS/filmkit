@@ -4,6 +4,10 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+
+- The hosted GitHub job installs Mise 2026.11.11 instead of 2026.11.10.
+
 ## [0.26.1] - 2026-11-21
 
 ### Changed
