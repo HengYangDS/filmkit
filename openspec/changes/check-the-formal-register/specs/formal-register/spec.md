@@ -142,7 +142,8 @@ any word, an executable that reports another version.
 #### Scenario: A checker whose run cannot be read
 
 - **WHEN** the checker prints no JSON object, names a line that no place holds or a span where its place does not
-  hold the form, outlives its deadline, cannot be run, or the engine's own rule files are not where it installed them
+  hold the form, outlives its deadline, cannot be run, or the engine's own Vale configuration or rule files are not
+  where it installed them
 - **THEN** the check refuses in one line that names what happened, and neither passes nor ends in a traceback
 
 ### Requirement: Each place is read as the viewer meets it

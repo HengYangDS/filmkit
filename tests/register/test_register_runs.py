@@ -121,7 +121,9 @@ def test_the_checker_runs_alone_on_the_engines_configuration(tmp_path, monkeypat
         "open(sys.argv[0] + '.args', 'w').write(json.dumps(sys.argv[1:])); print('{}')",
     )
     register.check()
-    config = Path(register.__file__).with_name("vale.ini")
+    # The configuration is the check's own file beside the module, named for the check.
+    config = Path(register.__file__).with_name("register.ini")
+    assert config.is_file()
     assert json.loads(Path(f"{vale}.args").read_text()) == [
         "--no-global",
         f"--config={config}",
@@ -153,7 +155,11 @@ def test_the_text_reaches_the_checker_as_utf8_under_any_locale(tmp_path, monkeyp
         "LANG": "en_US.ISO8859-1",
     }
     ran = subprocess.run(
-        [sys.executable, "-c", child], capture_output=True, env=environment, check=False, timeout=60
+        [sys.executable, "-B", "-c", child],
+        capture_output=True,
+        env=environment,
+        check=False,
+        timeout=60,
     )
     assert ran.returncode == 0, ran.stderr.decode("utf-8", "replace")
     assert Path(f"{vale}.text").read_bytes() == "你们先看。\n".encode()
@@ -197,6 +203,12 @@ def test_a_style_folder_without_rule_files_refuses_before_any_word_is_read(tmp_p
     monkeypatch.setattr(register, "_STYLE", tmp_path)
     assert str(refused()) == (
         f"The engine's register style at {tmp_path} holds no rule file; install the engine again"
+    )
+    # An engine that lost its Vale configuration is refused by the file's name, before the style.
+    lost = tmp_path / "register.ini"
+    monkeypatch.setattr(register, "_CONFIG", lost)
+    assert str(refused()) == (
+        f"The engine's register configuration at {lost} is not there; install the engine again"
     )
 
 

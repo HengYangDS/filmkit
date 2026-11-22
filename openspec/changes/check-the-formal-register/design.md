@@ -44,8 +44,10 @@ and an independent review of this design's first draft found two of its decision
    - **Applies to:** `src/filmkit/register/` and its base style.
 2. **One run over one text, one place a paragraph, mapped back by a table.** An empty place is skipped; a place's line
    breaks are joined by a space between Latin words and by nothing between Chinese characters. Vale runs with
-   `--no-global --config <the engine's config> --ext=.txt --output=JSON`. The entry page is one bilingual template:
-   it is one place, read once for both editions.
+   `--no-global --config <the engine's config> --ext=.txt --output=JSON`. The configuration is `register.ini` beside the
+   check's module, a name of the engine's own: ETHOS takes a tracked file named `vale.ini` or `.vale.ini`, wherever it
+   stands, for the repository's own prose policy and admits that at one place only [S10]. The entry page is one
+   bilingual template: it is one place, read once for both editions.
 3. **Levels follow who listed the form.** `error` refuses; `warning` is recorded.
    - **Rests on:** the owner approved the standard's text, lists included [S1]; the first style refused formal words
      at error level through forms the engine had added (不得由, 尽管用户, 进行到底), and no test held a level [S6].
@@ -158,8 +160,9 @@ and an independent review of this design's first draft found two of its decision
 - On the entry page a ruby's reading (`rt`, `rp`) is an annotation and is left out of its run, so that it does not
   part the form it annotates; an English form whose letters continue in the next inline element (`you` and `ng` in
   two spans) is the word the viewer reads, and is no occurrence [S9, n1].
-- An installed engine that lost one of its rule files is refused by the installation record's own lines; a file
-  changed in place is not detected at run time [S9, m1].
+- An installed engine that lost one of its rule files is refused by the installation record's own lines, and an
+  engine without its Vale configuration by the file's name; a file changed in place is not detected at run time
+  [S9, m1].
 - A new pinned binary → held by Mise's lock and release age; CI installs it as it installs every tool.
 - Every released film is refused after adopting → by design; each film's December edition fixes its words with its
   owner's approval, and declares an exception where a form is a quotation.
@@ -196,3 +199,9 @@ and an independent review of this design's first draft found two of its decision
   effective lines, 530 lines; the new file 55, 63 and 78). Measured the same day, statements, effective lines and lines:
   `test_film.py` 320, 499, 649; `test_adoption.py` 346, 472, 609; `test_ending.py` 281, 474, 604;
   `test_child_processes.py` 255, 386, 521; `test_preflight.py` 266, 447, 530.
+- [S10] ETHOS 0.2.0-beta.11's readiness on the lane's head `4469f39`, 22 November 2026
+  (`build/evidence/check-the-formal-register/readiness/`): refused before any gate ran, with
+  `native_tool_configuration_location_invalid:vale`. Its rule, read in the installed product
+  (`repository/policy/quality/tool_configuration.py` and the paradigm's `vale` entry): a tracked path whose file name is
+  `vale.ini` or `.vale.ini` is the prose gate's configuration, whose place is `.config/checks/vale/vale.ini`. The
+  engine's file was `src/filmkit/register/vale.ini` until that day; Vale reads any file that `--config` names.

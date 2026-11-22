@@ -8,13 +8,14 @@ R5's marks as errors; R2, R4 and the forms the engine adds within a rule's class
 rest of the standard is the reviewers' to judge.
 
 The check first asks the Vale on the path for its version and refuses one other than the
-version the engine's release states (`filmkit.released.vale`), and refuses a style folder that
-lacks a rule file the engine was installed with, before it reads any word. It then gathers the
-words a viewer meets outside the picture (`filmkit.concepts.places`), renders them as one text,
-one place a paragraph, its lines joined by nothing between Chinese characters and by a space
-elsewhere, characters a viewer does not see and an empty place left out, and runs Vale once on
-it, mapping each alert back to its place by a table. A listed form is an error wherever it
-stands: the engine holds no list of words that excuses one.
+version the engine's release states (`filmkit.released.vale`), and refuses an engine without its
+Vale configuration and a style folder that lacks a rule file the engine was installed with,
+before it reads any word. It then gathers the words a viewer meets outside the picture
+(`filmkit.concepts.places`), renders them as one text, one place a paragraph, its lines joined
+by nothing between Chinese characters and by a space elsewhere, characters a viewer does not see
+and an empty place left out, and runs Vale once on it, mapping each alert back to its place by a
+table. A listed form is an error wherever it stands: the engine holds no list of words that
+excuses one.
 
 A film keeps a form at one place in `[[register.exceptions]]` (`filmkit.film.Register`) by naming
 the text the form stands within there: the check excuses exactly the form's error-level
@@ -48,8 +49,10 @@ import filmkit.concepts as concepts
 import filmkit.released as released
 from filmkit.film import FILM, form_key
 
-# The engine's Vale configuration and the folder of its base style.
-_CONFIG = Path(__file__).with_name("vale.ini")
+# The engine's Vale configuration, which the check names to Vale by `--config`, and the folder of
+# its base style. The file is the check's own data and bears the check's name: `vale.ini` is the
+# name of a repository's own prose policy, which this file is not.
+_CONFIG = Path(__file__).with_name("register.ini")
 _STYLE = Path(__file__).with_name("styles") / "register"
 # The standard's document, how it opens each rule of its list, and the rules it states.
 _STANDARD = Path(__file__).with_name("standard.md")
@@ -188,7 +191,11 @@ def _shipped() -> set[str]:
 
 
 def _styled() -> None:
-    """Refuse a style folder without rule files, or without one the engine was installed with."""
+    """Refuse an engine without its Vale configuration, and a style folder without rule files or
+    without one the engine was installed with."""
+    if not _CONFIG.is_file():
+        message = f"The engine's register configuration at {_CONFIG} is not there; {_AGAIN}"
+        raise RegisterError(message)
     held = {path.name for path in _STYLE.glob("*.yml")}
     if not held:
         message = f"The engine's register style at {_STYLE} holds no rule file; {_AGAIN}"
