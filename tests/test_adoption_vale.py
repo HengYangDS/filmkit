@@ -14,12 +14,11 @@ project, found, TASKS = base.project, base.found, base.TASKS
 TOOL, ASKED = released.VALE, released.vale()
 ON = f"the engine was released on Vale {ASKED}"
 PINNED = f'[tools]\n"{TOOL}" = "{ASKED}"\n'
+# How a finding that names no pin ends: the record's version and the entry to add.
+ADD = f'{ON}: pin "{TOOL}" = "{ASKED}" under [tools]'
 # The finding for a Mise file that holds no version under the tool's name: it names the file it
 # read and the name it looked under, and does not say that the film pins none.
-ABSENT = (
-    f'{{file}} holds no "{TOOL}" version under [tools]; {ON}: '
-    f'pin "{TOOL}" = "{ASKED}" under [tools]'
-)
+ABSENT = f'{{file}} holds no "{TOOL}" version under [tools]; {ADD}'
 # What a film's Mise configuration states of Vale, and the finding that names it: its pin, or its
 # absence under the tool's name, with the version the release record states. A pin under another
 # name, in another form or of no one version is not the release's.
@@ -60,6 +59,14 @@ def test_a_pin_in_another_of_mises_files_is_not_read_and_the_finding_says_where_
     (project / ".config/mise/config.toml").write_text(TASKS)
     (project / "mise.toml").write_text(PINNED)
     assert found(project)["vale"] == [ABSENT.format(file="config.toml")]
+
+
+def test_a_film_without_a_mise_configuration_is_told_the_version_and_the_entry_to_add(project):
+    shutil.rmtree(project / ".config")
+    assert found(project)["vale"] == [
+        "the film has no Mise configuration (.config/mise/config.toml, mise.toml, .mise.toml) at "
+        f"or above it; {ADD}"
+    ]
 
 
 def test_tools_that_are_no_table_are_a_finding_of_the_question(project):

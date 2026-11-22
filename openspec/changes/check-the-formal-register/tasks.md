@@ -98,3 +98,9 @@
       prompt says the check does not read the picture's words, and that each part of the report the prompt names is
       one the check gives. Done when the tests in `tests/review/test_prepare.py` and `tests/review/test_prompts.py`
       pass.
+
+## 7. After the sixth review
+
+- [x] 7.1 The adoption reader's finding for a film without a Mise configuration is held whole, with the record's
+      version and the entry to add. Done when the test in `tests/test_adoption_vale.py` passes and fails with the
+      finding cut after "at or above it".

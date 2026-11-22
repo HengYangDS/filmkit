@@ -196,9 +196,9 @@ def test_a_film_without_a_mise_configuration_has_unread_tasks_and_pins_no_vale(p
     result = adoption.report(project)
     assert result["findings"]["tasks"] == []
     assert any("tasks" in note for note in result["not_read"])
-    # A film without a Mise configuration pins no Vale, which is a finding and not unread.
-    (absent,) = result["findings"]["vale"]
-    assert absent.startswith("the film has no Mise configuration (.config/mise/config.toml, mi")
+    # A film without a Mise configuration pins no Vale, which is a finding and not unread; its
+    # words are held with the Vale question's (`tests/test_adoption_vale.py`).
+    assert len(result["findings"]["vale"]) == 1
 
 
 def test_the_template_is_asked_for_every_anchor_at_once(project):
