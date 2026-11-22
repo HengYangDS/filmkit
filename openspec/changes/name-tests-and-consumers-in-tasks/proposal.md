@@ -1,8 +1,8 @@
 ## Why
 
-Two habits that decide whether a Change's checks hold stand only in a session's notes today. The step check of a
-release reads a code step's focused tests from the test files its Change's tasks name, so a Change whose tasks name
-none gets no focused test (20 November 2026). And a new check is proved on the films it will judge only when someone
+Two habits that decide whether a Change's checks hold stand only in a session's notes today. A task that verifies
+code and says only that the tests pass leaves a reader of the Change, person or tool, to guess its focused tests or
+to run none (20 November 2026). And a new check is proved on the films it will judge only when someone
 remembers to run it there: on 2 November that run found two defects the tests had missed, and the adoption reader and
 the still scan of 0.25.0 and 0.26.0 were accepted by it. OpenSpec's per-artifact rules are where such a rule reaches
 every author of a Change; the repository paradigm requires only that its common rules come first, and a repository's
@@ -12,7 +12,8 @@ on 21 November 2026 at ETHOS `e4d9d04d3`).
 ## What Changes
 
 - `openspec/config.yaml`, `rules.tasks`, after the paradigm's three common rules and without touching them:
-  - a task that verifies code names the test file that verifies it, as a path in backticks;
+  - a task that verifies code names the test file that verifies it, as a path in backticks, or the command where no
+    test file can hold the check, so that a reader of the Change finds the task's focused tests from the task itself;
   - a Change that adds or changes a check carries an acceptance task that runs the check on its real consumers, the
     released films for an engine check, with the record under `build/evidence/<change>/`.
 

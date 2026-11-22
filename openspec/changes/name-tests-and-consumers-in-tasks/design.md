@@ -29,9 +29,9 @@ paradigm's three common rules, which the paradigm's report requires to come firs
 
 - [A later paradigm release ships the same rules as common rules] → The repository's two rules are
   removed in the lane that adopts that release, so that each rule keeps one source.
-- [A rule that no gate reads is forgotten] → A release's step check reads a code step's focused tests
-  from the test files that the tasks name, so a task that names none is met there; the acceptance
-  task is read when the Change is reviewed.
+- [A rule that no gate reads is forgotten] → No gate reads either rule. A task that names neither a
+  test file nor a command is met by whoever lands or reviews its step, person or tool, who finds no
+  focused test in the task; the acceptance task is read when the Change is reviewed.
 
 ## Migration Plan
 
