@@ -87,12 +87,13 @@ CONTRACT_FIELDS = ("concepts", "readings")
 # The prompt fields that a film with review levels cites: the levels and the sentences file.
 LEVEL_FIELDS = ("levels", "sentences")
 # The prompt field that every film cites, and what it states before the standard's rules: the
-# round's register report, what it holds and what the register check does not read.
+# round's register report, what it holds and what the register check does not read. The names of
+# the report's two parts are the check's own (`register.WARNINGS`, `register.EXCUSED`).
 REGISTER_FIELD = "register"
 REGISTERED = (
     "{report} is the register check's report on the words a viewer meets outside the picture, "
-    "in both editions and on the entry page. Its `warnings` are the forms the check records "
-    "and does not refuse, each with its place and its rule's message; its `excused` are the "
+    "in both editions and on the entry page. Its `{warnings}` are the forms the check records "
+    "and does not refuse, each with its place and its rule's message; its `{excused}` are the "
     "exceptions the film declares that the check applied, each with the text its form stands "
     "within and the film's reason. The check judges single forms, and it does not read the "
     "words the picture paints: those words, the warnings, the exceptions and everything a "
@@ -182,7 +183,9 @@ def register_text(out_dir: Path) -> str:
     """`{register}`: the round's register report, what it holds and what the check does not
     read, then the rules R1 to R6 as the standard's document states them, the list's own lines.
     The standard's refusal of a document it cannot give the rules from is its own."""
-    stated = REGISTERED.format(report=cited(out_dir / REGISTER))
+    stated = REGISTERED.format(
+        report=cited(out_dir / REGISTER), warnings=register.WARNINGS, excused=register.EXCUSED
+    )
     return f"{stated}\n{register.rules().rstrip()}"
 
 

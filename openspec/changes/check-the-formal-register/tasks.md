@@ -104,3 +104,6 @@
 - [x] 7.1 The adoption reader's finding for a film without a Mise configuration is held whole, with the record's
       version and the entry to add. Done when the test in `tests/test_adoption_vale.py` passes and fails with the
       finding cut after "at or above it".
+- [x] 7.2 The names of the report's two parts that the prompt tells its reader of are stated once, in
+      `filmkit.register`, and the prompt is filled from them. Done when the test of a prepared round in
+      `tests/review/test_prepare.py` passes and fails where the prompt names a part the report does not hold.

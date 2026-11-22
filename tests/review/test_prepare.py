@@ -2,6 +2,7 @@
 `test_prepare_again` holds a second preparation of a round."""
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -144,6 +145,12 @@ def test_a_prepared_round_holds_the_register_report_and_each_prompt_names_it_wit
         text = (folder / f"prompt-{code}.md").read_text()
         assert f"ROOT/{PREPARED}/register.json is the register check's report" in text
         assert rules in text
+        # The prompt tells its reader of two parts of the report by name, and the round's report
+        # holds each under that name.
+        (told,) = (line for line in text.splitlines() if "is the register check's report" in line)
+        named = re.findall(r"`(\w+)`", told)
+        assert len(named) == 2
+        assert all(isinstance(report[name], list) for name in named)
 
 
 def test_the_binding_names_the_language_entry_and_each_delivery_member(root, ready):

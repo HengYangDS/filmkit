@@ -141,7 +141,9 @@ and an independent review of this design's first draft found two of its decision
 9. **The warnings and the standard reach the reviewers** through the round's preparation: `review.round prepare`
    writes the register report into the round and fills `{register}` with its path and the rules R1 to R6 from the one
    source, `src/filmkit/register/standard.md`; a template without `{register}` is refused, as one without the concept
-   contract's field is. The films' review declarations then need not restate the standard.
+   contract's field is. The films' review declarations then need not restate the standard. The field's sentence names
+   two parts of the report, its warnings and the exceptions applied; their names are stated once, in
+   `filmkit.register`, where the check builds its report under them, and the sentence is filled from there [S11, m4].
 10. **The forms are the engine's, the exceptions the film's.** One base style for every film, as the watched characters
     of the readings check are the engine's; a film adds no forms of its own and excuses by place.
 11. **A checker's run that cannot be read is a refusal, in one line.** Output that is no JSON object, an alert on a
@@ -206,3 +208,7 @@ and an independent review of this design's first draft found two of its decision
   (`repository/policy/quality/tool_configuration.py` and the paradigm's `vale` entry): a tracked path whose file name is
   `vale.ini` or `.vale.ini` is the prose gate's configuration, whose place is `.config/checks/vale/vale.ini`. The
   engine's file was `src/filmkit/register/vale.ini` until that day; Vale reads any file that `--config` names.
+- [S11] `build/evidence/formal-register/code-review-6.md`, the sixth review, 22 November 2026: land; six minor
+  findings and ten notes. Of this Change: m3 (a clause of the adoption reader's finding without a test), m4 (the
+  report's two names kept twice, with a test that compared the copies), m5 (the template refusal not run on the
+  films' templates) and n3 (what the template refusal's words say beyond what it refuses).

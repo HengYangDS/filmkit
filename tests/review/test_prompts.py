@@ -6,7 +6,6 @@ import pytest
 from still_records import REQUIRE_FILM_SCAN
 
 import filmkit.picture.still_scan as still_scan
-import filmkit.register as register
 import filmkit.repository as repository
 import filmkit.review.prompts as review_prompts
 import filmkit.review.record as review_record
@@ -15,13 +14,6 @@ import filmkit.specification as specification
 from filmkit.picture.errors import PictureError
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
-
-
-def test_the_register_field_names_parts_that_the_checks_report_holds():
-    # The field's sentence names the report's parts by hand: each is a key the check itself gives.
-    named = re.findall(r"`(\w+)`", review_prompts.REGISTERED)
-    assert named == ["warnings", "excused"]
-    assert set(named) <= set(register.check())
 
 
 @pytest.mark.usefixtures("unleveled")

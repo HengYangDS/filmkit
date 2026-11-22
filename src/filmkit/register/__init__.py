@@ -27,7 +27,8 @@ removes a warning. A Vale run that cannot run, outlives its deadline or answers 
 the one it documents is a refusal too, so the check never passes on a run it cannot read.
 
 `rules` gives the standard's rules R1 to R6 as its document states them, for the reviewers'
-prompt (`filmkit.review.prompts`), which restates none of them.
+prompt (`filmkit.review.prompts`), which restates none of them; `WARNINGS` and `EXCUSED` are the
+names of the report's two parts that the prompt tells its reader of.
 
 Usage: python -m filmkit.register
 """
@@ -95,6 +96,10 @@ _KEEP = (
 _LISTED = ("register.address", "register.colloquial", "register.contractions")
 # How a refusal of the engine's own files ends.
 _AGAIN = "install the engine again"
+# The two parts of the report that a reader is told of by name: the forms the check records and
+# does not refuse, and the exceptions it applied. The names are stated here once: `check` builds
+# its report under them, and the reviewers' prompt names them from here.
+WARNINGS, EXCUSED = "warnings", "excused"
 
 
 class RegisterError(ValueError):
@@ -371,12 +376,12 @@ def check() -> dict:
     return {
         "vale": pinned,
         "places": len(places),
-        "warnings": [
+        WARNINGS: [
             {"place": a.place, "form": a.form, "rule": a.rule, "message": a.message}
             for a in alerts
             if not a.error
         ],
-        "excused": [e.model_dump() for e in exceptions if applied[id(e)]],
+        EXCUSED: [e.model_dump() for e in exceptions if applied[id(e)]],
     }
 
 

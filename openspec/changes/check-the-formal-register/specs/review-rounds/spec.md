@@ -10,7 +10,8 @@ them. A template that does not cite `{register}` SHALL be refused before anythin
 
 - **WHEN** a round is prepared
 - **THEN** it holds the register report, with each warning's place and form and each exception applied with its
-  text and its reason, and each prompt names it with the rules
+  text and its reason, and each prompt names it with the rules and names no part of the report that the report does
+  not hold
 
 #### Scenario: A template without the field
 
