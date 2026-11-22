@@ -4,4 +4,4 @@
       the list it replaces select the same files and the same number of tests, and ETHOS's recipe reader takes the
       script, by the record in `build/evidence/find-node-tests-by-pattern/` (both runs' counts and file lists, and the
       reader's answer).
-- [ ] 1.2 The Changelog's entry, with the release's other Changes.
+- [x] 1.2 The Changelog's entry, with the release's other Changes.
