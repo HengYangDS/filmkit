@@ -14,8 +14,7 @@ the packaged film's tags and chapter track read each value as the display copy s
 #### Scenario: A comment with a semicolon
 
 - **WHEN** the release comment holds a semicolon
-- **THEN** the chapter metadata writes it escaped and the films' comment tag reads the semicolon, with the same bytes
-  as before the escape
+- **THEN** the chapter metadata writes it escaped and the films' comment tag reads the semicolon as before
 
 #### Scenario: An author with a mark
 

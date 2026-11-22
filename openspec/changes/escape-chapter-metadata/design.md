@@ -31,10 +31,12 @@ chapter title.
 
 ## Risks / Trade-offs
 
-- [A released film's packaged bytes change] → No released film holds a backslash or a newline in
-  these values, and FFmpeg reads an escaped semicolon back as the same character, which is the
-  proposal's evidence that the packaged tags stay the same bytes. A film adopts the release after it
-  rebuilds and compares, as for every release.
+- [A released film's delivered bytes change] → They do, in two members of the viewing package. Each
+  released English edition's comment holds a semicolon, so its `chapters.ffmeta` gains one
+  backslash; its player page holds that file as a download and names its size, so the page changes
+  with it. FFmpeg reads the escaped semicolon back as the same character, so the packaged film's
+  tags read as before. The release says so, and a film adopts it after it rebuilds and compares, as
+  for every release.
 
 ## Migration Plan
 
