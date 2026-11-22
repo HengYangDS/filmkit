@@ -298,7 +298,7 @@ A film pins a release tag in its Python project and locks it:
 dependencies = ["filmkit"]
 
 [tool.uv.sources]
-filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.27.0" }
+filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.28.0" }
 ```
 
 Before it installs its npm packages, supplies or builds anything, a film asks what the release it pins expects of it: `python -m filmkit.adoption`, run in any environment that holds the engine, reads the film's tracked files and lists the differences in one run (the declaration, the npm packages and their lock, the Python lock, the tasks, the picture template and the pin of Vale). A film that adopts a new release works through that list first.
