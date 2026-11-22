@@ -336,6 +336,19 @@ def unknown_field(root, put, previous, monkeypatch):
     )
 
 
+def reshaped_fields(root, put, previous, monkeypatch):
+    # A conversion or a format specification would cut or reword what the engine fills a field
+    # with: `{register:.0}` leaves no rule and names no report, and `{levels!r}` quotes the levels.
+    template = review_prompts.TEMPLATE.replace("{register}", "{register:.0}")
+    template = template.replace("{levels}", "{levels!r}").replace("{concepts}", "{concepts!s:>9}")
+    monkeypatch.setattr(review_prompts, "TEMPLATE", template)
+    return previous, (
+        "content/review/prompt.md cites {concepts!s:>9} and {levels!r} and {register:.0}, each "
+        "with a conversion or a format specification; the engine fills a field that is cited by "
+        "its name alone"
+    )
+
+
 def other_program_level(root, put, previous, monkeypatch):
     put(Edition("en").audio_assembly, {"program_level": {"policy": {"integrated_lufs": -14.0}}})
     return previous, "the soundtracks declare different program levels: [-16.5, -14.0]"
@@ -370,6 +383,7 @@ def refused_words(root, put, previous, monkeypatch):
         lacking_a_report,
         note_that_is_no_text,
         unknown_field,
+        reshaped_fields,
         other_program_level,
         missing_timeline,
         no_register_field,

@@ -120,9 +120,31 @@ DISPOSED = (
 )
 
 
+def cited_fields(template: str) -> list[str]:
+    """Each field a template cites, by its name as written, `{}` as the empty name.
+
+    The one reading of a template's fields. The engine fills a field with the text a reviewer is
+    to read whole, so a field written with a conversion or a format specification is refused by
+    name: `{register:.0}` would cut the rules to nothing, and the prompt would still be written.
+    """
+    cited = [field for field in string.Formatter().parse(template) if field[1] is not None]
+    reshaped = sorted(
+        "{" + name + (f"!{conversion}" if conversion else "") + (f":{form}" if form else "") + "}"
+        for _, name, form, conversion in cited
+        if form or conversion
+    )
+    if reshaped:
+        msg = (
+            f"{FILM.review.prompt} cites {' and '.join(reshaped)}, each with a conversion or a "
+            "format specification; the engine fills a field that is cited by its name alone"
+        )
+        raise ReviewError(msg)
+    return [name for _, name, _, _ in cited]
+
+
 def template_fields(template: str) -> set[str]:
-    """The names of the fields a template cites."""
-    return {name for _, name, _, _ in string.Formatter().parse(template) if name}
+    """The names of the fields a template cites (`cited_fields`), `{}` left out."""
+    return {name for name in cited_fields(template) if name}
 
 
 def contract_gaps(template: str, dimensions: dict[str, str]) -> list[str]:
@@ -465,14 +487,16 @@ def read_round(
     A round's preparation asks this before it derives anything, and `prompts` before it writes
     anything. Refused unless the review configuration keeps the concept contract the film
     declares (`contract_gaps`) and the levels it declares (`level_gaps`), the template cites
-    the register field, a first round's template cites no previous review, each edition's
-    1080p captioned film holds its passing still scan (`still_scan.require_film_scan`, whose
-    refusal is raised as that owner's own), a later round disposes of every previous finding
+    every field by its name alone (`cited_fields`, asked first) and cites the register field, a
+    first round's template cites no previous review, each edition's 1080p captioned film holds
+    its passing still scan (`still_scan.require_film_scan`, whose refusal is raised as that
+    owner's own), a later round disposes of every previous finding
     (`stated_dispositions`), the previous round holds each edition's review and report, the
     changes note is text, the soundtracks declare one program level, the standard gives its
     rules (`filmkit.register.rules`, whose refusal is its own too), the template cites no field
     the engine does not fill, and each edition of a film with levels has its timeline.
     """
+    named = set(cited_fields(TEMPLATE))
     gaps = contract_gaps(TEMPLATE, DIMENSIONS)
     if gaps:
         msg = "the review omits the concept contract the film declares: " + "; ".join(gaps)
@@ -513,7 +537,6 @@ def read_round(
         }
     # A field is filled by its first name: `{root.name}` asks for `root`, and `{}` for none.
     filled = {*fields[CODES[0]], *EDITION_FIELDS}
-    named = {name for _, name, _, _ in string.Formatter().parse(TEMPLATE) if name is not None}
     unknown = sorted(
         name for name in named if re.split(r"[.\[]", name, maxsplit=1)[0] not in filled
     )
