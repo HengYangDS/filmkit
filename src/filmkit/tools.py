@@ -46,7 +46,7 @@ import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.picture import metrics
 from filmkit.picture.errors import PictureError
-from filmkit.production import CODES
+from filmkit.production import ARTIFACTS, CODES, EVIDENCE, STAGE
 
 # The engine's Node modules, which the package carries below this module's folder.
 PACKAGE = Path(__file__).resolve().parent
@@ -71,11 +71,12 @@ BUILD_RUNS = {
     ("geometry-check",): "geometry-check",
     ("player-check", "cover"): "player-check-cover",
 }
-# Where a tool's argument names an edition: its stage, or its folder of evidence or artifacts.
+# Where a tool's argument names an edition: its stage, or its folder of evidence or artifacts,
+# each by the last name `production` gives it.
 EDITION = "|".join(CODES)
-EDITION_PLACE = re.compile(
-    rf"(?:^|/)(?:final-delivery-(?P<stage>{EDITION})-uhd[^/]*|(?:editions|film)/(?P<folder>{EDITION}))(?=/|$)"
-)
+STAGED = f"(?P<stage>{EDITION})".join(map(re.escape, STAGE.split("{code}")))
+FOLDERS = "|".join(re.escape(folder.name) for folder in (EVIDENCE, ARTIFACTS))
+EDITION_PLACE = re.compile(rf"(?:^|/)(?:{STAGED}[^/]*|(?:{FOLDERS})/(?P<folder>{EDITION}))(?=/|$)")
 # Seconds a tool has to end, once the command's wait for it was cut short and it was asked to,
 # before it is killed.
 STOP_SECONDS = 20

@@ -10,6 +10,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import filmkit.production as production
 import filmkit.repository as repository
 
 
@@ -85,7 +86,7 @@ def main():
     parser.add_argument(
         "--directory",
         type=Path,
-        default=repository.ROOT / "build/artifacts/film",
+        default=repository.ROOT / production.ARTIFACTS,
     )
     parser.add_argument("--port", type=int, default=8769)
     args = parser.parse_args()

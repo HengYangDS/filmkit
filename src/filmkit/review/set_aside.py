@@ -31,13 +31,13 @@ from pathlib import Path
 from typing import NamedTuple
 
 import filmkit.repository as repository
-from filmkit.production import CODES, RENDITIONS, Edition
+from filmkit.production import ARTIFACTS, CODES, RENDITIONS, Edition
 from filmkit.review import ReviewError
 from filmkit.review.files import REVIEWS, edition_review, present, review_files, round_number
 
 EXIT_CONDITION = "Retire after the successor delivery is accepted"
 # Below the film's root, the folder each set-aside label holds, with one folder per edition.
-SUPERSEDED = Path("build/artifacts/film/superseded")
+SUPERSEDED = ARTIFACTS / "superseded"
 # A label is a lowercase name of words joined by hyphens, such as round-5 or preview-2026-11-05.
 LABEL = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 # The command that sets one edition of a reviewed round aside, as a refusal names it.

@@ -61,7 +61,7 @@ from filmkit.film import FILM, copied_players
 from filmkit.picture.derivation import film_source
 from filmkit.picture.equivalence import require_equivalence
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, validate_picture
-from filmkit.production import CODES, RENDITIONS
+from filmkit.production import ARTIFACTS, CODES, RENDITIONS
 from filmkit.repository import read, run, sha, write
 from filmkit.specification import (
     AUTHOR,
@@ -84,7 +84,7 @@ class PackagingError(ValueError):
 # The delivery folder's entry page, below the repository root.
 INDEX = Path(FILM.entry)
 # The language entry page derived from INDEX, below the root.
-LANGUAGE_INDEX = Path("build/artifacts/film") / PAGE
+LANGUAGE_INDEX = ARTIFACTS / PAGE
 # The folder below the root where each edition's films are encoded and finished.
 WORK = Path("build/runtime/work/final-film-packaging")
 # What a failed or timed-out encode was bound to, in the edition's evidence folder.

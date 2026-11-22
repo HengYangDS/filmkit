@@ -6,17 +6,19 @@ Every action takes the edition it produces as an argument; nothing holds a curre
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import filmkit.repository as repository
 from filmkit.film import FILM
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
-
 # The language editions, Chinese first.
 CODES = ("zh", "en")
+# Below the film's root, the folders of the editions' films and documents and of their evidence,
+# each holding a folder for each edition by its code; and the name of an edition's captioned
+# picture's stage below the work folder, which the uncaptioned picture's extends.
+ARTIFACTS = Path("build/artifacts/film")
+EVIDENCE = Path("build/evidence/editions")
+STAGE = "final-delivery-{code}-uhd"
 
 
 @dataclass(frozen=True)
@@ -182,18 +184,18 @@ class Edition:
 
     @property
     def artifacts(self) -> Path:
-        return repository.ROOT / "build/artifacts/film" / self.code
+        return repository.ROOT / ARTIFACTS / self.code
 
     @property
     def evidence(self) -> Path:
-        return repository.ROOT / "build/evidence/editions" / self.code
+        return repository.ROOT / EVIDENCE / self.code
 
     def rendered(self, captions: bool = True) -> Rendered:
         """The captioned picture's places, or with `captions` False the uncaptioned one's."""
         suffix = "" if captions else "-uncaptioned"
         return Rendered(
             captions,
-            repository.ROOT / "build/runtime/work" / f"final-delivery-{self.code}-uhd{suffix}",
+            repository.ROOT / "build/runtime/work" / (STAGE.format(code=self.code) + suffix),
             self.artifacts / f"{FILM.slug}-final-picture{suffix}.mp4",
             self.evidence / f"render/receipt{suffix}.json",
         )
