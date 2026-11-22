@@ -14,5 +14,5 @@
 
 ## 3. Acceptance
 
-- [ ] 3.1 Run the built functions (`judgment.bench`, `recognition.compared`) over the recorded transcripts of the six editions of 22 November and the trial clones' records of that evening. Done when `build/evidence/hold-a-take-to-its-words-not-its-respelling/acceptance.md` states, by edition and record, the takes that pass `units` before and after, and that none which passes before is refused after.
-- [ ] 3.2 Run the built readings check on the sources of the three released films. Done when the same folder's record states that it refuses the ETHOS film's name in both editions, with the name, its spoken form and the thoughts, and passes the essentials film and the full film as before.
+- [x] 3.1 Run the built functions (`judgment.bench`, `recognition.compared`) over the recorded transcripts of the six editions of 22 November and the trial clones' records of that evening. Done when `build/evidence/hold-a-take-to-its-words-not-its-respelling/acceptance.md` states, by edition and record, the takes that pass `units` before and after, and that none which passes before is refused after.
+- [x] 3.2 Run the built readings check on the sources of the three released films. Done when the same folder's record states that it refuses the ETHOS film's name in both editions, with the name, its spoken form and the thoughts, and passes the essentials film and the full film as before.
