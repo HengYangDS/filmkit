@@ -303,7 +303,7 @@ Before it installs its npm packages, supplies or builds anything, a film asks wh
 
 Its `package.json` declares the npm packages the engine runs, each at the version the engine's own `package.json` names under `dependencies`, the one place those versions are stated by hand (the engine's record, `filmkit/released.json`, is generated from it by `python -m filmkit.released`): `@napi-rs/canvas`, which draws the pictures and which the engine checks before it stages, renders or runs a tool; and `puppeteer-core` and `@puppeteer/browsers`, which drive and install the browser build of the checks. `python -m filmkit.adoption` names each that a film holds at another version.
 
-Its Mise configuration pins Vale under `[tools]` as `"github:vale-cli/vale"`, the tool the engine pins, at the version the engine's record states. `python -m filmkit.adoption` reads the pin in the file it reads the film's tasks from, and names a film that pins another version there, or none, with the record's version.
+Its Mise configuration pins Vale under `[tools]` as `"github:vale-cli/vale"`, the tool the engine pins, at the version the engine's record states. `python -m filmkit.adoption` reads that one entry in the file it reads the film's tasks from, and in no other: it names a file that holds another version under that name, or none, with the record's version. A pin of Vale under another name, or in another of Mise's files beside the one that holds the tasks, is not read, and the finding says that the file holds none under this name.
 
 ## Commands
 

@@ -27,11 +27,12 @@ of the film that cannot be read is a finding of the question that reads it.
   (`filmkit.picture.template`).
 - `vale`: the film's Mise configuration, the file its tasks are read from, pins under `[tools]`
   the Vale the engine was released on, which the register check runs and beside which it
-  refuses every other (`filmkit.register`). The finding names the film's pin, or its absence,
-  and the release's version. Only the tool the engine itself pins is read
-  (`filmkit.released.VALE`), as one version: a pin of Vale under another name, in a list or
-  in another file of Mise's is not the release's and is named as none or as it stands, and a
-  film without a Mise configuration pins none.
+  refuses every other (`filmkit.register`). Only the tool the engine itself pins is read
+  (`filmkit.released.VALE`), as one version, in that one file. The finding names the file and
+  what it holds under that tool's name, another version or none, with the release's version: a
+  pin of Vale under another name or in another file of Mise's is not read, so the finding says
+  that the file holds none under this name, not that the film pins none. A film without a Mise
+  configuration is named as having none.
 
 What the engine was released on is its own record (`filmkit.released`). The manifests, the locks
 and the tasks are read at the film's root or above it, up to the folder that holds the film's
@@ -362,19 +363,19 @@ def picture_template(root: Path) -> list[str]:
 
 def vale(root: Path) -> list[str]:
     """The film's pin of the Vale that the register check runs, against the engine's record:
-    another version, another form of pin or none, each named with the release's version."""
+    another version, another form of pin or none under that tool's name in the one file read,
+    each named with the release's version."""
     asked = released.vale()
     on = f"the engine was released on Vale {asked}"
     pin = f'pin "{released.VALE}" = "{asked}" under [tools]'
     config = held(root, *TASK_FILES)
     if config is None:
         places = ", ".join(TASK_FILES)
-        return [f"no Mise configuration ({places}) at or above the film pins Vale; {on}: {pin}"]
+        return [f"the film has no Mise configuration ({places}) at or above it; {on}: {pin}"]
     tools = table(read_toml(config).get("tools"), f"{config.name}: tools")
     pinned = released.pinned_vale(tools)
     if pinned is None:
-        absent = f'[tools] holds no "{released.VALE}" version'
-        return [f"{config.name} pins no Vale ({absent}); {on}: {pin}"]
+        return [f'{config.name} holds no "{released.VALE}" version under [tools]; {on}: {pin}']
     return [] if pinned == asked else [f"{config.name} pins Vale {pinned}; {on}"]
 
 

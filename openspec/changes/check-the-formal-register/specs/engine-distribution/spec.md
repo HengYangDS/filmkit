@@ -1,3 +1,34 @@
+## ADDED Requirements
+
+### Requirement: The command reads a film's pin of the register checker
+
+The command SHALL read the entry `github:vale-cli/vale` under `[tools]`, as one version, in the Mise configuration the film's tasks are read from, and no other entry or file for it. It SHALL report a file whose entry states another version than the release record's, and a file that holds no version under that name, each by the file's name with the record's version. A film without a Mise configuration SHALL be reported as having none.
+
+#### Scenario: Another version
+
+- **WHEN** the film's Mise configuration pins `github:vale-cli/vale` at another version than the release record's
+- **THEN** the command names the file, the film's version and the record's
+
+#### Scenario: A pin under another name or in another file
+
+- **WHEN** a film pins Vale as `vale` or as another tool's entry, or in `mise.toml` beside the `.config/mise/config.toml` that holds its tasks
+- **THEN** the command says that the file it read holds no version under `github:vale-cli/vale`, with the record's version and the entry to add, and does not say that the film pins none
+
+#### Scenario: A film whose one Mise file bears another name
+
+- **WHEN** a film's one Mise configuration is `mise.toml` or `.mise.toml` and pins the record's version there
+- **THEN** the command reads the pin in that file and reports no finding
+
+#### Scenario: No Mise configuration
+
+- **WHEN** a film has no Mise configuration at or above its root
+- **THEN** the command reports that the film has none, with the record's version and the entry to add
+
+#### Scenario: Tools that are no table
+
+- **WHEN** the file states `tools` as something other than a table
+- **THEN** the question reports the file and the place, and the other questions are answered
+
 ## MODIFIED Requirements
 
 ### Requirement: The engine carries a record of what it was released on
@@ -18,32 +49,3 @@ The installed engine SHALL carry a record of the version and integrity of each n
 
 - **WHEN** the record is written
 - **THEN** it states the Vale version the engine's tool configuration pins
-
-### Requirement: The command compares a film's packages with the release
-
-The command SHALL report each npm package the engine runs that the film's manifest does not declare at the release's version or that its lock does not hold at the release's version and integrity, a pin of another engine release, and each Python package of the engine's runtime that the film's lock holds at another version, with the constraints that close the difference. A package the film alone holds SHALL be no finding.
-
-#### Scenario: An older indirect package
-
-- **WHEN** a film's Python lock holds a package of the engine's runtime at an older version than the release's
-- **THEN** the finding names the package with both versions and prints the constraint that holds it to the release's
-
-#### Scenario: The film's own packages
-
-- **WHEN** a film declares an npm package the engine does not run, or locks a Python package outside the engine's runtime at any version
-- **THEN** the command reports no finding for it
-
-#### Scenario: A lock that is missing
-
-- **WHEN** a film holds no npm lock or no Python lock at or above its root
-- **THEN** the command reports the missing lock as a finding
-
-#### Scenario: A lock of another release
-
-- **WHEN** a film pins this release and its Python lock still holds the engine at another version
-- **THEN** the command reports the lock's version and says to lock again
-
-#### Scenario: A film that pins another Vale or none
-
-- **WHEN** a film's tool configuration pins a Vale version other than the release record's, or pins none
-- **THEN** the command names the film's pin, or its absence, and the record's version

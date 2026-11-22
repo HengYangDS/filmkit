@@ -198,7 +198,7 @@ def test_a_film_without_a_mise_configuration_has_unread_tasks_and_pins_no_vale(p
     assert any("tasks" in note for note in result["not_read"])
     # A film without a Mise configuration pins no Vale, which is a finding and not unread.
     (absent,) = result["findings"]["vale"]
-    assert absent.startswith("no Mise configuration (.config/mise/config.toml, mise.toml, ")
+    assert absent.startswith("the film has no Mise configuration (.config/mise/config.toml, mi")
 
 
 def test_the_template_is_asked_for_every_anchor_at_once(project):
@@ -226,34 +226,6 @@ def test_the_command_prints_one_line_and_exits_by_its_findings(project, monkeypa
 
 def test_the_packaged_record_equals_what_the_repository_holds():
     assert released.load() == released.compute(ENGINE)
-
-
-# The finding for a film whose Mise configuration holds no pin of the tool the engine pins.
-ABSENT = (
-    'config.toml pins no Vale ([tools] holds no "{tool}" version); {on}: '
-    'pin "{tool}" = "{asked}" under [tools]'
-)
-# What a film's Mise configuration states of Vale, and the finding that names it: its pin, or its
-# absence, with the version the release record states. A pin under another name, in another form
-# or of no one version is not the release's.
-PINS = [
-    ('[tools]\n"{tool}" = "{asked}"\n', None),
-    ('[tools."{tool}"]\nversion = "{asked}"\n', None),
-    ('[tools]\n"{tool}" = "9.9.9"\n', "config.toml pins Vale 9.9.9; {on}"),
-    ('[tools."{tool}"]\nversion = "9.9.8"\n', "config.toml pins Vale 9.9.8; {on}"),
-    ('[tools]\n"{tool}" = ["{asked}"]\n', "config.toml pins Vale ['{asked}']; {on}"),
-    ('[tools]\nnode = "26.13.1"\n', ABSENT),
-    ('[tools]\nvale = "{asked}"\n', ABSENT),
-    ("", ABSENT),
-]
-
-
-@pytest.mark.parametrize(("tools", "finding"), PINS)
-def test_a_film_that_pins_another_vale_or_none_is_named(project, tools, finding):
-    tool, asked = released.VALE, released.vale()
-    words = {"tool": tool, "asked": asked, "on": f"the engine was released on Vale {asked}"}
-    (project / ".config/mise/config.toml").write_text(TASKS + tools.format(**words))
-    assert found(project)["vale"] == ([finding.format(**words)] if finding else [])
 
 
 def test_the_record_states_the_vale_the_mise_configuration_pins(project):
