@@ -61,6 +61,7 @@ import numpy as np
 
 import filmkit.durations as durations
 import filmkit.picture.still_record as still_record
+import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.picture.errors import PictureError
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
@@ -445,7 +446,7 @@ def film_record(edition: Edition) -> dict:
     in the words that follow "The <code> film" in a refusal."""
     if not edition.film_stills.is_file():
         raise NoAnswerError(" has no still scan record")
-    subjects, engine = film_subjects(edition), version("filmkit")
+    subjects, engine = film_subjects(edition), version(released.ENGINE)
     try:
         return still_record.answer(
             edition.film_stills, subjects, rules(), film_frames(edition), engine
@@ -501,7 +502,7 @@ def scan_film(edition: Edition) -> dict:
         except StillScanError as error:
             path.unlink(missing_ok=True)
             raise PictureError(str(error)) from error
-        record["engine_version"] = version("filmkit")
+        record["engine_version"] = version(released.ENGINE)
         repository.write(path, record)
     longest, held = record["longest_fine_speech"], len(over_limit(record))
     print(json.dumps({"longest_fine_speech": longest, "over_limit": held, "scanned": scanned}))

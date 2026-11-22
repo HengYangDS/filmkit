@@ -64,6 +64,7 @@ import filmkit.picture.equivalence as equivalence
 import filmkit.picture.faults as faults
 import filmkit.picture.ground as ground_rows
 import filmkit.picture.rendering as rendering
+import filmkit.released as released
 import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.picture import renderer
@@ -146,7 +147,7 @@ def source_bindings(edition: Edition) -> dict:
         "source_receipt_sha256": repository.sha(captioned.receipt),
         "composition_sha256": repository.sha(repository.ROOT / COMPOSITION_SCRIPT),
         "timeline_sha256": repository.sha(edition.timeline),
-        "engine_version": version("filmkit"),
+        "engine_version": version(released.ENGINE),
     }
 
 

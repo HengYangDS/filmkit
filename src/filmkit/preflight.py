@@ -60,6 +60,7 @@ import filmkit.picture.renderer as renderer
 import filmkit.picture.rendering as rendering
 import filmkit.picture.still_scan as still_scan
 import filmkit.register as register
+import filmkit.released as released
 import filmkit.repository as repository
 import filmkit.review.clarity as review_clarity
 import filmkit.sources as sources
@@ -201,7 +202,7 @@ def sound(edition: Edition) -> str | None:
         current = {
             "soundtrack_sha256": repository.sha(edition.soundtrack),
             "timeline_sha256": repository.sha(edition.timeline),
-            "engine_version": version("filmkit"),
+            "engine_version": version(released.ENGINE),
         }
     except FileNotFoundError as error:
         return missing(error)
@@ -352,7 +353,7 @@ def preflight(edition: Edition) -> dict:
     receipt = {
         "edition": edition.code,
         "verdict": "refuse" if stale else "pass",
-        "engine_version": version("filmkit"),
+        "engine_version": version(released.ENGINE),
         "inputs": report,
         "bound": bound,
     }
@@ -369,7 +370,7 @@ def preflight(edition: Edition) -> dict:
 def moved_inputs(receipt: dict, edition: Edition, *, own: bool) -> list[str]:
     """The inputs a receipt bound that no longer hold, an engine of another version first:
     all of the edition's inputs, or with `own` False only those both editions share."""
-    moved = [] if receipt.get("engine_version") == version("filmkit") else ["engine_version"]
+    moved = [] if receipt.get("engine_version") == version(released.ENGINE) else ["engine_version"]
     try:
         current = bound_inputs(edition) if own else shared_inputs()
     except FileNotFoundError as error:

@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import filmkit.media as media
+import filmkit.released as released
 import filmkit.repository as repository
 import filmkit.sources as sources
 from filmkit.film import FILM
@@ -397,7 +398,7 @@ def require_passing_gates(edition: Edition) -> None:
     current = {
         "composition_sha256": sha(repository.ROOT / COMPOSITION_SCRIPT),
         "timeline_sha256": sha(edition.timeline),
-        "engine_version": version("filmkit"),
+        "engine_version": version(released.ENGINE),
         **face_bindings(),
     }
     stale = [key for key, value in current.items() if record.get(key) != value]

@@ -11,6 +11,7 @@ import pytest
 
 import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
+import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
 from filmkit.production import STAGE_RECORD, Edition
@@ -57,7 +58,7 @@ def edition(tmp_path, monkeypatch):
     put(edition.audio_assembly, assembly)
     composition = repository.sha(root / picture_rendering.COMPOSITION_SCRIPT)
     gates = {"composition_sha256": composition, "timeline_sha256": repository.sha(edition.timeline)}
-    gates |= {"engine_version": version("filmkit"), **picture_rendering.face_bindings()}
+    gates |= {"engine_version": version(released.ENGINE), **picture_rendering.face_bindings()}
     put(edition.picture_gates, {**gates, "verdict": "pass"})
     fake = tmp_path / "native-canvas"
     body = """

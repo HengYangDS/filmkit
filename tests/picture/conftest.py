@@ -19,6 +19,7 @@ import pytest
 
 import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
+import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.production import Edition
 from filmkit.specification import DURATION
@@ -90,7 +91,7 @@ class FilmRoot:
         record = {
             "composition_sha256": repository.sha(self.path / picture_rendering.COMPOSITION_SCRIPT),
             "timeline_sha256": repository.sha(edition.timeline),
-            "engine_version": version("filmkit"),
+            "engine_version": version(released.ENGINE),
             **picture_rendering.face_bindings(),
             "verdict": "pass",
         }

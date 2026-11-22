@@ -18,6 +18,7 @@ import pytest
 import filmkit.picture.encoding as encoding
 import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
+import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.film import FILM
 from filmkit.picture.rendering import PictureError
@@ -99,7 +100,7 @@ def passing_gates(edition, **changes):
     record = {
         "composition_sha256": repository.sha(composition),
         "timeline_sha256": repository.sha(edition.timeline),
-        "engine_version": version("filmkit"),
+        "engine_version": version(released.ENGINE),
         **picture_rendering.face_bindings(),
         "verdict": "pass",
         **changes,

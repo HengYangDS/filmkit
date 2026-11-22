@@ -13,6 +13,7 @@ import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.preflight as preflight
 import filmkit.produce as produce
+import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.film import FILM
 from filmkit.production import Edition
@@ -84,7 +85,7 @@ def edition(tmp_path, monkeypatch):
         {
             "composition_sha256": composition,
             "timeline_sha256": repository.sha(edition.timeline),
-            "engine_version": version("filmkit"),
+            "engine_version": version(released.ENGINE),
             **picture_rendering.face_bindings(),
             "verdict": "pass",
         },
@@ -95,7 +96,7 @@ def edition(tmp_path, monkeypatch):
         {
             "soundtrack_sha256": repository.sha(edition.soundtrack),
             "timeline_sha256": repository.sha(edition.timeline),
-            "engine_version": version("filmkit"),
+            "engine_version": version(released.ENGINE),
             "clarity": {"floor_db": 18.0, "thoughts": []},
             "verdict": "pass",
         },

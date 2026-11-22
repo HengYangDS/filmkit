@@ -200,7 +200,7 @@ def module_exists(module: str) -> bool:
 def npm_packages(root: Path) -> list[str]:
     """What the film's npm manifest and lock hold against the engine's record."""
     record = released.load()["npm"]
-    manifest = held(root, "package.json")
+    manifest = held(root, released.MANIFEST)
     if manifest is None:
         asked = ", ".join(f"{name} {entry['version']}" for name, entry in record.items())
         return [f"no package.json at or above the film; the engine runs {asked}"]
@@ -209,7 +209,7 @@ def npm_packages(root: Path) -> list[str]:
         **table(stated.get("devDependencies"), "package.json: devDependencies"),
         **table(stated.get("dependencies"), "package.json: dependencies"),
     }
-    lock = manifest.with_name("package-lock.json")
+    lock = manifest.with_name(released.NPM_LOCK)
     locked = None
     if lock.is_file():
         locked = table(read_json(lock).get("packages"), "package-lock.json: packages")
@@ -262,7 +262,7 @@ def python_lock(root: Path, not_read: list[str]) -> list[str]:
     another release has locked that one."""
     record, engine = released.load()["python"], version(released.ENGINE)
     found = pinned(root, engine, not_read)
-    lock = held(root, "uv.lock")
+    lock = held(root, released.PYTHON_LOCK)
     if lock is None:
         return [*found, "no uv.lock at or above the film; it locks the release it pins"]
     packages = read_toml(lock).get("package") or []

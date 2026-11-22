@@ -42,6 +42,7 @@ import filmkit.child_processes as child_processes
 import filmkit.durations as durations
 import filmkit.picture.browser as picture_browser
 import filmkit.picture.renderer as picture_renderer
+import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.picture import metrics
 from filmkit.picture.errors import PictureError
@@ -62,7 +63,7 @@ TOOLS = {
     "whole-turns": "picture/whole-turns.mjs",
 }
 # The copies, below the film's root, in a folder for each engine version.
-CACHE = picture_browser.TOOL_CACHE / "filmkit"
+CACHE = picture_browser.TOOL_CACHE / released.ENGINE
 # The runs a film's build makes from the command line, which alone write a duration record: the
 # tool with the words its arguments begin with, and the record's name. Every other run, of
 # another tool or of the player check in another mode, is taken for a run by hand.
@@ -100,7 +101,7 @@ def stage_tools() -> Path:
 
     A copy whose bytes equal the package's stays untouched; any other is replaced whole.
     """
-    cache = repository.ROOT / CACHE / version("filmkit")
+    cache = repository.ROOT / CACHE / version(released.ENGINE)
     for module in sorted(PACKAGE.rglob("*.mjs")):
         copy = cache / module.relative_to(PACKAGE)
         if copy.is_file() and copy.read_bytes() == module.read_bytes():

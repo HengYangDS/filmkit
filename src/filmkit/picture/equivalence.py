@@ -55,6 +55,7 @@ import numpy as np
 import filmkit.durations as durations
 import filmkit.media as media
 import filmkit.picture.faults as faults
+import filmkit.released as released
 import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.picture.rendering import (
@@ -121,7 +122,7 @@ def current_bindings(edition: Edition) -> dict:
     return {
         "composition_sha256": repository.sha(repository.ROOT / COMPOSITION_SCRIPT),
         "timeline_sha256": repository.sha(edition.timeline),
-        "engine_version": version("filmkit"),
+        "engine_version": version(released.ENGINE),
         "pictures": {
             name: picture_bindings(edition, captions)
             for name, captions in (("captioned", True), ("uncaptioned", False))

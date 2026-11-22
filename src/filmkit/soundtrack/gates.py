@@ -19,6 +19,7 @@ import json
 from importlib.metadata import version
 from typing import TYPE_CHECKING
 
+import filmkit.released as released
 import filmkit.repository as repository
 import filmkit.review.clarity as clarity
 import filmkit.review.endings as endings
@@ -71,7 +72,7 @@ def check_sound(edition: Edition) -> dict:
     bound = {
         "soundtrack_sha256": repository.sha(edition.soundtrack),
         "timeline_sha256": repository.sha(edition.timeline),
-        "engine_version": version("filmkit"),
+        "engine_version": version(released.ENGINE),
     }
     clarity_measured = clarity.voice_clarity(edition.code, edition.soundtrack, timeline)
     endings_measured = endings.endings(edition, timeline, assembly)

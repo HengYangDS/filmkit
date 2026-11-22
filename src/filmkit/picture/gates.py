@@ -51,6 +51,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import filmkit.durations as durations
+import filmkit.released as released
 import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.film import FILM
@@ -387,7 +388,7 @@ def current_bindings(edition: Edition) -> dict:
     return {
         "composition_sha256": repository.sha(repository.ROOT / COMPOSITION_SCRIPT),
         "timeline_sha256": repository.sha(edition.timeline),
-        "engine_version": version("filmkit"),
+        "engine_version": version(released.ENGINE),
         **face_bindings(),
     }
 
