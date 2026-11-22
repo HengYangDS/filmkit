@@ -48,6 +48,7 @@ import filmkit.durations as durations
 import filmkit.media as media
 import filmkit.production as production
 import filmkit.repository as repository
+from filmkit.delivery.player import COVER
 from filmkit.film import Declared
 
 MANIFEST = Path("content/release.json")
@@ -106,8 +107,9 @@ class Release(Declared):
 
 
 def release_name(edition: production.Edition, path: Path) -> str:
-    """The name a release publishes an edition's review record or report under: the edition's
-    prefix, then the name of its build file."""
+    """The name a release publishes an edition's file under where the file's own name does not
+    tell the editions apart, as its review record and report and its cover: the edition's prefix,
+    then that name."""
     return f"{edition.prefix}-{path.name}"
 
 
@@ -119,7 +121,7 @@ def members(
     With `uncaptioned` False they are those of a release published before the films without
     captions existed, which holds only the films with captions.
     """
-    prefix, review = edition.prefix, edition.production_review
+    review = edition.production_review
     report = production.review_report(review)
     films = [
         edition.film(kind)
@@ -132,7 +134,7 @@ def members(
             document.name: ("document", document)
             for document in (edition.srt, edition.vtt, edition.transcript)
         },
-        f"{prefix}-cover.png": ("document", edition.artifacts / packaging.COVER_PNG),
+        release_name(edition, Path(COVER)): ("document", edition.artifacts / packaging.COVER_PNG),
         release_name(edition, review): ("review", review),
         release_name(edition, report): ("review", report),
     }

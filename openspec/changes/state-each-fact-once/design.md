@@ -60,10 +60,10 @@ See [proposal.md](proposal.md). Line numbers are of `1e4d459`; a source path wit
    - **Chosen because:** they are npm's and uv's file names, stated once for the engine's own manifests; the three path statements read them and the messages keep their words.
    - **Applies to:** the three path statements of `adoption.py`.
    - **Reopened when:** not applicable.
-8. **An edition's documents and its page are named once.**
-   - **Rests on:** the documents are written to `edition.artifacts` (`captions/documents.py:233-242`), listed, bound and read again (`delivery/packaging.py:134-138`, `:246`, `:285`, `:442`; `delivery/player.py:240-244`, `:398`) and published under the same names (`delivery/reproduction.py:125-126`). The page's name stands at `delivery/packaging.py:86`, `:139`, `:154`, `:256` and `delivery/player.py:406`, `:408`; the player module owns the page (`delivery/player.py:3`), and `packaging` already imports from it (`delivery/packaging.py:50-51`).
-   - **Considered:** the documents' names in their writer, `captions/documents.py`, which packaging, the player and the release would import; the names as places of `Edition`. The page's name in packaging; in the player.
-   - **Chosen because:** an edition's files are `Edition`'s places, beside `film(kind)` (`production.py:212-214`); the page is the player's.
+8. **An edition's documents, its cover's name and its page are named once.**
+   - **Rests on:** the documents are written to `edition.artifacts` (`captions/documents.py:233-242`), listed, bound and read again (`delivery/packaging.py:134-138`, `:246`, `:285`, `:442`; `delivery/player.py:240-244`, `:398`) and published under the same names (`delivery/reproduction.py:125-126`). The page's name stands at `delivery/packaging.py:86`, `:139`, `:154`, `:256` and `delivery/player.py:406`, `:408`; the player module owns the page (`delivery/player.py:3`), and `packaging` already imports from it (`delivery/packaging.py:50-51`). The delivered cover is named after the film as `cover.png` (`delivery/player.py:69`), and its release name spells that name again after the edition's prefix (`delivery/reproduction.py:128`).
+   - **Considered:** the documents' names in their writer, `captions/documents.py`, which packaging, the player and the release would import; the names as places of `Edition`. The page's name in packaging; in the player. The cover's release name spelled in the release; built from the cover's own name.
+   - **Chosen because:** an edition's files are `Edition`'s places, beside `film(kind)` (`production.py:212-214`); the page is the player's, and so is the cover's own name, from which the release builds its release name as it builds the review's (decision 5).
    - **Applies to:** the statements named.
    - **Reopened when:** an edition delivers another document.
 9. **The edition's folders and the pictures' frames are read from their owners.**
@@ -115,8 +115,8 @@ The owners the decisions name exist as the design reads them at `1e4d459`: `prod
 
 - Decision 1: `production.STAGE_PAGE` and `STAGE_RECORD`, and `Rendered.page`.
 - Decision 3: `player.Version`, a named tuple of the five fields the decision lists; `player.kinds_at`, which takes a size's two kinds from `RENDITIONS`; `VERSIONS`; and `OPENING`, the version whose button starts pressed, which the page's video and status line read.
-- Decision 5: `reproduction.release_name(edition, path)`.
-- Decision 8: `Edition.srt`, `vtt`, `transcript`, `chapters` and `chapter_metadata`, and `player.PAGE`.
+- Decision 5: `reproduction.release_name(edition, path)`, which the cover's release name reads too (decision 8).
+- Decision 8: `Edition.srt`, `vtt`, `transcript`, `chapters` and `chapter_metadata`, `player.PAGE`, and `player.COVER`, the cover's name after the film's.
 - Decision 9: `repository.ARTIFACTS` and `EVIDENCE`, and `production.STAGE`, the captioned stage's name as a format of the edition's code, which `tools.py` splits at the code to build its pattern; and `production.VIEWING_SIZE`, from which `VIEWING` and its scale filter are built.
 
 Where the code says more than the design:

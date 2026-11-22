@@ -68,8 +68,11 @@ CLOSING = ("）", "」", "』", "】", "〕", "〉", "》")
 # The name of a delivered page: each edition's player, in the edition's folder, and the language
 # entry page above them.
 PAGE = "index.html"
-# Each edition's cover as delivered, PNG and JPEG; the PNG is the video's poster.
-COVER_PNG = f"{FILM.slug}-cover.png"
+# Each edition's cover as delivered, PNG and JPEG, under the film's name; the PNG is the video's
+# poster. `COVER` is the PNG's name after the film's, which a release publishes under the edition's
+# prefix (`filmkit.delivery.reproduction.members`).
+COVER = "cover.png"
+COVER_PNG = f"{FILM.slug}-{COVER}"
 COVER_JPEG = f"{FILM.slug}-cover.jpg"
 
 
