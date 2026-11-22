@@ -122,6 +122,8 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
             "- Repairs: 07.6 names all seven checks.\n- Pause policy the scripts declare:"
         ),
         "Write only under ROOT/build/evidence/reviews/round-5/.",
+        "ROOT/build/evidence/reviews/round-5/register.json is the register check's report on ",
+        "\n- **R1. The film does not address its audience.** No 你、你们、您、大家、咱们;",
         "inner pauses at most 0.33 s Chinese; 0.33 s (0.22 s at commas) English;",
         "inner pause floors Chinese 。？！ 0.31 s, ， 0.155 s; English none declared;",
         "breaths Chinese 7.5 s with a 0.26 s pause; English none declared;",
@@ -307,7 +309,7 @@ def test_a_template_that_cites_the_previous_review_needs_a_previous_round(
     out = round_inputs(root, put, monkeypatch)
     template = (
         "{media}\n- The previous review is in {previous}/{code}-review.md ({findings}).{scripts}\n"
-        "{dispositions}{concepts} {readings}\n"
+        "{dispositions}{concepts} {readings}\n{register}\n"
     )
     monkeypatch.setattr(review_prompts, "TEMPLATE", template)
     with pytest.raises(ReviewError) as refusal:

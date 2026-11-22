@@ -16,6 +16,9 @@ Each edition: exactly {duration} s, 16:9 pure 2D, {fps} fps, UHD master and a 10
 - Voice clarity floors the film declares: {clarity}. {out}/measurements.json records the cepstral peak prominence of each soundtrack, of each segment by the soundtrack's kept frames whose centres lie inside it, and of each thought as its median over the frame grid's 16 phases, against them.
 - The {other_language} ({other}) edition is the same film in its own language; compare with it only for shared terms and structure.
 
+## Formal register
+{register}
+
 ## Scores
 Audio is evaluated automatically: score narration from the soundtrack, your measurements of it, recognition and word timings. Score each dimension 0-100:
 {dimensions}

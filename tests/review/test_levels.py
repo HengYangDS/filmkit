@@ -201,7 +201,9 @@ def prompted(root, put, monkeypatch, template):
 def test_the_prompts_state_each_level_with_its_dimensions_and_name_the_sentences(
     root, put, monkeypatch
 ):
-    template = "{media}\n{concepts} {readings}\nLevels:\n{levels}\nSentences: {sentences}\n"
+    template = (
+        "{media}\n{concepts} {readings}\n{register}\nLevels:\n{levels}\nSentences: {sentences}\n"
+    )
     out = prompted(root, put, monkeypatch, template)
     review_prompts.prompts(None, out)
     text = (out / "prompt-zh.md").read_text()
@@ -226,7 +228,8 @@ def test_the_prompts_state_each_level_with_its_dimensions_and_name_the_sentences
 
 
 def test_a_template_without_the_levels_or_the_sentences_is_refused(root, put, monkeypatch):
-    out = prompted(root, put, monkeypatch, "{media}\n{concepts} {readings}\n{levels}\n")
+    template = "{media}\n{concepts} {readings}\n{register}\n{levels}\n"
+    out = prompted(root, put, monkeypatch, template)
     with pytest.raises(ReviewError) as refusal:
         review_prompts.prompts(None, out)
     assert str(refusal.value) == (
@@ -237,7 +240,7 @@ def test_a_template_without_the_levels_or_the_sentences_is_refused(root, put, mo
     # A film without levels owes neither, and its prompts state none.
     review = FILM.review.model_copy(update={"levels": None})
     monkeypatch.setattr(review_prompts, "FILM", FILM.model_copy(update={"review": review}))
-    monkeypatch.setattr(review_prompts, "TEMPLATE", "{media}\n{concepts} {readings}\n{levels}\n")
+    monkeypatch.setattr(review_prompts, "TEMPLATE", template)
     review_prompts.prompts(None, out)
     assert not (out / "sentences-zh.json").exists()
     assert (out / "prompt-zh.md").read_text().endswith("none declared\n")

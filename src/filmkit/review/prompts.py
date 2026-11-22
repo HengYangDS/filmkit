@@ -7,6 +7,12 @@ pause, level and clarity policies the film declares, and the previous round's re
 declares a concept contract gets prompts only when its template cites the contract and the
 reading occurrence plans and its dimensions score concept fidelity.
 
+Every film's template cites `{register}`, and one that does not is refused, naming the field.
+The field names the round's register report (`REGISTER`, which the round's preparation writes
+from `filmkit.register.check`), says what the report holds and what the check does not read,
+and states the rules R1 to R6 of the formal register as the engine's standard states them
+(`filmkit.register.rules`), so a film's review declaration restates none of them.
+
 No round is prepared for films the engine's own measure refuses: the checks that only read
 (`read_round`) ask each edition's passing still scan of its 1080p captioned film
 (`filmkit.picture.still_scan.require_film_scan`, whose record `produce scan-film` writes), so a
@@ -39,6 +45,7 @@ import string
 from pathlib import Path
 
 import filmkit.picture.still_scan as still_scan
+import filmkit.register as register
 import filmkit.repository as repository
 import filmkit.sources as sources
 import filmkit.specification as specification
@@ -57,12 +64,13 @@ from filmkit.review.files import (
 from filmkit.review.record import DIMENSIONS
 from filmkit.review.sentences import sentences
 
-# The round's own inputs that each reviewer prompt names: the listening plan, the measurements
-# and the binding of the delivery members whose players were read back.
+# The round's own inputs that each reviewer prompt names: the listening plan, the measurements,
+# the binding of the delivery members whose players were read back and the register report.
 LISTENING_PLAN = "pronunciation-listening-plan.json"
 MEASUREMENTS = "measurements.json"
 BINDING = "player-check-artifacts.json"
-ROUND_INPUTS = (LISTENING_PLAN, MEASUREMENTS, BINDING)
+REGISTER = "register.json"
+ROUND_INPUTS = (LISTENING_PLAN, MEASUREMENTS, BINDING, REGISTER)
 # Each edition's files that the prompts write into the round's directory: its sentences, for a
 # film with levels, and its prompt.
 SENTENCES, PROMPT = "sentences-{code}.json", "prompt-{code}.md"
@@ -78,6 +86,19 @@ CONCEPT_DIMENSION = "concept_fidelity"
 CONTRACT_FIELDS = ("concepts", "readings")
 # The prompt fields that a film with review levels cites: the levels and the sentences file.
 LEVEL_FIELDS = ("levels", "sentences")
+# The prompt field that every film cites, and what it states before the standard's rules: the
+# round's register report, what it holds and what the register check does not read.
+REGISTER_FIELD = "register"
+REGISTERED = (
+    "{report} is the register check's report on the words a viewer meets outside the picture, "
+    "in both editions and on the entry page. Its `warnings` are the forms the check records "
+    "and does not refuse, each with its place and its rule's message; its `excused` are the "
+    "exceptions the film declares that the check applied, each with the text its form stands "
+    "within and the film's reason. The check judges single forms, and it does not read the "
+    "words the picture paints: those words, the warnings, the exceptions and everything a "
+    "single form cannot show are the reviewer's to judge against the rules of the formal "
+    "register, as the engine's standard states them:"
+)
 # The fields that cite the previous round's review itself, which a first round cannot fill.
 PREVIOUS_FIELDS = ("previous", "findings")
 FIRST_ROUND = (
@@ -133,6 +154,14 @@ def level_gaps(template: str) -> list[str]:
         for name in LEVEL_FIELDS
         if name not in fields
     ]
+
+
+def register_text(out_dir: Path) -> str:
+    """`{register}`: the round's register report, what it holds and what the check does not
+    read, then the rules R1 to R6 as the standard's document states them, the list's own lines.
+    The standard's refusal of a document it cannot give the rules from is its own."""
+    stated = REGISTERED.format(report=cited(out_dir / REGISTER))
+    return f"{stated}\n{register.rules().rstrip()}"
 
 
 def levels_text() -> str:
@@ -276,6 +305,7 @@ def prompt_context(out_dir: Path, previous: Path | None, changes: Path | None) -
             f"{index}. {name}: {text}" for index, (name, text) in enumerate(DIMENSIONS.items(), 1)
         ),
         "levels": levels_text(),
+        REGISTER_FIELD: register_text(out_dir),
     }
 
 
@@ -434,13 +464,14 @@ def read_round(
 
     A round's preparation asks this before it derives anything, and `prompts` before it writes
     anything. Refused unless the review configuration keeps the concept contract the film
-    declares (`contract_gaps`) and the levels it declares (`level_gaps`), a first round's
-    template cites no previous review, each edition's 1080p captioned film holds its passing
-    still scan (`still_scan.require_film_scan`, whose refusal is raised as that owner's own), a
-    later round disposes of every previous finding (`stated_dispositions`), the previous round
-    holds each edition's review and report, the changes note is text, the soundtracks declare
-    one program level, the template cites no field the engine does not fill, and each edition
-    of a film with levels has its timeline.
+    declares (`contract_gaps`) and the levels it declares (`level_gaps`), the template cites
+    the register field, a first round's template cites no previous review, each edition's
+    1080p captioned film holds its passing still scan (`still_scan.require_film_scan`, whose
+    refusal is raised as that owner's own), a later round disposes of every previous finding
+    (`stated_dispositions`), the previous round holds each edition's review and report, the
+    changes note is text, the soundtracks declare one program level, the standard gives its
+    rules (`filmkit.register.rules`, whose refusal is its own too), the template cites no field
+    the engine does not fill, and each edition of a film with levels has its timeline.
     """
     gaps = contract_gaps(TEMPLATE, DIMENSIONS)
     if gaps:
@@ -449,6 +480,12 @@ def read_round(
     gaps = level_gaps(TEMPLATE)
     if gaps:
         msg = "the review omits the levels the film declares: " + "; ".join(gaps)
+        raise ReviewError(msg)
+    if REGISTER_FIELD not in template_fields(TEMPLATE):
+        msg = (
+            f"{FILM.review.prompt} never cites {{{REGISTER_FIELD}}}, which names the round's "
+            "register report and states the rules of the formal register"
+        )
         raise ReviewError(msg)
     unfilled = sorted(template_fields(TEMPLATE).intersection(PREVIOUS_FIELDS))
     if previous is None and unfilled:

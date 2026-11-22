@@ -16,6 +16,8 @@ from filmkit.production import CODES
 # The round the preparation tests prepare, and its number.
 ROUND = 19
 PREPARED = "build/evidence/reviews/round-19"
+# What the stand-in for the register check reports: a film whose words hold nothing to report.
+REGISTER_REPORT = {"vale": "0.0.0", "places": 0, "warnings": [], "excused": []}
 
 
 def names(folder):

@@ -205,6 +205,28 @@ def test_the_rules_of_a_class_quote_the_sentence_of_the_standard_they_render():
         assert " ".join(quoted.split()) in standard, name
 
 
+def test_the_rules_the_reviewers_read_are_the_standards_own_lines(tmp_path, monkeypatch):
+    document = STANDARD.read_text(encoding="utf-8")
+    rules = register.rules()
+    # Its lines from R1 to the document's end, as they stand there, and nothing restated.
+    assert document.endswith(rules)
+    assert rules.startswith("- **R1. The film does not address its audience.**")
+    assert re.findall(r"^- \*\*(R\d)\. ", rules, re.M) == ["R1", "R2", "R3", "R4", "R5", "R6"]
+    # A document that no longer states one of the six is refused by name, never cut short.
+    short = tmp_path / "standard.md"
+    short.write_text(document.replace("- **R4. ", "- **Fourth. "), encoding="utf-8")
+    monkeypatch.setattr(register, "_STANDARD", short)
+    with pytest.raises(RegisterError) as refusal:
+        register.rules()
+    assert str(refusal.value) == (
+        f"The engine's standard at {short} states the rules R1, R2, R3, R5, R6, not R1 to R6; "
+        "install the engine again"
+    )
+    short.unlink()
+    with pytest.raises(RegisterError, match="cannot be read: .*install the engine again"):
+        register.rules()
+
+
 # One form of each rule of the base style, and whether the rule refuses it or reports it.
 LEVELS = {
     "address": ("你们先看。", "你们", "error"),

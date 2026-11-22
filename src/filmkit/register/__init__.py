@@ -25,6 +25,9 @@ quotation. A passing check returns the warnings and the exceptions it applied; n
 removes a warning. A Vale run that cannot run, outlives its deadline or answers in any form but
 the one it documents is a refusal too, so the check never passes on a run it cannot read.
 
+`rules` gives the standard's rules R1 to R6 as its document states them, for the reviewers'
+prompt (`filmkit.review.prompts`), which restates none of them.
+
 Usage: python -m filmkit.register
 """
 
@@ -48,6 +51,10 @@ from filmkit.film import FILM, form_key
 # The engine's Vale configuration and the folder of its base style.
 _CONFIG = Path(__file__).with_name("vale.ini")
 _STYLE = Path(__file__).with_name("styles") / "register"
+# The standard's document, how it opens each rule of its list, and the rules it states.
+_STANDARD = Path(__file__).with_name("standard.md")
+_RULE = re.compile(r"^- \*\*(R\d+)\. ", re.M)
+_RULES = tuple(f"R{number}" for number in range(1, 7))
 # The longest a Vale run may take, in seconds: a film's words take hundredths of one.
 _DEADLINE = 60
 # Han characters and CJK or full-width marks: a line break between two of them joins by nothing.
@@ -83,6 +90,8 @@ _KEEP = (
     "(within) and a reason"
 )
 _LISTED = ("register.address", "register.colloquial", "register.contractions")
+# How a refusal of the engine's own files ends.
+_AGAIN = "install the engine again"
 
 
 class RegisterError(ValueError):
@@ -182,17 +191,40 @@ def _styled() -> None:
     """Refuse a style folder without rule files, or without one the engine was installed with."""
     held = {path.name for path in _STYLE.glob("*.yml")}
     if not held:
-        message = (
-            f"The engine's register style at {_STYLE} holds no rule file; install the engine again"
-        )
+        message = f"The engine's register style at {_STYLE} holds no rule file; {_AGAIN}"
         raise RegisterError(message)
     lacking = sorted(_shipped() - held)
     if lacking:
         message = (
             f"The engine's register style at {_STYLE} lacks {', '.join(lacking)}, which the engine"
-            " was installed with; install the engine again"
+            f" was installed with; {_AGAIN}"
         )
         raise RegisterError(message)
+
+
+def rules() -> str:
+    """The rules R1 to R6 as the standard states them: the document's own lines from R1 to the
+    end of its list of rules, which ends the document or stands before its next heading.
+
+    A document that cannot be read, or that states other rules than R1 to R6, once each and in
+    their order, is the engine's own file gone wrong and is refused by name: the reviewers are
+    never given a part of the rules as the whole.
+    """
+    try:
+        document = _STANDARD.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        message = f"The engine's standard at {_STANDARD} cannot be read: {error}; {_AGAIN}"
+        raise RegisterError(message) from None
+    opened = list(_RULE.finditer(document))
+    stated = tuple(rule[1] for rule in opened)
+    if stated != _RULES:
+        message = (
+            f"The engine's standard at {_STANDARD} states the rules {', '.join(stated) or 'none'},"
+            f" not {_RULES[0]} to {_RULES[-1]}; {_AGAIN}"
+        )
+        raise RegisterError(message)
+    heading = re.compile(r"^#", re.M).search(document, opened[-1].end())
+    return document[opened[0].start() : heading.start() if heading else None].rstrip() + "\n"
 
 
 def _paragraph(text: str) -> str:

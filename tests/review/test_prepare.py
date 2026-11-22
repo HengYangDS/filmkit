@@ -6,12 +6,14 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from preparing import PREPARED, ROUND, names, prepare, refusal, tree
+from preparing import PREPARED, REGISTER_REPORT, ROUND, names, prepare, refusal, tree
 from still_records import REQUIRE_FILM_SCAN
 
+import filmkit.concepts as concepts
 import filmkit.delivery.folder as delivery_folder
 import filmkit.media as media
 import filmkit.picture.still_scan as still_scan
+import filmkit.register as register
 import filmkit.repository as repository
 import filmkit.review.files as review_files
 import filmkit.review.measurement as review_measurement
@@ -20,6 +22,7 @@ import filmkit.review.round as review_round
 import filmkit.soundtrack.level as soundtrack_level
 import filmkit.sources as sources
 import filmkit.tools as tools
+from filmkit.film import FILM, Film
 from filmkit.narration.spoken_units import AlignmentError
 from filmkit.picture.errors import PictureError
 from filmkit.production import CODES, Edition
@@ -27,6 +30,8 @@ from filmkit.review import ReviewError
 
 # Each edition's files that the prompts write: its sentences and its prompt.
 PROMPTED = (("sentences", "json"), ("prompt", "md"))
+# The register check itself, kept before the fixture of a ready build stands in for it.
+REGISTER_CHECK = register.check
 
 
 def test_prepare_writes_the_round_of_a_ready_build_and_its_prompts_last(
@@ -46,12 +51,13 @@ def test_prepare_writes_the_round_of_a_ready_build_and_its_prompts_last(
     # and again when the prompts are written, from the round's own copies of the note and the
     # dispositions.
     assert asked == [*CODES, *CODES]
-    bound = ["changes.md", "dispositions.json", "player-check-artifacts.json"]
+    bound = ["changes.md", "dispositions.json", "player-check-artifacts.json", "register.json"]
     planned = sorted([*bound, "pronunciation-listening-plan.json"])
     measured = sorted([*planned, "measurements.json"])
     kept = sorted([*measured, "player-check.json", "player-en.png", "player-zh.png"])
     # Each step began on the files of the steps before it: the copies of the note and the
-    # dispositions first, the measurements before the browser, and the prompts last.
+    # dispositions and the register report first, the measurements before the browser, and the
+    # prompts last.
     assert ready == [
         ("listening plan", bound),
         ("measurements", planned),
@@ -75,6 +81,8 @@ def test_prepare_writes_the_round_of_a_ready_build_and_its_prompts_last(
     # The measurements are written as the measurement's own command writes them.
     stated = json.dumps({"scope": "stand-in", "editions": {}}, ensure_ascii=False, indent=2)
     assert (folder / "measurements.json").read_text() == stated + "\n"
+    # The register report is the check's own, written as the engine writes a record.
+    assert json.loads((folder / "register.json").read_text()) == REGISTER_REPORT
     assert (folder / "changes.md").read_bytes() == changes.read_bytes()
     assert (folder / "dispositions.json").read_bytes() == previous[3].read_bytes()
     for code in CODES:
@@ -86,12 +94,45 @@ def test_prepare_writes_the_round_of_a_ready_build_and_its_prompts_last(
             f"Write only under ROOT/{PREPARED}/.",
             f"ROOT/{PREPARED}/measurements.json records the cepstral peak prominence",
             f"ROOT/{PREPARED}/sentences-{code}.json lists every sentence of this edition",
+            f"ROOT/{PREPARED}/register.json is the register check's report",
             "- Repairs: 07.6 names all seven checks.\n",
         ):
             assert cited in text
     assert (
         "    - R18-1: The card names all seven checks.\n" in (folder / "prompt-zh.md").read_text()
     )
+
+
+def test_a_prepared_round_holds_the_register_report_and_each_prompt_names_it_with_the_rules(
+    ready, monkeypatch
+):
+    kept = {"place": "zh title", "form": "其实", "within": "名副其实", "reason": "an idiom"}
+    declared = {**FILM.model_dump(by_alias=True), "register": {"exceptions": [kept]}}
+    monkeypatch.setattr(register, "FILM", Film.model_validate(declared))
+    held = [("zh title", "让数据名副其实"), ("zh 01.1", "我们先看。"), ("en 01.1", "Why? And how?")]
+    places = [concepts.Place(where, text) for where, text in held]
+    monkeypatch.setattr(concepts, "places", lambda: {"both": places})
+    monkeypatch.setattr(register, "check", REGISTER_CHECK)
+    folder = prepare()
+    # The report holds each warning with its place and form, and each exception the check
+    # applied with the text its form stands within and its reason.
+    report = json.loads((folder / "register.json").read_text())
+    assert sorted(report) == ["excused", "places", "vale", "warnings"]
+    assert [(warning["place"], warning["form"]) for warning in report["warnings"]] == [
+        ("zh 01.1", "我们"),
+        ("en 01.1", "?"),
+    ]
+    assert (report["places"], report["excused"]) == (3, [kept])
+    # Each prompt names the report and carries the rules as the standard's document states them:
+    # its own lines from R1 to its end.
+    standard = Path(register.__file__).with_name("standard.md").read_text(encoding="utf-8")
+    rules = standard[standard.index("- **R1. The film does not address its audience.**") :]
+    assert rules.count("\n- **R") == 5
+    assert "- **R6. Terms and collocations of the field.**" in rules
+    for code in CODES:
+        text = (folder / f"prompt-{code}.md").read_text()
+        assert f"ROOT/{PREPARED}/register.json is the register check's report" in text
+        assert rules in text
 
 
 def test_the_binding_names_the_language_entry_and_each_delivery_member(root, ready):
@@ -182,7 +223,11 @@ def test_a_preparation_that_stops_while_it_derives_refuses_in_one_line_and_leave
     assert refusal() == (
         "prepare: zh: the picture gate record is not bound to the current timeline"
     )
-    assert names(folder) == ["player-check-artifacts.json", "pronunciation-listening-plan.json"]
+    assert names(folder) == [
+        "player-check-artifacts.json",
+        "pronunciation-listening-plan.json",
+        "register.json",
+    ]
     assert [name for name, _ in ready] == ["listening plan"]
     monkeypatch.setattr(review_measurement, "measure", measure)
 
@@ -204,6 +249,7 @@ def test_a_preparation_that_stops_while_it_derives_refuses_in_one_line_and_leave
         "player-check-artifacts.json",
         "player-check.json",
         "pronunciation-listening-plan.json",
+        "register.json",
     ]
 
     def absent(binding, receipt):
@@ -216,6 +262,7 @@ def test_a_preparation_that_stops_while_it_derives_refuses_in_one_line_and_leave
         "measurements.json",
         "player-check-artifacts.json",
         "pronunciation-listening-plan.json",
+        "register.json",
     ]
 
 
@@ -292,9 +339,35 @@ def missing_timeline(root, put, previous, monkeypatch):
     return previous, "missing build/artifacts/film/en/timeline.json"
 
 
+def no_register_field(root, put, previous, monkeypatch):
+    template = review_prompts.TEMPLATE.replace("{register}", "")
+    monkeypatch.setattr(review_prompts, "TEMPLATE", template)
+    return previous, (
+        "content/review/prompt.md never cites {register}, which names the round's register "
+        "report and states the rules of the formal register"
+    )
+
+
+def refused_words(root, put, previous, monkeypatch):
+    def refuse():
+        line = "zh 01.1: '你们' addresses the audience (R1)"
+        raise register.RegisterError(line, advise=True)
+
+    monkeypatch.setattr(register, "check", refuse)
+    return previous, "zh 01.1: '你们' addresses the audience (R1) A film keeps a standard word "
+
+
 @pytest.mark.parametrize(
     "case",
-    [lacking_a_report, note_that_is_no_text, unknown_field, other_program_level, missing_timeline],
+    [
+        lacking_a_report,
+        note_that_is_no_text,
+        unknown_field,
+        other_program_level,
+        missing_timeline,
+        no_register_field,
+        refused_words,
+    ],
 )
 def test_every_check_that_only_reads_refuses_in_one_line_before_anything_is_derived(
     root, put, ready, previous, monkeypatch, case

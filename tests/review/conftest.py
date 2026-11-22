@@ -14,6 +14,7 @@ import filmkit.review.listening_plan as review_listening_plan
 import filmkit.review.measurement as review_measurement
 import filmkit.review.prompts as review_prompts
 import filmkit.review.record as review_record
+import filmkit.review.round as review_round
 from filmkit.production import CODES, Edition
 
 SCORES = dict.fromkeys(review_record.DIMENSIONS, 96)
@@ -74,9 +75,10 @@ def review(put):
 @pytest.fixture
 def ready(root, put, monkeypatch):
     """A build that is ready for round 19: every delivery member and the records the prompts
-    and the sentences read, with stand-ins for the listening plan, the measurement and the
-    player check. Returns each step that ran with the names the round held when it began."""
-    from preparing import ROUND, names, passing_players
+    and the sentences read, with stand-ins for the register check, the listening plan, the
+    measurement and the player check. Returns each step that ran with the names the round held
+    when it began."""
+    from preparing import REGISTER_REPORT, ROUND, names, passing_players
     from test_levels import timeline_of
     from test_prompts import round_inputs
 
@@ -97,6 +99,7 @@ def ready(root, put, monkeypatch):
 
     plan = step("listening plan", lambda out: put(out, {"status": "planned-not-listened"}))
     measure = step("measurements", lambda: {"scope": "stand-in", "editions": {}})
+    monkeypatch.setattr(review_round.register, "check", lambda: dict(REGISTER_REPORT))
     monkeypatch.setattr(review_listening_plan, "listening_plan", plan)
     monkeypatch.setattr(review_measurement, "measure", measure)
     monkeypatch.setattr(delivery_folder, "check_players", step("readback", passing_players))

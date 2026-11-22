@@ -56,7 +56,7 @@
       receipt for it and for a Vale that is not the pinned one, by the tests in `tests/narration/test_narrate.py` and
       `tests/test_preflight_register.py`, `admitted` refuses both editions after the entry page changes, and an entry
       page that is no text ends both pre-render questions in a refused receipt, not a traceback.
-- [ ] 3.4 `review.round prepare` writes the register report into the round and fills `{register}` with its path and
+- [x] 3.4 `review.round prepare` writes the register report into the round and fills `{register}` with its path and
       the rules from `src/filmkit/register/standard.md`; a template without `{register}` is refused. Done when a prepared
       round holds both and a template without the field is refused, by the tests in `tests/review/test_prepare.py`.
 

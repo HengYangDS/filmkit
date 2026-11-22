@@ -5,12 +5,13 @@ A round sets the packages of the previous build aside before the next render
 one command, and records the finished reviews as the production reviews that
 `filmkit.delivery.verification` accepts.
 
-`prepare` writes what the round's reviewers read: the binding of the members a delivery would
-hold and the real-browser readback of their players (`filmkit.delivery.folder`), the listening
-plan (`filmkit.review.listening_plan`), the measurements (`filmkit.review.measurement`), the
-changes note and the dispositions it was given, and each edition's sentences and reviewer prompt
-with the exact media hashes and the previous round's findings with the disposition of each, or
-the statement that the round is the first (`filmkit.review.prompts`). It checks what it reads
+`prepare` writes what the round's reviewers read: the register check's report on the film's
+words (`filmkit.register`), the binding of the members a delivery would hold and the
+real-browser readback of their players (`filmkit.delivery.folder`), the listening plan
+(`filmkit.review.listening_plan`), the measurements (`filmkit.review.measurement`), the changes
+note and the dispositions it was given, and each edition's sentences and reviewer prompt with
+the exact media hashes and the previous round's findings with the disposition of each, or the
+statement that the round is the first (`filmkit.review.prompts`). It checks what it reads
 before it derives anything, writes the note and the dispositions first and the prompts last,
 and prepares a round again only while the round holds nothing but a preparation.
 
@@ -46,6 +47,7 @@ from typing import NamedTuple
 
 import filmkit.delivery.folder as delivery_folder
 import filmkit.media as media
+import filmkit.register as register
 import filmkit.repository as repository
 import filmkit.review.listening_plan as review_listening_plan
 import filmkit.review.measurement as review_measurement
@@ -81,6 +83,7 @@ OWNER_REFUSALS = (
     soundtrack_level.LevelError,
     AlignmentError,
     sources.SourceError,
+    register.RegisterError,
 )
 
 HUMAN_LISTENING = (
@@ -189,21 +192,25 @@ def prepare(
     (`filmkit.review.prompts.read_round`): the template's fields, each edition's passing still
     scan, the previous round's reviews, reports and dispositions, a dispositions file that is no
     JSON being refused by name, the note's text, the program levels and each edition's
-    timeline. Then the films and the other members a delivery would hold, and the round itself
+    timeline. Then the film's words are asked of the register check (`filmkit.register.check`),
+    once: a film whose words it refuses gets no round, and its report is kept for the round.
+    Then the films and the other members a delivery would hold, and the round itself
     (`refuse_more_than_a_preparation`).
 
     Every file of an earlier preparation is then removed (`prepared_names`), and the round is
     written in this order: the copies of the note and the dispositions from what was read, the
-    binding of the delivery's members, the listening plan, the measurements, the real-browser
-    readback of the members' players with its screenshots, and each edition's sentences and
-    prompt. The copies come first: they may be the only ones, so they are back before anything
-    that can refuse. The measurements come before the browser starts, so what they refuse is
-    known first. The prompts come last: a round without prompts binds no film and starts no
-    reviewer, so a preparation that stops leaves nothing that can be taken for a round.
+    register report as the check gave it, the binding of the delivery's members, the listening
+    plan, the measurements, the real-browser readback of the members' players with its
+    screenshots, and each edition's sentences and prompt. The copies come first: they may be
+    the only ones, so they are back before anything that can refuse. The measurements come
+    before the browser starts, so what they refuse is known first. The prompts come last: a
+    round without prompts binds no film and starts no reviewer, so a preparation that stops
+    leaves nothing that can be taken for a round.
     """
     round_dir = round_directory(number)
     copies = {CHANGES: given(changes), DISPOSITIONS: given(dispositions)}
     round_prompts.read_round(previous, round_dir, changes, dispositions)
+    words = register.check()
     members = delivery_folder.plan(repository.ROOT)
     present([source for source, _ in members])
     refuse_more_than_a_preparation(number, round_dir)
@@ -213,6 +220,7 @@ def prepare(
     for name, copy in kept.items():
         copy.parent.mkdir(parents=True, exist_ok=True)
         copy.write_bytes(copies[name])
+    repository.write(round_dir / round_prompts.REGISTER, words)
     binding = delivery_folder.bind_players(
         repository.ROOT, members, round_dir / round_prompts.BINDING
     )
