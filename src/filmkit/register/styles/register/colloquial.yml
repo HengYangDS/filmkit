@@ -1,8 +1,8 @@
 # R3 of the formal register (`standard.md`), Chinese: the colloquial words and particles it lists,
 # at error level; the class's other members the engine adds stand in `informal` as warnings. Each
-# form is matched plainly, a particle wherever it stands; the check lowers an occurrence inside a
-# standard word of `standard-words.toml` to a warning that names the word, so no occurrence is
-# silent.
+# form is matched plainly, a particle wherever it stands, inside a standard word too. A film keeps
+# a standard word or a quotation that holds a form by declaring the text it stands within
+# (`[[register.exceptions]]`).
 extends: existence
 message: "'%s' is colloquial (R3)"
 level: error
