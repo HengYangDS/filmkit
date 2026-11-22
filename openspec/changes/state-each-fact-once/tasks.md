@@ -93,15 +93,16 @@
       Done when no statement of `verification.py`, `produce.py`, `draft.py` or the cover painting spells a frame's
       width or height, `production.py` spells the viewing film's once, and the tests in
       `tests/delivery/test_verification_picture.py`, `tests/test_produce.py`, `tests/test_production.py`,
-      `tests/picture/test_draft.py`, `tests/delivery/test_packaging.py`, `tests/delivery/test_viewing_encode.py` and
-      `tests/delivery/player.test.mjs` pass unchanged.
+      `tests/picture/test_draft.py`, `tests/delivery/test_packaging.py` and `tests/delivery/test_viewing_encode.py`
+      pass unchanged, and `tests/delivery/player.test.mjs` passes, which holds the refusals of the Change's
+      `film-engine` requirement.
 
 ## 8. The Changelog
 
 - [x] 8.1 Record the Change under `Unreleased` in `CHANGELOG.md`, as `CONTRIBUTING.md` asks. Done when the entry
       says that the engine reads each of these names from one owner, that no film's output, record or command
-      changes, that the renderer's usage text gains `node`, and that the cover check refuses a stage whose record
-      and page disagree.
+      changes, that the renderer's usage text gains `node`, and that the cover check refuses, before it paints, a
+      folder that is no whole stage, naming each case.
 
 ## 9. Acceptance
 

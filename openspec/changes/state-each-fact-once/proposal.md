@@ -22,11 +22,13 @@ None.
 
 ### Modified Capabilities
 
-None. No requirement states how the code holds these names, and no requirement on output changes. `.openspec.yaml` sets `skip_specs: true`.
+- `film-engine`: a requirement beside "A film paints its covers from its picture", which is unchanged: the cover check paints at the frame of the stage's record and refuses, before it paints, a folder that is no whole stage, as `picture-gates`' "The geometry check takes its frame from the stage's record" refuses it for the geometry check.
+
+No other requirement changes: none states how the code holds these names, and the renderer's usage text is stated in none.
 
 ## Impact
 
 - Engine modules of the picture, the delivery, the review, the captions, the sound gate, the pre-render check, the adoption command and the tools, and the tests that build these names as inputs. No film's tracked file, record or delivered byte changes, and no command line changes.
-- Two printed texts change: the usage the renderer's Node module prints when it is invoked wrongly gains the word `node`, which it is run with; and the cover check refuses, before it paints, a stage whose record and page disagree, as the geometry check already does.
+- Two printed texts change: the usage the renderer's Node module prints when it is invoked wrongly gains the word `node`, which it is run with; and the cover check paints at the frame its stage's record states and refuses, before it paints, a folder that is no whole stage: no record, a record that is no JSON or lacks a whole positive width, height, seconds or rate, no page or a page with no film element, or a page that states another width, height or seconds than its record, as the geometry check already does.
 - Acceptance builds the sample film's sound, pictures and packages on the base head and on the Change's head from one narration and compares the two builds file by file; it runs the changed geometry and cover checks on the released films' stages. It is host-heavy and runs under host tickets.
 - Out of scope: the decisions note (`decisions.md`); module paths and command strings that name the import package, which every import statement names alike; the roots of the build layout, among them the work folder, which modules other than the edition's places use; prose that names a fact (README, Changelog, design, docstrings, messages); every film's tracked files, which stay frozen until December.
