@@ -150,8 +150,10 @@ def test_units_with_the_same_letters_stay_alike_beside_a_declared_term():
     # `name's` says the term's possessive and `names` is no form of it; their letters are the
     # same, and the recognizer's apostrophe is no difference, term or no term.
     names = narration_recognition.Names((NAME,))
-    text, heard = "Their names are here.", "Their name's are here."
-    assert (by_reading(text, heard), by_reading(text, heard, names)) == (0, 0)
+    text = "Their names are here."
+    # A straight apostrophe keeps one unit; a curly one or a space parts it, and the parts join.
+    for heard in ("Their name's are here.", "Their name’s are here.", "Their name s are here."):
+        assert (by_reading(text, heard), by_reading(text, heard, names)) == (0, 0), heard
     chinese = narration_recognition.Names((NAME,), chinese=True, others=OTHERS)
     assert by_reading("那些 names 在这里。", "那些name's在这里。", chinese) == 0
 

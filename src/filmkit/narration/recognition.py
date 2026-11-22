@@ -168,14 +168,18 @@ def read_units(
     return found
 
 
+def _letters(unit: Read) -> str:
+    """A Latin unit's own letters and digits, whatever term it says."""
+    return unit.unit.replace("'", "")
+
+
 def alike(expected: Read, observed: Read) -> bool:
     """Whether a text's unit and a transcript's are the same to a listener."""
     if expected.han != observed.han:
         return False
     if not expected.han:
         # Units of the same letters and digits are alike whatever term either says.
-        same_letters = expected.unit.replace("'", "") == observed.unit.replace("'", "")
-        return same_letters or expected.reading == observed.reading
+        return _letters(expected) == _letters(observed) or expected.reading == observed.reading
     return (
         expected.unit == observed.unit
         or expected.reading == observed.reading
@@ -184,16 +188,22 @@ def alike(expected: Read, observed: Read) -> bool:
 
 
 def _joined(units: Sequence[Read], end: int, other: Read) -> list[int]:
-    """Each count of Latin units ending at `end` whose letters and digits spell `other`."""
+    """Each count of Latin units ending at `end` whose letters and digits spell `other`.
+
+    The units are spelled by their readings and by their own letters, and either may meet
+    either of `other`'s, so a term declared beside a word parts no two of the same letters.
+    """
     if other.han:
         return []
-    found, spelled = [], ""
+    found, by_reading, by_letters = [], "", ""
+    targets = {_letters(other), other.reading}
     for count in range(1, min(JOINED, end) + 1):
         unit = units[end - count]
         if unit.han:
             break
-        spelled = unit.reading + spelled
-        if count > 1 and spelled == other.reading:
+        by_reading = unit.reading + by_reading
+        by_letters = _letters(unit) + by_letters
+        if count > 1 and {by_reading, by_letters} & targets:
             found.append(count)
     return found
 
