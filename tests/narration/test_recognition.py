@@ -146,6 +146,16 @@ def test_a_declared_term_is_one_unit_under_its_display_and_spoken_forms():
         assert by_reading(text, heard, names) == after, heard
 
 
+def test_units_with_the_same_letters_stay_alike_beside_a_declared_term():
+    # `name's` says the term's possessive and `names` is no form of it; their letters are the
+    # same, and the recognizer's apostrophe is no difference, term or no term.
+    names = narration_recognition.Names((NAME,))
+    text, heard = "Their names are here.", "Their name's are here."
+    assert (by_reading(text, heard), by_reading(text, heard, names)) == (0, 0)
+    chinese = narration_recognition.Names((NAME,), chinese=True, others=OTHERS)
+    assert by_reading("那些 names 在这里。", "那些name's在这里。", chinese) == 0
+
+
 def test_a_term_in_chinese_speech_is_alike_one_latin_unit_that_is_no_other_unit_of_the_edition():
     names = narration_recognition.Names((NAME,), chinese=True, others=OTHERS)
     text = "Naim 走的是另一条路。"

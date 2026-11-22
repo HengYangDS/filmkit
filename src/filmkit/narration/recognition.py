@@ -173,7 +173,9 @@ def alike(expected: Read, observed: Read) -> bool:
     if expected.han != observed.han:
         return False
     if not expected.han:
-        return expected.reading == observed.reading
+        # Units of the same letters and digits are alike whatever term either says.
+        same_letters = expected.unit.replace("'", "") == observed.unit.replace("'", "")
+        return same_letters or expected.reading == observed.reading
     return (
         expected.unit == observed.unit
         or expected.reading == observed.reading
