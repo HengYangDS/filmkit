@@ -2,9 +2,9 @@
 
 ### Requirement: The chapter metadata keeps every character of its values
 
-The chapter metadata that packaging reads SHALL escape, in the film's title, its comment and each chapter title, every
-mark the metadata format reads as its own syntax (`=`, `;`, `#`, the backslash and a newline), so that the packaged
-film's tags and chapter track read each value as the display copy sets it.
+The chapter metadata that packaging reads SHALL escape, in the film's title, its author, its comment and each chapter
+title, every mark the metadata format reads as its own syntax (`=`, `;`, `#`, the backslash and a newline), so that
+the packaged film's tags and chapter track read each value as the display copy sets it.
 
 #### Scenario: A title with a backslash
 
@@ -16,3 +16,9 @@ film's tags and chapter track read each value as the display copy sets it.
 - **WHEN** the release comment holds a semicolon
 - **THEN** the chapter metadata writes it escaped and the films' comment tag reads the semicolon, with the same bytes
   as before the escape
+
+#### Scenario: An author with a mark
+
+- **WHEN** the scripts declare an author that holds one of the marks
+- **THEN** the chapter metadata writes it escaped under both of its keys, and FFmpeg reads the author back as
+  declared
