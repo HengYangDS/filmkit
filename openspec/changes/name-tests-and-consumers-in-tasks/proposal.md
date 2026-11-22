@@ -2,7 +2,7 @@
 
 Two habits that decide whether a Change's checks hold stand only in a session's notes today. A task that verifies
 code and says only that the tests pass leaves a reader of the Change, person or tool, to guess its focused tests or
-to run none (20 November 2026). And a new check is proved on the films it will judge only when someone
+to run none. And a new check is proved on the films it will judge only when someone
 remembers to run it there: on 2 November that run found two defects the tests had missed, and the adoption reader and
 the still scan of 0.25.0 and 0.26.0 were accepted by it. OpenSpec's per-artifact rules are where such a rule reaches
 every author of a Change; the repository paradigm requires only that its common rules come first, and a repository's
