@@ -2,7 +2,7 @@
 
 ### Requirement: A Latin name respelled in other letters is a declared term
 
-Where an edition says a name that its normalization respells as one Latin recognition unit of other letters, the film SHALL declare it as a term. Whatever the contract's schema version, the readings check SHALL refuse such a name that no term names, in one line naming the name, its spoken form and the thoughts whose recognition units say it. A rule that only spaces or recases a name, or whose display or spoken form is more than one recognition unit, SHALL ask for no term.
+Where an edition says a name that its normalization respells as one Latin recognition unit of other letters, the film SHALL declare it as a term. Whatever the contract's schema version, the readings check SHALL refuse such a name that no term names, in one line naming the name, its spoken form and the thoughts that say it as a word of their own. A rule that only spaces or recases a name, or whose display or spoken form is more than one recognition unit, SHALL ask for no term.
 
 #### Scenario: A respelled name and no term
 
@@ -18,6 +18,11 @@ Where an edition says a name that its normalization respells as one Latin recogn
 
 - **WHEN** the contract respells Node.js as Noad.js and the film declares no term
 - **THEN** the readings check asks for no term
+
+#### Scenario: A name only inside a compound
+
+- **WHEN** the narration says the respelled NAME only inside "Naim-based" and the film declares no term
+- **THEN** the readings check asks for no term, and a declaration of the term finds no occurrence there either
 
 #### Scenario: A name only spaced
 

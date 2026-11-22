@@ -245,16 +245,40 @@ def test_a_name_respelled_with_other_letters_needs_a_term():
     assert terms.respelling_failures((), kept, [("01.1", "Name 和 Open Spec。")], "zh") == []
     alone = respelling(("NAME", "Naim"))
     assert terms.respelling_failures((), alone, thoughts[1:], "zh") == []
-    # A thought says the name where a recognition unit says it, as the comparison reads it.
-    joined = [("01.3", "一种 Naim-based 的做法。")]
-    assert terms.respelling_failures((), alone, joined, "zh") == [
+    # A form of several recognition units could be no term the comparison reads: none asked,
+    # also where only one of the two forms is several units.
+    parted = respelling(("Node.js", "Noad.js"), ("O’Neil", "O’Neel"), ("Next.js", "Nextjs"))
+    said = [("01.4", "用 Noad.js 跑，问 O’Neel，再用 Nextjs。")]
+    assert terms.respelling_failures((), parted, said, "zh") == []
+
+
+def test_every_reader_counts_a_term_by_the_words_that_say_it():
+    def name(**reference) -> NarrationTerm:
+        return NarrationTerm(term="NAME", spoken="Naim", ipa="ˈneɪm", reference=reference)
+
+    alone = respelling(("NAME", "Naim"))
+    owed = (
         "zh: the normalization respells NAME as Naim, said in 01.3; declare NAME in "
         "[[narration.terms]]"
+    )
+    # Inside a compound the name is no word of its own, for every reader alike.
+    compound = [("01.3", "一种 Naim-based 的做法。")]
+    assert terms.respelling_failures((), alone, compound, "zh") == []
+    assert terms.declaration_failures((name(),), compound, "zh") == []
+    # Beside a word of its own, every reader counts that word once.
+    both = [("01.3", "一种 Naim-based 的做法，Naim 也这样做。")]
+    assert terms.respelling_failures((), alone, both, "zh") == [owed]
+    first = name(zh={"thought": "01.3", "index": 0})
+    second = name(zh={"thought": "01.3", "index": 1})
+    assert terms.declaration_failures((first,), both, "zh") == []
+    assert terms.declaration_failures((second,), both, "zh") == [
+        "zh: the NAME reference 01.3 #1 is not in the narration; 01.3 says it 1 times"
     ]
-    # A form of several recognition units could be no term the comparison reads: none asked.
-    parted = respelling(("Node.js", "Noad.js"), ("O’Neil", "O’Neel"))
-    said = [("01.4", "用 Noad.js 跑，问 O’Neel。")]
-    assert terms.respelling_failures((), parted, said, "zh") == []
+    take = {"index": 3, "spoken_text": both[0][1]}
+    records = [{"id": "01", "utterance_groups": {"records": [take]}}]
+    assert len(terms.receipt_references("zh", (first,), records)) == 1
+    with pytest.raises(terms.TermError, match="NAME reference 01.3 #1 is not in the narration"):
+        terms.receipt_references("zh", (second,), records)
 
 
 def test_every_language_gives_a_term_its_declared_spoken_form():

@@ -115,6 +115,12 @@ def says(word: str, forms: frozenset[str]) -> bool:
     return said_form(word, forms) is not None
 
 
+def times_said(text: str, forms: frozenset[str]) -> int:
+    """How many words of a text say a term, each a Latin word as the aligner gives words: a
+    term inside a compound such as `NAME-based` is no word of its own."""
+    return sum(says(match.group(), forms) for match in LATIN_WORD.finditer(text))
+
+
 def parity_failures(terms: tuple[NarrationTerm, ...], languages: dict, contract: str) -> list[str]:
     """Each language whose normalization gives a declared term another spoken form, or none.
 
@@ -151,10 +157,7 @@ def declaration_failures(
     failures = []
     for term in terms:
         forms = spoken_forms(term)
-        said = {
-            where: sum(says(match.group(), forms) for match in LATIN_WORD.finditer(text))
-            for where, text in thoughts
-        }
+        said = {where: times_said(text, forms) for where, text in thoughts}
         places = [where for where, count in said.items() if count]
         reference = term.reference.get(code)
         if reference is None and places:
@@ -184,7 +187,8 @@ def respelling_failures(
     Such a name is compared as a term (`recognition.read_units`) and said as one, so the film
     declares it. Words and letters are the comparison's to say: a term is read per recognition
     unit, so a name is asked for only where its display and spoken forms are each one Latin
-    unit, and a thought says it where one of its units does; a rule whose letters
+    unit, and a thought says it as every reader of a declared term counts it (`times_said`);
+    a rule whose letters
     `recognition.reading_distance` finds the same, one that only spaces or recases a name, asks
     for no term. `language` is the edition's language in the pronunciation contract, and
     `thoughts` holds each thought's name and spoken text in narration order.
@@ -212,11 +216,7 @@ def respelling_failures(
         ):
             continue
         forms = frozenset({display.casefold(), spoken.casefold()})
-        places = [
-            where
-            for where, text in thoughts
-            if any(says(unit, forms) for unit in recognition_units(text))
-        ]
+        places = [where for where, text in thoughts if times_said(text, forms)]
         if places:
             failures.append(
                 f"{code}: the normalization respells {display} as {spoken}, said in "
@@ -483,13 +483,7 @@ def receipt_references(
             ),
             None,
         )
-        said = (
-            0
-            if child is None
-            else sum(
-                says(word.group(), forms) for word in LATIN_WORD.finditer(child["spoken_text"])
-            )
-        )
+        said = 0 if child is None else times_said(child["spoken_text"], forms)
         if said <= reference.index:
             msg = (
                 f"{code}: the {term.term} reference {named(reference)} is not in the narration "
