@@ -199,28 +199,62 @@ def test_ffmpeg_reads_every_value_of_the_chapter_metadata_back_as_declared(tmp_p
     assert [chapter["tags"] for chapter in read["chapters"]] == [{"title": MARKED["chapter_title"]}]
 
 
+# The edition's script and its timeline, the two files a value of the chapter metadata is read
+# from.
+SCRIPT, TIMELINE = "content/en/film-script.json", "build/artifacts/film/en/timeline.json"
+
+
 @pytest.mark.parametrize(
     ("field", "named"),
     [
-        ("title", "title"),
-        ("author", "author"),
-        ("comment", "release.comment"),
-        ("chapter_title", "chapter_title of chapter one"),
+        ("title", f"{TIMELINE} holds title"),
+        ("author", f"{SCRIPT} holds author"),
+        ("comment", f"{SCRIPT} holds release.comment"),
+        ("chapter_title", f"{TIMELINE} holds chapter_title of segment 01"),
     ],
 )
 def test_a_value_that_ends_in_a_backslash_is_refused_before_a_document_is_written(
     tmp_path, monkeypatch, field, named
 ):
     # FFmpeg reads the line after such a value into it, whatever is written, so the value is
-    # refused as the film declares it, by its script, its field and its JSON text.
+    # refused by the file that holds it, its field and its JSON text: the documents are written
+    # from a timeline's title and chapter titles and from the script's author and comment.
     timeline, edition = marked(tmp_path, monkeypatch, **{field: "Ends \\"})
     with pytest.raises(CaptionError) as refusal:
         captions_documents.subtitle_files(timeline, edition)
     assert str(refusal.value) == (
-        f'content/en/film-script.json declares {named} "Ends \\\\": chapters.ffmeta cannot hold a '
-        "value that ends in a backslash, since FFmpeg reads the next line into it"
+        f'{named} "Ends \\\\": chapters.ffmeta cannot hold a value that ends in a backslash, since '
+        "FFmpeg reads the next line into it"
     )
     assert list(edition.artifacts.iterdir()) == []
+
+
+def test_a_chapter_that_returns_is_refused_by_the_title_the_writer_would_write(
+    tmp_path, monkeypatch
+):
+    # The writer starts a chapter wherever the chapter changes, so a chapter that returns is
+    # written a second time, under the title of the segment where it returns: the refusal reads
+    # that title too, and names its segment.
+    timeline, edition = marked(tmp_path, monkeypatch, chapter_title="A", title="Three parts")
+    first = timeline["segments"][0]
+    timeline["segments"] = [
+        {**first, "id": "01", "chapter": "a", "chapter_title": "A"},
+        {**first, "id": "02", "chapter": "b", "chapter_title": "B"},
+        {**first, "id": "03", "chapter": "a", "chapter_title": "Again \\"},
+    ]
+    with pytest.raises(CaptionError) as refusal:
+        captions_documents.subtitle_files(timeline, edition)
+    assert f'{TIMELINE} holds chapter_title of segment 03 "Again \\\\": ' in str(refusal.value)
+    assert list(edition.artifacts.iterdir()) == []
+    # Without the backslash the three chapters are written, the third under its own title.
+    timeline["segments"][2]["chapter_title"] = "Again"
+    captions_documents.subtitle_files(timeline, edition)
+    chapters = json.loads((edition.artifacts / "chapters.json").read_text())["chapters"]
+    assert [(chapter["id"], chapter["title"]) for chapter in chapters] == [
+        ("a", "A"),
+        ("b", "B"),
+        ("a", "Again"),
+    ]
 
 
 def test_timecodes_round_to_the_millisecond():

@@ -11,7 +11,7 @@ typographic quotation marks (`filmkit.captions.timing.typeset`).
 The chapter metadata holds the film's title, author, comment and chapter titles with every mark
 of its format escaped (`_metadata_value`). A value that the format cannot keep, one that ends in
 a backslash, is refused with `CaptionError` before any document is written
-(`require_metadata_values`); the film's text is never changed to fit.
+(`require_metadata_values`), by the file that holds it; the film's text is never changed to fit.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 
 from filmkit.captions import CaptionError
 from filmkit.captions.timing import shown_text, typeset
-from filmkit.repository import write
+from filmkit.repository import relative, write
 from filmkit.specification import AUTHOR, CHAPTER_CARD_SHOWN, DURATION
 
 if TYPE_CHECKING:
@@ -74,22 +74,37 @@ class Part:
     sections: tuple[Scene, ...]
 
 
+def _chapter_segments(segments: list[dict]) -> list[list[dict]]:
+    """The segments of each chapter in order: a chapter runs while the segments' chapter stays
+    the same and takes the title of its first segment, so a chapter that returns is a chapter
+    again, under the title of the segment where it returns.
+
+    The one derivation of the chapters: the documents are written from it (`_chapters`) and the
+    chapter titles are judged by it (`require_metadata_values`).
+    """
+    held: list[list[dict]] = []
+    for segment in segments:
+        if not held or held[-1][0]["chapter"] != segment["chapter"]:
+            held.append([])
+        held[-1].append(segment)
+    return held
+
+
 def _chapters(segments: list[dict]) -> list[_Chapter]:
     """Each chapter of the timeline in order, from the first of its segments.
 
     A later chapter begins once its card replaces the previous running head.
     """
     chapters: list[_Chapter] = []
-    for segment in segments:
-        if not chapters or chapters[-1].entry["id"] != segment["chapter"]:
-            start = segment["start"] + (CHAPTER_CARD_SHOWN if chapters else 0.0)
-            entry = {
-                "id": segment["chapter"],
-                "title": typeset(segment["chapter_title"]),
-                "start": round(start, 3),
-            }
-            chapters.append(_Chapter(entry, []))
-        chapters[-1].segments.append(segment)
+    for held in _chapter_segments(segments):
+        first = held[0]
+        start = first["start"] + (CHAPTER_CARD_SHOWN if chapters else 0.0)
+        entry = {
+            "id": first["chapter"],
+            "title": typeset(first["chapter_title"]),
+            "start": round(start, 3),
+        }
+        chapters.append(_Chapter(entry, held))
     return chapters
 
 
@@ -157,33 +172,36 @@ def _metadata_value(text: str) -> str:
     return "".join(f"\\{mark}" if mark in _METADATA_MARKS else mark for mark in text)
 
 
-def require_metadata_values(timeline: dict, edition: Edition) -> None:
+def require_metadata_values(titled: dict, source: str, edition: Edition) -> None:
     """Refuse a film whose chapter metadata would hold a value that ends in a backslash.
 
     FFmpeg reads a newline after a backslash as part of the value, whether or not that backslash
     is itself escaped, so it reads the next line into such a value and loses that line's own tag;
-    no escape keeps the value. The values are the film's: its title, its author, its release
-    comment and each chapter's title, from a script or a timeline. The refusal names the script,
-    each field and its value as the script's JSON writes it, and changes nothing.
+    no escape keeps the value. The values are the film's: the title and each chapter's title of
+    `titled`, a script or a timeline read from the file `source`, and the author and the release
+    comment of the edition's script. A chapter's title is the one the metadata would be written
+    with, the title of the chapter's first segment (`_chapter_segments`). The refusal names, for
+    each value, the file that holds it, its field and the value as JSON writes it, and changes
+    nothing.
     """
-    titles: dict[str, str] = {}
-    for segment in timeline["segments"]:
-        titles.setdefault(segment["chapter"], segment["chapter_title"])
-    values = {
-        "title": timeline["title"],
-        "author": AUTHOR,
-        "release.comment": edition.comment,
-        **{f"chapter_title of chapter {chapter}": title for chapter, title in titles.items()},
-    }
+    values = [
+        (source, "title", titled["title"]),
+        (edition.script, "author", AUTHOR),
+        (edition.script, "release.comment", edition.comment),
+        *(
+            (source, f"chapter_title of segment {held[0]['id']}", held[0]["chapter_title"])
+            for held in _chapter_segments(titled["segments"])
+        ),
+    ]
     ending = [
-        f"{field} {json.dumps(value, ensure_ascii=False)}"
-        for field, value in values.items()
+        f"{held} holds {field} {json.dumps(value, ensure_ascii=False)}"
+        for held, field, value in values
         if value.endswith("\\")
     ]
     if ending:
         msg = (
-            f"{edition.script} declares {'; '.join(ending)}: chapters.ffmeta cannot hold a value "
-            "that ends in a backslash, since FFmpeg reads the next line into it"
+            f"{'; '.join(ending)}: chapters.ffmeta cannot hold a value that ends in a backslash, "
+            "since FFmpeg reads the next line into it"
         )
         raise CaptionError(msg)
 
@@ -208,9 +226,10 @@ def subtitle_files(timeline: dict, edition: Edition) -> None:
     """Write the edition's SRT and VTT captions, chapters, transcript and chapter metadata.
 
     Nothing is written for a film whose chapter metadata would hold a value the format cannot
-    keep (`require_metadata_values`).
+    keep (`require_metadata_values`); both callers write the timeline they pass to its file
+    first, so the refusal names that file.
     """
-    require_metadata_values(timeline, edition)
+    require_metadata_values(timeline, relative(edition.timeline), edition)
     output = edition.artifacts
     srt, vtt = _cue_documents(timeline["captions"])
     (output / f"{edition.prefix}.srt").write_text(srt)

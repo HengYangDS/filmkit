@@ -572,7 +572,7 @@ def assemble(edition: Edition) -> None:
         raise AssemblyError(msg)
     # Refused before a recording is decoded or a file written: a value the chapter metadata
     # cannot keep would otherwise be met after the soundtrack and the timeline were written.
-    require_metadata_values(script, edition)
+    require_metadata_values(script, edition.script, edition)
     edition.artifacts.mkdir(parents=True, exist_ok=True)
     decoded = decode_recordings(edition, segments, records)
     clips = designed_clips(segments, records, alignments, decoded, policy, releases)

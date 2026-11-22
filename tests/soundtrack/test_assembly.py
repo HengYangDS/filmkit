@@ -183,7 +183,10 @@ def test_assembly_refuses_a_value_the_chapter_metadata_cannot_hold_before_it_dec
     monkeypatch.setattr(soundtrack_assembly, "_decode", decoding)
     with pytest.raises(CaptionError) as refusal:
         soundtrack_assembly.assemble(two_chapters)
-    assert 'declares chapter_title of chapter b "B\\\\": ' in str(refusal.value)
+    # The assembly reads the script, and says so.
+    assert str(refusal.value).startswith(
+        'content/film-script.json holds chapter_title of segment 02 "B\\\\": chapters.ffmeta cannot'
+    )
     assert not two_chapters.artifacts.exists()
 
 

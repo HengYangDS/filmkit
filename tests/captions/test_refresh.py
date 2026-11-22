@@ -182,17 +182,42 @@ def test_a_refresh_refuses_a_selection_of_other_copy(edition):
         captions_refresh.refresh_captions(edition)
 
 
-def test_a_refresh_refuses_a_value_the_chapter_metadata_cannot_hold_before_it_writes(edition):
-    # A title that ends in a backslash cannot be kept in chapters.ffmeta: the refresh refuses it
-    # before it writes the timeline or the receipt, so the edition stays as it was.
-    timeline = read(edition.timeline)
-    timeline["title"] = "Ends \\"
+def assembled_on(edition, title: str) -> list[bytes]:
+    """Assemble the edition on a title: its script, its timeline and its receipt agree on it.
+    Returns the timeline's and the receipt's bytes."""
+    revise_script(edition, lambda script: script.update(title=title))
+    timeline, receipt = read(edition.timeline), read(edition.audio_assembly)
+    timeline["title"] = title
+    receipt["script_sha256"] = sha256(repository.ROOT / edition.script)
     write_json(edition.timeline, timeline)
-    kept = [path.read_bytes() for path in (edition.timeline, edition.audio_assembly)]
-    with pytest.raises(CaptionError, match="declares title "):
+    write_json(edition.audio_assembly, receipt)
+    return [path.read_bytes() for path in (edition.timeline, edition.audio_assembly)]
+
+
+def test_a_refresh_refuses_a_value_the_chapter_metadata_cannot_hold_before_it_writes(edition):
+    # A title that ends in a backslash cannot be kept in chapters.ffmeta. The refresh writes its
+    # documents from the timeline, so it names the timeline, and it refuses before it writes the
+    # timeline or the receipt: the edition stays as it was.
+    kept = assembled_on(edition, "Ends \\")
+    with pytest.raises(CaptionError) as refusal:
         captions_refresh.refresh_captions(edition)
+    assert str(refusal.value).startswith(
+        'build/artifacts/film/zh/timeline.json holds title "Ends \\\\": chapters.ffmeta cannot hold'
+    )
     assert [path.read_bytes() for path in (edition.timeline, edition.audio_assembly)] == kept
     assert not (edition.artifacts / "chapters.ffmeta").exists()
+
+
+def test_a_refresh_over_a_corrected_script_asks_for_the_assembly_before_the_metadata(edition):
+    # An edition assembled on such a title whose script was corrected since is stale: the refresh
+    # says so, which names the step that is owed, and says nothing of a value the script no
+    # longer holds.
+    kept = assembled_on(edition, "Ends \\")
+    revise_script(edition, lambda script: script.update(title="Ends"))
+    with pytest.raises(CaptionError) as refusal:
+        captions_refresh.refresh_captions(edition)
+    assert str(refusal.value) == "Caption refresh requires the exact current script and waveform"
+    assert [path.read_bytes() for path in (edition.timeline, edition.audio_assembly)] == kept
 
 
 def test_a_refresh_over_a_reviewed_build_waits_for_its_set_aside(edition):

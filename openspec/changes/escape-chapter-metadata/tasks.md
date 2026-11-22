@@ -23,3 +23,13 @@
       when no edition is refused and the escape changes each English edition's comment by one backslash and no other
       value, by the record in `build/evidence/escape-chapter-metadata/` (`released-values.json` and the command that
       wrote it).
+
+## 3. What the sixth review found
+
+- [x] 3.1 The documents and the refusal read a chapter's title by one derivation, so a chapter that returns is
+      refused by the title it would be written with. Done when the test of a chapter that returns in
+      `tests/captions/test_documents.py` passes; it failed before the repair.
+- [x] 3.2 `refresh-captions` asks the refusal after it has held the edition to its current script and selection, and
+      the refusal names the file that holds each value. Done when the tests in `tests/captions/test_refresh.py`,
+      `tests/captions/test_documents.py` and `tests/soundtrack/test_assembly.py` pass; each failed before the repair.
+- [ ] 3.3 The Changelog names the records that follow a stale film package, each as the code binds it.
