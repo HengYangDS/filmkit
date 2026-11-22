@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-22
+
 ### Added
 
 - `python -m filmkit.register` checks a film's words against the formal register and refuses every error-level form the film does not excuse by its place; it prints the Vale version, the count of places read, the warnings and the exceptions it applied. It reads the words a viewer meets outside the picture: each edition's title, chapter and segment titles, thoughts, caption terms, release synopsis, comment and description and player summary, and the entry page's text with the words of its `alt`, `title` and `aria-label` attributes. The engine carries the register's standard in `filmkit/register/standard.md`, and Vale 3.27.0, pinned in the engine's Mise configuration and lock, applies the engine's rules; the engine's release record states that version, and the check refuses another Vale.
@@ -603,7 +605,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.26.1...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.27.0...HEAD
+[0.27.0]: https://github.com/HengYangDS/filmkit/compare/v0.26.1...v0.27.0
 [0.26.1]: https://github.com/HengYangDS/filmkit/compare/v0.26.0...v0.26.1
 [0.26.0]: https://github.com/HengYangDS/filmkit/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/HengYangDS/filmkit/compare/v0.24.1...v0.25.0
