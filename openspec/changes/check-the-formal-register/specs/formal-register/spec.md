@@ -60,7 +60,7 @@ hold no list of words that excuses one.
 
 #### Scenario: A listed form inside a standard word
 
-- **WHEN** a title reads 让数据名副其实, or a thought holds 迷你, 跑道, 统一下发 or 酒吧, and the film declares nothing
+- **WHEN** a title reads 这个示例名副其实, or a thought holds 迷你, 跑道, 统一下发 or 酒吧, and the film declares nothing
 - **THEN** the register check refuses the form, names its place, and says that a film keeps a standard word by
   declaring the place and the word
 
@@ -99,12 +99,12 @@ does not hold, and SHALL keep every warning in its report whatever the film decl
 
 #### Scenario: A standard word
 
-- **WHEN** a title reads 让数据名副其实 and the film declares that title, 其实, the text 名副其实 and its reason
+- **WHEN** a title reads 这个示例名副其实 and the film declares that title, 其实, the text 名副其实 and its reason
 - **THEN** the register check reports nothing for it and lists the exception with its text and its reason
 
 #### Scenario: A quoted phrase
 
-- **WHEN** a thought quotes 「帮我搞定」 as an example and the film declares that thought, 搞, the text 帮我搞定 and its
+- **WHEN** a thought quotes 「先搞清楚」 as an example and the film declares that thought, 搞, the text 先搞清楚 and its
   reason
 - **THEN** the register check reports nothing for it and lists the exception with its reason
 

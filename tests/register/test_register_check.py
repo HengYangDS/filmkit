@@ -25,7 +25,7 @@ STYLE = Path(register.__file__).with_name("styles") / "register"
 INFLECTIONS = ("yours", "yourself", "yourselves")
 COLLOQUIAL, ADDRESS = "is colloquial (R3)", "addresses the audience (R1)"
 # A quotation a film keeps at one place, as its declaration states it.
-QUOTED = {"place": "zh 01.1", "form": "搞", "within": "帮我搞定", "reason": "a quoted request"}
+QUOTED = {"place": "zh 01.1", "form": "搞", "within": "先搞清楚", "reason": "a quoted remark"}
 
 
 def with_register(*exceptions: dict) -> film.Film:
@@ -82,7 +82,7 @@ TEXTS = [
     ("you", "you.", False),
     ("搞", "搞", False),
     ("其实", "名副其实", True),
-    ("搞", "帮我搞定", True),
+    ("搞", "先搞清楚", True),
     ("you", "thank-you note", True),
     ("!", "Yahoo! Inc.", True),
     ("-", "10 - 2", True),
@@ -277,19 +277,19 @@ def test_each_rule_refuses_or_reports_at_its_level(monkeypatch, rule):
 
 def test_a_form_is_excused_within_its_declared_text_and_nowhere_else(words, monkeypatch):
     monkeypatch.setattr(register, "FILM", with_register(QUOTED))
-    say(words, "zh", "「帮我搞定」是一个例子。")
+    say(words, "zh", "「先搞清楚」是一个例子。")
     assert register.check()["excused"] == [QUOTED]
-    say(words, "zh", "「帮我搞定」是一个例子，不要再搞。")
+    say(words, "zh", "「先搞清楚」是一个例子，不要再搞。")
     refusal(f"zh 01.1: '搞' {COLLOQUIAL}")
     say(words, "zh", "这是一个例子，不要再搞。")
     refusal(
         f"zh 01.1: '搞' {COLLOQUIAL}",
-        "The register exception of '搞' at zh 01.1 is stale: the place does not hold '帮我搞定'",
+        "The register exception of '搞' at zh 01.1 is stale: the place does not hold '先搞清楚'",
     )
 
 
 def test_a_standard_word_is_refused_until_the_film_declares_it(words, monkeypatch):
-    say(words, "zh", title="让数据名副其实")
+    say(words, "zh", title="这个示例名副其实")
     refusal = refused()
     assert str(refusal).splitlines() == [f"zh title: '其实' {COLLOQUIAL}", KEEP]
     assert list(refusal.lines) == [f"zh title: '其实' {COLLOQUIAL}"]
@@ -422,5 +422,5 @@ def test_a_stale_exception_alone_brings_no_advice(monkeypatch):
     monkeypatch.setattr(register, "FILM", with_register(QUOTED))
     placed(monkeypatch, "这是一个例子。")
     refusal = refused()
-    stale = "The register exception of '搞' at zh 01.1 is stale: the place does not hold '帮我搞定'"
+    stale = "The register exception of '搞' at zh 01.1 is stale: the place does not hold '先搞清楚'"
     assert (str(refusal), list(refusal.lines)) == (stale, [stale])
