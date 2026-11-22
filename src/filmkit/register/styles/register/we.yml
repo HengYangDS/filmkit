@@ -8,20 +8,20 @@ level: warning
 scope: paragraph
 nonword: true
 tokens:
-  - '我们'
-  - '(?<![A-Za-z])(?:[Ww]e|[Uu]s|[Oo]urs?|[Oo]urselves)(?![A-Za-z])'
+  - "我们"
+  - "(?<![A-Za-z])(?:[Ww]e|[Uu]s|[Oo]urs?|[Oo]urselves)(?![A-Za-z])"
 tests:
   - name: every form
     input: |
       我们发现，We found that our tools, and ours alone, told us so; we’re sure ourselves.
     contains:
-      - '''我们'''
-      - '''We'''
-      - '''our'''
-      - '''ours'''
-      - '''us'''
-      - '''we'''
-      - '''ourselves'''
+      - "'我们'"
+      - "'We'"
+      - "'our'"
+      - "'ours'"
+      - "'us'"
+      - "'we'"
+      - "'ourselves'"
   - name: the country and words that hold a form
     input: |
       The US market uses web tools for the user and the bus.

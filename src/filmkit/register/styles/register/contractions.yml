@@ -12,12 +12,12 @@ scope: paragraph
 nonword: true
 ignorecase: true
 tokens:
-  - '(?<![A-Za-z])[A-Za-z]+n[''’ʼ′＇`´]t(?![A-Za-z])'
-  - '(?<![A-Za-z])[A-Za-z]+[''’ʼ′＇`´](?:re|ve|ll|d|m)(?![A-Za-z])'
-  - '(?<![A-Za-z])(?:it|that|there|here|what|who|where|when|why|how|let|he|she)[''’ʼ′＇`´]s(?![A-Za-z])'
-  - '(?<![A-Za-z])(?:gonna|wanna|gotta)(?![A-Za-z])'
-  - '(?<![A-Za-z])y[''’ʼ′＇`´]all(?![A-Za-z])'
-  - '(?<![A-Za-z])[''’ʼ′＇`´]t(?:is|was)(?![A-Za-z])'
+  - "(?<![A-Za-z])[A-Za-z]+n['’ʼ′＇`´]t(?![A-Za-z])"
+  - "(?<![A-Za-z])[A-Za-z]+['’ʼ′＇`´](?:re|ve|ll|d|m)(?![A-Za-z])"
+  - "(?<![A-Za-z])(?:it|that|there|here|what|who|where|when|why|how|let|he|she)['’ʼ′＇`´]s(?![A-Za-z])"
+  - "(?<![A-Za-z])(?:gonna|wanna|gotta)(?![A-Za-z])"
+  - "(?<![A-Za-z])y['’ʼ′＇`´]all(?![A-Za-z])"
+  - "(?<![A-Za-z])['’ʼ′＇`´]t(?:is|was)(?![A-Za-z])"
 tests:
   - name: every contraction and apostrophe
     input: |

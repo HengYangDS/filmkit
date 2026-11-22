@@ -7,19 +7,19 @@ level: warning
 scope: paragraph
 nonword: true
 tokens:
-  - '咱(?!们)'
-  - '各位(?!于)'
-  - '诸位'
-  - '朋友们'
+  - "咱(?!们)"
+  - "各位(?!于)"
+  - "诸位"
+  - "朋友们"
 tests:
   - name: every form
     input: |
       咱俩先看，各位请看，诸位留意，朋友们好。
     contains:
-      - '''咱'''
-      - '''各位'''
-      - '''诸位'''
-      - '''朋友们'''
+      - "'咱'"
+      - "'各位'"
+      - "'诸位'"
+      - "'朋友们'"
   - name: forms that are no address
     input: |
       咱们

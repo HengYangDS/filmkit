@@ -10,11 +10,11 @@ scope: paragraph
 nonword: true
 ignorecase: true
 tokens:
-  - '你们?'
-  - '您'
-  - '大家'
-  - '咱们'
-  - '(?<![A-Za-z0-9])you(?:rs?|rself|rselves)?(?![A-Za-z0-9])'
+  - "你们?"
+  - "您"
+  - "大家"
+  - "咱们"
+  - "(?<![A-Za-z0-9])you(?:rs?|rself|rselves)?(?![A-Za-z0-9])"
 tests:
   - name: every Chinese form, inside a word too
     input: |

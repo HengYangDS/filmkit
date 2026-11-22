@@ -9,20 +9,20 @@ level: error
 scope: paragraph
 nonword: true
 tokens:
-  - '弄'
-  - '搞'
-  - '拿准'
-  - '拿不准'
-  - '跑'
-  - '看一眼'
-  - '现查'
-  - '其实'
-  - '说白了'
-  - '一下'
-  - '吧'
-  - '呢'
-  - '啊'
-  - '呀'
+  - "弄"
+  - "搞"
+  - "拿准"
+  - "拿不准"
+  - "跑"
+  - "看一眼"
+  - "现查"
+  - "其实"
+  - "说白了"
+  - "一下"
+  - "吧"
+  - "呢"
+  - "啊"
+  - "呀"
 tests:
   - name: every form the standard lists, inside a word too
     input: |
