@@ -110,3 +110,7 @@
 - [x] 7.3 The refusal of a reshaped template field says what it refuses, a conversion or a format specification, and
       no longer that a field is cited by its name alone: a field written with an attribute or an index is filled as
       before. Done when the tests in `tests/review/test_prepare.py` pass.
+- [x] 7.4 The refusal of a reshaped template field asked of the three released films' reviewer prompt templates at
+      their release tags, by the engine's own reader of a template's fields. Done when no template is refused, by the
+      record in `build/evidence/check-the-formal-register/template-fields/` (`template-fields.json` and the command
+      that wrote it).
