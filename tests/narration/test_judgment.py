@@ -389,6 +389,35 @@ def test_a_reference_take_without_two_formants_is_refused_in_one_line(
     assert not (Edition("en").ear_first / narration_judge.RECORD).exists()
 
 
+def test_a_reference_the_segments_alignment_does_not_place_is_refused_in_one_line(
+    narrated, voiced, monkeypatch
+):
+    import converging
+
+    record = says_name(narrated, voiced, monkeypatch)
+    monkeypatch.setattr(narration_terms, "first_vowel", lambda *_: CLOSE)
+
+    def misplaced(segment):
+        """The segment's words as an aligner placed them that parts the name in two items."""
+        found = []
+        for word, start, end in converging.placed(segment):
+            middle = (start + end) / 2
+            found += [("Na", start, middle), ("im", middle, end)] if word == "Naim" else []
+            found += [] if word == "Naim" else [(word, start, end)]
+        return found
+
+    # The take alone holds its reference; the segment's alignment holds none: no thought is
+    # named, so the gate stops before any thought is judged rather than let every one settle.
+    converging.write_checks("en", [record], misplaced)
+    with pytest.raises(SystemExit) as refused:
+        narration_judge.main(["--language", "en"])
+    assert str(refused.value) == (
+        "en: the NAME reference 26.1 #0 is not in the narration as the selection aligns its "
+        "segment; declare another occurrence of NAME as its en reference in [[narration.terms]]"
+    )
+    assert not (Edition("en").ear_first / narration_judge.RECORD).exists()
+
+
 def test_judge_refuses_every_thought_with_every_failing_line_and_writes_one_record(
     narrated, voiced, capsys
 ):

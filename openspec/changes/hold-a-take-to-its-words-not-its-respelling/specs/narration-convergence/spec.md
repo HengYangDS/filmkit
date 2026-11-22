@@ -1,8 +1,23 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
-### Requirement: A respelled Han word reads as its spoken form
+### Requirement: Han characters are compared by reading
 
-Where a `homophone` rule of the pronunciation contract respells a Han word, the comparison of a transcript with a take's text SHALL read that word as the dictionary reads the rule's spoken form, in the text and in the transcript.
+Where a transcript is compared with a take's text, two Han characters with the same reading, tone kept, SHALL count as the same unit. A character's reading SHALL be that of the declared word it stands in, or of the spoken form where a `homophone` rule respells its word, and otherwise the dictionary's in its context. 的, 地 and 得 SHALL count as one only where the text says a particle. A take's record SHALL state its differing units by reading beside those by unit.
+
+#### Scenario: A homophone in the transcript
+
+- **WHEN** a Chinese take's text holds 在 and its transcript holds 再 at that place
+- **THEN** the take differs by one unit and by no unit by reading
+
+#### Scenario: Another tone
+
+- **WHEN** a take's text holds 买 and its transcript holds 卖
+- **THEN** the take differs by one unit by reading
+
+#### Scenario: A character that is no particle
+
+- **WHEN** a take's text holds 土地 and its transcript holds 土的
+- **THEN** the take differs by one unit by reading
 
 #### Scenario: A respelled word written in its own characters
 
@@ -13,6 +28,8 @@ Where a `homophone` rule of the pronunciation contract respells a Han word, the 
 
 - **WHEN** the contract respells 去重 as 去虫, the take's text holds 去众 and its transcript holds 去重
 - **THEN** the take differs by one unit by reading
+
+## ADDED Requirements
 
 ### Requirement: A declared term is one unit under both its forms
 
@@ -42,9 +59,9 @@ In the Chinese edition a declared term SHALL also count as the same as one Latin
 - **WHEN** that Chinese transcript holds, in the term's place, "Agent", "2024", "内姆", "Nime Nime", "Nime OK" or nothing
 - **THEN** the take differs by at least one unit by reading
 
-### Requirement: A reference without two formants stops the command in one line
+### Requirement: A reference that gives no first vowel stops the command in one line
 
-Where a declared term's reference occurrence shows no two formants, on its take or as the selection aligns its segment, `judge`, `converge` and `audition` SHALL stop before they judge a thought against it or ask a candidate, with one line that names the reference and says to declare another occurrence, and with no traceback.
+Where a declared term's reference occurrence shows no two formants on its take, or shows none or does not stand as the selection aligns its segment, `judge`, `converge` and `audition` SHALL stop before they judge a thought against it or ask a candidate, with one line that names the reference and says to declare another occurrence, and with no traceback.
 
 #### Scenario: On its take
 
@@ -55,3 +72,8 @@ Where a declared term's reference occurrence shows no two formants, on its take 
 
 - **WHEN** the take alone shows two formants and the segment's alignment beside the receipt shows none at the reference
 - **THEN** `judge` exits with one line that names the reference, says that the selection aligns its segment, and says to declare another occurrence, and writes no judgment record
+
+#### Scenario: Not in its segment
+
+- **WHEN** the take alone holds the reference and the segment's alignment places no word that says the term there
+- **THEN** `judge` exits with one line that names the reference as not in the narration as the selection aligns its segment, says to declare another occurrence, and writes no judgment record
