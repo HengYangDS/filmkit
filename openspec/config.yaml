@@ -58,3 +58,8 @@ rules:
       design prose or a parallel ledger.
     - Separate implementation tasks from lifecycle preconditions and effects; a Change never records
       its own landing, archive or Lane retirement as a completed task.
+    - A task that verifies code names the test file that verifies it, as a path in backticks, so
+      that a step's focused tests are read from the tasks.
+    - A Change that adds or changes a check carries an acceptance task that runs the check on its
+      real consumers, the released films for an engine check, and keeps the record under
+      `build/evidence/<change>/`.
