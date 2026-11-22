@@ -16,7 +16,7 @@ filmkit carries no film's content. A film's scripts, casts, pages, review policy
 
 ## Prepare the tools
 
-The engine builds films on an Apple-silicon Mac. [Mise](https://mise.jdx.dev) installs the locked Node, CPython, uv and ETHOS that the [project configuration](.config/mise/config.toml) and its [lock](.config/mise/mise.lock) declare, and Homebrew supplies FFmpeg with libx264, ExifTool and rsync 3:
+The engine builds films on an Apple-silicon Mac. [Mise](https://mise.jdx.dev) installs the locked Node, CPython, uv, Vale and ETHOS that the [project configuration](.config/mise/config.toml) and its [lock](.config/mise/mise.lock) declare, and Homebrew supplies FFmpeg with libx264, ExifTool and rsync 3:
 
 ```sh
 brew install ffmpeg exiftool rsync
