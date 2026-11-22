@@ -207,12 +207,12 @@ def require_terms(code: str, script: dict, records: list[dict], film=None) -> No
     if not path:
         return
     languages = repository.read(path)["pronunciation"]["languages"]
-    rules = languages.get(Edition(code).language, {}).get("normalization", [])
+    language = languages[Edition(code).language]
     said = [
         (f"{record['id']}.{child['index']}", child["spoken_text"])
         for record, child in thoughts(records)
     ]
-    failures = terms.respelling_failures((film or FILM).narration.terms, rules, said, code)
+    failures = terms.respelling_failures((film or FILM).narration.terms, language, said, code)
     if failures:
         raise SystemExit("\n".join(failures))
 

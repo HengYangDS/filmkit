@@ -219,25 +219,42 @@ def test_one_function_says_which_form_a_unit_says_and_whether_it_is_possessive()
     assert terms.says("Name's", forms) and not terms.says("Nime", forms)
 
 
-def english_name(display: str, spoken: str) -> dict:
-    return {"display": display, "spoken": spoken, "kind": "english-name"}
+def respelling(*rules: tuple[str, str]) -> dict:
+    """A language's contract whose normalization respells each name as given."""
+    return {
+        "normalization": [
+            {"display": display, "spoken": spoken, "kind": "english-name"}
+            for display, spoken in rules
+        ]
+    }
 
 
 def test_a_name_respelled_with_other_letters_needs_a_term():
     name = NarrationTerm(
         term="NAME", spoken="Naim", ipa="ˈneɪm", reference={"zh": {"thought": "01.1", "index": 0}}
     )
-    rules = [english_name("NAME", "Naim"), english_name("OpenSpec", "Open Spec")]
+    language = respelling(("NAME", "Naim"), ("OpenSpec", "Open Spec"))
     thoughts = [("01.1", "Naim 走的是另一条路。"), ("01.2", "Open Spec 也一样。")]
-    assert terms.respelling_failures((), rules, thoughts, "zh") == [
+    assert terms.respelling_failures((), language, thoughts, "zh") == [
         "zh: the normalization respells NAME as Naim, said in 01.1; declare NAME in "
         "[[narration.terms]]"
     ]
-    assert terms.respelling_failures((name,), rules, thoughts, "zh") == []
+    assert terms.respelling_failures((name,), language, thoughts, "zh") == []
     # Spaced or recased, a name keeps its letters; a rule that no thought says asks nothing.
-    kept = [english_name("OpenSpec", "Open Spec"), english_name("NaMe", "Name")]
+    kept = respelling(("OpenSpec", "Open Spec"), ("NaMe", "Name"))
     assert terms.respelling_failures((), kept, [("01.1", "Name 和 Open Spec。")], "zh") == []
-    assert terms.respelling_failures((), [english_name("NAME", "Naim")], thoughts[1:], "zh") == []
+    alone = respelling(("NAME", "Naim"))
+    assert terms.respelling_failures((), alone, thoughts[1:], "zh") == []
+    # A thought says the name where a recognition unit says it, as the comparison reads it.
+    joined = [("01.3", "一种 Naim-based 的做法。")]
+    assert terms.respelling_failures((), alone, joined, "zh") == [
+        "zh: the normalization respells NAME as Naim, said in 01.3; declare NAME in "
+        "[[narration.terms]]"
+    ]
+    # A form of several recognition units could be no term the comparison reads: none asked.
+    parted = respelling(("Node.js", "Noad.js"), ("O’Neil", "O’Neel"))
+    said = [("01.4", "用 Noad.js 跑，问 O’Neel。")]
+    assert terms.respelling_failures((), parted, said, "zh") == []
 
 
 def test_every_language_gives_a_term_its_declared_spoken_form():

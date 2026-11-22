@@ -176,29 +176,38 @@ def declaration_failures(
 
 
 def respelling_failures(
-    terms: tuple[NarrationTerm, ...], rules: list[dict], thoughts: list[tuple[str, str]], code: str
+    terms: tuple[NarrationTerm, ...], language: dict, thoughts: list[tuple[str, str]], code: str
 ) -> list[str]:
     """Each name an edition says that its normalization respells in other letters and that no
     declared term names.
 
     Such a name is compared as a term (`recognition.read_units`) and said as one, so the film
-    declares it. Whether the letters are other letters is the comparison's to say
-    (`recognition.reading_distance`): a rule that only spaces or recases a name asks for no
-    term, nor does one whose display or spoken form is no single Latin word, which no term can
-    be. `rules` holds the edition's normalization rules, and `thoughts` each thought's name and
-    spoken text in narration order.
+    declares it. Words and letters are the comparison's to say: a term is read per recognition
+    unit, so a name is asked for only where its display and spoken forms are each one Latin
+    unit, and a thought says it where one of its units does; a rule whose letters
+    `recognition.reading_distance` finds the same, one that only spaces or recases a name, asks
+    for no term. `language` is the edition's language in the pronunciation contract, and
+    `thoughts` holds each thought's name and spoken text in narration order.
     """
     # The comparison reads a unit by `said_form`, so it is imported where it is asked.
-    from filmkit.narration.recognition import reading_distance
+    from filmkit.narration.recognition import HAN_UNIT, reading_distance, recognition_units
+
+    def one_unit(form: str) -> bool:
+        units = recognition_units(form)
+        return (
+            LATIN_WORD.fullmatch(form) is not None
+            and len(units) == 1
+            and not (HAN_UNIT.fullmatch(units[0]))
+        )
 
     declared = {term.term.casefold() for term in terms}
     failures = []
-    for rule in rules:
+    for rule in language.get("normalization", []):
         display, spoken = rule.get("display", ""), rule.get("spoken", "")
         if (
             rule.get("kind") != "english-name"
             or display.casefold() in declared
-            or not (LATIN_WORD.fullmatch(display) and LATIN_WORD.fullmatch(spoken))
+            or not (one_unit(display) and one_unit(spoken))
             or reading_distance(display, spoken) == 0
         ):
             continue
@@ -206,7 +215,7 @@ def respelling_failures(
         places = [
             where
             for where, text in thoughts
-            if any(says(match.group(), forms) for match in LATIN_WORD.finditer(text))
+            if any(says(unit, forms) for unit in recognition_units(text))
         ]
         if places:
             failures.append(

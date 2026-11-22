@@ -382,8 +382,7 @@ def term_failures(
     """
     declared, languages = FILM.narration.terms, performance["languages"]
     said = [tuple(thought) for thought in thoughts]
-    rules = languages[Edition(code).language].get("normalization", [])
-    owed = terms.respelling_failures(declared, rules, said, code)
+    owed = terms.respelling_failures(declared, languages[Edition(code).language], said, code)
     if not declared:
         return owed
     return (
