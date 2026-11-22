@@ -1,6 +1,6 @@
 ## Context
 
-See [proposal.md](proposal.md). Line numbers are of `1e4d459`; a source path without `tests/`, `.config/` or `openspec/` is below `src/filmkit/`. The engine keeps an edition's places in `production.py` (`Edition`, `Rendered`) and its delivered films in `RENDITIONS` (`production.py:94-99`). Its Node modules run as tools from a film's copy of them (`tools.py:98-112`), and `picture/stage-contract.mjs` is their reading of a stage. The review of 20 November listed facts stated twice [S1]; its dispositions sorted them [S2]; the re-reading at `1e4d459` of the places the dispositions call single is [S3].
+See [proposal.md](proposal.md). Line numbers are of `1e4d459`; a source path without `tests/`, `.config/` or `openspec/` is below `src/filmkit/`. The engine keeps an edition's places in `production.py` (`Edition`, `Rendered`) and its delivered films in `RENDITIONS` (`production.py:94-99`). Its Node modules run as tools from a film's copy of them (`tools.py:98-112`), and `picture/stage-contract.mjs` is their reading of a stage. Each fact below was found stated twice by reading the engine at `1e4d459`, a commit of this repository, whose lines the decisions cite.
 
 ## Goals / Non-Goals
 
@@ -11,9 +11,13 @@ See [proposal.md](proposal.md). Line numbers are of `1e4d459`; a source path wit
 
 **Non-Goals:**
 
-- The items of the decisions note, among them the player check's own lists (D3, D4), the films' prompt template (D2), the source of `released.ENGINE` (D6) and the stage's names across the two languages (D9).
+- The player check's own lists: the 25 delivery members, to which `bindingProblems` holds a binding (`delivery/player-check.mjs:51-71`, `:76-99`), and the films' kinds, sizes and pages and the editions' page languages (`delivery/player-read.mjs:28-31`, `delivery/player-check.mjs:56-59`, `delivery/player-verdict.mjs:20`, `:346`). Reading them from the delivery's binding changes what the check refuses and the binding's bytes, which reviewers read (`review/prompts.py:71`): a Change of its own.
+- The review files' names in a film's prompt template (`examples/sample-film/content/review/prompt.md:36`, beside `review/files.py:54-57`): filling them from the engine changes each film's template, which stays frozen until December, and a requirement of `review-rounds`.
+- The source of `released.ENGINE`, the folder of the package (`released.py:29`), whose name the project's equals (`pyproject.toml:2`, `:37`). Reading the name from `pyproject.toml` would derive it a second time, since an installed engine holds no `pyproject.toml`.
+- The stage's names standing once in Python and once among the Node modules: the stage's folder is the interface between the two languages, and `tests/picture/test_stage_contract.py` runs the Node reader on a stage the Python wrote. Handing the tools a stage's files instead of its folder would change the films' tasks, which name the folder.
 - Module paths and command strings that name the import package (decision 6).
-- The roots of the build layout, among them the work folder, which modules other than the edition's places use (D10).
+- The roots of the build layout, among them the work folder, which modules other than the edition's places use: 35 string literals of `src/` begin with `build/`, each module joining its own folder below a root, and an owner of the roots is a Change of its own.
+- Facts of another kind that look alike: the H.264 levels keyed by the delivered heights (`specification.py:53`), a fact of the encoder's levels as the HD tag of decision 9 is of the tag; the composition's logical frame of 1920 by 1080 (`picture/equivalence.py:76`, `picture/template.py:23-26`), the composition's and not a delivered film's; the still scan's film, chosen by its kind (`picture/still_scan.py:85`), a read of `RENDITIONS`; and the pre-render check's painting, `cover.png` in its own work folder (`preflight.py:108`), no delivered file.
 - A test's expected values, which stay literals (decision 10).
 
 ## Decisions
@@ -29,7 +33,7 @@ See [proposal.md](proposal.md). Line numbers are of `1e4d459`; a source path wit
    - **Considered:** each module keeping its literal; importing from the contract.
    - **Chosen because:** the contract is already the tools' reading of a stage and imports no browser.
    - **Applies to:** the three modules named.
-   - **Reopened when:** decision D9 of the decisions note changes how a tool is handed a stage.
+   - **Reopened when:** the tools are handed a stage's files instead of its folder.
 3. **`VERSIONS` is the one statement of how the delivered films pair into versions.**
    - **Rests on:** `RENDITIONS` states each film's size and whether its picture draws captions; `delivery/player.py:73-76`, `:221-224` and `:425` pair or name the kinds by hand, and the status line names the version the page opens on by its word (`:431`) beside the flag that presses its button (`:74`). The page's words for a version are keys of `WORDS`: the button's (`viewing`, `uhd`; `delivery/player.py:84-85`, `:114-115`) and the film's (`viewing_film`, `uhd_film`; `:94-95`, `:124-125`).
    - **Considered:** deriving the pairing in each of the four places; deriving it once.
@@ -51,9 +55,9 @@ See [proposal.md](proposal.md). Line numbers are of `1e4d459`; a source path wit
 6. **The engine's version is read under `released.ENGINE`; the import package's name is out of scope.**
    - **Rests on:** `ENGINE` (`released.py:29`) is read as the distribution's name by `adoption.py:247`, `:263`, `:275-276`, `:399` and `register/__init__.py:185`. Eleven reads of the version spell the name (`picture/derivation.py:149`, `picture/equivalence.py:124`, `picture/gates.py:390`, `picture/rendering.py:400`, `picture/still_scan.py:448`, `:504`, `preflight.py:204`, `:355`, `:372`, `soundtrack/gates.py:74`, `tools.py:103`), and so does the tool cache's folder (`tools.py:65`). Module paths and command strings name the import package: `adoption.py:62`, `:66`; `durations.py:372`; `narration/converge.py:155`; `narration/narrate.py:71`, `:92`, `:108`; `narration/processes.py:135`; `picture/faults.py:87`, `:89`; `picture/repair.py:51`; `review/set_aside.py:45`; `tools.py:191`.
    - **Considered:** deriving the module paths too, from `__package__` or a module's `__name__`; leaving them.
-   - **Chosen because:** the version reads and the cache folder name the distribution, which `ENGINE` serves. A module path names the import package as every `import filmkit` statement of the engine does; deriving the strings alone would leave the name in every import, and renaming the package is one move of the whole tree. Which source `ENGINE` derives from is D6.
+   - **Chosen because:** the version reads and the cache folder name the distribution, which `ENGINE` serves. A module path names the import package as every `import filmkit` statement of the engine does; deriving the strings alone would leave the name in every import, and renaming the package is one move of the whole tree.
    - **Applies to:** the twelve statements named first.
-   - **Reopened when:** D6 is decided for another way than its first.
+   - **Reopened when:** the distribution's name and the import package's must differ.
 7. **The adoption command locates a film's manifests by the names the record states.**
    - **Rests on:** `released.py:34`; `adoption.py:203`, `:212`, `:265`. The messages name the files in prose (`adoption.py:215-216`, `:227`, `:233`).
    - **Considered:** keeping the three spelled names; reading the names the record states.
@@ -74,7 +78,7 @@ See [proposal.md](proposal.md). Line numbers are of `1e4d459`; a source path wit
    - **Applies to:** the statements named, but for `delivery/packaging.py:353`.
    - **Reopened when:** the build layout's roots get an owner of their own.
 10. **A test reads an owner only to build an input; an expected value stays a literal.**
-    - **Rests on:** the owner's rule of 20 November: a test's expected value standing beside its input is not a second source. The dispositions keep such values [S2].
+    - **Rests on:** the owner's rule of 20 November: a test's expected value standing beside its input is not a second source.
     - **Chosen because:** a test that asserts the code's constant equals itself checks nothing. A line that writes, places or alters an input may read the owner; an assertion is not rewritten. The lines by role are listed under "Test lines by role" below.
     - **Reopened when:** not applicable.
 11. **Acceptance builds the sample film on both heads from one narration and compares the builds file by file; the changed browser checks also run on the released films' stages.**
@@ -127,9 +131,3 @@ Where the code says more than the design:
 - In `tests/test_adoption.py:51-54` and `:553-554` the pin's table key, its tag and the lock entries' name read `released.ENGINE`; the stand-in source URL `https://example.invalid/filmkit` is no read of the engine's name and keeps its words.
 
 Line numbers above remain those of `1e4d459`; the Change moves some of them.
-
-## Sources
-
-- **[S1]** `build/evidence/release-0.25.0/reviews/review-ssot.md` in the canonical checkout, section C.
-- **[S2]** `build/evidence/release-0.25.0/work/adoption-study/notes-section-c-dispositions.md` in the canonical checkout.
-- **[S3]** The re-reading of the places said to stand once, `records/reread.md`, to be kept as `build/evidence/state-each-fact-once/reread.md`.
