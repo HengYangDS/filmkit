@@ -50,7 +50,7 @@ def project(tmp_path):
         shutil.copy2(ENGINE / name, tmp_path / name)
     (tmp_path / "pyproject.toml").write_text(
         f'[tool.uv.sources]\n{released.ENGINE} = {{ git = "https://example.invalid/filmkit", '
-        f'tag = "v{version(released.ENGINE)}" }}\n'
+        f'tag = "v{released.version()}" }}\n'
     )
     (tmp_path / ".config/mise").mkdir(parents=True)
     (tmp_path / ".config/mise/config.toml").write_text(TASKS + PIN)
@@ -162,7 +162,7 @@ def test_a_package_outside_the_engines_runtime_is_the_films_own(project):
 
 
 def test_a_pin_of_another_engine_release_is_a_finding(project):
-    rewrite(project / "pyproject.toml", f'tag = "v{version(released.ENGINE)}"', 'tag = "v0.0.0"')
+    rewrite(project / "pyproject.toml", f'tag = "v{released.version()}"', 'tag = "v0.0.0"')
     (finding,) = found(project)["python_lock"]
     assert "pins filmkit v0.0.0" in finding and f"v{version('filmkit')}" in finding
 
@@ -425,7 +425,7 @@ def test_the_template_names_scripts_and_stylesheets_as_a_browser_reads_them(proj
 
 
 def test_a_pin_that_is_no_tag_is_named_as_not_compared(project):
-    rewrite(project / "pyproject.toml", f'tag = "v{version(released.ENGINE)}"', 'rev = "db7a837"')
+    rewrite(project / "pyproject.toml", f'tag = "v{released.version()}"', 'rev = "db7a837"')
     result = adoption.report(project)
     assert result["findings"]["python_lock"] == []
     assert any("python_lock" in note and "tag" in note for note in result["not_read"])
@@ -556,7 +556,7 @@ def test_a_lock_of_another_engine_release_is_a_finding_when_the_pin_is_this_one(
     )
     (finding,) = found(project)["python_lock"]
     assert "uv.lock holds filmkit 0.0.1" in finding and "lock again" in finding
-    rewrite(project / "pyproject.toml", f'tag = "v{version(released.ENGINE)}"', 'tag = "v0.0.0"')
+    rewrite(project / "pyproject.toml", f'tag = "v{released.version()}"', 'tag = "v0.0.0"')
     (finding,) = found(project)["python_lock"]
     assert "pins filmkit v0.0.0" in finding
 

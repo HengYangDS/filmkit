@@ -53,7 +53,6 @@ import json
 import subprocess
 import sys
 from errno import ENOENT
-from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -446,7 +445,7 @@ def film_record(edition: Edition) -> dict:
     in the words that follow "The <code> film" in a refusal."""
     if not edition.film_stills.is_file():
         raise NoAnswerError(" has no still scan record")
-    subjects, engine = film_subjects(edition), version(released.ENGINE)
+    subjects, engine = film_subjects(edition), released.version()
     try:
         return still_record.answer(
             edition.film_stills, subjects, rules(), film_frames(edition), engine
@@ -502,7 +501,7 @@ def scan_film(edition: Edition) -> dict:
         except StillScanError as error:
             path.unlink(missing_ok=True)
             raise PictureError(str(error)) from error
-        record["engine_version"] = version(released.ENGINE)
+        record["engine_version"] = released.version()
         repository.write(path, record)
     longest, held = record["longest_fine_speech"], len(over_limit(record))
     print(json.dumps({"longest_fine_speech": longest, "over_limit": held, "scanned": scanned}))

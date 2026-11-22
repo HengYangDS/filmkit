@@ -500,7 +500,7 @@ def test_a_record_written_under_another_limit_is_refused_with_both_limits(packag
     record = still_scan.record_scan(packaged.film, edition.timeline, edition.film_stills, 99)
     assert (record["over_limit"], record["limit_seconds"]) == ([], 99)
     assert refusal(edition) == "The zh film's still scan record cannot be read; run scan-film"
-    rewrite(packaged, engine_version=version(released.ENGINE))
+    rewrite(packaged, engine_version=released.version())
     assert refusal(edition) == (
         "The zh film's still scan record states other rules than the engine's: a limit of 99 s "
         "where the engine's is 3.5 s; run scan-film"

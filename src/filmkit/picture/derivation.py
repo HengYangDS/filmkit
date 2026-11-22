@@ -54,7 +54,6 @@ import os
 import subprocess
 import time
 from datetime import UTC, datetime
-from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -147,7 +146,7 @@ def source_bindings(edition: Edition) -> dict:
         "source_receipt_sha256": repository.sha(captioned.receipt),
         "composition_sha256": repository.sha(repository.ROOT / COMPOSITION_SCRIPT),
         "timeline_sha256": repository.sha(edition.timeline),
-        "engine_version": version(released.ENGINE),
+        "engine_version": released.version(),
     }
 
 

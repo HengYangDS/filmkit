@@ -48,7 +48,6 @@ import ast
 import json
 import re
 import tomllib
-from importlib.metadata import version
 from pathlib import Path
 
 import filmkit.film as film
@@ -260,7 +259,7 @@ def python_lock(root: Path, not_read: list[str]) -> list[str]:
     """The release the film pins and locks, and what its Python lock holds against the engine's
     record. A lock of another release is named only where the pin is this one: a film that pins
     another release has locked that one."""
-    record, engine = released.load()["python"], version(released.ENGINE)
+    record, engine = released.load()["python"], released.version()
     found = pinned(root, engine, not_read)
     lock = held(root, released.PYTHON_LOCK)
     if lock is None:
@@ -396,7 +395,7 @@ def report(root: Path) -> dict:
             findings[name] = ask()
         except UnreadableError as error:
             findings[name] = [str(error)]
-    return {"engine": version(released.ENGINE), "findings": findings, "not_read": not_read}
+    return {"engine": released.version(), "findings": findings, "not_read": not_read}
 
 
 def main(argv: list[str] | None = None) -> None:

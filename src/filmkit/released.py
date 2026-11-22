@@ -19,6 +19,7 @@ repository's fix task runs it, and its tests refuse a record that differs from t
 
 from __future__ import annotations
 
+import importlib.metadata
 import json
 import tomllib
 from pathlib import Path
@@ -29,11 +30,16 @@ RECORD = Path(__file__).with_name("released.json")
 ENGINE = RECORD.parent.name
 # The command that writes the record, in the engine's repository.
 COMMAND = f"python -m {ENGINE}.{Path(__file__).stem}"
-# The repository's npm manifest, its npm lock and its Python lock, which the record is written
-# from.
+# npm's manifest, npm's lock and uv's lock by their names: the engine's repository writes the
+# record from its own, and a film or an installed npm package holds files of the same names.
 MANIFEST, NPM_LOCK, PYTHON_LOCK = "package.json", "package-lock.json", "uv.lock"
 # The repository's Mise configuration, and the tool in it that pins the register check's Vale.
 MISE_CONFIG, VALE = ".config/mise/config.toml", "github:vale-cli/vale"
+
+
+def version() -> str:
+    """The running engine's version, as its installed distribution states it."""
+    return importlib.metadata.version(ENGINE)
 
 
 class ReleasedError(ValueError):

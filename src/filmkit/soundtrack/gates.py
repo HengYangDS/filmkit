@@ -16,7 +16,6 @@ between thoughts, stays with the review's measurement.
 from __future__ import annotations
 
 import json
-from importlib.metadata import version
 from typing import TYPE_CHECKING
 
 import filmkit.released as released
@@ -72,7 +71,7 @@ def check_sound(edition: Edition) -> dict:
     bound = {
         "soundtrack_sha256": repository.sha(edition.soundtrack),
         "timeline_sha256": repository.sha(edition.timeline),
-        "engine_version": version(released.ENGINE),
+        "engine_version": released.version(),
     }
     clarity_measured = clarity.voice_clarity(edition.code, edition.soundtrack, timeline)
     endings_measured = endings.endings(edition, timeline, assembly)

@@ -85,7 +85,7 @@ def edition(tmp_path, monkeypatch):
         {
             "composition_sha256": composition,
             "timeline_sha256": repository.sha(edition.timeline),
-            "engine_version": version(released.ENGINE),
+            "engine_version": released.version(),
             **picture_rendering.face_bindings(),
             "verdict": "pass",
         },
@@ -96,7 +96,7 @@ def edition(tmp_path, monkeypatch):
         {
             "soundtrack_sha256": repository.sha(edition.soundtrack),
             "timeline_sha256": repository.sha(edition.timeline),
-            "engine_version": version(released.ENGINE),
+            "engine_version": released.version(),
             "clarity": {"floor_db": 18.0, "thoughts": []},
             "verdict": "pass",
         },

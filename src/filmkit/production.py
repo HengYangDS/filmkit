@@ -44,6 +44,11 @@ class Rendition:
     captions: bool = True
     keyframe_seconds: int | None = None
 
+    @property
+    def size(self) -> tuple[int, int]:
+        """The film's frame: its width, then its height."""
+        return (self.width, self.height)
+
 
 # The 1080p viewing film's encoder and its settings: x264, whose keyframes stand where its
 # options put them. VideoToolbox, which encoded these films before, left the declared grid six
@@ -66,13 +71,13 @@ VIEWING_RATE_FACTOR = 10
 # The two sizes a film is delivered at: the UHD master and the 1080p viewing film, whose encode
 # scales the picture to its frame.
 UHD = Rendition(3840, 2160, reencoded=False)
-VIEWING_SIZE = (1920, 1080)
+_VIEWING_SIZE = (1920, 1080)
 VIEWING = Rendition(
-    *VIEWING_SIZE,
+    *_VIEWING_SIZE,
     reencoded=True,
     video=(
         "-filter:v:0",
-        "scale=w={}:h={}:flags=area".format(*VIEWING_SIZE),
+        "scale=w={}:h={}:flags=area".format(*_VIEWING_SIZE),
         "-c:v:0",
         VIEWING_ENCODER,
         "-preset:v:0",

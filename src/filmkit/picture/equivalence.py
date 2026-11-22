@@ -46,7 +46,6 @@ import json
 import math
 import subprocess
 import threading
-from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -122,7 +121,7 @@ def current_bindings(edition: Edition) -> dict:
     return {
         "composition_sha256": repository.sha(repository.ROOT / COMPOSITION_SCRIPT),
         "timeline_sha256": repository.sha(edition.timeline),
-        "engine_version": version(released.ENGINE),
+        "engine_version": released.version(),
         "pictures": {
             name: picture_bindings(edition, captions)
             for name, captions in (("captioned", True), ("uncaptioned", False))

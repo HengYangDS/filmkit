@@ -114,14 +114,16 @@ Nothing migrates: no film's file, record or command changes. To roll back, rever
 The owners the decisions name exist as the design reads them at `1e4d459`: `production.py` with `Edition`, `Rendered` and `RENDITIONS`, `picture/stage-contract.mjs` with `RECORD`, `PAGE` and `frameContract`, `delivery/player.py`, `delivery/reproduction.py`, `released.ENGINE`, `MANIFEST`, `NPM_LOCK` and `PYTHON_LOCK`, and `picture.rendering.PICTURE_SIZE`. Their new members:
 
 - Decision 1: `production.STAGE_PAGE` and `STAGE_RECORD`, and `Rendered.page`.
-- Decision 3: `player.Version`, a named tuple of the five fields the decision lists; `player.kinds_at`, which takes a size's two kinds from `RENDITIONS`; `VERSIONS`; and `OPENING`, the version whose button starts pressed, which the page's video and status line read.
+- Decision 3: `player.Version`, a named tuple of the five fields the decision lists; the private `_kinds_at`, which takes a size's two kinds from `RENDITIONS` and refuses a size that holds other than one film with captions and one without; `VERSIONS`; and the private `_OPENING`, the version whose button starts pressed, which the page's video and status line read.
 - Decision 5: `reproduction.release_name(edition, path)`, which the cover's release name reads too (decision 8).
+- Decision 6: `released.version()`, the one derivation of the running engine's version, which the thirteen reads call.
 - Decision 8: `Edition.srt`, `vtt`, `transcript`, `chapters` and `chapter_metadata`, `player.PAGE`, and `player.COVER`, the cover's name after the film's.
-- Decision 9: `repository.ARTIFACTS` and `EVIDENCE`, and `production.STAGE`, the captioned stage's name as a format of the edition's code, which `tools.py` splits at the code to build its pattern; and `production.VIEWING_SIZE`, from which `VIEWING` and its scale filter are built.
+- Decision 9: `repository.ARTIFACTS` and `EVIDENCE`, and `production.STAGE`, the captioned stage's name as a format of the edition's code, which `tools.py` formats with a marker for the code and splits at it to build its pattern; `Rendition.size`, a rendition's frame, which `PICTURE_SIZE`, the stage sizes, the draft's frame, the verifier's media check and the player's versions read; and the private `production._VIEWING_SIZE`, from which `VIEWING` and its scale filter are built.
 
 Where the code says more than the design:
 
 - The draft's stage is no `Rendered` (`Edition.draft_stage`), so `picture/draft.py` hands `record_render` its stage's page as `stage / STAGE_PAGE`.
+- The renderer names the canvas package's manifest by `released.MANIFEST`, npm's manifest name, which decision 7 reads for a film's manifest (`picture/renderer.py:55` at `1e4d459`).
 - In `tests/test_adoption.py:51-54` and `:553-554` the pin's table key, its tag and the lock entries' name read `released.ENGINE`; the stand-in source URL `https://example.invalid/filmkit` is no read of the engine's name and keeps its words.
 
 Line numbers above remain those of `1e4d459`; the Change moves some of them.

@@ -5,7 +5,6 @@ import json
 import shutil
 import sys
 import textwrap
-from importlib.metadata import version
 
 import pytest
 
@@ -58,7 +57,7 @@ def edition(tmp_path, monkeypatch):
     put(edition.audio_assembly, assembly)
     composition = repository.sha(root / picture_rendering.COMPOSITION_SCRIPT)
     gates = {"composition_sha256": composition, "timeline_sha256": repository.sha(edition.timeline)}
-    gates |= {"engine_version": version(released.ENGINE), **picture_rendering.face_bindings()}
+    gates |= {"engine_version": released.version(), **picture_rendering.face_bindings()}
     put(edition.picture_gates, {**gates, "verdict": "pass"})
     fake = tmp_path / "native-canvas"
     body = """

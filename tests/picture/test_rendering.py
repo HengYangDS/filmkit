@@ -10,7 +10,6 @@ import signal
 import sys
 import textwrap
 import time
-from importlib.metadata import version
 from pathlib import Path
 
 import pytest
@@ -100,7 +99,7 @@ def passing_gates(edition, **changes):
     record = {
         "composition_sha256": repository.sha(composition),
         "timeline_sha256": repository.sha(edition.timeline),
-        "engine_version": version(released.ENGINE),
+        "engine_version": released.version(),
         **picture_rendering.face_bindings(),
         "verdict": "pass",
         **changes,

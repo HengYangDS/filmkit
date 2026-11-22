@@ -280,7 +280,7 @@ def verify_package(edition: production.Edition) -> dict:
 
 def verify_media(edition: production.Edition, path: Path, rendition: production.Rendition) -> dict:
     """Decode one complete delivered movie and check its rendition's declared contract."""
-    size = (rendition.width, rendition.height)
+    size = rendition.size
     data = media.probe(path)
     try:
         video = media.require_video(

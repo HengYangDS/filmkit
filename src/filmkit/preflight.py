@@ -49,7 +49,6 @@ Usage: python -m filmkit.produce preflight --language zh|en
 from __future__ import annotations
 
 import json
-from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -202,7 +201,7 @@ def sound(edition: Edition) -> str | None:
         current = {
             "soundtrack_sha256": repository.sha(edition.soundtrack),
             "timeline_sha256": repository.sha(edition.timeline),
-            "engine_version": version(released.ENGINE),
+            "engine_version": released.version(),
         }
     except FileNotFoundError as error:
         return missing(error)
@@ -353,7 +352,7 @@ def preflight(edition: Edition) -> dict:
     receipt = {
         "edition": edition.code,
         "verdict": "refuse" if stale else "pass",
-        "engine_version": version(released.ENGINE),
+        "engine_version": released.version(),
         "inputs": report,
         "bound": bound,
     }
@@ -370,7 +369,7 @@ def preflight(edition: Edition) -> dict:
 def moved_inputs(receipt: dict, edition: Edition, *, own: bool) -> list[str]:
     """The inputs a receipt bound that no longer hold, an engine of another version first:
     all of the edition's inputs, or with `own` False only those both editions share."""
-    moved = [] if receipt.get("engine_version") == version(released.ENGINE) else ["engine_version"]
+    moved = [] if receipt.get("engine_version") == released.version() else ["engine_version"]
     try:
         current = bound_inputs(edition) if own else shared_inputs()
     except FileNotFoundError as error:

@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 # The draft's frame rate and frame, the viewing film's, and the niceness it renders at unless the
 # caller's is higher.
 DRAFT_FPS = 10
-DRAFT_SIZE = (VIEWING.width, VIEWING.height)
+DRAFT_SIZE = VIEWING.size
 NICENESS = 10
 # Seconds a draft's render may take.
 DEADLINE = 3600

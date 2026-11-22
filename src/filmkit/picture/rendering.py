@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import json
 import shutil
-from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -48,8 +47,8 @@ TEMPLATE = Path(template.TEMPLATE)
 STYLE = COMPOSITION / template.STYLESHEET
 SOURCE_MANIFEST = sources.MANIFEST
 # The picture is rendered at the UHD master's frame; a stage may take either film's frame.
-PICTURE_SIZE = (RENDITIONS["uhd"].width, RENDITIONS["uhd"].height)
-STAGE_SIZES = {(rendition.width, rendition.height) for rendition in RENDITIONS.values()}
+PICTURE_SIZE = RENDITIONS["uhd"].size
+STAGE_SIZES = {rendition.size for rendition in RENDITIONS.values()}
 # The picture's data as the stage holds it for the renderer: what the document inlines.
 DATA = "film.json"
 
@@ -398,7 +397,7 @@ def require_passing_gates(edition: Edition) -> None:
     current = {
         "composition_sha256": sha(repository.ROOT / COMPOSITION_SCRIPT),
         "timeline_sha256": sha(edition.timeline),
-        "engine_version": version(released.ENGINE),
+        "engine_version": released.version(),
         **face_bindings(),
     }
     stale = [key for key, value in current.items() if record.get(key) != value]

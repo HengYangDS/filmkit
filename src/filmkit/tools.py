@@ -35,7 +35,6 @@ import shutil
 import signal
 import subprocess
 import tempfile
-from importlib.metadata import version
 from pathlib import Path
 
 import filmkit.child_processes as child_processes
@@ -74,9 +73,11 @@ BUILD_RUNS = {
 # Where a tool's argument names an edition: its stage, by the name `production.STAGE` gives it,
 # or its folder of evidence or artifacts, by the last name `repository` gives each.
 EDITION = "|".join(CODES)
-STAGED = f"(?P<stage>{EDITION})".join(map(re.escape, STAGE.split("{code}")))
-FOLDERS = "|".join(re.escape(place.name) for place in (repository.EVIDENCE, repository.ARTIFACTS))
-EDITION_PLACE = re.compile(rf"(?:^|/)(?:{STAGED}[^/]*|(?:{FOLDERS})/(?P<folder>{EDITION}))(?=/|$)")
+_STAGED = f"(?P<stage>{EDITION})".join(map(re.escape, STAGE.format(code="\0").split("\0")))
+_FOLDERS = "|".join(re.escape(place.name) for place in (repository.EVIDENCE, repository.ARTIFACTS))
+EDITION_PLACE = re.compile(
+    rf"(?:^|/)(?:{_STAGED}[^/]*|(?:{_FOLDERS})/(?P<folder>{EDITION}))(?=/|$)"
+)
 # Seconds a tool has to end, once the command's wait for it was cut short and it was asked to,
 # before it is killed.
 STOP_SECONDS = 20
@@ -102,7 +103,7 @@ def stage_tools() -> Path:
 
     A copy whose bytes equal the package's stays untouched; any other is replaced whole.
     """
-    cache = repository.ROOT / CACHE / version(released.ENGINE)
+    cache = repository.ROOT / CACHE / released.version()
     for module in sorted(PACKAGE.rglob("*.mjs")):
         copy = cache / module.relative_to(PACKAGE)
         if copy.is_file() and copy.read_bytes() == module.read_bytes():

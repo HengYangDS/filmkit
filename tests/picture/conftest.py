@@ -12,7 +12,6 @@ import shutil
 import sys
 import textwrap
 from dataclasses import dataclass
-from importlib.metadata import version
 from pathlib import Path
 
 import pytest
@@ -91,7 +90,7 @@ class FilmRoot:
         record = {
             "composition_sha256": repository.sha(self.path / picture_rendering.COMPOSITION_SCRIPT),
             "timeline_sha256": repository.sha(edition.timeline),
-            "engine_version": version(released.ENGINE),
+            "engine_version": released.version(),
             **picture_rendering.face_bindings(),
             "verdict": "pass",
         }

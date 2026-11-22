@@ -88,24 +88,33 @@ class Version(NamedTuple):
     films: str
 
 
-def kinds_at(size: Rendition) -> tuple[str, str]:
+def _kinds_at(size: Rendition) -> tuple[str, str]:
     """The kinds of `RENDITIONS` at a rendition's size: the film whose picture draws the
-    captions, then the one without them."""
-    kinds = {
-        rendition.captions: kind
-        for kind, rendition in RENDITIONS.items()
-        if (rendition.width, rendition.height) == (size.width, size.height)
-    }
-    return kinds[True], kinds[False]
+    captions, then the one without them. A size that holds other than one of each refuses."""
+    kinds = [
+        [
+            kind
+            for kind, rendition in RENDITIONS.items()
+            if (rendition.size, rendition.captions) == (size.size, drawn)
+        ]
+        for drawn in (True, False)
+    ]
+    if [len(found) for found in kinds] != [1, 1]:
+        message = (
+            f"RENDITIONS holds {kinds} at {size.size}: a version is one film with captions "
+            "and one without them"
+        )
+        raise ValueError(message)
+    return kinds[0][0], kinds[1][0]
 
 
 # The versions in the page's order, their films taken from `RENDITIONS` by size: the viewing
 # film's, which the page opens on with its captions, then the UHD master's.
 VERSIONS = (
-    Version(*kinds_at(VIEWING), pressed=True, button="viewing", films="viewing_film"),
-    Version(*kinds_at(UHD), pressed=False, button="uhd", films="uhd_film"),
+    Version(*_kinds_at(VIEWING), pressed=True, button="viewing", films="viewing_film"),
+    Version(*_kinds_at(UHD), pressed=False, button="uhd", films="uhd_film"),
 )
-OPENING = next(version for version in VERSIONS if version.pressed)
+_OPENING = next(version for version in VERSIONS if version.pressed)
 # The words of each edition's page.
 WORDS = {
     "zh": {
@@ -451,13 +460,13 @@ def player_page(edition: Edition, version: str) -> str:
 <header><div><h1>{title}</h1><p>{byline}</p></div>{languages}</header>
 <main>
 <div class="screen"><video id="film" controls playsinline preload="metadata" poster="{COVER_PNG}">
-<source src="{edition.film(OPENING.captioned).name}" type="video/mp4">
+<source src="{edition.film(_OPENING.captioned).name}" type="video/mp4">
 <track kind="metadata" srclang="{code}" label="{words["track"]}" default src="{track}">
 </video></div>
 {controls(edition, parts, words)}
 <section id="summary"><p>{escape(FILM.editions[code].summary)}</p><p id="playback-status" \
 role="status" data-unplayable="{escape(words["unplayable"])}">\
-{words[OPENING.button]} · {words["captions"]}{words["captions_on"]}</p></section>
+{words[_OPENING.button]} · {words["captions"]}{words["captions_on"]}</p></section>
 <section id="transcript"><details><summary>{words["transcript"]}</summary>\
 {transcript_html(parts, timeline["captions"], words)}</details></section>
 <footer><h2>{words["files"]}</h2><ul>{files}</ul><h3>{words["downloads"]}</h3>\

@@ -46,7 +46,6 @@ from __future__ import annotations
 import contextvars
 import json
 from concurrent.futures import ThreadPoolExecutor
-from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -388,7 +387,7 @@ def current_bindings(edition: Edition) -> dict:
     return {
         "composition_sha256": repository.sha(repository.ROOT / COMPOSITION_SCRIPT),
         "timeline_sha256": repository.sha(edition.timeline),
-        "engine_version": version(released.ENGINE),
+        "engine_version": released.version(),
         **face_bindings(),
     }
 

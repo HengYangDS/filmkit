@@ -52,7 +52,7 @@ from filmkit.repository import sha, write
 # The canvas package that draws the pictures, its manifest below the film's npm packages, and
 # the version the engine draws with.
 RENDERER_NAME = "@napi-rs/canvas"
-RENDERER_PACKAGE = Path(RENDERER_NAME) / "package.json"
+RENDERER_PACKAGE = Path(RENDERER_NAME) / released.MANIFEST
 # What the engine was released on states that package once (`filmkit.released`). An engine
 # whose record does not state it fails there when this module is imported: the last line of the
 # traceback names the record and the command that writes it.
