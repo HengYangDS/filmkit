@@ -232,6 +232,33 @@ class Edition:
         with its captions drawn, then the same two without captions."""
         return [self.film(kind) for kind in RENDITIONS]
 
+    # The documents the edition delivers beside its films, which the captions' writer writes
+    # from the timeline (`filmkit.captions.documents.subtitle_files`).
+    @property
+    def srt(self) -> Path:
+        """The captions as SRT."""
+        return self.artifacts / f"{self.prefix}.srt"
+
+    @property
+    def vtt(self) -> Path:
+        """The captions as WebVTT, whose cues the player's track embeds."""
+        return self.artifacts / f"{self.prefix}.vtt"
+
+    @property
+    def transcript(self) -> Path:
+        """The transcript, as Markdown."""
+        return self.artifacts / f"{self.prefix}-transcript.md"
+
+    @property
+    def chapters(self) -> Path:
+        """The chapters, as JSON."""
+        return self.artifacts / "chapters.json"
+
+    @property
+    def chapter_metadata(self) -> Path:
+        """The chapters as FFmetadata, which packaging maps into every film."""
+        return self.artifacts / "chapters.ffmeta"
+
     @property
     def ear_first(self) -> Path:
         """The narration's recordings and their receipt, alignment and transcript."""

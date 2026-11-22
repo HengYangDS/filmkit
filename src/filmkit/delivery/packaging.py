@@ -49,6 +49,7 @@ from filmkit.captions.timing import typeset
 from filmkit.delivery.player import (
     COVER_JPEG,
     COVER_PNG,
+    PAGE,
     entry_version,
     player_binding,
     player_page,
@@ -83,7 +84,7 @@ class PackagingError(ValueError):
 # The delivery folder's entry page, below the repository root.
 INDEX = Path(FILM.entry)
 # The language entry page derived from INDEX, below the root.
-LANGUAGE_INDEX = Path("build/artifacts/film/index.html")
+LANGUAGE_INDEX = Path("build/artifacts/film") / PAGE
 # The folder below the root where each edition's films are encoded and finished.
 WORK = Path("build/runtime/work/final-film-packaging")
 # What a failed or timed-out encode was bound to, in the edition's evidence folder.
@@ -131,12 +132,12 @@ def viewing_members(edition: Edition) -> tuple[str, ...]:
     return (
         COVER_PNG,
         COVER_JPEG,
-        f"{edition.prefix}.srt",
-        f"{edition.prefix}.vtt",
-        f"{edition.prefix}-transcript.md",
-        "chapters.json",
-        "chapters.ffmeta",
-        "index.html",
+        edition.srt.name,
+        edition.vtt.name,
+        edition.transcript.name,
+        edition.chapters.name,
+        edition.chapter_metadata.name,
+        PAGE,
     )
 
 
@@ -151,7 +152,7 @@ def package_language_index(version: str) -> dict:
     template = source.read_text()
     start = template.find("<nav")
     nav = template[start : template.find("</nav>", start)] if start >= 0 else ""
-    if not all(f'href="{code}/index.html"' in nav for code in CODES):
+    if not all(f'href="{code}/{PAGE}"' in nav for code in CODES):
         msg = "Delivery entry needs both sibling language links in a <nav>"
         raise PackagingError(msg)
     if "<base " in template:
@@ -243,7 +244,7 @@ def package_metadata(edition: Edition) -> None:
         msg = f"The timeline must last {DURATION} s at {FPS} fps"
         raise PackagingError(msg)
     refresh_shot_plan(edition, timeline)
-    chapters = read(output / "chapters.json")["chapters"]
+    chapters = read(edition.chapters)["chapters"]
     if len(chapters) != CHAPTERS:
         msg = f"The films have {CHAPTERS} chapters, not {len(chapters)}"
         raise PackagingError(msg)
@@ -253,7 +254,7 @@ def package_metadata(edition: Edition) -> None:
             msg = f"The cover must be 16:9, not {cover.width}x{cover.height}"
             raise PackagingError(msg)
         cover.convert("RGB").save(output / COVER_JPEG, quality=95)
-    (output / "index.html").write_text(player_page(edition, version), encoding="utf-8")
+    (output / PAGE).write_text(player_page(edition, version), encoding="utf-8")
     members = viewing_members(edition)
     write(
         edition.viewing_package,
@@ -282,7 +283,7 @@ def film_inputs(edition: Edition) -> dict[str, Path]:
         "soundtrack_sha256": edition.soundtrack,
         "cover_sha256": edition.artifacts / COVER_JPEG,
         "script_sha256": repository.ROOT / edition.script,
-        "chapters_sha256": edition.artifacts / "chapters.ffmeta",
+        "chapters_sha256": edition.chapter_metadata,
         "version_sha256": repository.ROOT / VERSION,
     }
 
@@ -439,7 +440,7 @@ def encode_command(
         "-f",
         "ffmetadata",
         "-i",
-        str(edition.artifacts / "chapters.ffmeta"),
+        str(edition.chapter_metadata),
         "-map",
         mapped,
         "-map",

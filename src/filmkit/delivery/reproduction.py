@@ -129,8 +129,8 @@ def members(
     return {
         **{film.name: ("film", film) for film in films},
         **{
-            f"{prefix}{suffix}": ("document", edition.artifacts / f"{prefix}{suffix}")
-            for suffix in (".srt", ".vtt", "-transcript.md")
+            document.name: ("document", document)
+            for document in (edition.srt, edition.vtt, edition.transcript)
         },
         f"{prefix}-cover.png": ("document", edition.artifacts / packaging.COVER_PNG),
         release_name(edition, review): ("review", review),

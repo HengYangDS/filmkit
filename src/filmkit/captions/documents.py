@@ -230,13 +230,12 @@ def subtitle_files(timeline: dict, edition: Edition) -> None:
     first, so the refusal names that file.
     """
     require_metadata_values(timeline, relative(edition.timeline), edition)
-    output = edition.artifacts
     srt, vtt = _cue_documents(timeline["captions"])
-    (output / f"{edition.prefix}.srt").write_text(srt)
-    (output / f"{edition.prefix}.vtt").write_text(vtt)
+    edition.srt.write_text(srt)
+    edition.vtt.write_text(vtt)
     chapters = _chapters(timeline["segments"])
-    write(output / "chapters.json", {"chapters": [chapter.entry for chapter in chapters]})
+    write(edition.chapters, {"chapters": [chapter.entry for chapter in chapters]})
     transcript = _transcript(timeline["title"], timeline["segments"], edition.code)
-    (output / f"{edition.prefix}-transcript.md").write_text(transcript)
+    edition.transcript.write_text(transcript)
     metadata = _chapter_metadata(timeline["title"], edition.comment, chapters)
-    (output / "chapters.ffmeta").write_text(metadata)
+    edition.chapter_metadata.write_text(metadata)

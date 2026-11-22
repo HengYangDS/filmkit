@@ -65,6 +65,9 @@ if TYPE_CHECKING:
 UNSPOKEN = re.compile(r"[\W_]+")
 # The closing full-width brackets, which hold their own space before what follows them.
 CLOSING = ("）", "」", "』", "】", "〕", "〉", "》")
+# The name of a delivered page: each edition's player, in the edition's folder, and the language
+# entry page above them.
+PAGE = "index.html"
 # Each edition's cover as delivered, PNG and JPEG; the PNG is the video's poster.
 COVER_PNG = f"{FILM.slug}-cover.png"
 COVER_JPEG = f"{FILM.slug}-cover.jpg"
@@ -256,15 +259,15 @@ def download_files(edition: Edition) -> list[tuple[str, str, str]]:
     """Each delivered file a browser would show as raw text, offered as a download: by name, with
     its media type and its label of kind, format and purpose in the edition's language."""
     words = WORDS[edition.code]
-    prefix, label = edition.prefix, words["labelled"].format
+    label = words["labelled"].format
     return [
-        (name, media_type, label(kind=words[kind], form=form, purpose=words[purpose]))
-        for name, media_type, kind, form, purpose in (
-            (f"{prefix}-transcript.md", "text/markdown", "script", "Markdown", "to_download"),
-            ("chapters.json", "application/json", "chapters", "JSON", "to_download"),
-            ("chapters.ffmeta", "text/plain", "chapters", "FFmetadata", "to_download"),
-            (f"{prefix}.vtt", "text/vtt", "captions", "WebVTT", "for_players"),
-            (f"{prefix}.srt", "application/x-subrip", "captions", "SRT", "for_players"),
+        (path.name, media_type, label(kind=words[kind], form=form, purpose=words[purpose]))
+        for path, media_type, kind, form, purpose in (
+            (edition.transcript, "text/markdown", "script", "Markdown", "to_download"),
+            (edition.chapters, "application/json", "chapters", "JSON", "to_download"),
+            (edition.chapter_metadata, "text/plain", "chapters", "FFmetadata", "to_download"),
+            (edition.vtt, "text/vtt", "captions", "WebVTT", "for_players"),
+            (edition.srt, "application/x-subrip", "captions", "SRT", "for_players"),
         )
     ]
 
@@ -418,7 +421,7 @@ def player_page(edition: Edition, version: str) -> str:
     title = escape(typeset(repository.read(edition.script)["title"]))
     timeline = repository.read(edition.timeline)
     parts = transcript_parts(timeline["segments"])
-    track = embedded(edition, f"{edition.prefix}.vtt", "text/vtt")
+    track = embedded(edition, edition.vtt.name, "text/vtt")
     files = "".join(file_link(edition, name, label) for name, label in listed_files(edition))
     downloads = "".join(
         download_link(edition, name, media_type, label)
@@ -426,9 +429,9 @@ def player_page(edition: Edition, version: str) -> str:
     )
     languages = (
         f'<nav id="languages" aria-label="{words["languages"]}">'
-        f'<a class="language" href="../{other_code}/index.html" lang="{other["lang"]}" '
+        f'<a class="language" href="../{other_code}/{PAGE}" lang="{other["lang"]}" '
         f'hreflang="{other["lang"]}">{other["language"]}</a>'
-        f'<a class="language" href="../index.html">{words["entry"]}</a></nav>'
+        f'<a class="language" href="../{PAGE}">{words["entry"]}</a></nav>'
     )
     shown = escape(version_label(code, version))
     byline = f"{escape(AUTHOR)} · {words['language']} · {shown} · {runtime_label()} · {FPS} fps"
