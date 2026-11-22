@@ -73,7 +73,9 @@
 
 ## 5. Acceptance
 
-- [ ] 5.1 The check run on every place of the three released films lists as errors the forms of the inventory's R1
+- [x] 5.1 The check run on every place of the three released films lists as errors the forms of the inventory's R1
       and R3 that the standard lists, with the standard words that hold one (名副其实 at five places in two films
-      on 21 November 2026), and no other; run on the texts proposed for the December editions in throwaway copies, each
-      with its declarations, it refuses nothing; the record stands in `build/evidence/check-the-formal-register/`.
+      on 21 November 2026) and each listed form in plain use that the inventory missed (弄 in 弄清, at one thought
+      of one film, on 22 November 2026), and no other; run on the texts proposed for the December editions in
+      throwaway copies, each with its declarations, it refuses nothing; the record stands in
+      `build/evidence/check-the-formal-register/acceptance/`.
