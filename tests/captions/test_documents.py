@@ -53,7 +53,7 @@ def test_chapters_land_on_their_cards_and_head_the_transcript(tmp_path, monkeypa
     metadata = (output / "chapters.ffmeta").read_text()
     assert f"START={round(second * 1000)}\n" in metadata
     assert f"END={specification.DURATION * 1000}\n" in metadata
-    assert f"comment={edition.comment}\n" in metadata
+    assert f"comment={edition.comment.replace(';', chr(92) + ';')}\n" in metadata
     assert ("示例影片" in metadata) == (code == "zh")
     for name in (f"{edition.prefix}.srt", f"{edition.prefix}.vtt"):
         lines = (output / name).read_text().splitlines()
@@ -125,6 +125,36 @@ def test_chinese_titles_keep_their_marks(tmp_path, monkeypatch):
     captions_documents.subtitle_files(timeline, edition)
     transcript = (edition.artifacts / f"{edition.prefix}-transcript.md").read_text()
     assert "### 0:01 · “做完了”\n\n它交回一句话：“做完了。”\n" in transcript
+
+
+def test_chapter_metadata_escapes_what_ffmetadata_reads_as_syntax(tmp_path, monkeypatch):
+    # FFmetadata reads =, ;, # and the backslash as its syntax and ends a value at a newline, so
+    # each is escaped by a backslash in every value the metadata holds.
+    release = repository.read(production.Edition("en").script)["release"]
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    edition = production.Edition("en")
+    repository.write(edition.script, {"release": {**release, "comment": "x;y = z"}})
+    edition.artifacts.mkdir(parents=True)
+    segment = {
+        "id": "01",
+        "chapter": "one",
+        "chapter_title": "a\\b#c",
+        "title": "One",
+        "start": 0.0,
+        "voice_start": 1.0,
+        "text": "Text.",
+        "utterance_groups": ["Text."],
+    }
+    timeline = {"title": "One \\ two", "captions": [], "segments": [segment]}
+    # The author is the film's value too, written under two keys: here it holds all five marks.
+    monkeypatch.setattr(captions_documents, "AUTHOR", "A;B = C#D\\E\nF")
+    captions_documents.subtitle_files(timeline, edition)
+    metadata = (edition.artifacts / "chapters.ffmeta").read_text()
+    assert "\ntitle=One \\\\ two\n" in metadata
+    assert "\ncomment=x\\;y \\= z\n" in metadata
+    assert "\ntitle=a\\\\b\\#c\n" in metadata
+    for key in ("artist", "author"):
+        assert f"\n{key}=A\\;B \\= C\\#D\\\\E\\\nF\n" in metadata
 
 
 def test_timecodes_round_to_the_millisecond():

@@ -139,18 +139,24 @@ def _transcript(title: str, segments: list[dict], code: str) -> str:
     return transcript
 
 
+def _metadata_value(text: str) -> str:
+    """A value as FFmetadata reads it: =, ;, #, the backslash and a newline each escaped by a
+    backslash, since the format reads them as its own syntax (FFmpeg's metadata format)."""
+    return "".join(f"\\{mark}" if mark in "=;#\\\n" else mark for mark in text)
+
+
 def _chapter_metadata(title: str, comment: str, chapters: list[_Chapter]) -> str:
     """The FFmetadata of the film's tags and chapters, in milliseconds; the last ends the film."""
     metadata = (
-        f";FFMETADATA1\ntitle={typeset(title)}\nartist={AUTHOR}\nauthor={AUTHOR}\n"
-        f"comment={typeset(comment)}\n"
+        f";FFMETADATA1\ntitle={_metadata_value(typeset(title))}\nartist={_metadata_value(AUTHOR)}\n"
+        f"author={_metadata_value(AUTHOR)}\ncomment={_metadata_value(typeset(comment))}\n"
     )
     for i, chapter in enumerate(chapters):
         end = chapters[i + 1].entry["start"] if i + 1 < len(chapters) else DURATION
         metadata += (
             "\n[CHAPTER]\nTIMEBASE=1/1000\n"
             f"START={round(chapter.entry['start'] * 1000)}\n"
-            f"END={round(end * 1000)}\ntitle={chapter.entry['title']}\n"
+            f"END={round(end * 1000)}\ntitle={_metadata_value(chapter.entry['title'])}\n"
         )
     return metadata
 
