@@ -222,14 +222,15 @@ def ending_of(child: dict) -> dict:
 
 
 def test_a_chinese_take_is_compared_by_the_readings_the_film_declares(monkeypatch, tmp_path):
-    # The bench of a Chinese edition holds the words whose readings the film's contract declares.
+    # The bench of a Chinese edition holds the words whose readings the film's contract declares,
+    # and each word a homophone rule respells, read as its spoken form reads.
     monkeypatch.setattr(repository, "ROOT", tmp_path)
     contract = {
         "schema_version": 2,
         "pronunciation": {
             "languages": {
                 "Chinese": {
-                    "normalization": [],
+                    "normalization": [{"display": "去重", "spoken": "去虫", "kind": "homophone"}],
                     "targets": [
                         {
                             "kind": "contextual-mandarin-word",
@@ -248,9 +249,9 @@ def test_a_chinese_take_is_compared_by_the_readings_the_film_declares(monkeypatc
     )
     monkeypatch.setattr(narration_judgment, "standards", lambda *_: [])
     bench = narration_judgment.bench("zh", [], asr=None, aligner={})
-    assert [word.term for word in bench.words] == ["重来"]
-    assert bench.words == tuple(
-        narration_readings.declared_words(contract["pronunciation"]["languages"]["Chinese"])[0]
+    assert [word.term for word in bench.words] == ["重来", "去重"]
+    assert bench.words == narration_readings.compared_words(
+        contract["pronunciation"]["languages"]["Chinese"]
     )
 
 

@@ -121,7 +121,8 @@ class Bench:
     """What every take of an edition is measured with.
 
     The recognizer, the pinned aligner with its identity, each declared term's reference vowel,
-    the Chinese words whose readings the film declares, and the film's flow limits.
+    the Chinese words a transcript is compared by (`readings.compared_words`), and the film's
+    flow limits.
     """
 
     code: str
@@ -165,7 +166,7 @@ def bench(code: str, references: list, *, asr, aligner: dict, film=None) -> Benc
     words = ()
     if code == "zh" and script.get("pronunciation_contract"):
         contract, _ = pronunciation_contract(script, edition.language)
-        words = tuple(readings.declared_words(contract)[0])
+        words = readings.compared_words(contract)
     measured_standards = standards(code, references, aligner, edition.language)
     return Bench(
         code, edition.language, asr, aligner, measured_standards, words, film.narration.flow

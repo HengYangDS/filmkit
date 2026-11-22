@@ -94,3 +94,13 @@ def test_a_declared_word_gives_its_characters_the_reading_the_film_declares():
     must = narration_readings.Word("得", ("děi",), None)
     assert narration_recognition.reading_distance("你得去。", "你的去。") == 0
     assert narration_recognition.reading_distance("你得去。", "你的去。", [must]) == 1
+
+
+def test_a_respelled_word_is_refused_where_the_text_holds_the_reading_it_respells_against():
+    # The film respells 去重 as 去虫 because the narrator reads 重 there as zhòng; a transcript
+    # that writes 去重 where the text holds 去众, said zhòng, holds another word.
+    rule = {"display": "去重", "spoken": "去虫", "kind": "homophone"}
+    words = narration_readings.compared_words({"normalization": [rule]})
+    text, heard = "他要去众人那里。", "他要去重人那里。"
+    assert narration_recognition.reading_distance(text, heard) == 0
+    assert narration_recognition.reading_distance(text, heard, words) == 1

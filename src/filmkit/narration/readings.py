@@ -169,6 +169,24 @@ def declared_words(contract: dict) -> tuple[list[Word], list[str]]:
     return words, failures
 
 
+def compared_words(contract: dict) -> tuple[Word, ...]:
+    """The words a Chinese transcript is compared by: the contract's declared words, and each
+    word a `homophone` rule respells, read as the dictionary reads the rule's spoken form.
+
+    A rule's word is no declaration: the narration says its spoken form, so `resolve` would
+    refuse it as never said. It is what the narrator is told the word sounds like, so a
+    transcript that writes the word in its own characters holds what was said.
+    """
+    respelled = [
+        Word(rule["display"], tuple(contextual(rule["spoken"]).values()), None)
+        for rule in contract.get("normalization", [])
+        if rule.get("kind") == "homophone"
+        and re.fullmatch(f"{HAN}+", rule["display"])
+        and re.fullmatch(f"{HAN}+", rule["spoken"])
+    ]
+    return (*declared_words(contract)[0], *respelled)
+
+
 def coverage(text: str, words: list[Word]) -> dict[int, tuple[Word, int, int]]:
     """For each position, the longest declared word covering it, its start and the offset."""
     spans = [

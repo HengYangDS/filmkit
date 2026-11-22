@@ -9,6 +9,7 @@ from pypinyin import Style, pinyin
 
 import filmkit.film as film_declaration
 import filmkit.narration.readings as readings
+import filmkit.narration.recognition as recognition
 import filmkit.repository as repository
 from filmkit.narration.readings import Thought, Word
 
@@ -171,6 +172,38 @@ def test_a_word_character_is_widened_to_a_dictionary_phrase_or_its_predecessor()
     assert readings.widened("只是数据。", 0) == (0, 2)
     assert readings.widened("做得更好。", 1) == (0, 2)
     assert readings.widened("得", 0) == (0, 1)
+
+
+def homophone(display: str, spoken: str) -> dict:
+    return {"display": display, "spoken": spoken, "kind": "homophone"}
+
+
+def test_a_homophone_rule_gives_its_display_word_the_reading_of_its_spoken_form():
+    target = {"term": "核对", "kind": "contextual-mandarin-word", "target_reading": "hé duì"}
+    contract = {
+        "normalization": [
+            homophone("去重", "去虫"),
+            homophone("就当", "就荡"),
+            homophone("行情", "航情"),
+            {"display": "NAME", "spoken": "Naim", "kind": "english-name"},
+        ],
+        "targets": [target],
+    }
+    declared = readings.declared_words(contract)[0]
+    words = readings.compared_words(contract)
+    assert words == (
+        *declared,
+        Word("去重", ("qù", "chóng"), None),
+        Word("就当", ("jiù", "dàng"), None),
+        Word("行情", ("háng", "qíng"), None),
+    )
+    # The text holds the spoken form; a transcript may write either spelling.
+    distance = recognition.reading_distance
+    text, display = "先去虫，再核对。", "先去重，再核对。"
+    assert (distance(text, display, declared), distance(text, display, words)) == (1, 0)
+    assert distance(text, "先去虫，再核对。", words) == 0
+    assert distance(text, "先去冲，再核对。", words) == 1
+    assert distance(text, "先，再核对。", words) == 2
 
 
 def test_the_cli_proposes_without_changing_the_contract(film, capsys):
