@@ -1,6 +1,6 @@
 /* Exercise every frame of the composition headlessly on one timeline and report layout, legibility, how its text
  * lines up and its pacing.
- * Usage: python -m filmkit.tools frame-audit <timeline.json> [step-seconds] [--from s] [--to s] [--at s]
+ * Its usage is `USAGE`, which it prints when it is invoked wrongly.
  * --from and --to limit the frames exercised to one stretch of the film, such as the scenes being rebuilt; --at
  * reports one frame in detail. TRACE=<file> writes the label trace that filmkit.picture.sync_audit reads; TEXTS=<file> writes
  * every text of every frame, whatever its role, which filmkit.picture.text_trace reads; MARKS=<file> writes the

@@ -16,8 +16,7 @@
  * cover: paints window.renderCover() from a staged UHD document and compares its pixels with the tracked cover; a
  * painting with no tracked cover yet is written, reported uncompared and fails, so the painting can become the cover.
  * No human hearing or complete-film playback is claimed.
- * Usage: python -m filmkit.tools player-check players <binding.json> <receipt.json>
- *        python -m filmkit.tools player-check cover <stage-dir> <cover.png> <output.png> */
+ * Its usage is `USAGE`, which it prints when it is invoked wrongly. */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";

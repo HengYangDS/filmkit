@@ -12,7 +12,7 @@
  * pace from which a mark or a tip `race`s, and the `rail_clear` px a rail's names keep.
  * The strokes and the texts outside scenes are followed through every frame at 60 frames per second, the rate of the
  * film, since a line that opens within one frame of the film may be whole again in the next.
- * Usage: python -m filmkit.tools detail-audit <timeline.json> [fps] [--from s] [--to s] [--out report.json]
+ * Its usage is `USAGE`, which it prints when it is invoked wrongly.
  * FILMKIT_TEXT_METRICS=<file> names the advance widths of the film's declared faces, as for the frame audit. */
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";

@@ -6,7 +6,7 @@
  * 3 px, the radius being free, and its ink is measured against a circle from 0 drawn on the same canvas: a turn paints
  * when it holds PAINTED of that ink. filmkit.picture.gates refuses each line whose turn paints no ink from one of its
  * starts and records the others.
- * Usage: python -m filmkit.tools whole-turns <turns.json> */
+ * Its usage is `USAGE`, which it prints when it is invoked wrongly. */
 import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 

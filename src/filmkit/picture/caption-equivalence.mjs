@@ -14,7 +14,7 @@
  * The report, printed as JSON, gives the instants, the counts of paints compared and of caption paints, the cues whose
  * middle shows a caption paint, the band the caption paints cover in the composition's 1920x1080 frame, and the
  * findings, the first FINDINGS of them in full.
- * Usage: python -m filmkit.tools caption-equivalence <timeline.json> [<step>] */
+ * Its usage is `USAGE`, which it prints when it is invoked wrongly. */
 import { isDeepStrictEqual, parseArgs } from "node:util";
 
 import { openComposition, readTextMetrics, readTimeline } from "./headless-composition.mjs";

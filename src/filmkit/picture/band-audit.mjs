@@ -13,7 +13,7 @@
  * seconds, in which the captioned picture's band must show the ground, and the escapes and intrusions, the first
  * FINDINGS of each in full. The stand-in reports no fillRect, so a rectangle
  * filled that way in the rows is not seen here.
- * Usage: python -m filmkit.tools band-audit <timeline.json> <top> <bottom> [<fps>] */
+ * Its usage is `USAGE`, which it prints when it is invoked wrongly. */
 import { parseArgs } from "node:util";
 
 import { isCaptionPaint, screenBox } from "./caption-equivalence.mjs";

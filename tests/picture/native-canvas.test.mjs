@@ -213,6 +213,17 @@ test("an invocation that names no render is refused with the usage's status", as
   }
 });
 
+test("the renderer's usage says how it is run: Node on the module", async () => {
+  await assert.rejects(run(process.execPath, [MODULE]), (error) => {
+    assert.equal(error.code, 2);
+    assert.ok(
+      error.stderr.startsWith("Usage: node native-canvas.mjs render <stage> "),
+      error.stderr,
+    );
+    return true;
+  });
+});
+
 test("a face that does not register fails the render", async () => {
   const folder = await stage("zh");
   await writeFile(join(folder, "fonts/ibm-plex-sans-bold.ttf"), "no font");

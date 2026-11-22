@@ -1,8 +1,6 @@
 /** Draw a staged picture on a native canvas and encode it: the engine's renderer (`filmkit.picture.renderer`).
  *
- * Usage: node native-canvas.mjs render <stage> --output <picture.mp4> --fps <n> --group <frames>
- *                                --encoder <json> --text-renderer <name>
- *                                [--spans <n>] [--work <folder>] [--report <report.json>]
+ * Its usage is `USAGE`, which it prints when it is invoked wrongly.
  *
  * The stage (`filmkit.picture.rendering.stage_picture`) holds stage.json (the frame, the duration, the language and
  * the faces), film.json (the picture's data, `window.FILM`), the composition film.js and the fonts. The composition
@@ -54,7 +52,7 @@ import { RECORD } from "./stage-contract.mjs";
 const SPAN_THREADS = 2;
 const SELF = fileURLToPath(import.meta.url);
 const USAGE =
-  "Usage: native-canvas.mjs render <stage> --output <picture.mp4> --fps <n> --group <frames> --encoder <json> --text-renderer <name> [--spans <n>] [--work <folder>] [--report <report.json>]";
+  "Usage: node native-canvas.mjs render <stage> --output <picture.mp4> --fps <n> --group <frames> --encoder <json> --text-renderer <name> [--spans <n>] [--work <folder>] [--report <report.json>]";
 // The pixels' conversion: full-range RGBA to BT.709 in limited range, 4:2:0, with the primaries and the transfer
 // stated on each frame, since FFmpeg takes neither from an output option once a filter has made the frames.
 const CONVERSION =
