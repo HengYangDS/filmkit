@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+import filmkit.delivery.reproduction as reproduction
 import filmkit.delivery.verification as delivery_verification
 import filmkit.picture.rendering as picture_rendering
 import filmkit.production as production
@@ -19,7 +20,7 @@ def current_review(tmp_path, monkeypatch):
     for name, body in (
         ("content/film-script.json", "{}"),
         (str(picture_rendering.COMPOSITION_SCRIPT), "/* film */"),
-        ("build/evidence/editions/zh/production-review.md", "# Review\n"),
+        (repository.relative(production.review_report(edition.production_review)), "# Review\n"),
         ("build/artifacts/film/zh/sample-reel-zh-uhd.mp4", "uhd"),
         ("build/artifacts/film/zh/sample-reel-zh-1080p-captioned.mp4", "viewing"),
     ):
@@ -42,7 +43,7 @@ def current_review(tmp_path, monkeypatch):
         # A published record keeps the report path of the repository that recorded it.
         "report": {
             "path": "evidence/reviews/production-review.md",
-            "sha256": repository.sha(edition.production_review.with_name("production-review.md")),
+            "sha256": repository.sha(production.review_report(edition.production_review)),
         },
     }
     path = edition.production_review
@@ -63,13 +64,15 @@ def test_a_published_review_is_read_beside_its_report_wherever_it_lies(current_r
     films = [release / film.name for film in files]
     for film, published in zip(files, films, strict=True):
         published.write_bytes(film.read_bytes())
-    (release / "sample-reel-zh-production-review.md").write_text("# Review\n")
-    published = release / "sample-reel-zh-production-review.json"
-    published.write_text(json.dumps(record))
     edition = production.Edition("zh")
+    review = edition.production_review
+    report = release / reproduction.release_name(edition, production.review_report(review))
+    report.write_text("# Review\n")
+    published = release / reproduction.release_name(edition, review)
+    published.write_text(json.dumps(record))
     accepted = delivery_verification.verify_review(edition, films, record=published)
     assert accepted["path"] == "build/artifacts/release/sample-reel-zh-production-review.json"
-    (release / "sample-reel-zh-production-review.md").write_text("# Another review\n")
+    report.write_text("# Another review\n")
     with pytest.raises(VerificationError, match="Review report differs from its record"):
         delivery_verification.verify_review(edition, films, record=published)
 
@@ -95,7 +98,7 @@ def test_review_accepts_only_current_media_above_thresholds(current_review):
     with pytest.raises(VerificationError, match="current delivered edition"):
         check(schema_version=1)
     edition = production.Edition("zh")
-    report = edition.production_review.with_name("production-review.md")
+    report = production.review_report(edition.production_review)
     report.write_text("# Another review\n")
     with pytest.raises(VerificationError, match="Review report differs from its record"):
         check()
@@ -145,7 +148,8 @@ def test_an_edition_without_a_review_record_is_refused_in_one_line_by_name(
     # The verifier's command reports such a refusal as "<language>: <reason>".
     assert isinstance(refusal.value, delivery_verification.REFUSALS)
     # A published record that is named and missing is refused by its own place.
-    published = tmp_path / "build/artifacts/release/sample-reel-zh-production-review.json"
+    named = reproduction.release_name(edition, edition.production_review)
+    published = tmp_path / "build/artifacts/release" / named
     with pytest.raises(VerificationError) as refusal:
         delivery_verification.verify_review(edition, files, record=published)
     assert str(refusal.value) == (

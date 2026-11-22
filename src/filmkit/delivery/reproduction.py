@@ -105,6 +105,12 @@ class Release(Declared):
     assets: tuple[Asset, ...] = Field(min_length=1)
 
 
+def release_name(edition: production.Edition, path: Path) -> str:
+    """The name a release publishes an edition's review record or report under: the edition's
+    prefix, then the name of its build file."""
+    return f"{edition.prefix}-{path.name}"
+
+
 def members(
     edition: production.Edition, *, uncaptioned: bool = True
 ) -> dict[str, tuple[str, Path]]:
@@ -114,6 +120,7 @@ def members(
     captions existed, which holds only the films with captions.
     """
     prefix, review = edition.prefix, edition.production_review
+    report = production.review_report(review)
     films = [
         edition.film(kind)
         for kind, rendition in production.RENDITIONS.items()
@@ -126,8 +133,8 @@ def members(
             for suffix in (".srt", ".vtt", "-transcript.md")
         },
         f"{prefix}-cover.png": ("document", edition.artifacts / packaging.COVER_PNG),
-        f"{prefix}-production-review.json": ("review", review),
-        f"{prefix}-production-review.md": ("review", production.review_report(review)),
+        release_name(edition, review): ("review", review),
+        release_name(edition, report): ("review", report),
     }
 
 
@@ -239,7 +246,7 @@ def identical(name: str, rebuilt: Path, published: Path) -> dict:
 def review(edition: production.Edition, assets: dict[str, Path]) -> dict:
     """The edition's published review, which must bind its published films and sources."""
     films = [assets[film.name] for film in edition.films if film.name in assets]
-    record = assets[f"{edition.prefix}-production-review.json"]
+    record = assets[release_name(edition, edition.production_review)]
     try:
         accepted = verification.verify_review(edition, films, record=record)
     except verification.VerificationError as error:

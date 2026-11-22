@@ -162,8 +162,9 @@ def release(tmp_path, monkeypatch, films) -> Release:
                 source.write_text(f"{name}\n")
             if layer != "review":
                 published.publish(name, source)
-        report = f"# Review of {code}\n"
-        (published.folder / f"{edition.prefix}-production-review.md").write_text(report)
+        report, reviewed = f"# Review of {code}\n", edition.production_review
+        named = reproduction.release_name(edition, production.review_report(reviewed))
+        (published.folder / named).write_text(report)
         review = {
             "schema_version": review_record.SCHEMA_VERSION,
             "language": code,
@@ -181,7 +182,7 @@ def release(tmp_path, monkeypatch, films) -> Release:
             "report": {"path": "evidence/reviews/production-review.md", "sha256": ""},
         }
         review["report"]["sha256"] = repository.content_sha(report)
-        (published.folder / f"{edition.prefix}-production-review.json").write_text(
+        (published.folder / reproduction.release_name(edition, reviewed)).write_text(
             json.dumps(review)
         )
     published.record()
@@ -363,7 +364,7 @@ def test_a_release_without_the_films_without_captions_compares_the_films_it_publ
         edition = production.Edition(code)
         for kind in ("uhd-uncaptioned", "1080p-uncaptioned"):
             (release.folder / edition.film(kind).name).unlink()
-        path = release.folder / f"{edition.prefix}-production-review.json"
+        path = release.folder / reproduction.release_name(edition, edition.production_review)
         review = json.loads(path.read_text())
         review["media"] = [item for item in review["media"] if "uncaptioned" not in item["path"]]
         path.write_text(json.dumps(review))
@@ -398,7 +399,8 @@ def test_a_release_publishes_every_edition_s_films_without_captions_or_none(rele
 
 
 def test_a_review_that_does_not_bind_the_published_films_fails(release):
-    path = release.folder / "sample-reel-en-production-review.json"
+    edition = production.Edition("en")
+    path = release.folder / reproduction.release_name(edition, edition.production_review)
     review = json.loads(path.read_text())
     review["media"][0]["sha256"] = "0" * 64
     path.write_text(json.dumps(review))
