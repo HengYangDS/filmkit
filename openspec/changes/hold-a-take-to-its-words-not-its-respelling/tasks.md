@@ -1,7 +1,7 @@
 ## 1. Measured before the build
 
 - [x] 1.1 Read how the recognizer writes the name in the Chinese takes of the voice chosen on 22 November 2026 (`zh-direct-55849`). Done: one Latin unit in all 89 written occurrences, so the third rule's width is one unit (`filmkit/build/runtime/work/trial-ethos/zh-third-voice/name-forms.json`).
-- [ ] 1.2 With the ETHOS term declared in the film's trial clone, run `python -m filmkit.narration.judge` for each edition under one host ticket, on filmkit 0.26.1 as it is. Done when a record under `build/evidence/hold-a-take-to-its-words-not-its-respelling/` states whether any bound occurrence, the reference first, shows no two formants, and how many occurrences fail against the declared reference on the take and at the gate.
+- [x] 1.2 With the ETHOS term declared in the film's trial clone, run `python -m filmkit.narration.judge` for each edition under one host ticket, on filmkit 0.26.1 as it is. Done when a record under `build/evidence/hold-a-take-to-its-words-not-its-respelling/` states whether any bound occurrence, the reference first, shows no two formants, and how many occurrences fail against the declared reference on the take and at the gate.
 
 ## 2. The engine
 
