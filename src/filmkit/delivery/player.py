@@ -48,18 +48,18 @@ import re
 from html import escape
 from pathlib import Path
 from string import Template
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import filmkit.repository as repository
 from filmkit.captions.documents import clock, transcript_parts
 from filmkit.captions.timing import shown_text, typeset
 from filmkit.film import FILM
-from filmkit.production import CODES
+from filmkit.production import CODES, RENDITIONS, UHD, VIEWING
 from filmkit.specification import AUTHOR, DURATION, FPS
 
 if TYPE_CHECKING:
     from filmkit.captions.documents import Part, Scene
-    from filmkit.production import Edition
+    from filmkit.production import Edition, Rendition
 
 # What a thought's words and its cues' are compared without: all but letters and digits.
 UNSPOKEN = re.compile(r"[\W_]+")
@@ -68,12 +68,38 @@ CLOSING = ("）", "」", "』", "】", "〕", "〉", "》")
 # Each edition's cover as delivered, PNG and JPEG; the PNG is the video's poster.
 COVER_PNG = f"{FILM.slug}-cover.png"
 COVER_JPEG = f"{FILM.slug}-cover.jpg"
-# Each version's films with and without captions, whether the page opens on it, and the word of
-# its button.
+
+
+class Version(NamedTuple):
+    """A version of the film on the page: the kinds of its films with and without captions,
+    whether its button starts pressed, which marks the version the page opens on, and the keys
+    of `WORDS` that name its button and its films in the files list."""
+
+    captioned: str
+    uncaptioned: str
+    pressed: bool
+    button: str
+    films: str
+
+
+def kinds_at(size: Rendition) -> tuple[str, str]:
+    """The kinds of `RENDITIONS` at a rendition's size: the film whose picture draws the
+    captions, then the one without them."""
+    kinds = {
+        rendition.captions: kind
+        for kind, rendition in RENDITIONS.items()
+        if (rendition.width, rendition.height) == (size.width, size.height)
+    }
+    return kinds[True], kinds[False]
+
+
+# The versions in the page's order, their films taken from `RENDITIONS` by size: the viewing
+# film's, which the page opens on with its captions, then the UHD master's.
 VERSIONS = (
-    ("1080p-captioned", "1080p-uncaptioned", "true", "viewing"),
-    ("uhd", "uhd-uncaptioned", "false", "uhd"),
+    Version(*kinds_at(VIEWING), pressed=True, button="viewing", films="viewing_film"),
+    Version(*kinds_at(UHD), pressed=False, button="uhd", films="uhd_film"),
 )
+OPENING = next(version for version in VERSIONS if version.pressed)
 # The words of each edition's page.
 WORDS = {
     "zh": {
@@ -217,12 +243,9 @@ def listed_files(edition: Edition) -> list[tuple[str, str]]:
     film, cover = words["film"], words["cover"]
     return [
         *(
-            (edition.film(kind).name, f"{film} · {words[version]} · {words[captions]} · MP4")
-            for version, kinds in (
-                ("viewing_film", ("1080p-captioned", "1080p-uncaptioned")),
-                ("uhd_film", ("uhd", "uhd-uncaptioned")),
-            )
-            for kind, captions in zip(kinds, ("drawn", "undrawn"), strict=True)
+            (edition.film(kind).name, f"{film} · {words[version.films]} · {words[captions]} · MP4")
+            for version in VERSIONS
+            for kind, captions in ((version.captioned, "drawn"), (version.uncaptioned, "undrawn"))
         ),
         (COVER_PNG, f"{cover} · PNG"),
         (COVER_JPEG, f"{cover} · JPEG"),
@@ -365,10 +388,10 @@ def controls(edition: Edition, parts: list[Part], words: dict[str, str]) -> str:
     reader reads beside the pressed state, is the word for captions alone.
     """
     versions = "".join(
-        f'<button type="button" data-captioned="{edition.film(captioned).name}" '
-        f'data-uncaptioned="{edition.film(uncaptioned).name}" '
-        f'aria-pressed="{pressed}">{words[name]}</button>'
-        for captioned, uncaptioned, pressed, name in VERSIONS
+        f'<button type="button" data-captioned="{edition.film(version.captioned).name}" '
+        f'data-uncaptioned="{edition.film(version.uncaptioned).name}" '
+        f'aria-pressed="{"true" if version.pressed else "false"}">{words[version.button]}</button>'
+        for version in VERSIONS
     )
     on, off = escape(words["captions_on"]), escape(words["captions_off"])
     versions += (
@@ -422,13 +445,13 @@ def player_page(edition: Edition, version: str) -> str:
 <header><div><h1>{title}</h1><p>{byline}</p></div>{languages}</header>
 <main>
 <div class="screen"><video id="film" controls playsinline preload="metadata" poster="{COVER_PNG}">
-<source src="{edition.film("1080p-captioned").name}" type="video/mp4">
+<source src="{edition.film(OPENING.captioned).name}" type="video/mp4">
 <track kind="metadata" srclang="{code}" label="{words["track"]}" default src="{track}">
 </video></div>
 {controls(edition, parts, words)}
 <section id="summary"><p>{escape(FILM.editions[code].summary)}</p><p id="playback-status" \
 role="status" data-unplayable="{escape(words["unplayable"])}">\
-{words["viewing"]} · {words["captions"]}{words["captions_on"]}</p></section>
+{words[OPENING.button]} · {words["captions"]}{words["captions_on"]}</p></section>
 <section id="transcript"><details><summary>{words["transcript"]}</summary>\
 {transcript_html(parts, timeline["captions"], words)}</details></section>
 <footer><h2>{words["files"]}</h2><ul>{files}</ul><h3>{words["downloads"]}</h3>\
