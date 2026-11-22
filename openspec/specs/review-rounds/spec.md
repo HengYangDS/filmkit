@@ -106,7 +106,7 @@ For a film that declares levels, a round's preparation SHALL fill `{levels}` wit
 
 #### Scenario: A film with levels
 
-- **WHEN** the prompts are written for a film whose levels hold its five dimensions
+- **WHEN** the prompts are written for a film whose levels hold its six dimensions
 - **THEN** each prompt states 信, 达 and 雅 with what each asks and each dimension under its level
 
 #### Scenario: A template without the field
@@ -167,12 +167,12 @@ A set-aside, reviewed or not, SHALL move each edition's films with captions, its
 
 ### Requirement: A round is prepared by one command
 
-`review.round prepare` SHALL write a round's directory: the binding of the members a delivery would hold, the readback of their players with its screenshots, the listening plan, the measurements, each edition's sentences and prompt, and the changes note and dispositions it was given. It SHALL check what it reads before it derives anything, write the note and the dispositions first and the prompts last, and refuse a round's number below zero.
+`review.round prepare` SHALL write a round's directory: the register report, the binding of the members a delivery would hold, the readback of their players with its screenshots, the listening plan, the measurements, each edition's sentences and prompt, and the changes note and dispositions it was given. It SHALL check what it reads before it derives anything, write the note and the dispositions first, the register report next and the prompts last, and refuse a round's number below zero.
 
 #### Scenario: A build that is ready
 
 - **WHEN** round 19 is prepared with the previous round and a disposition of each of its findings
-- **THEN** the round's directory holds the binding, the readback, the listening plan, the measurements, both editions' sentences and prompts, the changes note and the dispositions
+- **THEN** the round's directory holds the register report, the binding, the readback, the listening plan, the measurements, both editions' sentences and prompts, the changes note and the dispositions
 - **AND** each prompt names its edition's four films with their SHA-256, and cites the round's directory for the round's inputs
 
 #### Scenario: A refusal before anything is derived
@@ -412,3 +412,49 @@ A set-aside, reviewed or not, SHALL move an edition's film record with the editi
 
 - **WHEN** an edition holds no film record
 - **THEN** its films, package record and pictures are set aside as before, and the set-aside names no missing record
+
+### Requirement: A round carries the register report
+
+A round's preparation SHALL write the register check's report of both editions into the round and SHALL fill the
+template's `{register}` field with the report's path and the rules R1 to R6 as the `formal-register` capability states
+them. A template that does not cite `{register}` SHALL be refused before anything is written, naming the field.
+
+#### Scenario: A prepared round
+
+- **WHEN** a round is prepared
+- **THEN** it holds the register report, with each warning's place and form and each exception applied with its
+  text and its reason, and each prompt names it with the rules and names no part of the report that the report does
+  not hold
+
+#### Scenario: A template without the field
+
+- **WHEN** a film's prompt template does not cite `{register}`
+- **THEN** the preparation refuses before it writes anything and names the field
+
+### Requirement: A round is refused with the register check
+
+A round's preparation SHALL ask the register check once, before it derives anything, and SHALL refuse the round in one
+line, making no directory, when the check refuses the film's words or cannot run the Vale the release record states.
+
+#### Scenario: Words the check refuses
+
+- **WHEN** a round is prepared for a film whose words hold an error-level form that the film does not excuse
+- **THEN** the preparation refuses in one line that names each place and form, and the round's directory does not exist
+
+#### Scenario: No pinned Vale
+
+- **WHEN** a round is prepared where no Vale is on the path
+- **THEN** the preparation refuses in one line that names the version the check runs, and the round's directory does
+  not exist
+
+### Requirement: A template cites no field with a conversion or a format specification
+
+A round's preparation SHALL refuse, before it derives anything, a template that cites a field with a conversion or a
+format specification, naming each such field as the template writes it: the engine fills a field with the text a
+reviewer reads whole.
+
+#### Scenario: A field cited with a conversion or a format specification
+
+- **WHEN** the film's template cites `{register:.0}` or `{levels!r}`
+- **THEN** the preparation refuses in one line that names each such field as the template writes it, and the round's
+  directory does not exist

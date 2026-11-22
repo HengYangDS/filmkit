@@ -8,12 +8,12 @@ Keep, with each pre-render check, a receipt of an edition's answers and of the i
 
 ### Requirement: The pre-render check writes a readiness receipt
 
-`produce preflight` SHALL write the edition's readiness receipt whether it passes or refuses: its verdict, each question's answer, the engine version, and the SHA-256 of the composition, the stylesheet, each declared font and the declaration, which both editions share, and of the edition's script, cast, timeline, assembly record and soundtrack. A missing input SHALL refuse by name and leave a receipt without digests.
+`produce preflight` SHALL write the edition's readiness receipt whether it passes or refuses: its verdict, each question's answer, the engine version, and the SHA-256 of the composition, the stylesheet, each declared font, the declaration and the film's entry page, which both editions share, and of the edition's script, cast, timeline, assembly record and soundtrack. A missing input SHALL refuse by name and leave a receipt without digests.
 
 #### Scenario: A ready edition
 
 - **WHEN** every question of the check answers current
-- **THEN** `build/evidence/editions/<edition>/readiness.json` holds a passing verdict, each answer, the engine version and the nine digests
+- **THEN** `build/evidence/editions/<edition>/readiness.json` holds a passing verdict, each answer, the engine version and the ten digests
 
 #### Scenario: A refused edition
 
@@ -27,7 +27,7 @@ Keep, with each pre-render check, a receipt of an edition's answers and of the i
 
 ### Requirement: Readiness is checked again without repeating the work
 
-`produce admitted` SHALL run no audit and SHALL refuse unless the edition's receipt passed, was written by the running engine version and binds every input as it stands, and unless the other edition's receipt passed, was written by that version and binds the composition, the stylesheet, the fonts and the declaration as they stand. A refusal SHALL name each receipt, the inputs that moved and the check to run again.
+`produce admitted` SHALL run no audit and SHALL refuse unless the edition's receipt passed, was written by the running engine version and binds every input as it stands, and unless the other edition's receipt passed, was written by that version and binds the composition, the stylesheet, the fonts, the declaration and the film's entry page as they stand. A refusal SHALL name each receipt, the inputs that moved and the check to run again.
 
 #### Scenario: Both editions ready
 
@@ -53,3 +53,8 @@ Keep, with each pre-render check, a receipt of an edition's answers and of the i
 
 - **WHEN** the edition's receipt names another engine version
 - **THEN** `admitted` refuses and names the engine version among the inputs that moved
+
+#### Scenario: An entry page changed after the check
+
+- **WHEN** the film's entry page changes after both receipts passed
+- **THEN** neither edition is admitted, and the refusal names both receipts and the entry page
