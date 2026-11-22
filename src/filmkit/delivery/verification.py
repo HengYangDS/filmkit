@@ -167,7 +167,7 @@ def require_covering_geometry(edition: production.Edition) -> dict:
         and geometry.get("passed") is True
         and geometry["findings"] == geometry["errors"] == []
         and geometry["index_sha256"] == repository.sha(edition.rendered().page)
-        and (geometry["width"], geometry["height"]) == (3840, 2160)
+        and (geometry["width"], geometry["height"]) == picture_rendering.PICTURE_SIZE
         and (geometry["duration"], geometry["fps"]) == (DURATION, FPS)
         and step in (1, 2)
         and geometry["checked"] == -(-DURATION * FPS // step)

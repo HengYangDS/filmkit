@@ -22,6 +22,7 @@ import {
   seekPoints,
 } from "../../src/filmkit/delivery/player-check.mjs";
 import { openFileLinks } from "../../src/filmkit/delivery/player-read.mjs";
+import { PAGE, RECORD } from "../../src/filmkit/picture/stage-contract.mjs";
 
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const FILM = { slug: "sample-reel", duration: 60 };
@@ -337,5 +338,36 @@ test("the player check refuses a malformed invocation before opening a browser",
       result.stderr.includes("Usage: python -m filmkit.tools player-check"),
       args.join(" "),
     );
+  }
+});
+
+test("the cover check refuses a stage whose record and page disagree before it paints", async () => {
+  const tool = fileURLToPath(
+    new URL("../../src/filmkit/delivery/player-check.mjs", import.meta.url),
+  );
+  const stage = await mkdtemp(join(tmpdir(), "cover-stage-"));
+  try {
+    // A restaging cut short: the record states the UHD frame, the page another.
+    await writeFile(
+      join(stage, RECORD),
+      JSON.stringify({ width: 3840, height: 2160, duration: 60, fps: 60 }),
+    );
+    await writeFile(
+      join(stage, PAGE),
+      '<div id="film" data-width="1920" data-height="1080" data-duration="60"></div>',
+    );
+    const painting = join(stage, "painting.png");
+    const args = [tool, "cover", stage, join(stage, "cover.png"), painting];
+    const result = spawnSync(process.execPath, args, { encoding: "utf8" });
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, "");
+    assert.equal(
+      result.stderr,
+      `player-check: The stage's page ${join(stage, "index.html")} states a width of 1920 where ` +
+        "its record states 3840; run stage-picture again\n",
+    );
+    await assert.rejects(readFile(painting), { code: "ENOENT" });
+  } finally {
+    await rm(stage, { recursive: true, force: true });
   }
 });

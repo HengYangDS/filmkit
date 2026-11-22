@@ -52,6 +52,7 @@ from filmkit.picture.equivalence import compare_pictures
 from filmkit.picture.gates import check_picture
 from filmkit.picture.qualification import qualify_renderer
 from filmkit.picture.rendering import (
+    PICTURE_SIZE,
     PictureError,
     render_picture,
     stage_picture,
@@ -166,8 +167,8 @@ def arguments() -> argparse.ArgumentParser:
     parser.add_argument("action", choices=[*EDITION_ACTIONS])
     parser.add_argument("--duration", type=int, default=DURATION)
     parser.add_argument("--start", type=float, default=0)
-    parser.add_argument("--width", type=int, default=3840)
-    parser.add_argument("--height", type=int, default=2160)
+    parser.add_argument("--width", type=int, default=PICTURE_SIZE[0])
+    parser.add_argument("--height", type=int, default=PICTURE_SIZE[1])
     parser.add_argument("--output", type=Path)
     parser.add_argument("--language", choices=CODES, help="the edition of an edition action")
     parser.add_argument("--deadline", type=int, help="seconds a render may take")

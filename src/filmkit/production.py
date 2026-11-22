@@ -63,15 +63,16 @@ class Rendition:
 VIEWING_ENCODER = "libx264"
 VIEWING_PRESET = "veryfast"
 VIEWING_RATE_FACTOR = 10
-# The two sizes a film is delivered at: the UHD master and the 1080p viewing film.
+# The two sizes a film is delivered at: the UHD master and the 1080p viewing film, whose encode
+# scales the picture to its frame.
 UHD = Rendition(3840, 2160, reencoded=False)
+VIEWING_SIZE = (1920, 1080)
 VIEWING = Rendition(
-    1920,
-    1080,
+    *VIEWING_SIZE,
     reencoded=True,
     video=(
         "-filter:v:0",
-        "scale=w=1920:h=1080:flags=area",
+        "scale=w={}:h={}:flags=area".format(*VIEWING_SIZE),
         "-c:v:0",
         VIEWING_ENCODER,
         "-preset:v:0",

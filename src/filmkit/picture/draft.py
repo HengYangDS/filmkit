@@ -31,15 +31,16 @@ import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
 from filmkit.picture import renderer
 from filmkit.picture.rendering import PictureError
-from filmkit.production import STAGE_PAGE
+from filmkit.production import STAGE_PAGE, VIEWING
 from filmkit.specification import DURATION
 
 if TYPE_CHECKING:
     from filmkit.production import Edition
 
-# The draft's frame rate and frame, and the niceness it renders at unless the caller's is higher.
+# The draft's frame rate and frame, the viewing film's, and the niceness it renders at unless the
+# caller's is higher.
 DRAFT_FPS = 10
-DRAFT_SIZE = (1920, 1080)
+DRAFT_SIZE = (VIEWING.width, VIEWING.height)
 NICENESS = 10
 # Seconds a draft's render may take.
 DEADLINE = 3600

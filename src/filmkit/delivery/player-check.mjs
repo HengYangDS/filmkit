@@ -25,7 +25,7 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
 import { launchBrowser } from "../picture/headless-browser.mjs";
-import { PAGE } from "../picture/stage-contract.mjs";
+import { frameContract, PAGE, StageError } from "../picture/stage-contract.mjs";
 import { decodePng } from "./player-frames.mjs";
 import { digestFile, readDelivery, seekPoints } from "./player-read.mjs";
 import { LANGUAGES } from "./player-verdict.mjs";
@@ -297,11 +297,14 @@ export function coverReport(painted, tracked) {
   };
 }
 
-/** Paint the cover from a staged UHD document, write it, and compare its pixels with the tracked cover, if any. */
+/** Paint the cover from a staged UHD document at the frame its stage states, write it, and compare its pixels with
+ * the tracked cover, if any. A stage whose record and page disagree throws `StageError` before a browser opens, as the
+ * geometry check refuses it (`stage-contract.mjs`). */
 export async function paintCover(stage, cover, output) {
+  const [width, height] = await frameContract(stage);
   const browser = await launchBrowser({
     args: ["--allow-file-access-from-files"],
-    defaultViewport: { width: 3840, height: 2160, deviceScaleFactor: 1 },
+    defaultViewport: { width, height, deviceScaleFactor: 1 },
   });
   try {
     const page = await browser.newPage();
@@ -338,9 +341,15 @@ if (import.meta.main) {
   if (command === "players" && args.length === 2) {
     endAs(await checkPlayers(args[0], args[1]));
   } else if (command === "cover" && args.length === 3) {
-    const result = await paintCover(args[0], args[1], args[2]);
-    console.log(JSON.stringify(result));
-    process.exitCode = result.identical ? 0 : 1;
+    // A folder that is no whole stage is refused in one line with status 1, before a browser opens or a painting is
+    // written.
+    const result = await paintCover(args[0], args[1], args[2]).catch((error) => {
+      if (!(error instanceof StageError)) throw error;
+      console.error(`player-check: ${error.message}`);
+      return null;
+    });
+    if (result !== null) console.log(JSON.stringify(result));
+    process.exitCode = result?.identical ? 0 : 1;
   } else {
     console.error(USAGE);
     process.exitCode = 2;
