@@ -131,11 +131,11 @@ def unit_distance(
     return row[-1]
 
 
-def _latin(unit: str, declared: Sequence[NarrationTerm]) -> Read:
-    """A Latin unit as it is heard: as the declared term it says, its possessive kept, or by its
-    letters and digits."""
+def _latin(unit: str, word: str, declared: Sequence[NarrationTerm]) -> Read:
+    """A Latin unit as it is heard: as the declared term it says where its whole `word` says it
+    too (`terms.unit_says`), its possessive kept, or by its letters and digits."""
     for term in declared:
-        said = terms.said_form(unit, terms.spoken_forms(term))
+        said = terms.unit_says(unit, word, terms.spoken_forms(term))
         if said is not None:
             letters = "".join(recognition_units(term.spoken)).replace("'", "")
             return Read(unit, letters + ("s" if said[1] else ""), term=term.term)
@@ -153,11 +153,14 @@ def read_units(
     text = text.lower()
     covered, dictionary = readings.coverage(text, list(words)), readings.contextual(text)
     alone = {start for start, end in readings.segments(text) if end - start == 1}
+    latin_words = [(w.start(), w.end(), w.group()) for w in terms.LATIN_WORD.finditer(text)]
     found = []
     for match in UNIT.finditer(text):
         unit, at = match.group(), match.start()
         if HAN_UNIT.fullmatch(unit) is None:
-            found.append(_latin(unit, declared))
+            letter = at + len(unit) - len(unit.lstrip("'"))
+            word = next((w for start, end, w in latin_words if start <= letter < end), unit)
+            found.append(_latin(unit, word, declared))
             continue
         word, _start, offset = covered.get(at, (None, 0, 0))
         reading = dictionary.get(at, unit) if word is None else word.syllables[offset]

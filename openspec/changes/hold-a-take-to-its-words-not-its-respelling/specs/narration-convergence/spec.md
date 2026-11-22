@@ -33,7 +33,7 @@ Where a transcript is compared with a take's text, two Han characters with the s
 
 ### Requirement: A declared term is one unit under both its forms
 
-Where a transcript is compared with a take's text, a Latin unit that says a term the film declares, its display form or its spoken form in any case, SHALL count as that term, its possessive kept, in every edition. A Latin unit in other letters SHALL still differ in the English edition.
+Where a transcript is compared with a take's text, a Latin unit whose whole word says a term the film declares, its display form or its spoken form in any case, SHALL count as that term, its possessive kept, in every edition; inside a compound its letters SHALL be compared as any other unit's. A Latin unit in other letters SHALL still differ in the English edition.
 
 #### Scenario: A declared term in its display form
 

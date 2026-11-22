@@ -158,6 +158,18 @@ def test_units_with_the_same_letters_stay_alike_beside_a_declared_term():
     assert by_reading("那些 names 在这里。", "那些name's在这里。", chinese) == 0
 
 
+def test_a_term_inside_a_compound_is_compared_by_its_letters():
+    # The term line measures no occurrence inside a compound, so nothing would hold its sound:
+    # there the comparison reads the letters, as for any other word, and fails closed.
+    chinese = narration_recognition.Names((NAME,), chinese=True, others=OTHERS)
+    assert by_reading("一种 Naim-based 的做法。", "一种Nime-based的做法。", chinese) == 1
+    english = narration_recognition.Names((NAME,))
+    assert by_reading("A Naim-based plan.", "A Name-based plan.", english) == 1
+    # A whole word that says the term is the term, its curly possessive's parts included.
+    assert by_reading("Naim 的做法。", "Nime的做法。", chinese) == 0
+    assert by_reading("It is Naim’s aim.", "It is Name's aim.", chinese) == 0
+
+
 def test_a_term_in_chinese_speech_is_alike_one_latin_unit_that_is_no_other_unit_of_the_edition():
     names = narration_recognition.Names((NAME,), chinese=True, others=OTHERS)
     text = "Naim 走的是另一条路。"

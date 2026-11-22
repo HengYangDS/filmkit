@@ -115,6 +115,14 @@ def says(word: str, forms: frozenset[str]) -> bool:
     return said_form(word, forms) is not None
 
 
+def unit_says(unit: str, word: str, forms: frozenset[str]) -> tuple[str, bool] | None:
+    """The form of a term that a recognition unit says, and whether it is the possessive, where
+    the whole word that holds the unit says that form: inside a compound such as `NAME-based`
+    a unit is no word of its own, and the term line measures no occurrence there."""
+    said, whole = said_form(unit, forms), said_form(word, forms)
+    return said if said is not None and whole is not None and said[0] == whole[0] else None
+
+
 def times_said(text: str, forms: frozenset[str]) -> int:
     """How many words of a text say a term, each a Latin word as the aligner gives words: a
     term inside a compound such as `NAME-based` is no word of its own."""
