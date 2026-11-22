@@ -106,7 +106,7 @@
 
 ## 9. Acceptance
 
-- [ ] 9.1 Make the acceptance checkout, a worktree of the base head apart from the Lane. In these tasks `<work>` and
+- [x] 9.1 Make the acceptance checkout, a worktree of the base head apart from the Lane. In these tasks `<work>` and
       `<evidence>` are the Lane's `build/runtime/work/state-each-fact-once/` and `build/evidence/state-each-fact-once/`,
       `<base>` is the commit the Lane started from and `<head>` its commit after groups 1 to 8; each `mise run` names
       one task and runs in the checkout's root, and a step not marked with a host ticket runs as the host's admission
@@ -115,25 +115,25 @@
       the sample film's `build/runtime/tool-cache/` and is the one step that reaches the network; the host's FFmpeg
       with libx264 and ExifTool serve every later step. Done when `sample:supply` exits 0 and the checkout's `HEAD` is
       `<base>`.
-- [ ] 9.2 Narrate the sample film once, on the base head: `mise run sample:narrate` in the checkout (one host
+- [x] 9.2 Narrate the sample film once, on the base head: `mise run sample:narrate` in the checkout (one host
       ticket: it loads the speech models), then clone the checkout's `examples/sample-film/build/` to
       `<work>/narrated/` with `/bin/cp -c -R`. Done when the clone holds both editions'
       `build/evidence/editions/<code>/ear-first/`.
-- [ ] 9.3 Build the base head's outputs on that narration, below the checkout's `examples/sample-film/build/`:
+- [x] 9.3 Build the base head's outputs on that narration, below the checkout's `examples/sample-film/build/`:
       `mise run sample:sound` (on the narration; it loads no speech model), `mise run sample:picture` (one host
       ticket: it renders), `mise run sample:package` (one host ticket: it packages) and
       `mise run sample:verify > <evidence>/verify-base.json`; then move the checkout's `examples/sample-film/build/` to
       `<work>/before/`. Done when each step exits 0 and `<work>/before/` holds each edition's four films.
-- [ ] 9.4 Build the same on the Change's head: `git -C <work>/checkout checkout --detach <head>`, clone
+- [x] 9.4 Build the same on the Change's head: `git -C <work>/checkout checkout --detach <head>`, clone
       `<work>/narrated/` back to the checkout's `examples/sample-film/build/` with `/bin/cp -c -R`, and run
       `sample:sound`, `sample:picture` (one host ticket), `sample:package` (one host ticket) and `sample:verify`,
       its report to `<evidence>/verify-change.json`, as in task 9.3. Done when each step exits 0.
-- [ ] 9.5 Compare `<work>/before/` with the checkout's `examples/sample-film/build/`, and `verify-base.json` with
+- [x] 9.5 Compare `<work>/before/` with the checkout's `examples/sample-film/build/`, and `verify-base.json` with
       `verify-change.json`, file by file by the rule of design decision 11, with a script kept beside its record
       `<evidence>/compared.json`. Done when the record lists every file of both builds, no file stands in one build
       only, and each file is equal by its bytes, by its streams' hashes for a packaged film, or after the values that
       the decision sets aside, which the record names by file and field.
-- [ ] 9.6 Run the geometry check and the cover check of both heads on the released films' stages, which their trial
+- [x] 9.6 Run the geometry check and the cover check of both heads on the released films' stages, which their trial
       clones hold: `$HOME/projects/ddwg-film-worktrees/20261122-trial-edition-on-0-26-1`,
       `$HOME/projects/ddwg-essentials-film-worktrees/20261120-trial-edition-on-0-26-0` and
       `$HOME/projects/ethos-film-worktrees/20261122-trial-edition-on-0-26-1`. On 22 November only the essentials clone
@@ -148,7 +148,7 @@
       film. Nothing is written in a trial clone. Done when each stage gives the same exit status, geometry receipt and
       painting on both heads, and `released.json` states each painting's SHA-256, what each clone's `build/` held and
       which changed checks did not run there, with the reasons of design decision 11.
-- [ ] 9.7 Remove the acceptance's work: untrust the checkout's Mise configuration (`mise trust --untrust`), remove the
+- [x] 9.7 Remove the acceptance's work: untrust the checkout's Mise configuration (`mise trust --untrust`), remove the
       checkout with `git worktree remove`, then remove `<work>`. Done when `git worktree list` no longer names the
       checkout, `<work>` is gone, and `<evidence>` holds `compared.json` with its script, both verification reports,
       and `released.json` with the receipts of task 9.6.
