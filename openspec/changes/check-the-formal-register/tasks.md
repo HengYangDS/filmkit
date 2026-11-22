@@ -3,7 +3,8 @@
 - [x] 1.0 Write `src/filmkit/register/standard.md`: the scope, the order and R1 to R6 as the owner approved them
       (`build/evidence/formal-register/standard.md`), its words unchanged.
 - [x] 1.1 Pin Vale 3.27.0 in `.config/mise/config.toml` and `mise.lock` under the repository's release age. Done when
-      `mise install --locked` installs it and the engine's tests resolve it.
+      `mise install --locked` installs it and `tests/register/test_register_style.py`, which holds the Vale on the path
+      to the version the release record states, passes under Mise.
 - [x] 1.2 `concepts.places()` gives each edition's places and the entry page once, for the concept check and the
       register check: each text run of the page a unit of its own, the words of `alt`, `title` and `aria-label` with it,
       a caption term's place named with its term. Done when the tests in `tests/test_concepts.py` pass and refuse a
@@ -15,8 +16,8 @@
       listed Chinese words and particles, each plainly, wherever it stands), `contractions` (R3 English), `marks` (R5 in
       both editions: exclamation marks, dashes and ellipses in their typed forms; an unspaced en dash and a command's
       flag pass). Warnings: `we` (R2), `questions` (R4: more than one question in a thought), and one rule each for the
-      forms the engine adds to R1's and R3's classes. Done when `vale test --coverage` passes on every rule, with
-      possessives and curly apostrophes as English cases.
+      forms the engine adds to R1's and R3's classes. Done when `vale test --coverage` passes on every rule, as
+      `tests/register/test_register_style.py` runs it, with possessives and curly apostrophes as English cases.
 - [x] 2.2 `tests/register/test_register_style.py` runs `vale test --coverage` on the base style with the pinned Vale
       and requires a firing case of every token of an error rule; PyYAML, with which it reads the rules, is declared in
       the `dev` group at the version the lock holds. Done when `uv lock --check` passes and the lock's change is the two
@@ -66,10 +67,14 @@
       `language_quality` and `雅` ask for formal standard written language. Done when `python -m filmkit.register` passes on
       the sample and a test in `tests/register/test_register_check.py` reads the two declarations.
 - [x] 4.2 The release record states Vale's version; the adoption reader reports a film that pins another or none.
-      Done when the tests in `tests/test_adoption.py` cover both.
+      Done when the tests in `tests/test_adoption.py` cover the record and those in `tests/test_adoption_vale.py` the
+      reader.
 - [ ] 4.3 The README's command table, requirements and its sentence on what narration checks first, and the
       Changelog's adoption sentences: a film adopting this release passes the register check before it narrates and
-      declares its exceptions by place; its entry page is now read by the concept check too.
+      declares its exceptions by place; pins Vale as `github:vale-cli/vale` in the Mise file of its tasks and has that
+      Vale on the path for narration, the pre-render check and a review round; cites `{register}` in its prompt
+      template; and asks for formal standard written language where its review declaration scores language; its entry
+      page is now read by the concept check too.
 
 ## 5. Acceptance
 
@@ -79,3 +84,17 @@
       of one film, on 22 November 2026), and no other; run on the texts proposed for the December editions in
       throwaway copies, each with its declarations, it refuses nothing; the record stands in
       `build/evidence/check-the-formal-register/acceptance/`.
+
+## 6. After the fifth review and the readiness
+
+- [x] 6.1 The check's Vale configuration is `register.ini`, INI to a strict reader, and an engine without it is
+      refused by name before any word is read. Done when the tests in `tests/register/test_register_runs.py` pass and
+      ETHOS's readiness runs every gate but `native-behavior` on the lane's head and none fails.
+- [x] 6.2 A template that cites a field with a conversion or a format specification is refused before anything is
+      derived. Done when the tests in `tests/review/test_prepare.py` pass.
+- [x] 6.3 The adoption reader's Vale finding names the file it read and the name it looked under, and a pin elsewhere
+      is not read. Done when the tests in `tests/test_adoption_vale.py` pass.
+- [x] 6.4 Tests hold that a round is refused with the register check, where no Vale is on the path too, that the
+      prompt says the check does not read the picture's words, and that each part of the report the prompt names is
+      one the check gives. Done when the tests in `tests/review/test_prepare.py` and `tests/review/test_prompts.py`
+      pass.
