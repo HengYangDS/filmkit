@@ -107,3 +107,6 @@
 - [x] 7.2 The names of the report's two parts that the prompt tells its reader of are stated once, in
       `filmkit.register`, and the prompt is filled from them. Done when the test of a prepared round in
       `tests/review/test_prepare.py` passes and fails where the prompt names a part the report does not hold.
+- [x] 7.3 The refusal of a reshaped template field says what it refuses, a conversion or a format specification, and
+      no longer that a field is cited by its name alone: a field written with an attribute or an index is filled as
+      before. Done when the tests in `tests/review/test_prepare.py` pass.

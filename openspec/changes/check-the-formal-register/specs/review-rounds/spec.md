@@ -34,7 +34,7 @@ line, making no directory, when the check refuses the film's words or cannot run
 - **THEN** the preparation refuses in one line that names the version the check runs, and the round's directory does
   not exist
 
-### Requirement: A template cites each field by its name alone
+### Requirement: A template cites no field with a conversion or a format specification
 
 A round's preparation SHALL refuse, before it derives anything, a template that cites a field with a conversion or a
 format specification, naming each such field as the template writes it: the engine fills a field with the text a

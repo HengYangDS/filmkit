@@ -355,8 +355,8 @@ def reshaped_fields(root, put, previous, monkeypatch):
     monkeypatch.setattr(review_prompts, "TEMPLATE", template)
     return previous, (
         "content/review/prompt.md cites {concepts!s:>9} and {levels!r} and {register:.0}, each "
-        "with a conversion or a format specification; the engine fills a field that is cited by "
-        "its name alone"
+        "with a conversion or a format specification; the engine fills a field that is cited "
+        "with neither"
     )
 
 

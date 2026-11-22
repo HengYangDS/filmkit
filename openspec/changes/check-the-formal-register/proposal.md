@@ -51,6 +51,9 @@ with rule tests and 0.03 s a film, and matched the inventory's R1 and R2 counts 
   `review.round prepare`, `released`, `adoption` call it; Mise's configuration and lock; the README and the Changelog.
 - **Breaking for a film:** after adopting, a film whose words hold an error-level form is refused before narration
   and before a render, naming each place. Every released film holds such forms (the inventory); each fixes them in
-  its December edition, with its owner's approval of the words.
+  its December edition, with its owner's approval of the words. A film that adopts also pins Vale as
+  `github:vale-cli/vale` in the Mise file of its tasks and has that Vale on the path for narration, the pre-render
+  check and a review round, cites `{register}` in its reviewer prompt template, and asks for formal standard written
+  language where its review declaration scores language.
 - Out of scope: R4 to R6 beyond the warnings, which stay with the reviewers; the picture's words, which join the check
   once the geometry check records the texts it paints; the films' texts; the concept check's counterexamples.

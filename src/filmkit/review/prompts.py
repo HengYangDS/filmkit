@@ -137,7 +137,7 @@ def cited_fields(template: str) -> list[str]:
     if reshaped:
         msg = (
             f"{FILM.review.prompt} cites {' and '.join(reshaped)}, each with a conversion or a "
-            "format specification; the engine fills a field that is cited by its name alone"
+            "format specification; the engine fills a field that is cited with neither"
         )
         raise ReviewError(msg)
     return [name for _, name, _, _ in cited]
@@ -488,16 +488,16 @@ def read_round(
     edition's sentences: everything of a round's prompts that only reading gives.
 
     A round's preparation asks this before it derives anything, and `prompts` before it writes
-    anything. Refused unless the review configuration keeps the concept contract the film
-    declares (`contract_gaps`) and the levels it declares (`level_gaps`), the template cites
-    every field by its name alone (`cited_fields`, asked first) and cites the register field, a
-    first round's template cites no previous review, each edition's 1080p captioned film holds
-    its passing still scan (`still_scan.require_film_scan`, whose refusal is raised as that
-    owner's own), a later round disposes of every previous finding
-    (`stated_dispositions`), the previous round holds each edition's review and report, the
-    changes note is text, the soundtracks declare one program level, the standard gives its
-    rules (`filmkit.register.rules`, whose refusal is its own too), the template cites no field
-    the engine does not fill, and each edition of a film with levels has its timeline.
+    anything. Refused unless the review configuration keeps the concept contract the film declares
+    (`contract_gaps`) and the levels it declares (`level_gaps`), the template cites no field with a
+    conversion or a format specification (`cited_fields`, asked first) and cites the register field,
+    a first round's template cites no previous review, each edition's 1080p captioned film holds its
+    passing still scan (`still_scan.require_film_scan`, whose refusal is raised as that owner's
+    own), a later round disposes of every previous finding (`stated_dispositions`), the previous
+    round holds each edition's review and report, the changes note is text, the soundtracks declare
+    one program level, the standard gives its rules (`filmkit.register.rules`, whose refusal is its
+    own too), the template cites no field the engine does not fill, and each edition of a film with
+    levels has its timeline.
     """
     named = set(cited_fields(TEMPLATE))
     gaps = contract_gaps(TEMPLATE, DIMENSIONS)
