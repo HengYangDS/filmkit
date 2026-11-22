@@ -410,3 +410,54 @@ test("the cover check refuses a folder that is no whole stage before it paints",
     await rm(stage, { recursive: true, force: true });
   }
 });
+
+/** The cover check run on a folder: its status, its output and its error text. */
+function paintedFrom(stage) {
+  const tool = fileURLToPath(
+    new URL("../../src/filmkit/delivery/player-check.mjs", import.meta.url),
+  );
+  const args = [tool, "cover", stage, join(stage, "cover.png"), join(stage, "painting.png")];
+  return spawnSync(process.execPath, args, { encoding: "utf8" });
+}
+
+test("the cover check refuses a stage whose record holds no JSON before it paints", async () => {
+  const stage = await mkdtemp(join(tmpdir(), "cover-stage-"));
+  try {
+    await writeFile(join(stage, RECORD), "{");
+    await writeFile(
+      join(stage, PAGE),
+      '<div id="film" data-width="3840" data-height="2160" data-duration="60"></div>',
+    );
+    const result = paintedFrom(stage);
+    const said = `player-check: The stage's record ${join(stage, "stage.json")} holds no JSON (`;
+    assert.equal(result.status, 1, result.stderr);
+    assert.equal(result.stdout, "");
+    assert.ok(result.stderr.startsWith(said), result.stderr);
+    assert.ok(result.stderr.endsWith("); run stage-picture again\n"), result.stderr);
+    assert.equal(result.stderr.split("\n").length, 2, result.stderr);
+    await assert.rejects(readFile(join(stage, "painting.png")), { code: "ENOENT" });
+  } finally {
+    await rm(stage, { recursive: true, force: true });
+  }
+});
+
+test("the cover check refuses a stage without its page before it paints", async () => {
+  const stage = await mkdtemp(join(tmpdir(), "cover-stage-"));
+  try {
+    await writeFile(
+      join(stage, RECORD),
+      JSON.stringify({ width: 3840, height: 2160, duration: 60, fps: 60 }),
+    );
+    const result = paintedFrom(stage);
+    assert.equal(result.status, 1, result.stderr);
+    assert.equal(result.stdout, "");
+    assert.equal(
+      result.stderr,
+      `player-check: The stage's page ${join(stage, "index.html")} is absent; ` +
+        "run stage-picture again\n",
+    );
+    await assert.rejects(readFile(join(stage, "painting.png")), { code: "ENOENT" });
+  } finally {
+    await rm(stage, { recursive: true, force: true });
+  }
+});
