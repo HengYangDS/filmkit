@@ -191,7 +191,7 @@ def test_tasks_that_render_ask_readiness_somewhere(project):
     assert found(project)["tasks"] == []
 
 
-def test_a_film_whose_tasks_no_mise_configuration_holds_is_named_and_refuses_nothing(project):
+def test_a_film_without_a_mise_configuration_has_unread_tasks_and_pins_no_vale(project):
     shutil.rmtree(project / ".config")
     result = adoption.report(project)
     assert result["findings"]["tasks"] == []

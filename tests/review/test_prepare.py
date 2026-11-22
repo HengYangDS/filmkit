@@ -37,13 +37,18 @@ REGISTER_CHECK = register.check
 def test_prepare_writes_the_round_of_a_ready_build_and_its_prompts_last(
     root, put, ready, previous, capsys, monkeypatch
 ):
-    asked = []
+    asked, words = [], []
 
     def passing(edition):
         asked.append(edition.code)
         return {}
 
+    def reported():
+        words.append(dict(REGISTER_REPORT))
+        return words[-1]
+
     monkeypatch.setattr(still_scan, "require_film_scan", passing)
+    monkeypatch.setattr(register, "check", reported)
     changes = put(root / "notes/changes.md", "- Repairs: 07.6 names all seven checks.\n")
     folder = prepare(*previous, "--changes", changes)
     # Each edition's still scan is asked twice, in the editions' order. The requirement is one
@@ -81,8 +86,10 @@ def test_prepare_writes_the_round_of_a_ready_build_and_its_prompts_last(
     # The measurements are written as the measurement's own command writes them.
     stated = json.dumps({"scope": "stand-in", "editions": {}}, ensure_ascii=False, indent=2)
     assert (folder / "measurements.json").read_text() == stated + "\n"
-    # The register report is the check's own, written as the engine writes a record.
+    # The register report is the check's own, written as the engine writes a record, and the
+    # check was asked once: the report in the round is the one that admitted it.
     assert json.loads((folder / "register.json").read_text()) == REGISTER_REPORT
+    assert len(words) == 1
     assert (folder / "changes.md").read_bytes() == changes.read_bytes()
     assert (folder / "dispositions.json").read_bytes() == previous[3].read_bytes()
     for code in CODES:

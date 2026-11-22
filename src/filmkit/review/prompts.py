@@ -11,7 +11,7 @@ Every film's template cites `{register}`, and one that does not is refused, nami
 The field names the round's register report (`REGISTER`, which the round's preparation writes
 from `filmkit.register.check`), says what the report holds and what the check does not read,
 and states the rules R1 to R6 of the formal register as the engine's standard states them
-(`filmkit.register.rules`), so a film's review declaration restates none of them.
+(`filmkit.register.rules`), so a film's review declaration need not restate them.
 
 No round is prepared for films the engine's own measure refuses: the checks that only read
 (`read_round`) ask each edition's passing still scan of its 1080p captioned film
