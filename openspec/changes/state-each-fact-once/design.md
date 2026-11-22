@@ -110,6 +110,24 @@ Inputs, which may read the owner; expectations, which stay literal.
 
 Nothing migrates: no film's file, record or command changes. To roll back, revert the Change's commits.
 
+## As built
+
+The owners the decisions name exist as the design reads them at `1e4d459`: `production.py` with `Edition`, `Rendered` and `RENDITIONS`, `picture/stage-contract.mjs` with `RECORD`, `PAGE` and `frameContract`, `delivery/player.py`, `delivery/reproduction.py`, `released.ENGINE`, `MANIFEST`, `NPM_LOCK` and `PYTHON_LOCK`, and `picture.rendering.PICTURE_SIZE`. Their new members:
+
+- Decision 1: `production.STAGE_PAGE` and `STAGE_RECORD`, and `Rendered.page`.
+- Decision 3: `player.Version`, a named tuple of the five fields the decision lists; `player.kinds_at`, which takes a size's two kinds from `RENDITIONS`; `VERSIONS`; and `OPENING`, the version whose button starts pressed, which the page's video and status line read.
+- Decision 5: `reproduction.release_name(edition, path)`.
+- Decision 8: `Edition.srt`, `vtt`, `transcript`, `chapters` and `chapter_metadata`, and `player.PAGE`.
+- Decision 9: `production.ARTIFACTS`, `EVIDENCE` and `STAGE`, the captioned stage's name as a format of the edition's code, which `tools.py` splits at the code to build its pattern; and `production.VIEWING_SIZE`, from which `VIEWING` and its scale filter are built.
+
+Where the code says more than the design:
+
+- The draft's stage is no `Rendered` (`Edition.draft_stage`), so `picture/draft.py` hands `record_render` its stage's page as `stage / STAGE_PAGE`.
+- `production.py` imported `Path` for type checking only; the folders it now states need it when the module runs.
+- In `tests/test_adoption.py:51-54` and `:553-554` the pin's table key, its tag and the lock entries' name read `released.ENGINE`; the stand-in source URL `https://example.invalid/filmkit` is no read of the engine's name and keeps its words.
+
+Line numbers above remain those of `1e4d459`; the Change moves some of them.
+
 ## Sources
 
 - **[S1]** `build/evidence/release-0.25.0/reviews/review-ssot.md` in the canonical checkout, section C.

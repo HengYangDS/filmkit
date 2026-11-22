@@ -22,7 +22,7 @@
 
 ## 2. The versions of the player page
 
-- [ ] 2.1 Make `VERSIONS` in `src/filmkit/delivery/player.py` the one statement of how the films pair into versions,
+- [x] 2.1 Make `VERSIONS` in `src/filmkit/delivery/player.py` the one statement of how the films pair into versions,
       taking each version's captioned and uncaptioned kinds from `production.RENDITIONS` by size, and let
       `listed_files`, the film the page opens on and the status line read it (design decision 3). Done when
       `player.py` holds none of `"1080p-captioned"`, `"1080p-uncaptioned"` and `"uhd-uncaptioned"`, holds `"uhd"` and
@@ -58,7 +58,7 @@
       `tests/picture/test_rendering.py`, `tests/picture/test_still_scan.py`, `tests/picture/test_still_record.py`,
       `tests/picture/test_uncaptioned.py`, `tests/test_preflight.py`, `tests/soundtrack/test_sound_gates.py`,
       `tests/test_tools.py` and `tests/test_adoption.py` pass.
-- [ ] 5.2 Locate a film's npm manifest, npm lock and Python lock in `src/filmkit/adoption.py` by
+- [x] 5.2 Locate a film's npm manifest, npm lock and Python lock in `src/filmkit/adoption.py` by
       `released.MANIFEST`, `released.NPM_LOCK` and `released.PYTHON_LOCK` (design decision 7). Done when no path
       statement of `adoption.py` spells one of the three names and the tests in `tests/test_adoption.py` pass.
 
@@ -96,7 +96,7 @@
 
 ## 8. The Changelog
 
-- [ ] 8.1 Record the Change under `Unreleased` in `CHANGELOG.md`, as `CONTRIBUTING.md` asks. Done when the entry
+- [x] 8.1 Record the Change under `Unreleased` in `CHANGELOG.md`, as `CONTRIBUTING.md` asks. Done when the entry
       says that the engine reads each of these names from one owner, that no film's output, record or command
       changes, that the renderer's usage text gains `node`, that the cover check refuses a stage whose record and
       page disagree, and that the media server loads the film's declaration when it starts.
