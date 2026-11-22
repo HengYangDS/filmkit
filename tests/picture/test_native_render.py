@@ -17,7 +17,7 @@ import filmkit.picture.browser as picture_browser
 import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
-from filmkit.production import Edition
+from filmkit.production import STAGE_PAGE, Edition
 from filmkit.specification import DURATION
 
 # Every test here has the deadline of a test that starts real processes, and their end.
@@ -81,7 +81,8 @@ def drawn(folder, spans):
     """Draw a stage at FPS in `spans` spans through the engine's own run and receipt."""
     output, receipt = folder.with_suffix(f".{spans}.mp4"), folder.with_suffix(f".{spans}.json")
     command = picture_renderer.command(folder, output, FPS, spans)
-    return output, picture_renderer.record_render(command, folder, output, receipt, 120, "test")
+    page = folder / STAGE_PAGE
+    return output, picture_renderer.record_render(command, page, output, receipt, 120, "test")
 
 
 def test_a_native_picture_meets_the_engines_contract_of_a_picture(

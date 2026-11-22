@@ -203,7 +203,7 @@ def test_a_rendered_pairs_comparison_record_says_why_the_picture_was_rendered(
     for captions, receipt in receipts.items():
         rendered = edition.rendered(captions)
         (rendered.stage).mkdir(parents=True)
-        (rendered.stage / "index.html").write_text(rendered.name)
+        rendered.page.write_text(rendered.name)
         rendered.file.parent.mkdir(parents=True, exist_ok=True)
         rendered.file.write_text(rendered.name)
         repository.write(rendered.receipt, receipt)

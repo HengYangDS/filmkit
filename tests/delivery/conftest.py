@@ -267,7 +267,7 @@ def picture(inputs: Inputs, *, derived: bool = False) -> None:
     write_input(root / picture_rendering.COMPOSITION_SCRIPT, "/* film */")
     for captions in (True, False):
         rendered = edition.rendered(captions)
-        write_input(rendered.stage / "index.html", f"<html>{rendered.name}</html>")
+        write_input(rendered.page, f"<html>{rendered.name}</html>")
         write_input(rendered.file, f"{rendered.name} picture")
         receipt = {"picture": rendered.name, "output_sha256": sha(rendered.file)}
         if derived and not captions:
@@ -288,7 +288,7 @@ def picture(inputs: Inputs, *, derived: bool = False) -> None:
             "passed": True,
             "findings": [],
             "errors": [],
-            "index_sha256": sha(edition.picture_stage / "index.html"),
+            "index_sha256": sha(edition.rendered().page),
             "width": 3840,
             "height": 2160,
             "duration": DURATION,
@@ -429,7 +429,8 @@ def built(editions, tmp_path_factory, monkeypatch) -> Built:
 
     def staged_now(edition, stage, *, captions=True):
         current.asked.append((edition.code, stage, captions))
-        if (stage / "index.html").read_text() != f"<html>{edition.rendered(captions).name}</html>":
+        page = stage / production.STAGE_PAGE
+        if page.read_text() != f"<html>{edition.rendered(captions).name}</html>":
             msg = "The staged document differs from the one the current sources derive"
             raise picture_rendering.PictureError(msg)
         return {}

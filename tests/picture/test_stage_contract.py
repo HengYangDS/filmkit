@@ -13,7 +13,7 @@ import subprocess
 from pathlib import Path
 
 import filmkit.picture.rendering as picture_rendering
-from filmkit.production import Edition
+from filmkit.production import STAGE_RECORD, Edition
 from filmkit.specification import DURATION, FPS
 
 # The contract's reader imports no browser, so it runs wherever the engine's Node tools run.
@@ -42,8 +42,8 @@ def test_the_geometry_check_reads_its_frame_contract_from_the_engines_own_stage(
     assert "data-fps" not in (stage / "index.html").read_text(encoding="utf-8")
     # A stage restaged at another size and cut short before its record: the page and the record
     # disagree, and the refusal names what to run.
-    record = json.loads((stage / "stage.json").read_text(encoding="utf-8"))
-    (stage / "stage.json").write_text(json.dumps({**record, "width": 1920}), encoding="utf-8")
+    record = json.loads((stage / STAGE_RECORD).read_text(encoding="utf-8"))
+    (stage / STAGE_RECORD).write_text(json.dumps({**record, "width": 1920}), encoding="utf-8")
     apart = contract(stage)
     assert apart.returncode == 1
     page = stage / "index.html"

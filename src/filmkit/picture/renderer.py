@@ -303,17 +303,18 @@ def take_report(command: list[str]) -> dict:
 
 
 def record_render(
-    command: list[str], stage: Path, output: Path, receipt: Path, deadline: float, picture: str
+    command: list[str], page: Path, output: Path, receipt: Path, deadline: float, picture: str
 ) -> dict:
-    """Run a renderer command on a stage to its exit or deadline and write its receipt.
+    """Run a renderer command on a stage to its exit or deadline and write its receipt; `page`
+    is the page the stage holds, whose SHA-256 the receipt binds.
 
     The receipt names the picture, the command, the canvas that drew it with the native library
     and the text renderer its processes report, the operating system, and what else the
     renderer reports: the spans, the frames it gave its encoders and the digest of the drawn
     frames. A render that does not exit 0 within its deadline, that reports no drawn frames, or
-    whose stage changed meanwhile, raises `PictureError` after its receipt is written.
+    whose staged page changed meanwhile, raises `PictureError` after its receipt is written.
     """
-    source = sha(stage / "index.html")
+    source = sha(page)
     # A report left by a run that was cut short is not this run's.
     take_report(command)
     started = datetime.now(UTC)
@@ -338,7 +339,7 @@ def record_render(
     }
     write(receipt, record)
     print(json.dumps({key: record[key] for key in ("exit", "timed_out", "elapsed_seconds")}))
-    if exit_code != 0 or timed_out or source != sha(stage / "index.html"):
+    if exit_code != 0 or timed_out or source != sha(page):
         msg = "Native picture render did not complete from the current stage"
         raise PictureError(msg)
     if not isinstance(record["drawn_sha256"], str):

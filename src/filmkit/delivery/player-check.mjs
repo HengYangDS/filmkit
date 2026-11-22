@@ -26,6 +26,7 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
 import { launchBrowser } from "../picture/headless-browser.mjs";
+import { PAGE } from "../picture/stage-contract.mjs";
 import { decodePng } from "./player-frames.mjs";
 import { digestFile, readDelivery, seekPoints } from "./player-read.mjs";
 import { LANGUAGES } from "./player-verdict.mjs";
@@ -305,7 +306,7 @@ export async function paintCover(stage, cover, output) {
   });
   try {
     const page = await browser.newPage();
-    await page.goto(pathToFileURL(resolve(stage, "index.html")).href, {
+    await page.goto(pathToFileURL(resolve(stage, PAGE)).href, {
       waitUntil: "load",
       timeout: 60000,
     });

@@ -464,7 +464,7 @@ def picture_sync(edition: production.Edition) -> dict:
 def picture_geometry(edition: production.Edition) -> dict:
     """The real-browser geometry check, which must have checked the current staged document."""
     geometry = repository.read(edition.picture_geometry)
-    staged = edition.picture_stage / "index.html"
+    staged = edition.rendered().page
     if not staged.is_file() or geometry.get("index_sha256") != repository.sha(staged):
         msg = f"{edition.code}: the picture geometry does not check the current stage"
         raise ReviewError(msg)

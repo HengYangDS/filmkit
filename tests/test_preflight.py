@@ -107,7 +107,7 @@ def edition(tmp_path, monkeypatch):
             "passed": True,
             "findings": [],
             "errors": [],
-            "index_sha256": repository.sha(edition.picture_stage / "index.html"),
+            "index_sha256": repository.sha(edition.rendered().page),
             "width": 3840,
             "height": 2160,
             "duration": DURATION,

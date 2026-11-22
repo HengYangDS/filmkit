@@ -21,7 +21,7 @@ import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 from filmkit.film import FILM
 from filmkit.picture.rendering import PictureError
-from filmkit.production import Edition
+from filmkit.production import STAGE_RECORD, Edition
 from filmkit.specification import DURATION, FPS
 
 # The real composition, found before a test rebinds the repository root.
@@ -164,7 +164,7 @@ def completed_receipt(edition):
         "renderer": drawn_by,
         "exit": 0,
         "timed_out": False,
-        "source_sha256": repository.sha(stage / "index.html"),
+        "source_sha256": repository.sha(edition.rendered().page),
         "output_path": str(picture),
         "output_sha256": repository.sha(picture),
     }
@@ -296,7 +296,7 @@ def test_a_completed_render_binds_only_the_current_stage(staged):
             picture_rendering.validate_picture_binding(edition, {**receipt, **change})
     # A document edited after staging no longer derives from the current sources, even
     # when its render receipt names it.
-    document = edition.picture_stage / "index.html"
+    document = edition.rendered().page
     original = document.read_text()
     document.write_text(original.replace("<title>", "<title>Edited "))
     edited = {**receipt, "source_sha256": repository.sha(document)}
@@ -320,7 +320,7 @@ def test_a_changed_template_or_copied_member_refuses_the_stage(staged, root):
     with pytest.raises(PictureError, match=re.escape(staged_font)):
         picture_rendering.validate_picture_binding(edition, receipt)
     # A record that drops its members cannot pass by checking none of them.
-    record = edition.picture_stage / "stage.json"
+    record = edition.picture_stage / STAGE_RECORD
     put(record, {**json.loads(record.read_text()), "members": []})
     with pytest.raises(PictureError, match="declared members"):
         picture_rendering.require_current_stage(edition, edition.picture_stage)

@@ -285,10 +285,8 @@ def record(stated: list[str]) -> tuple[Release, Release | None]:
         films = [film.name for film in edition.films]
         editions[code] = reproduction.EditionRecord(
             soundtrack_sha256=repository.sha(edition.soundtrack),
-            stage_sha256=repository.sha(edition.picture_stage / "index.html"),
-            uncaptioned_stage_sha256=repository.sha(
-                edition.rendered(captions=False).stage / "index.html"
-            ),
+            stage_sha256=repository.sha(edition.rendered().page),
+            uncaptioned_stage_sha256=repository.sha(edition.rendered(captions=False).page),
             picture_floor_db={name: floors[name] for name in films if name in floors},
         )
         assets += [

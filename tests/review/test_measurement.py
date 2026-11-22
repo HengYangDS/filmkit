@@ -534,7 +534,7 @@ def test_the_measured_sync_is_the_report_the_picture_gate_judged(root, put):
 @pytest.mark.usefixtures("root")
 def test_the_measured_geometry_checks_the_current_staged_document(put):
     edition = Edition("en")
-    staged = put(edition.picture_stage / "index.html", "<!doctype html>")
+    staged = put(edition.rendered().page, "<!doctype html>")
     geometry = {
         "checked": 45000,
         "step_frames": 2,

@@ -10,7 +10,7 @@ import { analysis } from "./rules/frame.mjs";
 import { inkLevel, readingLoad } from "./rules/ink.mjs";
 import { faintLabels, listTracker, nameRules } from "./rules/names.mjs";
 import { rowGaps } from "./rules/rows.mjs";
-import { frameContract, StageError } from "./stage-contract.mjs";
+import { frameContract, PAGE, StageError } from "./stage-contract.mjs";
 
 /** Page instrumentation: record every painted path and fill in logical frame coordinates, and the size each text is
  * painted at on the logical frame, its font's size under the transform it is drawn in. */
@@ -282,7 +282,7 @@ const RULES = {
 export async function inspectWorkspace(workspace, { step = 2 } = {}) {
   // The frame is the stage's record's, with which its page agrees (`stage-contract.mjs`): the page states no rate.
   const [width, height, duration, fps] = await frameContract(workspace);
-  const entry = resolve(workspace, "index.html");
+  const entry = resolve(workspace, PAGE);
   const source = await readFile(entry, "utf8");
   const browser = await launchBrowser({
     args: ["--allow-file-access-from-files", "--no-sandbox"],

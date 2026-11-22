@@ -31,7 +31,7 @@ import filmkit.sources as sources
 from filmkit.film import FILM
 from filmkit.picture import encoding, faces, renderer, template
 from filmkit.picture.errors import PictureError
-from filmkit.production import RENDITIONS
+from filmkit.production import RENDITIONS, STAGE_PAGE, STAGE_RECORD
 from filmkit.repository import content_sha, read, sha, write
 from filmkit.specification import DURATION, FPS
 
@@ -247,11 +247,11 @@ def stage_picture(
     )
     data = film_data(edition, start, timeline=timeline, captions=captions)
     target.mkdir(parents=True, exist_ok=True)
-    (target / "index.html").write_text(document, encoding="utf-8")
+    (target / STAGE_PAGE).write_text(document, encoding="utf-8")
     (target / DATA).write_text(data, encoding="utf-8")
     members = [copy_member(target, path, source) for path, source in staged_members()]
     write(
-        target / "stage.json",
+        target / STAGE_RECORD,
         {
             "duration": duration,
             "start": start,
@@ -299,7 +299,7 @@ def require_current_stage(edition: Edition, stage: Path, *, captions: bool = Tru
     and data must be the ones those sources derive now, and every copied member must match its
     record and its source.
     """
-    record, document = stage / "stage.json", stage / "index.html"
+    record, document = stage / STAGE_RECORD, stage / STAGE_PAGE
     if not record.is_file() or not document.is_file():
         msg = f"No staged picture document and record in {repository.relative(stage)}"
         raise PictureError(msg)
@@ -346,7 +346,7 @@ def recorded_picture(record: dict) -> str:
 
 def require_completed_receipt(receipt: dict, stage: Path) -> None:
     """Refuse a receipt unless the renderer exited 0 within its deadline on the staged document."""
-    document = stage / "index.html"
+    document = stage / STAGE_PAGE
     if (
         receipt.get("exit") != 0
         or receipt.get("timed_out", True)
@@ -427,7 +427,7 @@ def render_picture(edition: Edition, deadline: int, *, captions: bool = True) ->
     require_current_stage(edition, rendered.stage, captions=captions)
     command = renderer.command(rendered.stage, rendered.file, FPS, renderer.spans())
     renderer.record_render(
-        command, rendered.stage, rendered.file, rendered.receipt, deadline, rendered.name
+        command, rendered.page, rendered.file, rendered.receipt, deadline, rendered.name
     )
 
 

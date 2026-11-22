@@ -403,10 +403,10 @@ def compare_edition(
     `assets` holds each published asset's file and `listed` its record in the manifest.
     """
     layers = members(edition)
-    uncaptioned = edition.rendered(captions=False).stage / "index.html"
+    uncaptioned = edition.rendered(captions=False).page
     return {
         "soundtrack": recorded(edition.soundtrack, record.soundtrack_sha256),
-        "stage": recorded(edition.picture_stage / "index.html", record.stage_sha256),
+        "stage": recorded(edition.rendered().page, record.stage_sha256),
         **(
             {}
             if record.uncaptioned_stage_sha256 is None

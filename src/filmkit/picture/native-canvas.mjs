@@ -48,6 +48,7 @@ import vm from "node:vm";
 import { crc32 } from "node:zlib";
 import { createCanvas, getTextRenderer, GlobalFonts, setTextRenderer } from "@napi-rs/canvas";
 import { compositionScope } from "./headless-composition.mjs";
+import { RECORD } from "./stage-contract.mjs";
 
 // The encoder threads of each span of a film drawn in several: the count the whole-film measurements ran with.
 const SPAN_THREADS = 2;
@@ -117,7 +118,7 @@ function loadedLibrary() {
 
 /** Open a stage's picture: its record, its canvas and the composition's `renderFrame`. */
 function openPicture(stage, textRenderer) {
-  const record = JSON.parse(readFileSync(join(stage, "stage.json"), "utf8"));
+  const record = JSON.parse(readFileSync(join(stage, RECORD), "utf8"));
   if (!Array.isArray(record.faces) || typeof record.language !== "string")
     throw Error(`The record of ${stage} names no faces or no language; stage the picture again`);
   for (const { family, path } of record.faces) {
@@ -345,7 +346,7 @@ async function render(args) {
     writeFileSync(checksums.replace(/\.crc$/, "") + ".json", JSON.stringify(ran()));
     return null;
   }
-  const record = JSON.parse(readFileSync(join(stage, "stage.json"), "utf8"));
+  const record = JSON.parse(readFileSync(join(stage, RECORD), "utf8"));
   const frames = Math.round(record.duration * fps),
     plan = planSpans(frames, group, options.spans);
   clearSpans(work);

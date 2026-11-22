@@ -10,7 +10,7 @@ import filmkit.delivery.folder as delivery_folder
 import filmkit.delivery.release as release
 import filmkit.delivery.reproduction as reproduction
 import filmkit.repository as repository
-from filmkit.production import CODES
+from filmkit.production import CODES, STAGE_PAGE
 
 # The sample film declares review levels; these reviews keep the overall and dimension floors.
 pytestmark = pytest.mark.usefixtures("unleveled")
@@ -44,7 +44,7 @@ def test_a_stale_uncaptioned_stage_of_a_derived_picture_refuses_naming_edition_a
     edition = built.editions["zh"].edition
     receipt = repository.read(edition.rendered(captions=False).receipt)
     assert isinstance(receipt["derived"], dict)
-    (uncaptioned_stage("zh") / "index.html").write_text("<html>stale</html>")
+    (uncaptioned_stage("zh") / STAGE_PAGE).write_text("<html>stale</html>")
     assert unchanged_refusal(built) == (
         "zh: uncaptioned picture: "
         "The staged document differs from the one the current sources derive"
@@ -121,7 +121,7 @@ def test_the_checks_refuse_in_their_order_and_the_first_stops_the_command(built)
     soundtrack = edition.soundtrack.read_bytes()
     built.version("1.4.0-rc.1")
     edition.soundtrack.write_bytes(b"another soundtrack")
-    (uncaptioned_stage("en") / "index.html").write_text("<html>stale</html>")
+    (uncaptioned_stage("en") / STAGE_PAGE).write_text("<html>stale</html>")
     edition.production_review.unlink()
     (built.folder / "index.html").unlink()
     built.manifest.write_text("{}")
@@ -132,7 +132,7 @@ def test_the_checks_refuse_in_their_order_and_the_first_stops_the_command(built)
     assert built.asked == [("zh", uncaptioned_stage("zh"), False)]
     edition.soundtrack.write_bytes(soundtrack)
     assert refused(absent).startswith("en: uncaptioned picture: The staged document differs")
-    (uncaptioned_stage("en") / "index.html").write_text("<html>uncaptioned</html>")
+    (uncaptioned_stage("en") / STAGE_PAGE).write_text("<html>uncaptioned</html>")
     assert refused(absent).startswith("en: No review record")
     english.review()
     assert "index.html is missing" in refused(absent)

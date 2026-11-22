@@ -69,7 +69,7 @@ def pictures(tmp_path, monkeypatch):
     for captions in (True, False):
         rendered = edition.rendered(captions)
         rendered.stage.mkdir(parents=True)
-        (rendered.stage / "index.html").write_text(f"<html>{rendered.name}</html>")
+        rendered.page.write_text(f"<html>{rendered.name}</html>")
         repository.write(rendered.receipt, {"picture": rendered.name})
     encode(edition.rendered(True).file, CAPTION)
     encode(edition.rendered(False).file)

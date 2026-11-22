@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { encoderArguments, planSpans } from "../../src/filmkit/picture/native-canvas.mjs";
+import { RECORD } from "../../src/filmkit/picture/stage-contract.mjs";
 import { authoredTimeline, SAMPLE, scratchFolder } from "./sample-film.mjs";
 
 const run = promisify(execFile);
@@ -91,10 +92,7 @@ async function stage(code, { record = {}, script = null } = {}) {
   await writeFile(join(folder, "film.json"), JSON.stringify(await authoredTimeline(code)));
   const language = code === "en" ? "en" : "zh-CN";
   const whole = { duration: 2, fps: 30, width: 1920, height: 1080, edition: code, language };
-  await writeFile(
-    join(folder, "stage.json"),
-    JSON.stringify({ ...whole, faces: FACES, ...record }),
-  );
+  await writeFile(join(folder, RECORD), JSON.stringify({ ...whole, faces: FACES, ...record }));
   return folder;
 }
 

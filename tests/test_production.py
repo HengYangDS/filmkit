@@ -22,6 +22,9 @@ def test_each_picture_has_its_own_stage_file_and_receipt():
     )
     root = repository.ROOT
     assert uncaptioned.stage == root / "build/runtime/work/final-delivery-en-uhd-uncaptioned"
+    assert uncaptioned.page == (
+        root / "build/runtime/work/final-delivery-en-uhd-uncaptioned/index.html"
+    )
     assert uncaptioned.file == edition.artifacts / "sample-reel-final-picture-uncaptioned.mp4"
     assert uncaptioned.receipt == edition.evidence / "render/receipt-uncaptioned.json"
     assert edition.caption_equivalence == edition.evidence / "caption-equivalence.json"

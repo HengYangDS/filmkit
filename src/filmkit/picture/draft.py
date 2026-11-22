@@ -31,6 +31,7 @@ import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
 from filmkit.picture import renderer
 from filmkit.picture.rendering import PictureError
+from filmkit.production import STAGE_PAGE
 from filmkit.specification import DURATION
 
 if TYPE_CHECKING:
@@ -56,7 +57,8 @@ def render_draft(edition: Edition, deadline: float = DEADLINE) -> dict:
     # nice raises the niceness by its increment, so a caller nicer than NICENESS stays as it is.
     increment = max(0, NICENESS - os.getpriority(os.PRIO_PROCESS, 0))
     niced = ["nice", "-n", str(increment), *command]
-    renderer.record_render(niced, stage, draft, edition.draft_receipt, deadline, "draft")
+    page = stage / STAGE_PAGE
+    renderer.record_render(niced, page, draft, edition.draft_receipt, deadline, "draft")
     try:
         record = still_scan.record_draft(edition, draft)
     except still_scan.StillScanError as error:

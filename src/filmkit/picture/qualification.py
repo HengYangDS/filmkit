@@ -97,7 +97,7 @@ def qualify_renderer(edition: Edition, deadline: float = renderer.DEADLINE) -> d
     command = renderer.command(rendered.stage, again, FPS, drawn_in)
     with durations.phase("render"):
         second_receipt = renderer.record_render(
-            command, rendered.stage, again, receipt, deadline, rendered.name
+            command, rendered.page, again, receipt, deadline, rendered.name
         )
     ran = second_receipt["renderer"]
     if renderer.build(ran) != renderer.build(drew):
@@ -117,7 +117,7 @@ def qualify_renderer(edition: Edition, deadline: float = renderer.DEADLINE) -> d
         "renderer": ran,
         "pinned_build": renderer.unqualified(second_receipt) is None,
         "drawn_alike": drawn[0] == drawn[1],
-        "stage_sha256": repository.sha(rendered.stage / "index.html"),
+        "stage_sha256": repository.sha(rendered.page),
         "first": render_of(rendered.file, first_receipt, frames["first"]),
         "second": render_of(again, second_receipt, frames["second"]),
         "comparison": compared["comparison"],

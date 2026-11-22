@@ -95,10 +95,10 @@ class Release:
         for code in production.CODES:
             edition = production.Edition(code)
             films = [film.name for film in edition.films if (self.folder / film.name).is_file()]
-            uncaptioned = edition.rendered(captions=False).stage / "index.html"
+            uncaptioned = edition.rendered(captions=False).page
             editions[code] = {
                 "soundtrack_sha256": repository.sha(edition.soundtrack),
-                "stage_sha256": repository.sha(edition.picture_stage / "index.html"),
+                "stage_sha256": repository.sha(edition.rendered().page),
                 **(
                     {"uncaptioned_stage_sha256": repository.sha(uncaptioned)}
                     if len(films) == len(edition.films)
@@ -153,7 +153,7 @@ def release(tmp_path, monkeypatch, films) -> Release:
         for captions in (True, False):
             stage = edition.rendered(captions).stage
             stage.mkdir(parents=True)
-            (stage / "index.html").write_text(f"<html>{code} {captions}</html>")
+            (stage / production.STAGE_PAGE).write_text(f"<html>{code} {captions}</html>")
         edition.soundtrack.write_bytes(f"soundtrack {code}".encode())
         for film in edition.films:
             shutil.copyfile(films["same"], film)
@@ -334,13 +334,11 @@ def test_different_decoded_audio_fails(release):
     [
         (lambda edition: edition.soundtrack.write_bytes(b"another soundtrack"), "soundtrack"),
         (
-            lambda edition: (edition.picture_stage / "index.html").write_text("<html></html>"),
+            lambda edition: edition.rendered().page.write_text("<html></html>"),
             "stage",
         ),
         (
-            lambda edition: (edition.rendered(captions=False).stage / "index.html").write_text(
-                "<html></html>"
-            ),
+            lambda edition: edition.rendered(captions=False).page.write_text("<html></html>"),
             "uncaptioned_stage",
         ),
         (

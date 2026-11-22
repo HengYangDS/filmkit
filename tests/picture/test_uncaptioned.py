@@ -13,7 +13,7 @@ import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
-from filmkit.production import Edition
+from filmkit.production import STAGE_RECORD, Edition
 from filmkit.specification import DURATION
 
 # The real composition, found before a test rebinds the repository root.
@@ -105,7 +105,7 @@ def test_the_uncaptioned_stage_inlines_the_timeline_without_its_captions(edition
 
 def test_a_stage_record_that_names_no_picture_is_the_captioned_one(edition):
     picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160)
-    record = edition.picture_stage / "stage.json"
+    record = edition.picture_stage / STAGE_RECORD
     earlier = {key: value for key, value in json.loads(record.read_text()).items()}
     del earlier["picture"]
     put(record, earlier)

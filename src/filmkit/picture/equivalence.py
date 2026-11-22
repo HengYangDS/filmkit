@@ -113,7 +113,7 @@ def picture_bindings(edition: Edition, captions: bool) -> dict:
     }
     if not captions and isinstance(repository.read(rendered.receipt).get("derived"), dict):
         return {"derived": True, **files}
-    return {"stage_sha256": repository.sha(rendered.stage / "index.html"), **files}
+    return {"stage_sha256": repository.sha(rendered.page), **files}
 
 
 def current_bindings(edition: Edition) -> dict:

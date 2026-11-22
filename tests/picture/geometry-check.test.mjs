@@ -17,7 +17,12 @@ import { analysis } from "../../src/filmkit/picture/rules/frame.mjs";
 import { inkLevel, readingLoad } from "../../src/filmkit/picture/rules/ink.mjs";
 import { faintLabels, listTracker, nameRules } from "../../src/filmkit/picture/rules/names.mjs";
 import { rowGaps } from "../../src/filmkit/picture/rules/rows.mjs";
-import { frameContract, StageError } from "../../src/filmkit/picture/stage-contract.mjs";
+import {
+  frameContract,
+  PAGE,
+  RECORD,
+  StageError,
+} from "../../src/filmkit/picture/stage-contract.mjs";
 import { authoredTimeline, SAMPLE, scratchFolder } from "./sample-film.mjs";
 
 // Scripts run in a context keep their file name, so coverage attributes them to their sources.
@@ -339,7 +344,7 @@ test("the row gaps refuse only for a film that gates them", () => {
 
 test("a stage's frame is its record's, and a stage whose record or page states another is refused by name", async () => {
   const folder = await scratchFolder();
-  const record = join(folder, "stage.json");
+  const record = join(folder, RECORD);
   const refused = (said) =>
     assert.rejects(frameContract(folder), (error) => {
       assert.ok(error instanceof StageError, String(error));
@@ -347,8 +352,7 @@ test("a stage's frame is its record's, and a stage whose record or page states a
       assert.ok(error.message.endsWith("; run stage-picture again"), error.message);
       return true;
     });
-  const page = (attributes) =>
-    writeFile(join(folder, "index.html"), `<div id="film" ${attributes}></div>`);
+  const page = (attributes) => writeFile(join(folder, PAGE), `<div id="film" ${attributes}></div>`);
   // A stage's page sizes itself and states no rate, so the page alone is no contract.
   await page('data-width="3840" data-height="2160" data-duration="60"');
   await refused(`record ${record} is absent`);

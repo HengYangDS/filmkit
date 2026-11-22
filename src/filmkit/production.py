@@ -99,9 +99,17 @@ RENDITIONS = {
 }
 
 
+# What a picture's stage holds by name: the page that the renderer draws and the browser checks
+# paint, and the record that binds the stage to its inputs (`filmkit.picture.rendering`). The
+# engine's Node modules read the same names from `picture/stage-contract.mjs`.
+STAGE_PAGE = "index.html"
+STAGE_RECORD = "stage.json"
+
+
 @dataclass(frozen=True)
 class Rendered:
-    """One of an edition's two pictures and its places: its stage, its file and its receipt.
+    """One of an edition's two pictures and its places: its stage, with the page it holds, its
+    file and its receipt.
 
     The captioned picture draws the timeline's captions; the uncaptioned one is staged from the
     same composition and timeline with no captions, and is otherwise the same picture.
@@ -116,6 +124,11 @@ class Rendered:
     def name(self) -> str:
         """The picture as its stage record, receipt and package name it."""
         return "captioned" if self.captions else "uncaptioned"
+
+    @property
+    def page(self) -> Path:
+        """The page the stage holds, which the renderer draws."""
+        return self.stage / STAGE_PAGE
 
 
 def review_report(record: Path) -> Path:

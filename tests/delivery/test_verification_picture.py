@@ -69,7 +69,7 @@ def test_geometry_that_does_not_cover_the_staged_film_is_refused(inputs, key, va
 
 
 def test_a_restaged_picture_is_refused(inputs):
-    (inputs.edition.picture_stage / "index.html").write_text("<html>restaged</html>")
+    inputs.edition.rendered().page.write_text("<html>restaged</html>")
     with pytest.raises(VerificationError, match="does not cover the current staged film"):
         delivery_verification.verify_picture(inputs.edition)
 

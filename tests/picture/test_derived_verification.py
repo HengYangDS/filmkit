@@ -26,7 +26,7 @@ def verified(compared):
         "passed": True,
         "findings": [],
         "errors": [],
-        "index_sha256": sha(edition.picture_stage / "index.html"),
+        "index_sha256": sha(edition.rendered().page),
         "width": 3840,
         "height": 2160,
         "duration": DURATION,
