@@ -296,6 +296,21 @@ def test_a_take_that_says_a_declared_term_is_held_to_the_term_and_not_to_its_res
     assert first["failed"] == []
 
 
+def test_a_complete_receipt_with_an_undeclared_respelled_name_is_refused_before_any_model_loads(
+    narrated, voiced, monkeypatch
+):
+    # A complete receipt narrates nothing, so no readings check runs before the models load.
+    says_name(narrated, voiced, monkeypatch, term=False)
+    monkeypatch.setattr(narration_judgment, "load_asr", pytest.fail)
+    monkeypatch.setattr(narration_judgment, "load_aligner", pytest.fail)
+    with pytest.raises(SystemExit) as refused:
+        narration_judge.main(["--language", "en"])
+    assert str(refused.value) == (
+        "en: the normalization respells NAME as Naim, said in 26.1; declare NAME in "
+        "[[narration.terms]]"
+    )
+
+
 def test_judge_refuses_every_thought_with_every_failing_line_and_writes_one_record(
     narrated, voiced, capsys
 ):

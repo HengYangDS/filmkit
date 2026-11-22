@@ -20,7 +20,9 @@ Every Latin word in the Chinese narration must be one of the names the Chinese c
 capitals an English target. Every language's normalization must give each Latin-script term the
 film declares in `[[narration.terms]]` the term's declared spoken form, whatever the contract's
 schema version, and the text of each edition that says the term must hold its declared reference
-occurrence (`narration.terms`, which also measures how the recordings say it).
+occurrence (`narration.terms`, which also measures how the recordings say it). A name that an
+edition says and that its normalization respells in other letters must be such a term, whatever
+the schema version: its takes are compared and said as the term's.
 
 The check writes each edition's occurrence plan, a view derived on every check, below
 build/evidence/readings/. Every failure is reported at once, and thoughts are numbered from 1
@@ -372,15 +374,22 @@ def propose() -> dict:
     return report
 
 
-def term_failures(code: str, script: dict, performance: dict, contract: str) -> list[str]:
-    """What the contract and an edition's text leave wrong in the film's declared terms."""
-    declared = FILM.narration.terms
+def term_failures(
+    code: str, thoughts: list[Thought], performance: dict, contract: str
+) -> list[str]:
+    """What the contract and an edition's text leave wrong in the film's declared terms, and each
+    name the edition says that its normalization respells in other letters and no term declares.
+    """
+    declared, languages = FILM.narration.terms, performance["languages"]
+    said = [tuple(thought) for thought in thoughts]
+    rules = languages[Edition(code).language].get("normalization", [])
+    owed = terms.respelling_failures(declared, rules, said, code)
     if not declared:
-        return []
-    languages = performance["languages"]
-    thoughts = edition_thoughts(script, languages[Edition(code).language])
-    return terms.parity_failures(declared, languages, contract) + terms.declaration_failures(
-        declared, [tuple(thought) for thought in thoughts], code
+        return owed
+    return (
+        terms.parity_failures(declared, languages, contract)
+        + terms.declaration_failures(declared, said, code)
+        + owed
     )
 
 
@@ -394,7 +403,8 @@ def check(code: str) -> dict:
     script = repository.read(edition.script)
     path = script["pronunciation_contract"]
     performance = repository.read(path)["pronunciation"]
-    declared = term_failures(code, script, performance, path)
+    thoughts = edition_thoughts(script, performance["languages"][edition.language])
+    declared = term_failures(code, thoughts, performance, path)
     version = performance.get("schema_version")
     if version != SCHEMA and declared:
         raise ReadingError("\n".join(declared))
@@ -406,7 +416,6 @@ def check(code: str) -> dict:
             "status": "not_applicable",
         }
     contract = performance["languages"][edition.language]
-    thoughts = edition_thoughts(script, contract)
     if code == "zh":
         words, failures = declared_words(contract)
         rows, gaps = resolve(thoughts, words)

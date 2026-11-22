@@ -194,17 +194,39 @@ def held(code: str, script: dict, film=None) -> Held:
     return Held(releases, *clarity.thought_lines(code, film=film or FILM))
 
 
+def require_terms(code: str, script: dict, records: list[dict], film=None) -> None:
+    """Refuse, in one line each, a name that a receipt's thoughts say, that the edition's
+    normalization respells in other letters and that the film declares no term for
+    (`terms.respelling_failures`). It is asked before any model loads: a complete receipt
+    narrates nothing, so no readings check runs before a judgment or an audition."""
+    path = script.get("pronunciation_contract")
+    if not path:
+        return
+    languages = repository.read(path)["pronunciation"]["languages"]
+    rules = languages.get(Edition(code).language, {}).get("normalization", [])
+    said = [
+        (f"{record['id']}.{child['index']}", child["spoken_text"])
+        for record, child in thoughts(records)
+    ]
+    failures = terms.respelling_failures((film or FILM).narration.terms, rules, said, code)
+    if failures:
+        raise SystemExit("\n".join(failures))
+
+
 def studio(
     code: str, records: list[dict], *, models: tuple | None = None, film=None
 ) -> tuple[Bench, Held]:
     """The bench and the held lines of an edition whose receipt holds `records`.
 
-    The receipt's term references are read before any model loads; `models`, a recognizer and
-    an aligner already loaded, are used in place of loading them again.
+    The receipt's term references, and the terms its respelled names need (`require_terms`),
+    are read before any model loads; `models`, a recognizer and an aligner already loaded, are
+    used in place of loading them again.
     """
     film = film or FILM
     references = terms.receipt_references(code, film.narration.terms, records)
-    lines = held(code, repository.read(Edition(code).script), film)
+    script = repository.read(Edition(code).script)
+    require_terms(code, script, records, film)
+    lines = held(code, script, film)
     asr, aligner = models or (load_asr(), load_aligner())
     return bench(code, references, asr=asr, aligner=aligner, film=film), lines
 

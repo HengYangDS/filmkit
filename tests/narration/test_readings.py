@@ -365,3 +365,82 @@ def test_a_declared_term_is_spelled_alike_and_its_reference_is_in_the_text(film,
     declare(zh={"thought": "03.1", "index": 0}, en={"thought": "03.1", "index": 0})
     with pytest.raises(readings.ReadingError, match="reference for en, but the narration never"):
         readings.check("en")
+
+
+def test_a_respelled_latin_name_is_declared_as_a_term_before_narration(film, monkeypatch):
+    root, edit = film
+    scripts = {"zh": "content/film-script.json", "en": "content/en/film-script.json"}
+    places = {
+        "zh": ("接着渲染", "接着用 HyperFrames 渲染"),
+        "en": ("frame and", "frame with HyperFrames and"),
+    }
+
+    def segment_of(code: str, change) -> None:
+        path = root / scripts[code]
+        script = json.loads(path.read_text(encoding="utf-8"))
+        change(script["segments"][2])
+        path.write_text(json.dumps(script, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    def insert(code: str):
+        def inserted(segment) -> None:
+            before, after = places[code]
+            segment["utterance_groups"][0] = segment["utterance_groups"][0].replace(before, after)
+            segment["text"] = "".join(segment["utterance_groups"])
+
+        return inserted
+
+    for code in scripts:
+        segment_of(code, insert(code))
+
+    def say(spoken: str, names: list[str]) -> None:
+        """Both editions say HyperFrames in 03.1, respelled `spoken` in every language."""
+
+        def respell(segment) -> None:
+            segment["spoken_text"] = segment["text"].replace("HyperFrames", spoken)
+
+        for code in scripts:
+            segment_of(code, respell)
+        rule = {"display": "HyperFrames", "spoken": spoken, "kind": "english-name"}
+
+        def respelled(contract) -> None:
+            for language in ("Chinese", "English"):
+                contract["languages"][language]["normalization"] = [rule]
+            contract["languages"]["Chinese"]["embedded_english_targets"] = names
+
+        edit(respelled)
+
+    def declare(*terms) -> None:
+        narration = film_declaration.Narration(terms=terms)
+        monkeypatch.setattr(
+            readings, "FILM", film_declaration.FILM.model_copy(update={"narration": narration})
+        )
+
+    declare()
+    say("Hyperfraims", ["Hyperfraims"])
+    owed = (
+        "{code}: the normalization respells HyperFrames as Hyperfraims, said in 03.1; declare "
+        "HyperFrames in [[narration.terms]]"
+    )
+    with pytest.raises(readings.ReadingError) as refusal:
+        readings.check("zh")
+    assert str(refusal.value) == owed.format(code="zh")
+    with pytest.raises(readings.ReadingError) as refusal:
+        readings.check("en")
+    assert str(refusal.value) == owed.format(code="en")
+    # Declared, the name is a term: every language gives it the declared form.
+    reference = {"zh": {"thought": "03.1", "index": 0}}
+    term = film_declaration.NarrationTerm(
+        term="HyperFrames", spoken="Hyperfraims", ipa="ˈhaɪpərfreɪmz", reference=reference
+    )
+    declare(term)
+    assert readings.check("zh")["occurrences"] == 38
+    # A respelling that only spaces the name keeps its letters and asks for no term.
+    declare()
+    say("Hyper Frames", ["Hyper", "Frames"])
+    assert readings.check("zh")["occurrences"] == 38
+    # The contract's schema version does not spare the name its term.
+    say("Hyperfraims", ["Hyperfraims"])
+    edit(lambda contract: contract.update(schema_version=1))
+    with pytest.raises(readings.ReadingError) as refusal:
+        readings.check("zh")
+    assert str(refusal.value) == owed.format(code="zh")

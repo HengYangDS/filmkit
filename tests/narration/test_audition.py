@@ -386,6 +386,23 @@ def declare_term(monkeypatch, thought: str) -> None:
     )
 
 
+def test_an_audition_asks_for_the_term_before_it_loads_a_model(auditioned):
+    # The contract respells the name the second thought says; the film declares no term for it.
+    contract = "content/voice-performance.json"
+    rule = {"display": "Sekond", "spoken": "Second", "kind": "english-name"}
+    languages = {"English": {"normalization": [rule]}}
+    repository.write(contract, {"pronunciation": {"languages": languages}})
+    script = repository.read(Edition("en").script)
+    repository.write(Edition("en").script, {**script, "pronunciation_contract": contract})
+    with pytest.raises(SystemExit) as refused:
+        narration_audition.audition("en", "targets.json")
+    assert str(refused.value) == (
+        "en: the normalization respells Sekond as Second, said in 26.2; declare Sekond in "
+        "[[narration.terms]]"
+    )
+    assert not (auditioned["root"] / narration_audition.AUDITIONS).exists()
+
+
 def test_a_reference_the_receipt_does_not_hold_refuses_before_any_model_loads(
     auditioned, monkeypatch
 ):

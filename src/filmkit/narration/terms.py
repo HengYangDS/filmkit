@@ -18,7 +18,9 @@ A narrator given two spellings of a term may say it two ways, so the readings ch
 before any narration, refuses a language whose normalization gives a declared term another spoken
 form, or none (spelling parity). It also refuses a term an edition says without a reference, a
 reference the edition's text does not hold, and a reference of an edition that never says the
-term.
+term. A name that the normalization respells in other letters is compared as a term, so the
+readings check, and the judgment and the audition before any model loads, refuse such a name
+that the edition says and no term declares (`respelling_failures`).
 
 An aligned or written word says the term when, without a trailing possessive, it is the term or
 its spoken form, in any case. Each occurrence's first vowel is the median first and second formant
@@ -162,6 +164,47 @@ def declaration_failures(
             failures.append(
                 f"{code}: the {term.term} reference {named(reference)} is not in the narration; "
                 f"{reference.thought} says it {said.get(reference.thought, 0)} times"
+            )
+    return failures
+
+
+def respelling_failures(
+    terms: tuple[NarrationTerm, ...], rules: list[dict], thoughts: list[tuple[str, str]], code: str
+) -> list[str]:
+    """Each name an edition says that its normalization respells in other letters and that no
+    declared term names.
+
+    Such a name is compared as a term (`recognition.read_units`) and said as one, so the film
+    declares it. Whether the letters are other letters is the comparison's to say
+    (`recognition.reading_distance`): a rule that only spaces or recases a name asks for no
+    term, nor does one whose display or spoken form is no single Latin word, which no term can
+    be. `rules` holds the edition's normalization rules, and `thoughts` each thought's name and
+    spoken text in narration order.
+    """
+    # The comparison reads a unit by `said_form`, so it is imported where it is asked.
+    from filmkit.narration.recognition import reading_distance
+
+    declared = {term.term.casefold() for term in terms}
+    failures = []
+    for rule in rules:
+        display, spoken = rule.get("display", ""), rule.get("spoken", "")
+        if (
+            rule.get("kind") != "english-name"
+            or display.casefold() in declared
+            or not (LATIN_WORD.fullmatch(display) and LATIN_WORD.fullmatch(spoken))
+            or reading_distance(display, spoken) == 0
+        ):
+            continue
+        forms = frozenset({display.casefold(), spoken.casefold()})
+        places = [
+            where
+            for where, text in thoughts
+            if any(says(match.group(), forms) for match in LATIN_WORD.finditer(text))
+        ]
+        if places:
+            failures.append(
+                f"{code}: the normalization respells {display} as {spoken}, said in "
+                f"{', '.join(places)}; declare {display} in [[narration.terms]]"
             )
     return failures
 
