@@ -1,17 +1,22 @@
 ## Context
 
 See [proposal.md](proposal.md) and the `caption-text` delta. `filmkit.captions.documents` writes
-`chapters.ffmeta`, which FFmpeg reads when a film is packaged. FFmetadata reads `=`, `;`, `#`, the
-backslash and a newline in a value as its own syntax unless a backslash precedes each. Every value
-in the file is the film's: its title, its author (written under two keys), its comment and each
-chapter title.
+`chapters.ffmeta`. Packaging gives the file to FFmpeg, which takes the film's chapters from it; the
+film's title, artist and comment tags are set on the packaging command, which replaces the file's,
+and the file's `author` reaches no tag of the film. The file is also a member of the viewing
+package and a download of the player page. FFmetadata reads `=`, `;`, `#`, the backslash and a
+newline in a value as its own syntax unless a backslash precedes each, and FFmpeg's reader ends a
+value at a carriage return too. Every value in the file is the film's: its title, its author
+(written under two keys), its comment and each chapter title.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Every character of a film's title, its author, its comment and each chapter title reaches the
-  packaged film's metadata.
+- FFmpeg reads each value of `chapters.ffmeta` back as the film declares it, so a chapter title
+  reaches the packaged film's chapter track whole and the delivered file says what the film
+  declares.
+- A value the format cannot keep is refused, and the film's text is not changed to fit.
 
 **Non-Goals:**
 
@@ -19,6 +24,7 @@ chapter title.
   writes.
 - Escaping the keys and the numbers, which the engine writes itself and which hold none of these
   marks.
+- Changing how packaging sets the film's tags.
 
 ## Decisions
 
@@ -28,16 +34,43 @@ chapter title.
   punctuation in a title and the format has an escape for them.
 - The escape is applied where a value is written into the format and nowhere earlier, so the script
   and the other documents keep the text as authored.
+- A carriage return is escaped with the five marks that FFmpeg's documentation of the format lists.
+  The documentation does not name it; FFmpeg 9.0.2's reader ends a value at one and reads one back
+  whole after a backslash [S1, E2], which the read-back test holds.
+- A value that ends in a backslash is refused by `require_metadata_values`, in the module that
+  writes the format, with the package's `CaptionError`: the refusal names the script, the field and
+  the value as the script's JSON writes it. FFmpeg's reader takes a newline after a backslash as
+  part of the value, whether or not that backslash is itself escaped, so no escape keeps such a
+  value, and FFmpeg's own writer fails the same way [S1, E3]. Alternatives considered: stripping the
+  backslash, which changes the film's text; and stating the limit while writing the value, which
+  loses the next line's tag in silence. The values stand in a film's scripts, which no loader of
+  their own judges, and the limit is the format's, so its refusal stands with the format's writer.
+  `assemble` asks it before it decodes a recording and `refresh-captions` before it writes
+  anything, so a refused edition keeps its soundtrack, timeline, receipt and documents as they
+  were; the documents step asks it again before it writes a document.
 
 ## Risks / Trade-offs
 
-- [A released film's delivered bytes change] → They do, in two members of the viewing package. Each
-  released English edition's comment holds a semicolon, so its `chapters.ffmeta` gains one
-  backslash; its player page holds that file as a download and names its size, so the page changes
-  with it. FFmpeg reads the escaped semicolon back as the same character, so the packaged film's
-  tags read as before. The release says so, and a film adopts it after it rebuilds and compares, as
-  for every release.
+- [A released film's delivered bytes change] → They do. Each released English edition's comment
+  holds a semicolon, so its `chapters.ffmeta` gains one backslash, and its player page, which holds
+  that file as a download and names its size, changes with it. The edition's film package binds
+  `chapters.ffmeta` by its SHA-256, so the package is stale: its four films are set aside and
+  packaged again, with other bytes at least in their creation time, and the still scan, the review
+  round, the delivery and the release record follow [S1, E1]. No member of a Chinese edition
+  changes. The films' title, artist and comment tags are the packaging command's and read as
+  before. The release says so, and a film adopts it after it rebuilds and compares, as for every
+  release.
+- [A film declares a value that ends in a backslash] → It is refused by name before anything is
+  written. No released film declares one.
 
 ## Migration Plan
 
-Add the escape with its test. To roll back, write the values as before.
+Add the escape and the refusal with their tests. To roll back, write the values as before.
+
+## Sources
+
+- [S1] `build/evidence/check-the-formal-register/small-changes-review-1.md`, the independent review
+  of 22 November 2026, with its probes of FFmpeg 9.0.2: E1 (the package binds the file), E2 (the
+  carriage return), E3 (a value that ends in a backslash), E5 (which tags a film takes from the
+  file). The builder's own probes of the same day agree: a half-second film muxed with the file
+  bare and escaped, and each value read from the file by FFmpeg.

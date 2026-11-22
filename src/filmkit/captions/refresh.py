@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from filmkit.captions import CaptionError
-from filmkit.captions.documents import subtitle_files
+from filmkit.captions.documents import require_metadata_values, subtitle_files
 from filmkit.captions.timing import caption_receipt_fields, timed_caption_cues
 from filmkit.repository import read, sha, write
 
@@ -143,6 +143,9 @@ def _adopt_caption_authoring(timeline: dict, script: dict) -> None:
 def refresh_captions(edition: Edition) -> None:
     """Refresh picture/subtitle cues while preserving the selected assembled audio."""
     timeline = read(edition.timeline)
+    # Refused before anything is written, as the documents step would refuse it after the
+    # timeline and the receipt were.
+    require_metadata_values(timeline, edition)
     script = read(edition.script)
     receipt = read(edition.audio_assembly)
     hashes = _Hashes(

@@ -12,6 +12,7 @@ import filmkit.produce as produce
 import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.review.round as review_round
+from filmkit.captions import CaptionError
 
 WORDS = (("甲", 2.0, 2.4), ("乙", 2.4, 2.8), ("丙", 3.4, 3.8), ("丁", 3.8, 4.2))
 
@@ -179,6 +180,19 @@ def test_a_refresh_refuses_a_selection_of_other_copy(edition):
     write_json(edition.narration_selected, selected)
     with pytest.raises(ValueError, match="Selected narration differs"):
         captions_refresh.refresh_captions(edition)
+
+
+def test_a_refresh_refuses_a_value_the_chapter_metadata_cannot_hold_before_it_writes(edition):
+    # A title that ends in a backslash cannot be kept in chapters.ffmeta: the refresh refuses it
+    # before it writes the timeline or the receipt, so the edition stays as it was.
+    timeline = read(edition.timeline)
+    timeline["title"] = "Ends \\"
+    write_json(edition.timeline, timeline)
+    kept = [path.read_bytes() for path in (edition.timeline, edition.audio_assembly)]
+    with pytest.raises(CaptionError, match="declares title "):
+        captions_refresh.refresh_captions(edition)
+    assert [path.read_bytes() for path in (edition.timeline, edition.audio_assembly)] == kept
+    assert not (edition.artifacts / "chapters.ffmeta").exists()
 
 
 def test_a_refresh_over_a_reviewed_build_waits_for_its_set_aside(edition):

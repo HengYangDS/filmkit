@@ -9,6 +9,7 @@ import pytest
 import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as soundtrack_assembly
+from filmkit.captions import CaptionError
 
 REPOSITORY = repository.ROOT
 RATE = 48000
@@ -168,6 +169,22 @@ def test_a_declared_release_lets_its_thought_take_end_abruptly(two_chapters, mon
     monkeypatch.setattr(soundtrack_assembly, "_decode", decoding)
     with pytest.raises(Decoded):
         soundtrack_assembly.assemble(two_chapters)
+
+
+def test_assembly_refuses_a_value_the_chapter_metadata_cannot_hold_before_it_decodes(
+    two_chapters, monkeypatch
+):
+    # A chapter title that ends in a backslash cannot be kept in chapters.ffmeta: the assembly
+    # refuses it before a recording is decoded and before anything is written.
+    script = repository.ROOT / two_chapters.script
+    declared = json.loads(script.read_text())
+    declared["segments"][1]["chapter_title"] = "B\\"
+    script.write_text(json.dumps(declared, ensure_ascii=False))
+    monkeypatch.setattr(soundtrack_assembly, "_decode", decoding)
+    with pytest.raises(CaptionError) as refusal:
+        soundtrack_assembly.assemble(two_chapters)
+    assert 'declares chapter_title of chapter b "B\\\\": ' in str(refusal.value)
+    assert not two_chapters.artifacts.exists()
 
 
 @pytest.mark.ffmpeg

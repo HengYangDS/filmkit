@@ -7,13 +7,20 @@ starts where the timeline's segments change chapter. The transcript, which the p
 its voice, as a player shows a time (`clock`), and gives each thought, an utterance group, a
 paragraph. Every title, heading and tag they write is typeset as the captions are, with
 typographic quotation marks (`filmkit.captions.timing.typeset`).
+
+The chapter metadata holds the film's title, author, comment and chapter titles with every mark
+of its format escaped (`_metadata_value`). A value that the format cannot keep, one that ends in
+a backslash, is refused with `CaptionError` before any document is written
+(`require_metadata_values`); the film's text is never changed to fit.
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from filmkit.captions import CaptionError
 from filmkit.captions.timing import shown_text, typeset
 from filmkit.repository import write
 from filmkit.specification import AUTHOR, CHAPTER_CARD_SHOWN, DURATION
@@ -139,10 +146,46 @@ def _transcript(title: str, segments: list[dict], code: str) -> str:
     return transcript
 
 
+# The marks FFmetadata reads as its own syntax in a value: =, ;, #, the backslash and a newline,
+# as FFmpeg's documentation of the format lists them, and a carriage return, at which FFmpeg's
+# reader ends a value too, though the documentation does not list it.
+_METADATA_MARKS = "=;#\\\n\r"
+
+
 def _metadata_value(text: str) -> str:
-    """A value as FFmetadata reads it: =, ;, #, the backslash and a newline each escaped by a
-    backslash, since the format reads them as its own syntax (FFmpeg's metadata format)."""
-    return "".join(f"\\{mark}" if mark in "=;#\\\n" else mark for mark in text)
+    """A value as FFmetadata reads it: each of the format's marks escaped by a backslash."""
+    return "".join(f"\\{mark}" if mark in _METADATA_MARKS else mark for mark in text)
+
+
+def require_metadata_values(timeline: dict, edition: Edition) -> None:
+    """Refuse a film whose chapter metadata would hold a value that ends in a backslash.
+
+    FFmpeg reads a newline after a backslash as part of the value, whether or not that backslash
+    is itself escaped, so it reads the next line into such a value and loses that line's own tag;
+    no escape keeps the value. The values are the film's: its title, its author, its release
+    comment and each chapter's title, from a script or a timeline. The refusal names the script,
+    each field and its value as the script's JSON writes it, and changes nothing.
+    """
+    titles: dict[str, str] = {}
+    for segment in timeline["segments"]:
+        titles.setdefault(segment["chapter"], segment["chapter_title"])
+    values = {
+        "title": timeline["title"],
+        "author": AUTHOR,
+        "release.comment": edition.comment,
+        **{f"chapter_title of chapter {chapter}": title for chapter, title in titles.items()},
+    }
+    ending = [
+        f"{field} {json.dumps(value, ensure_ascii=False)}"
+        for field, value in values.items()
+        if value.endswith("\\")
+    ]
+    if ending:
+        msg = (
+            f"{edition.script} declares {'; '.join(ending)}: chapters.ffmeta cannot hold a value "
+            "that ends in a backslash, since FFmpeg reads the next line into it"
+        )
+        raise CaptionError(msg)
 
 
 def _chapter_metadata(title: str, comment: str, chapters: list[_Chapter]) -> str:
@@ -162,7 +205,12 @@ def _chapter_metadata(title: str, comment: str, chapters: list[_Chapter]) -> str
 
 
 def subtitle_files(timeline: dict, edition: Edition) -> None:
-    """Write the edition's SRT and VTT captions, chapters, transcript and chapter metadata."""
+    """Write the edition's SRT and VTT captions, chapters, transcript and chapter metadata.
+
+    Nothing is written for a film whose chapter metadata would hold a value the format cannot
+    keep (`require_metadata_values`).
+    """
+    require_metadata_values(timeline, edition)
     output = edition.artifacts
     srt, vtt = _cue_documents(timeline["captions"])
     (output / f"{edition.prefix}.srt").write_text(srt)

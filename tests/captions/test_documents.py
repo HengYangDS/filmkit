@@ -1,6 +1,7 @@
 """Subtitle documents: the captions, chapters, transcript and chapter metadata of an edition."""
 
 import json
+import subprocess
 
 import pytest
 
@@ -9,6 +10,7 @@ import filmkit.captions.timing as captions_timing
 import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.specification as specification
+from filmkit.captions import CaptionError
 
 
 @pytest.mark.parametrize(
@@ -127,34 +129,98 @@ def test_chinese_titles_keep_their_marks(tmp_path, monkeypatch):
     assert "### 0:01 · “做完了”\n\n它交回一句话：“做完了。”\n" in transcript
 
 
-def test_chapter_metadata_escapes_what_ffmetadata_reads_as_syntax(tmp_path, monkeypatch):
-    # FFmetadata reads =, ;, # and the backslash as its syntax and ends a value at a newline, so
-    # each is escaped by a backslash in every value the metadata holds.
+# A film whose every value in the chapter metadata holds the marks FFmetadata reads as its own
+# syntax: =, ;, #, the backslash and a newline, and a carriage return, at which FFmpeg ends a
+# value too. The title, the comment and the chapter title each hold some, the author all six.
+MARKED = {
+    "title": "One \\ two\rthree",
+    "author": "A;B = C#D\\E\nF\rG",
+    "comment": "x;y = z\rw",
+    "chapter_title": "a\\b#c\rd",
+}
+
+
+def marked(tmp_path, monkeypatch, **values) -> tuple[dict, production.Edition]:
+    """An English edition's timeline of one chapter whose values are `MARKED`'s, or the given
+    ones, staged below a new root with its script's release."""
+    held = {**MARKED, **values}
     release = repository.read(production.Edition("en").script)["release"]
     monkeypatch.setattr(repository, "ROOT", tmp_path)
     edition = production.Edition("en")
-    repository.write(edition.script, {"release": {**release, "comment": "x;y = z"}})
+    repository.write(edition.script, {"release": {**release, "comment": held["comment"]}})
     edition.artifacts.mkdir(parents=True)
     segment = {
         "id": "01",
         "chapter": "one",
-        "chapter_title": "a\\b#c",
+        "chapter_title": held["chapter_title"],
         "title": "One",
         "start": 0.0,
         "voice_start": 1.0,
         "text": "Text.",
         "utterance_groups": ["Text."],
     }
-    timeline = {"title": "One \\ two", "captions": [], "segments": [segment]}
-    # The author is the film's value too, written under two keys: here it holds all five marks.
-    monkeypatch.setattr(captions_documents, "AUTHOR", "A;B = C#D\\E\nF")
+    monkeypatch.setattr(captions_documents, "AUTHOR", held["author"])
+    return {"title": held["title"], "captions": [], "segments": [segment]}, edition
+
+
+def test_chapter_metadata_escapes_what_ffmetadata_reads_as_syntax(tmp_path, monkeypatch):
+    # Each mark is escaped by a backslash in every value the metadata holds; the author stands
+    # under two keys. The file is read as bytes: a text read would turn a carriage return into
+    # a newline.
+    timeline, edition = marked(tmp_path, monkeypatch)
     captions_documents.subtitle_files(timeline, edition)
-    metadata = (edition.artifacts / "chapters.ffmeta").read_text()
-    assert "\ntitle=One \\\\ two\n" in metadata
-    assert "\ncomment=x\\;y \\= z\n" in metadata
-    assert "\ntitle=a\\\\b\\#c\n" in metadata
+    metadata = (edition.artifacts / "chapters.ffmeta").read_bytes().decode()
+    assert "\ntitle=One \\\\ two\\\rthree\n" in metadata
+    assert "\ncomment=x\\;y \\= z\\\rw\n" in metadata
+    assert "\ntitle=a\\\\b\\#c\\\rd\n" in metadata
     for key in ("artist", "author"):
-        assert f"\n{key}=A\\;B \\= C\\#D\\\\E\\\nF\n" in metadata
+        assert f"\n{key}=A\\;B \\= C\\#D\\\\E\\\nF\\\rG\n" in metadata
+
+
+@pytest.mark.ffmpeg
+def test_ffmpeg_reads_every_value_of_the_chapter_metadata_back_as_declared(tmp_path, monkeypatch):
+    # The escape is right when FFmpeg's own reader gives each value back whole; it decodes nothing.
+    timeline, edition = marked(tmp_path, monkeypatch)
+    captions_documents.subtitle_files(timeline, edition)
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-f", "ffmetadata", "-show_entries", "format_tags:chapter_tags"]
+        + ["-of", "json", str(edition.artifacts / "chapters.ffmeta")],
+        capture_output=True,
+        check=True,
+        timeout=30,
+    )
+    read = json.loads(probe.stdout)
+    assert read["format"]["tags"] == {
+        "title": MARKED["title"],
+        "artist": MARKED["author"],
+        "author": MARKED["author"],
+        "comment": MARKED["comment"],
+    }
+    assert [chapter["tags"] for chapter in read["chapters"]] == [{"title": MARKED["chapter_title"]}]
+
+
+@pytest.mark.parametrize(
+    ("field", "named"),
+    [
+        ("title", "title"),
+        ("author", "author"),
+        ("comment", "release.comment"),
+        ("chapter_title", "chapter_title of chapter one"),
+    ],
+)
+def test_a_value_that_ends_in_a_backslash_is_refused_before_a_document_is_written(
+    tmp_path, monkeypatch, field, named
+):
+    # FFmpeg reads the line after such a value into it, whatever is written, so the value is
+    # refused as the film declares it, by its script, its field and its JSON text.
+    timeline, edition = marked(tmp_path, monkeypatch, **{field: "Ends \\"})
+    with pytest.raises(CaptionError) as refusal:
+        captions_documents.subtitle_files(timeline, edition)
+    assert str(refusal.value) == (
+        f'content/en/film-script.json declares {named} "Ends \\\\": chapters.ffmeta cannot hold a '
+        "value that ends in a backslash, since FFmpeg reads the next line into it"
+    )
+    assert list(edition.artifacts.iterdir()) == []
 
 
 def test_timecodes_round_to_the_millisecond():

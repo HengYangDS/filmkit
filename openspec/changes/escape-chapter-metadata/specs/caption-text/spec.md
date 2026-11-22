@@ -2,22 +2,40 @@
 
 ### Requirement: The chapter metadata keeps every character of its values
 
-The chapter metadata that packaging reads SHALL escape, in the film's title, its author, its comment and each chapter
-title, every mark the metadata format reads as its own syntax (`=`, `;`, `#`, the backslash and a newline), so that
-the packaged film's tags and chapter track read each value as the display copy sets it.
+The chapter metadata SHALL escape, in the film's title, its author, its comment and each chapter title, every mark the
+metadata format reads as its own syntax (`=`, `;`, `#`, the backslash and a newline) and a carriage return, at which
+FFmpeg ends a value too, so that FFmpeg reads each value from the file as the display copy sets it and a packaged
+film's chapter track holds each chapter title whole.
 
 #### Scenario: A title with a backslash
 
 - **WHEN** a chapter is titled a\b
-- **THEN** the chapter metadata writes a\\b and the films' chapter track reads a\b
+- **THEN** the chapter metadata writes a\\b and FFmpeg reads the chapter's title from it as a\b
 
 #### Scenario: A comment with a semicolon
 
 - **WHEN** the release comment holds a semicolon
-- **THEN** the chapter metadata writes it escaped and the films' comment tag reads the semicolon as before
+- **THEN** the chapter metadata writes it escaped and FFmpeg reads the comment from it with its semicolon
 
 #### Scenario: An author with a mark
 
 - **WHEN** the scripts declare an author that holds one of the marks
 - **THEN** the chapter metadata writes it escaped under both of its keys, and FFmpeg reads the author back as
   declared
+
+#### Scenario: A carriage return
+
+- **WHEN** a title, the author, the comment or a chapter title holds a carriage return
+- **THEN** the chapter metadata writes a backslash before it and FFmpeg reads the value back whole
+
+### Requirement: A value the chapter metadata cannot keep is refused
+
+The engine SHALL refuse a film whose title, author, comment or chapter title ends in a backslash, before it writes the
+edition's subtitle documents, naming the script, the field and the value, and SHALL NOT change the value: FFmpeg reads
+the line after such a value into it, whatever is written.
+
+#### Scenario: A title that ends in a backslash
+
+- **WHEN** an edition whose title ends in a backslash is assembled, or its captions are refreshed
+- **THEN** the command refuses in one line that names the script, the field and the value, and the edition's timeline,
+  receipt and documents stay as they were

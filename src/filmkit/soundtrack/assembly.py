@@ -27,7 +27,7 @@ import numpy as np
 import filmkit.narration.flow as flow
 import filmkit.narration.terms as terms
 import filmkit.repository as repository
-from filmkit.captions.documents import subtitle_files
+from filmkit.captions.documents import require_metadata_values, subtitle_files
 from filmkit.captions.phrasing import segment_caption_phrases
 from filmkit.captions.timing import caption_receipt_fields, timed_caption_cues
 from filmkit.film import FILM
@@ -570,6 +570,9 @@ def assemble(edition: Edition) -> None:
     if abrupt:
         msg = f"Thought takes end abruptly without a declared release: {', '.join(abrupt)}"
         raise AssemblyError(msg)
+    # Refused before a recording is decoded or a file written: a value the chapter metadata
+    # cannot keep would otherwise be met after the soundtrack and the timeline were written.
+    require_metadata_values(script, edition)
     edition.artifacts.mkdir(parents=True, exist_ok=True)
     decoded = decode_recordings(edition, segments, records)
     clips = designed_clips(segments, records, alignments, decoded, policy, releases)
