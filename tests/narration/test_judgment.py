@@ -1,5 +1,6 @@
 """A take's verdict on every line the film holds for it, and the choice among judged takes."""
 
+import dataclasses
 import json
 import wave
 
@@ -15,6 +16,7 @@ import filmkit.narration.terms as narration_terms
 import filmkit.preflight as preflight
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as soundtrack_assembly
+from filmkit.narration.recognition import Names
 from filmkit.production import Edition
 
 
@@ -294,6 +296,51 @@ def test_a_take_that_says_a_declared_term_is_held_to_the_term_and_not_to_its_res
     first = repository.read(Edition("en").ear_first / narration_judge.RECORD)["thoughts"][0]
     assert (first["differing_units"], first["differing_units_by_reading"]) == (1, 0)
     assert first["failed"] == []
+
+
+def test_a_chinese_bench_reads_the_editions_other_latin_units_from_its_script(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    rule = {"display": "NAME", "spoken": "Naim", "kind": "english-name"}
+    languages = {language: {"normalization": [rule]} for language in ("Chinese", "English")}
+    repository.write("contract.json", {"pronunciation": {"languages": languages}})
+    groups = ["NAME 和 Agent 一起。", "再用 Node.js 跑。"]
+    text = "".join(groups)
+    spoken = text.replace("NAME", "Naim")
+    segment = {"id": "01", "text": text, "spoken_text": spoken, "utterance_groups": groups}
+    for code in ("zh", "en"):
+        script = {"pronunciation_contract": "contract.json", "segments": [segment]}
+        repository.write(Edition(code).script, script)
+    monkeypatch.setattr(narration_judgment, "standards", lambda *_: [])
+    declared = narration_judgment.FILM.model_copy(
+        update={"narration": film.Narration(terms=(NAME,))}
+    )
+    # The script's Latin units by their letters, less the term's: `Node.js` is two units.
+    zh = narration_judgment.bench("zh", [], asr=None, aligner={}, film=declared)
+    assert zh.names == Names((NAME,), chinese=True, others=frozenset({"agent", "node", "js"}))
+    # The English bench has no rule of other letters, under which any word would pass.
+    en = narration_judgment.bench("en", [], asr=None, aligner={}, film=declared)
+    assert en.names == Names((NAME,))
+
+
+def test_a_take_records_the_unit_that_stood_for_a_term_in_other_letters(narrated, voiced):
+    record = narrated([voiced(), voiced()])
+    bench, _held = narration_judgment.studio("en", [record])
+    chinese = dataclasses.replace(
+        bench, code="zh", language="Chinese", names=Names((NAME,), chinese=True)
+    )
+    path = repository.ROOT / record["utterance_groups"]["records"][0]["path"]
+    said = "Naim 走的是另一条路。"
+    narrated.recognizer.heard[path.name] = "Nime 走的是另一条路。"
+    take = narration_judgment.measured(path, "26.1", said, chinese)
+    assert take["differing_units_by_reading"] == 0
+    assert take["terms_in_other_letters"] == [{"term": "NAME", "unit": "nime"}]
+    # A take that writes the term in one of its forms records none.
+    narrated.recognizer.heard[path.name] = "Name 走的是另一条路。"
+    take = narration_judgment.measured(path, "26.1", said, chinese)
+    assert take["differing_units_by_reading"] == 0
+    assert "terms_in_other_letters" not in take
 
 
 def test_a_complete_receipt_with_an_undeclared_respelled_name_is_refused_before_any_model_loads(

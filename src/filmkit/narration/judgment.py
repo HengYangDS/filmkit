@@ -18,7 +18,9 @@ declares a floor for the edition, and its verdict on each line:
            as the assembly begins its clip;
   pause    it holds no unmarked pause above its limit that the film does not keep;
   terms    every declared term it says is said within its reference's bounds;
-  units    its transcript holds its text: no unit differs by reading (`UNIT_LIMIT`);
+  units    its transcript holds its text: no unit differs by reading (`UNIT_LIMIT`). The
+           record names each unit of the transcript that stood for a declared term in other
+           letters (`terms_in_other_letters`, `recognition.stands_for`);
   clarity  it reads at or above the film's line for a single thought
            (`review.clarity.under_its_line`, which `filmkit.preflight` asks too). A film that
            declares a floor and no line for a single thought has its takes' clarity recorded
@@ -68,7 +70,8 @@ from filmkit.narration.pronunciation import pronunciation_contract
 from filmkit.narration.recognition import (
     NO_NAMES,
     Names,
-    reading_distance,
+    compared,
+    edition_names,
     recognition_units,
     unit_distance,
 )
@@ -170,12 +173,13 @@ def bench(code: str, references: list, *, asr, aligner: dict, film=None) -> Benc
     film = film or FILM
     edition = Edition(code)
     script = repository.read(edition.script)
-    words = ()
-    if code == "zh" and script.get("pronunciation_contract"):
+    words, texts, chinese = (), [], code == "zh" and bool(script.get("pronunciation_contract"))
+    if chinese:
         contract, _ = pronunciation_contract(script, edition.language)
         words = readings.compared_words(contract)
+        texts = [thought.text for thought in readings.edition_thoughts(script, contract)]
     measured_standards = standards(code, references, aligner, edition.language)
-    names = Names(tuple(film.narration.terms))
+    names = edition_names(film.narration.terms, texts, chinese=chinese)
     return Bench(
         code, edition.language, asr, aligner, measured_standards, words, film.narration.flow, names
     )
@@ -326,6 +330,8 @@ def measured(path: Path, thought: str, spoken_text: str, bench: Bench) -> dict:
     found = bench.aligner["model"].generate(str(path), text=spoken_text, language=bench.language)
     items = [dataclasses.asdict(item) for item in found.items]
     words, recording = flow.timed(items), flow.Recording.of(pcm, rate)
+    by_reading = compared(spoken_text, heard, bench.words, bench.names)
+    stood = [{"term": term, "unit": unit} for term, unit in by_reading.stood_for]
     return {
         "path": str(path.relative_to(repository.ROOT)),
         "wav_sha256": repository.sha(path),
@@ -334,9 +340,8 @@ def measured(path: Path, thought: str, spoken_text: str, bench: Bench) -> dict:
         "phrase_stops": _phrase_stops(pcm, rate, items, spoken_text),
         "heard": heard,
         "differing_units": unit_distance(recognition_units(spoken_text), recognition_units(heard)),
-        "differing_units_by_reading": reading_distance(
-            spoken_text, heard, bench.words, bench.names
-        ),
+        "differing_units_by_reading": by_reading.distance,
+        **({"terms_in_other_letters": stood} if stood else {}),
         **flow.take_flow(bench.code, thought, spoken_text, words, recording, bench.flow),
         **terms.take_terms(bench.standards, words, recording, thought),
         "short": too_short(len(pcm), rate),

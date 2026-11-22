@@ -24,6 +24,12 @@ units are also compared by reading (`reading_distance`), as a listener hears the
 - a Latin unit that says a term the film declares, its display form or its spoken form in any
   case, reads as that term, its possessive kept (`terms.said_form`): a respelling is how the
   narrator is told the name, and a recognizer writes the name in its own spelling;
+- in the Chinese edition, a declared term is also alike one Latin unit of other letters that
+  holds a letter and is no other Latin unit of the edition's script (`stands_for`): in Chinese
+  speech a recognizer has no steady spelling for a foreign name, and the term line holds how
+  it was said. A repeat, a trailing Latin word, digits, a Han word, another of the edition's
+  names as the script spells it and a missing unit still differ; another word that is no Latin
+  unit of the edition, and one of its names spelled otherwise, do not;
 - a Latin unit and a Han character are never alike.
 
 A number said and its digits (`ten`, `10`) stay different: neither the engine nor a film's
@@ -45,6 +51,7 @@ if TYPE_CHECKING:
 
 UNIT = re.compile(r"[\u4e00-\u9fff]|[a-z0-9']+")
 HAN_UNIT = re.compile(r"[\u4e00-\u9fff]")
+LETTER = re.compile(r"[a-z]")
 # The particles a speaker says alike, whichever the recognizer writes, and their reading.
 PARTICLES = frozenset("的地得")
 PARTICLE_READING = "de"
@@ -73,12 +80,23 @@ class Read(NamedTuple):
 
 class Names(NamedTuple):
     """What an edition's Latin units are read by beside their letters: the terms the film
-    declares (`filmkit.narration.terms`)."""
+    declares (`filmkit.narration.terms`) and, in the Chinese edition (`chinese`), the other
+    Latin units its script says, by their letters and digits (`others`)."""
 
     terms: tuple[NarrationTerm, ...] = ()
+    chinese: bool = False
+    others: frozenset[str] = frozenset()
 
 
 NO_NAMES = Names()
+
+
+class Compared(NamedTuple):
+    """A text and a transcript compared by reading: the fewest unit edits, and on one cheapest
+    alignment each declared term and the transcript's unit of other letters that stood for it."""
+
+    distance: int
+    stood_for: tuple[tuple[str, str], ...] = ()
 
 
 def recognition_units(text: str) -> list[str]:
@@ -178,14 +196,58 @@ def _joined(units: Sequence[Read], end: int, other: Read) -> list[int]:
     return found
 
 
-def reading_distance(
-    expected: str, observed: str, words: Sequence[readings.Word] = (), names: Names = NO_NAMES
-) -> int:
-    """The fewest unit edits between a text and a transcript, units compared by reading.
+def edition_names(
+    declared: Sequence[NarrationTerm], texts: Sequence[str], *, chinese: bool
+) -> Names:
+    """An edition's names: its declared terms and, in Chinese, the Latin units its spoken texts
+    say that say no term, by their letters and digits. They are recognition units, so a word
+    such as `Node.js` gives two."""
+    declared = tuple(declared)
+    if not chinese:
+        return Names(declared)
+    others = {
+        unit.reading
+        for text in texts
+        for unit in read_units(text, (), declared)
+        if not unit.han and unit.term is None
+    }
+    return Names(declared, True, frozenset(others))
 
-    Adjacent Latin units that one side writes as one are joined at no cost. `words` are the
-    Chinese words compared by their readings, and `names` the edition's names.
+
+def stands_for(expected: Read, observed: Read, names: Names) -> bool:
+    """Whether, in Chinese speech, a transcript's unit may stand for the text's declared term:
+    a Latin unit that holds a letter, says no term and is no other Latin unit of the edition.
+
+    A recognizer has no steady spelling for a foreign name in Chinese speech; how the term was
+    said there is the term line's to judge (`filmkit.narration.terms`).
     """
+    return (
+        names.chinese
+        and expected.term is not None
+        and not observed.han
+        and observed.term is None
+        and LETTER.search(observed.reading) is not None
+        and observed.reading not in names.others
+    )
+
+
+def _ways(want, got, i: int, j: int, cost: list[list[int]], names: Names) -> list[tuple]:
+    """Each way into cell (i, j) of the cost table: its cost, the cell it leaves, and whether a
+    unit of other letters stands there for a term. A way that holds both units alike comes
+    first, so one cheapest alignment names such a unit only where nothing else is cheaper."""
+    expected, observed = want[i - 1], got[j - 1]
+    ways = [(cost[i - 1][j - 1] + (not alike(expected, observed)), i - 1, j - 1, False)]
+    if stands_for(expected, observed, names):
+        ways.append((cost[i - 1][j - 1], i - 1, j - 1, True))
+    ways += [(cost[i - n][j - 1], i - n, j - 1, False) for n in _joined(want, i, observed)]
+    ways += [(cost[i - 1][j - n], i - 1, j - n, False) for n in _joined(got, j, expected)]
+    return [*ways, (cost[i - 1][j] + 1, i - 1, j, False), (cost[i][j - 1] + 1, i, j - 1, False)]
+
+
+def compared(
+    expected: str, observed: str, words: Sequence[readings.Word] = (), names: Names = NO_NAMES
+) -> Compared:
+    """A text and a transcript compared unit by unit, by reading (`reading_distance`)."""
     want = read_units(expected, words, names.terms)
     got = read_units(observed, words, names.terms)
     cost = [[0] * (len(got) + 1) for _ in range(len(want) + 1)]
@@ -194,12 +256,25 @@ def reading_distance(
             if not i or not j:
                 cost[i][j] = i + j
                 continue
-            ways = [
-                cost[i - 1][j] + 1,
-                cost[i][j - 1] + 1,
-                cost[i - 1][j - 1] + (not alike(want[i - 1], got[j - 1])),
-            ]
-            ways += [cost[i - count][j - 1] for count in _joined(want, i, got[j - 1])]
-            ways += [cost[i - 1][j - count] for count in _joined(got, j, want[i - 1])]
-            cost[i][j] = min(ways)
-    return cost[-1][-1]
+            cost[i][j] = min(way[0] for way in _ways(want, got, i, j, cost, names))
+    stood, i, j = [], len(want), len(got)
+    while i and j:
+        _, before_i, before_j, standing = next(
+            way for way in _ways(want, got, i, j, cost, names) if way[0] == cost[i][j]
+        )
+        if standing:
+            stood.append((want[i - 1].term, got[j - 1].unit))
+        i, j = before_i, before_j
+    return Compared(cost[-1][-1], tuple(reversed(stood)))
+
+
+def reading_distance(
+    expected: str, observed: str, words: Sequence[readings.Word] = (), names: Names = NO_NAMES
+) -> int:
+    """The fewest unit edits between a text and a transcript, units compared by reading.
+
+    Adjacent Latin units that one side writes as one are joined at no cost, and in the Chinese
+    edition one Latin unit of other letters may stand for a declared term (`stands_for`).
+    `words` are the Chinese words compared by their readings, and `names` the edition's names.
+    """
+    return compared(expected, observed, words, names).distance

@@ -8,6 +8,8 @@ from filmkit.film import NarrationTerm
 
 # A term written for the tests, respelled for the narrator as `terms` describes it.
 NAME = NarrationTerm(term="NAME", spoken="Naim", ipa="ˈneɪm")
+# The edition's other Latin units, as a Chinese bench reads them from its script.
+OTHERS = frozenset({"agent", "git", "github", "gitlab"})
 
 
 def test_units_fold_case_and_drop_punctuation_in_both_languages():
@@ -142,3 +144,43 @@ def test_a_declared_term_is_one_unit_under_its_display_and_spoken_forms():
     ]
     for text, heard, after in guards:
         assert by_reading(text, heard, names) == after, heard
+
+
+def test_a_term_in_chinese_speech_is_alike_one_latin_unit_that_is_no_other_unit_of_the_edition():
+    names = narration_recognition.Names((NAME,), chinese=True, others=OTHERS)
+    text = "Naim 走的是另一条路。"
+    for heard in ("Name走的是另一条路。", "Nime走的是另一条路。"):
+        assert (by_reading(text, heard), by_reading(text, heard, names)) == (1, 0), heard
+    refused = [
+        ("Agent走的是另一条路。", 1),
+        ("2024走的是另一条路。", 1),
+        ("内姆走的是另一条路。", 2),
+        ("走的是另一条路。", 1),
+        ("Name Name走的是另一条路。", 1),
+        ("Nime Nime走的是另一条路。", 1),
+        ("Nime OK走的是另一条路。", 1),
+        ("Ni me走的是另一条路。", 1),
+        ("N I M E走的是另一条路。", 3),
+        ("走的是Nime另一条路。", 2),
+    ]
+    for heard, after in refused:
+        assert by_reading(text, heard, names) == after, heard
+    assert by_reading("让 Naim Agent 接手。", "让NimeAgent接手。", names) == 1
+    # Decided and stated: a word that is no Latin unit of the edition passes in the name's
+    # place, and so does another of its names spelled otherwise than the script spells it.
+    assert by_reading(text, "Python走的是另一条路。", names) == 0
+    assert by_reading(text, "Agents走的是另一条路。", names) == 0
+    # The comparison names each unit that stood for the term in other letters, and no other.
+    compared = narration_recognition.compared
+    assert compared(text, "Nime走的是另一条路。", (), names).stood_for == (("NAME", "nime"),)
+    assert compared(text, "Name走的是另一条路。", (), names).stood_for == ()
+
+
+def test_an_english_edition_gives_a_term_no_other_letters():
+    # Built for the English edition, the comparison has no rule of other letters: in English
+    # every word is Latin letters, and any word would pass in the name's place.
+    texts = ["Naim is built for it.", "An Agent reads it."]
+    names = narration_recognition.edition_names((NAME,), texts, chinese=False)
+    assert names == narration_recognition.Names((NAME,))
+    assert by_reading("Naim is built for it.", "Nime is built for it.", names) == 1
+    assert by_reading("Naim 走的是另一条路。", "Nime走的是另一条路。", names) == 1
