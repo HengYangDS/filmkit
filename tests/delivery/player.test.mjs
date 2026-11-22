@@ -371,3 +371,42 @@ test("the cover check refuses a stage whose record and page disagree before it p
     await rm(stage, { recursive: true, force: true });
   }
 });
+
+test("the cover check refuses a folder that is no whole stage before it paints", async () => {
+  const tool = fileURLToPath(
+    new URL("../../src/filmkit/delivery/player-check.mjs", import.meta.url),
+  );
+  const stage = await mkdtemp(join(tmpdir(), "cover-stage-"));
+  try {
+    const painting = join(stage, "painting.png");
+    const refused = (said) => {
+      const args = [tool, "cover", stage, join(stage, "cover.png"), painting];
+      const result = spawnSync(process.execPath, args, { encoding: "utf8" });
+      assert.equal(result.status, 1, result.stderr);
+      assert.equal(result.stdout, "");
+      assert.equal(result.stderr, `player-check: The stage's ${said}; run stage-picture again\n`);
+    };
+    // A page alone states no frame: the record is absent.
+    await writeFile(
+      join(stage, PAGE),
+      '<div id="film" data-width="3840" data-height="2160" data-duration="60"></div>',
+    );
+    refused(`record ${join(stage, "stage.json")} is absent`);
+    // A record that states no rate.
+    await writeFile(
+      join(stage, RECORD),
+      JSON.stringify({ width: 3840, height: 2160, duration: 60 }),
+    );
+    refused(`record ${join(stage, "stage.json")} states no whole positive fps`);
+    // A whole record beside a page that holds no film element.
+    await writeFile(
+      join(stage, RECORD),
+      JSON.stringify({ width: 3840, height: 2160, duration: 60, fps: 60 }),
+    );
+    await writeFile(join(stage, PAGE), "<!doctype html><title>no film</title>");
+    refused(`page ${join(stage, "index.html")} holds no film element`);
+    await assert.rejects(readFile(painting), { code: "ENOENT" });
+  } finally {
+    await rm(stage, { recursive: true, force: true });
+  }
+});
