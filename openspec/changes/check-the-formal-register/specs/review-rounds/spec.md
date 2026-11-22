@@ -17,6 +17,22 @@ them. A template that does not cite `{register}` SHALL be refused before anythin
 - **WHEN** a film's prompt template does not cite `{register}`
 - **THEN** the preparation refuses before it writes anything and names the field
 
+### Requirement: A round is refused with the register check
+
+A round's preparation SHALL ask the register check once, before it derives anything, and SHALL refuse the round in one
+line, making no directory, when the check refuses the film's words or cannot run the Vale the release record states.
+
+#### Scenario: Words the check refuses
+
+- **WHEN** a round is prepared for a film whose words hold an error-level form that the film does not excuse
+- **THEN** the preparation refuses in one line that names each place and form, and the round's directory does not exist
+
+#### Scenario: No pinned Vale
+
+- **WHEN** a round is prepared where no Vale is on the path
+- **THEN** the preparation refuses in one line that names the version the check runs, and the round's directory does
+  not exist
+
 ### Requirement: A template cites each field by its name alone
 
 A round's preparation SHALL refuse, before it derives anything, a template that cites a field with a conversion or a
@@ -85,3 +101,17 @@ reviewer reads whole.
 
 - **WHEN** the measurement refuses an edition's records after the binding was written
 - **THEN** the command refuses in one line as the measurement words it, and the round holds no prompt
+
+### Requirement: The prompts state the levels
+
+For a film that declares levels, a round's preparation SHALL fill `{levels}` with each level, what it asks and, under it, each of its dimensions with what that dimension asks, and SHALL refuse a template that does not cite `{levels}` and `{sentences}`. A film without levels SHALL keep its prompts.
+
+#### Scenario: A film with levels
+
+- **WHEN** the prompts are written for a film whose levels hold its six dimensions
+- **THEN** each prompt states 信, 达 and 雅 with what each asks and each dimension under its level
+
+#### Scenario: A template without the field
+
+- **WHEN** a film declares levels and its template does not cite `{levels}`
+- **THEN** the command refuses and writes no prompt

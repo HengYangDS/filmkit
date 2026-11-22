@@ -6,6 +6,7 @@ import pytest
 from still_records import REQUIRE_FILM_SCAN
 
 import filmkit.picture.still_scan as still_scan
+import filmkit.register as register
 import filmkit.repository as repository
 import filmkit.review.prompts as review_prompts
 import filmkit.review.record as review_record
@@ -14,6 +15,13 @@ import filmkit.specification as specification
 from filmkit.picture.errors import PictureError
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
+
+
+def test_the_register_field_names_parts_that_the_checks_report_holds():
+    # The field's sentence names the report's parts by hand: each is a key the check itself gives.
+    named = re.findall(r"`(\w+)`", review_prompts.REGISTERED)
+    assert named == ["warnings", "excused"]
+    assert set(named) <= set(register.check())
 
 
 @pytest.mark.usefixtures("unleveled")
@@ -123,6 +131,10 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
         ),
         "Write only under ROOT/build/evidence/reviews/round-5/.",
         "ROOT/build/evidence/reviews/round-5/register.json is the register check's report on ",
+        (
+            "it does not read the words the picture paints: those words, the warnings, the "
+            "exceptions and everything a single form cannot show are the reviewer's to judge"
+        ),
         "\n- **R1. The film does not address its audience.** No 你、你们、您、大家、咱们;",
         "inner pauses at most 0.33 s Chinese; 0.33 s (0.22 s at commas) English;",
         "inner pause floors Chinese 。？！ 0.31 s, ， 0.155 s; English none declared;",

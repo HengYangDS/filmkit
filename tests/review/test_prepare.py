@@ -116,7 +116,11 @@ def test_a_prepared_round_holds_the_register_report_and_each_prompt_names_it_wit
     kept = {"place": "zh title", "form": "其实", "within": "名副其实", "reason": "an idiom"}
     declared = {**FILM.model_dump(by_alias=True), "register": {"exceptions": [kept]}}
     monkeypatch.setattr(register, "FILM", Film.model_validate(declared))
-    held = [("zh title", "让数据名副其实"), ("zh 01.1", "我们先看。"), ("en 01.1", "Why? And how?")]
+    held = [
+        ("zh title", "这个示例名副其实"),
+        ("zh 01.1", "我们先看。"),
+        ("en 01.1", "Why? And how?"),
+    ]
     places = [concepts.Place(where, text) for where, text in held]
     monkeypatch.setattr(concepts, "places", lambda: {"both": places})
     monkeypatch.setattr(register, "check", REGISTER_CHECK)
@@ -377,6 +381,13 @@ def refused_words(root, put, previous, monkeypatch):
     return previous, "zh 01.1: '你们' addresses the audience (R1) A film keeps a standard word "
 
 
+def no_pinned_vale(root, put, previous, monkeypatch):
+    # The round asks the check itself, which refuses where the Vale it runs is not on the path.
+    monkeypatch.setattr(register, "check", REGISTER_CHECK)
+    monkeypatch.setenv("PATH", str(root / "no-tools"))
+    return previous, "No vale on the path; the register check runs Vale "
+
+
 @pytest.mark.parametrize(
     "case",
     [
@@ -388,6 +399,7 @@ def refused_words(root, put, previous, monkeypatch):
         missing_timeline,
         no_register_field,
         refused_words,
+        no_pinned_vale,
     ],
 )
 def test_every_check_that_only_reads_refuses_in_one_line_before_anything_is_derived(
