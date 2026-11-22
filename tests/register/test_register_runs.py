@@ -1,6 +1,7 @@
 """The register check's Vale: the pinned one, run as documented, on the engine's own rule files;
 a run it cannot read is a refusal in one line."""
 
+import configparser
 import json
 import os
 import shutil
@@ -124,6 +125,12 @@ def test_the_checker_runs_alone_on_the_engines_configuration(tmp_path, monkeypat
     # The configuration is the check's own file beside the module, named for the check.
     config = Path(register.__file__).with_name("register.ini")
     assert config.is_file()
+    # It is INI to any reader, its settings under a section, and names the style folder the
+    # check holds its rule files to.
+    stated = configparser.ConfigParser(interpolation=None, strict=True)
+    stated.read_string(config.read_text(encoding="utf-8"))
+    style = config.parent / stated.defaults()["stylespath"] / stated["*.txt"]["basedonstyles"]
+    assert (stated.sections(), style) == (["*.txt"], register._STYLE)
     assert json.loads(Path(f"{vale}.args").read_text()) == [
         "--no-global",
         f"--config={config}",
