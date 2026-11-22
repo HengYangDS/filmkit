@@ -202,14 +202,72 @@ def test_edition_places_name_titles_thoughts_caption_terms_release_and_player():
         Place("en 01 title", "Part 01"),
         Place("en 01.1", "First. "),
         Place("en 01.2", "Second."),
-        Place("en caption term", "reference recording"),
-        Place("en caption term", "build folder"),
+        Place("en caption term 'reference recording'", "reference recording"),
+        Place("en caption term 'build folder'", "build folder"),
         Place("en release synopsis", "A film."),
         Place("en release comment", "For tests."),
         Place("en release description", "English"),
     ]
     # The player's own words: the summary the film declares; the engine words the rest.
     assert places[-1] == Place("en player summary", concepts.FILM.editions["en"].summary)
+
+
+def entry_texts() -> list[str]:
+    """The texts of the entry page's places, each on one line."""
+    return [" ".join(place.text.split()) for place in concepts.places()[concepts.ENTRY]]
+
+
+def test_the_places_hold_each_editions_words_and_the_entry_page_once(tmp_path, monkeypatch):
+    gathered = concepts.places()
+    assert list(gathered) == ["zh", "en", concepts.ENTRY]
+    assert gathered["en"][0].where == "en title"
+    # The entry page is one bilingual page: each run of its shown text, which a block element
+    # ends and an inline one does not, and each label a viewer meets is a place of that one name.
+    assert {place.where for place in gathered[concepts.ENTRY]} == {"entry page"}
+    shown = entry_texts()
+    assert shown[:3] == [
+        "示例影片 · 选择语言 / Choose a language",
+        "示例影片",
+        "从源文件到成片 Sample Reel · From Sources to Film",
+    ]
+    assert "选择语言 / Choose a language" in shown[3:]
+    assert not any("color-scheme" in text or "<" in text for text in shown)
+    # A template's content is not shown; a hidden element's is, and an image's alt and a title.
+    shutil.copytree(repository.ROOT / "content", tmp_path / "content")
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    page = tmp_path / concepts.FILM.entry
+    hidden = (
+        '<template><p>模板</p></template><p hidden>隐藏<b>的</b></p><img alt="图示" title="题">'
+    )
+    page.write_text(page.read_text(encoding="utf-8").replace("<footer>", hidden + "<footer>"))
+    shown = entry_texts()
+    assert {"隐藏的", "图示", "题", "Yang HENG"} <= set(shown)
+    assert not any("模板" in text for text in shown)
+
+
+def test_a_counterexample_on_the_entry_page_is_named_once(tmp_path, monkeypatch):
+    shutil.copytree(repository.ROOT / "content", tmp_path / "content")
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    page = tmp_path / concepts.FILM.entry
+    shown = page.read_text(encoding="utf-8").replace("从源文件到成片", "复刻一部影片")
+    # A counterexample in the page's style is no text the page shows.
+    page.write_text(shown.replace("<style>", "<style>/* remake */"), encoding="utf-8")
+    with pytest.raises(ConceptError) as refused:
+        concepts.check()
+    assert str(refused.value).splitlines() == [
+        "entry page at 0: '复刻', a counterexample of rebuild"
+    ]
+
+
+def test_an_entry_page_that_is_no_utf8_text_is_refused_naming_it(tmp_path, monkeypatch):
+    shutil.copytree(repository.ROOT / "content", tmp_path / "content")
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    (tmp_path / concepts.FILM.entry).write_bytes(b"<p>\xff</p>")
+    with pytest.raises(ConceptError) as refused:
+        concepts.check()
+    assert str(refused.value) == (
+        "The entry page content/index.html is no UTF-8 text: byte 3 cannot be read"
+    )
 
 
 def test_a_counterexample_in_the_player_or_the_synopsis_refuses(tmp_path, monkeypatch):

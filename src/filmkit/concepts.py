@@ -5,11 +5,13 @@ concept the films name means in the canonical source, quoting the passage of a d
 source manifest pins, and which words each edition uses for it: one rendering, the forms the
 narration may also use, and the counterexamples it must not use.
 
-The check reads both editions' scripts, the film's caption terms and its picture sources. Each
-segment declares the concepts it states; both editions of a segment declare the same ones, and
-each appears in that segment's narration by its rendering or a form. No counterexample appears
-in any narration, title, caption term, release synopsis, comment or description, the summary
-the edition's player shows, or picture source; the engine renders the rest of the player.
+The check reads both editions' scripts, the film's caption terms, its entry page and its picture
+sources. Each segment declares the concepts it states; both editions of a segment declare the
+same ones, and each appears in that segment's narration by its rendering or a form. No
+counterexample appears in any narration, title, caption term, release synopsis, comment or
+description, the summary the edition's player shows, the text the entry page shows, or picture
+source; the engine renders the rest of the player. The words a viewer meets outside the
+picture are gathered once (`places`), for this check and the register check (`filmkit.register`).
 With a local clone of the source repository, named by `FILM_SOURCE_CHECKOUT`, each quotation
 must be in its document at the pinned commit; without one the quotations are reported as not
 checked. Every failure is reported at once, and thoughts are numbered from 1 within their segment.
@@ -32,6 +34,7 @@ import os
 import re
 import subprocess
 import tomllib
+from html.parser import HTMLParser
 from typing import Annotated, NamedTuple
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
@@ -47,6 +50,23 @@ PICTURE = "picture"
 PICTURE_SUFFIXES = (".js", ".mjs", ".html", ".json")
 # The release fields a viewer reads in a film's metadata, in the order they are checked.
 RELEASE_PROSE = ("synopsis", "comment", "description")
+# The film's entry page, one bilingual page and so one place for both editions; the elements
+# whose content a page does not show, whose end tags HTML requires; the block elements, which
+# alone end a run of text, every other element, known or not, being read as inline; and the
+# attributes whose words a viewer meets.
+ENTRY = "entry page"
+UNSHOWN = frozenset({"script", "style", "template"})
+BLOCK = frozenset(
+    "address article aside blockquote body caption dd details dialog div dl dt fieldset"
+    " figcaption figure footer form h1 h2 h3 h4 h5 h6 head header hgroup hr html legend li main"
+    " menu nav noscript ol optgroup option p pre section summary table tbody td tfoot th thead"
+    " title tr ul".split()
+)
+LABELS = ("alt", "title", "aria-label")
+# A ruby's reading, an annotation of the text it stands beside: no text of the run. Its end tag
+# may be left out, so a reading ends at its own end, at the next reading, at its ruby's end or at
+# a block.
+READING = frozenset({"rt", "rp"})
 # A lowercase name of words joined by hyphens.
 Id = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")]
 Words = Annotated[str, StringConstraints(min_length=1)]
@@ -141,6 +161,53 @@ class Place(NamedTuple):
     text: str
 
 
+class Shown(HTMLParser):
+    """The words a page shows, a run at a time: each run of its text, which a block element ends
+    and no other element does, with a space where a `br` stands in either spelling, and each
+    label a viewer meets. Only script, style and template content is left out: what `hidden`
+    hides counts as shown, since a reading that guesses where an element whose end tag is left
+    out ends would hide what follows it. A ruby's reading (`rt`, `rp`) is no text of its run."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.left_out, self.run, self.reading = 0, [], False
+        self.runs: list[str] = []
+
+    def end_run(self) -> None:
+        text = "".join(self.run)
+        if text.strip():
+            self.runs.append(text)
+        self.run = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in UNSHOWN or self.left_out:
+            self.left_out += tag in UNSHOWN
+            return
+        self.reading = tag in READING or (self.reading and tag not in BLOCK)
+        if tag == "br":
+            self.run.append(" ")
+        elif tag in BLOCK:
+            self.end_run()
+        held = {name: value or "" for name, value in attrs}
+        self.runs += [held[name] for name in LABELS if held.get(name, "").strip()]
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in UNSHOWN:
+            self.left_out = max(0, self.left_out - 1)
+        elif not self.left_out:
+            self.reading = self.reading and tag not in {*READING, "ruby", *BLOCK}
+            if tag in BLOCK:
+                self.end_run()
+
+    def handle_data(self, data: str) -> None:
+        if not self.left_out and not self.reading:
+            self.run.append(data)
+
+    def close(self) -> None:
+        super().close()
+        self.end_run()
+
+
 class Unnumbered(NamedTuple):
     """A Chinese clause that says a Latin-script term with no number word, where the English
     names the term only by its plural."""
@@ -223,6 +290,25 @@ def found(text: str, phrase: str, code: str) -> list[int]:
     return [match.start() for match in re.finditer(pattern, text, flags)]
 
 
+def places(scripts: dict[str, dict] | None = None) -> dict[str, list[Place]]:
+    """The words a viewer meets outside the picture, by edition, from the editions' scripts
+    (read unless given), and under `ENTRY` the entry page's: one page for both editions, each
+    run of its shown text and each of its labels a place of that one name."""
+    if scripts is None:
+        scripts = {code: repository.read(Edition(code).script) for code in CODES}
+    gathered = {code: edition_places(code, script) for code, script in scripts.items()}
+    try:
+        page = (repository.ROOT / FILM.entry).read_text(encoding="utf-8")
+    except UnicodeDecodeError as error:
+        message = f"The entry page {FILM.entry} is no UTF-8 text: byte {error.start} cannot be read"
+        raise ConceptError(message) from None
+    shown = Shown()
+    shown.feed(page)
+    shown.close()
+    gathered[ENTRY] = [Place(ENTRY, run) for run in shown.runs]
+    return gathered
+
+
 def edition_places(code: str, script: dict) -> list[Place]:
     """The edition's words a viewer meets: titles, thoughts, caption terms, release and player."""
     places = [Place(f"{code} title", script["title"])]
@@ -236,7 +322,8 @@ def edition_places(code: str, script: dict) -> list[Place]:
             Place(f"{code} {segment['id']}.{index}", thought)
             for index, thought in enumerate(authored_groups(segment), 1)
         ]
-    places += [Place(f"{code} caption term", term) for term in FILM.editions[code].caption_terms]
+    terms = FILM.editions[code].caption_terms
+    places += [Place(f"{code} caption term {term!r}", term) for term in terms]
     release = script.get("release", {})
     places += [
         Place(f"{code} release {key}", release[key]) for key in RELEASE_PROSE if key in release
@@ -300,12 +387,14 @@ def declarations(contract: Contract, scripts: dict[str, dict]) -> list[str]:
 
 
 def counterexamples(contract: Contract, places: dict[str, list[Place]]) -> list[str]:
-    """Each counterexample in an edition's words or the picture, with where it occurs."""
+    """Each counterexample in an edition's words, or in the words both editions share (the entry
+    page, the picture), with where it occurs."""
+    shared = [place for name, held in places.items() if name not in CODES for place in held]
     failures = []
     for concept in contract.concept:
         for code in CODES:
             for phrase in concept.words(code).avoid:
-                for place in places[code] + places["picture"]:
+                for place in places[code] + shared:
                     failures += [
                         f"{place.where} at {position}: {phrase!r}, a counterexample of {concept.id}"
                         for position in found(place.text, phrase, code)
@@ -396,10 +485,8 @@ def check() -> dict:
     contract = load(FILM.concepts, pinned)
     status, failures = quotations(contract, pinned)
     scripts = {code: repository.read(Edition(code).script) for code in CODES}
-    places = {code: edition_places(code, script) for code, script in scripts.items()}
-    places["picture"] = picture_places()
     failures += declarations(contract, scripts)
-    failures += counterexamples(contract, places)
+    failures += counterexamples(contract, {**places(scripts), "picture": picture_places()})
     failures += number_parity(contract.number, scripts)
     if failures:
         raise ConceptError("\n".join(failures))

@@ -4,12 +4,13 @@ The repository's manifests and locks are the source. `package.json` names under 
 the npm packages the engine runs in a film, which a film declares at those versions;
 `package-lock.json` holds their integrity; `uv.lock` holds the version of every Python package
 the engine's own dependencies resolve to, on every platform the lock covers, so the record
-also names a package that another platform alone installs. An installed engine holds none of
-those files, so the record `released.json` beside this module carries what they state. An
-engine that holds no record it can read, or a record without a package the engine asks it for,
-ends in an error whose one line names the file and this command, which writes it (`load`,
-`npm_package`). The renderer asks when it is imported, so a caller sees that line as the last
-of a traceback. The command itself reads no record.
+also names a package that another platform alone installs; and the Mise configuration pins the
+Vale that applies the register check's style (`filmkit.register`). An installed engine holds
+none of those files, so the record `released.json` beside this module carries what they state.
+An engine that holds no record it can read, or a record without a package or the Vale the
+engine asks it for, ends in an error whose one line names the file and this command, which
+writes it (`load`, `npm_package`, `vale`). The renderer asks when it is imported, so a caller
+sees that line as the last of a traceback. The command itself reads no record.
 
 Usage: python -m filmkit.released
 Run in the engine's repository, where it writes the record from the manifests and locks. The
@@ -31,6 +32,8 @@ COMMAND = f"python -m {ENGINE}.{Path(__file__).stem}"
 # The repository's npm manifest, its npm lock and its Python lock, which the record is written
 # from.
 MANIFEST, NPM_LOCK, PYTHON_LOCK = "package.json", "package-lock.json", "uv.lock"
+# The repository's Mise configuration, and the tool in it that pins the register check's Vale.
+MISE_CONFIG, VALE = ".config/mise/config.toml", "github:vale-cli/vale"
 
 
 class ReleasedError(ValueError):
@@ -40,8 +43,9 @@ class ReleasedError(ValueError):
 
 def compute(root: Path) -> dict:
     """The record the engine's repository at a root states: each npm package a film declares
-    with its version and integrity, and each Python package of the engine's runtime with its
-    version. The engine's own development tools are in neither."""
+    with its version and integrity, each Python package of the engine's runtime with its
+    version, and the Vale version its Mise configuration pins. The engine's own development
+    tools are in none of them."""
     manifest = json.loads((root / MANIFEST).read_text(encoding="utf-8"))
     locked = json.loads((root / NPM_LOCK).read_text(encoding="utf-8"))["packages"]
     npm = {}
@@ -72,7 +76,12 @@ def compute(root: Path) -> dict:
             )
             raise ReleasedError(message)
         python[name] = versions.pop()
-    return {"npm": npm, "python": python}
+    pin = tomllib.loads((root / MISE_CONFIG).read_text(encoding="utf-8")).get("tools", {}).get(VALE)
+    vale = pin.get("version") if isinstance(pin, dict) else pin
+    if not isinstance(vale, str):
+        message = f"{MISE_CONFIG} pins no Vale: [tools] holds no {VALE} version"
+        raise ReleasedError(message)
+    return {"npm": npm, "python": python, "vale": vale}
 
 
 def written_by() -> str:
@@ -114,9 +123,23 @@ def npm_package(name: str) -> dict:
     return entry
 
 
+def vale() -> str:
+    """The Vale version the record states, the one the register check runs. A record that
+    states none ends in an error whose one line names the file and the command that writes it."""
+    stated = load().get("vale")
+    if not isinstance(stated, str):
+        message = (
+            f"This engine's record of what it was released on, {RECORD}, states no Vale version: "
+            f"{written_by()}"
+        )
+        raise ReleasedError(message)
+    return stated
+
+
 def main() -> None:
     root = Path(__file__).resolve().parents[2]
-    if not all((root / name).is_file() for name in (MANIFEST, NPM_LOCK, PYTHON_LOCK)):
+    sources = (MANIFEST, NPM_LOCK, PYTHON_LOCK, MISE_CONFIG)
+    if not all((root / name).is_file() for name in sources):
         message = f"released: {root} is no engine repository; an installed engine holds its record"
         raise SystemExit(message)
     try:

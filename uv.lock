@@ -330,6 +330,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-reportlog" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
@@ -349,6 +350,7 @@ dev = [
     { name = "pytest", specifier = "==9.2.0" },
     { name = "pytest-cov", specifier = "==7.1.0" },
     { name = "pytest-reportlog", specifier = "==1.0.0" },
+    { name = "pyyaml", specifier = "==6.0.3" },
 ]
 
 [[package]]

@@ -1,0 +1,108 @@
+# R5 of the formal register (`standard.md`), a class the document names:
+#   > no exclamations, no dashes, no ellipsis
+# Its members here, in both editions: the exclamation, the dash and the ellipsis in any of the forms
+# a keyboard gives. A dash between words is judged by literal spaces (`[ ]`: Vale reads a bare
+# space in a token as any white space) within its own place, so one text gets one verdict wherever
+# it stands; an en dash without spaces joins a compound or a range and passes, and so does a double
+# hyphen that opens a word after a space or the place's start, as a command's flag does
+# (`--dry-run`). `Yahoo! Inc.`, `x != y`, `v1.2...v1.3` and `10 - 2` are refused: a film keeps such
+# a place by declaring the text the mark stands within.
+extends: existence
+message: "'%s' is an exclamation, a dash or an ellipsis (R5)"
+level: error
+scope: paragraph
+nonword: true
+tokens:
+  - '[!！﹗‼︕]'
+  - '—+'
+  - '[―─]+'
+  - '－{2,}'
+  - '(?<=[^ ])-{2,}|-{2,}(?![A-Za-z])'
+  - '(?<=[ ])-(?=[ ])'
+  - '(?<=[ ])–|–(?=[ ])'
+  - '…+'
+  - '⋯+'
+  - '\.{3,}'
+  - '\.(?:[ ]\.){2,}'
+  - '。{3,}'
+  - '·{3,}'
+  - '．{3,}'
+tests:
+  - name: every mark
+    input: |
+      停下！
+      Stop!
+      Halt﹗
+      Halt‼
+      Halt︕
+      结论——如此。
+      One—two.
+      one ― two
+      one ─ two
+      one －－ two
+      one -- two
+      one --- two
+      one - two
+      three — four
+      five – six
+      – lead
+      tail –
+      等等……
+      还有…
+      以及⋯⋯
+      and so...
+      and so . . .
+      等等。。。
+      等等···
+      等等．．．
+    want: |
+      1:3:register.marks:'！' is an exclamation, a dash or an ellipsis (R5)
+      2:5:register.marks:'!' is an exclamation, a dash or an ellipsis (R5)
+      3:5:register.marks:'﹗' is an exclamation, a dash or an ellipsis (R5)
+      4:5:register.marks:'‼' is an exclamation, a dash or an ellipsis (R5)
+      5:5:register.marks:'︕' is an exclamation, a dash or an ellipsis (R5)
+      6:3:register.marks:'——' is an exclamation, a dash or an ellipsis (R5)
+      7:4:register.marks:'—' is an exclamation, a dash or an ellipsis (R5)
+      8:5:register.marks:'―' is an exclamation, a dash or an ellipsis (R5)
+      9:5:register.marks:'─' is an exclamation, a dash or an ellipsis (R5)
+      10:5:register.marks:'－－' is an exclamation, a dash or an ellipsis (R5)
+      11:5:register.marks:'--' is an exclamation, a dash or an ellipsis (R5)
+      12:5:register.marks:'---' is an exclamation, a dash or an ellipsis (R5)
+      13:5:register.marks:'-' is an exclamation, a dash or an ellipsis (R5)
+      14:7:register.marks:'—' is an exclamation, a dash or an ellipsis (R5)
+      15:6:register.marks:'–' is an exclamation, a dash or an ellipsis (R5)
+      16:1:register.marks:'–' is an exclamation, a dash or an ellipsis (R5)
+      17:6:register.marks:'–' is an exclamation, a dash or an ellipsis (R5)
+      18:3:register.marks:'……' is an exclamation, a dash or an ellipsis (R5)
+      19:3:register.marks:'…' is an exclamation, a dash or an ellipsis (R5)
+      20:3:register.marks:'⋯⋯' is an exclamation, a dash or an ellipsis (R5)
+      21:7:register.marks:'...' is an exclamation, a dash or an ellipsis (R5)
+      22:8:register.marks:'. . .' is an exclamation, a dash or an ellipsis (R5)
+      23:3:register.marks:'。。。' is an exclamation, a dash or an ellipsis (R5)
+      24:3:register.marks:'···' is an exclamation, a dash or an ellipsis (R5)
+      25:3:register.marks:'．．．' is an exclamation, a dash or an ellipsis (R5)
+  - name: a double hyphen inside a word and a spaced hyphen in arithmetic
+    input: |
+      x--y
+
+      10 - 2 = 8
+    want: |
+      1:2:register.marks:'--' is an exclamation, a dash or an ellipsis (R5)
+      3:4:register.marks:'-' is an exclamation, a dash or an ellipsis (R5)
+  - name: an en dash in a compound or a range, a dash that opens a place, and a flag
+    input: |
+      Human–AI work ran from 2019–2026.
+
+      2019–
+
+      pages 3–
+
+      –5 degrees, x-y, a·b, Sample Reel · From Sources
+
+      Run it with --dry-run, pass --locked (see --help).
+
+      --dry-run
+    want: ""
+  - name: a hyphen between tabs
+    input: "a\t-\tb"
+    want: ""

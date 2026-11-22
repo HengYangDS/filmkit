@@ -1,27 +1,27 @@
 ## 1. The pin and the standard's places
 
-- [ ] 1.0 Write `src/filmkit/register/standard.md`: the scope, the order and R1 to R6 as the owner approved them
+- [x] 1.0 Write `src/filmkit/register/standard.md`: the scope, the order and R1 to R6 as the owner approved them
       (`build/evidence/formal-register/standard.md`), its words unchanged.
-- [ ] 1.1 Pin Vale 3.27.0 in `.config/mise/config.toml` and `mise.lock` under the repository's release age. Done when
+- [x] 1.1 Pin Vale 3.27.0 in `.config/mise/config.toml` and `mise.lock` under the repository's release age. Done when
       `mise install --locked` installs it and the engine's tests resolve it.
-- [ ] 1.2 `concepts.places()` gives each edition's places and the entry page once, for the concept check and the
+- [x] 1.2 `concepts.places()` gives each edition's places and the entry page once, for the concept check and the
       register check: each text run of the page a unit of its own, the words of `alt`, `title` and `aria-label` with it,
       a caption term's place named with its term. Done when the tests in `tests/test_concepts.py` pass and refuse a
       counterexample on the entry page, named once.
 
 ## 2. The base style and its tests
 
-- [ ] 2.1 Write the base style. Errors: `Address` (R1's listed pronouns and their inflections), `Colloquial` (R3's
-      listed Chinese words and particles, each plainly, wherever it stands), `Contractions` (R3 English), `Marks` (R5 in
+- [x] 2.1 Write the base style. Errors: `address` (R1's listed pronouns and their inflections), `colloquial` (R3's
+      listed Chinese words and particles, each plainly, wherever it stands), `contractions` (R3 English), `marks` (R5 in
       both editions: exclamation marks, dashes and ellipses in their typed forms; an unspaced en dash and a command's
-      flag pass). Warnings: `We` (R2), `Questions` (R4: more than one question in a thought), and one rule each for the
+      flag pass). Warnings: `we` (R2), `questions` (R4: more than one question in a thought), and one rule each for the
       forms the engine adds to R1's and R3's classes. Done when `vale test --coverage` passes on every rule, with
       possessives and curly apostrophes as English cases.
-- [ ] 2.2 `tests/register/test_register_style.py` runs `vale test --coverage` on the base style with the pinned Vale
+- [x] 2.2 `tests/register/test_register_style.py` runs `vale test --coverage` on the base style with the pinned Vale
       and requires a firing case of every token of an error rule; PyYAML, with which it reads the rules, is declared in
       the `dev` group at the version the lock holds. Done when `uv lock --check` passes and the lock's change is the two
       `dev` lists alone.
-- [ ] 2.3 Tests in `tests/register/test_register_check.py` read the forms that
+- [x] 2.3 Tests in `tests/register/test_register_check.py` read the forms that
       `src/filmkit/register/standard.md` lists for R1 and R3 and require the check to refuse each; hold each rule's
       level by what the check does; and require every error-level form of the style to be a listed one or a declared
       inflection. Done when they fail for a listed form taken out of the style, for a level flipped and for an
@@ -35,10 +35,10 @@
 
 ## 3. The check
 
-- [ ] 3.1 Declare `[register]` with `[[register.exceptions]]` (`place`, `form`, `within`, `reason`) in the film model.
+- [x] 3.1 Declare `[register]` with `[[register.exceptions]]` (`place`, `form`, `within`, `reason`) in the film model.
       Done when tests in `tests/register/test_register_check.py` cover a valid exception, a malformed one, and a text
       that does not hold its form, adds only marks to it, or is held by another declared text of the same place.
-- [ ] 3.2 `filmkit.register.check()`: render the places as one text, one place or one run of the entry page a
+- [x] 3.2 `filmkit.register.check()`: render the places as one text, one place or one run of the entry page a
       paragraph, unseen characters left out; run the pinned Vale once; map each alert to its place by a table; excuse
       the occurrences of a form that lie inside a declared text at its place and refuse every other; refuse on errors,
       naming every place, on a stale exception, on a Vale whose version differs from the release record's, on rule

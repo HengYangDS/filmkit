@@ -9,7 +9,9 @@ a new film names its covers before they exist, and packaging requires them.
 
 from __future__ import annotations
 
+import itertools
 import tomllib
+import unicodedata
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Annotated, Literal
 
@@ -484,11 +486,84 @@ class Captions(Declared):
         return cues
 
 
+def form_key(place: str, form: str) -> tuple[str, str]:
+    """A form at a place as the register check compares it: its letter case set aside."""
+    return place, form.casefold()
+
+
+class RegisterException(Declared):
+    """One form the film keeps at one place against the register check (`filmkit.register`):
+    the place as the check names it, the form as the check matched it, the text the form stands
+    within there (a standard word or a quotation, holding the form and a letter or a digit beyond
+    it), and why. The check excuses exactly the form's error-level occurrences that lie inside
+    that text."""
+
+    place: Stated
+    form: Stated
+    within: Stated
+    reason: Stated
+
+    @model_validator(mode="after")
+    def within_holds_the_form(self) -> RegisterException:
+        """Refuse a text that does not hold the form, or adds to it no letter or digit: a form
+        and a mark (吧。) would keep the form wherever the mark follows it."""
+        form, within = self.form.casefold(), self.within.casefold()
+        at = within.find(form)
+        beyond = within[:at] + within[at + len(form) :] if at >= 0 else ""
+        if not any(unicodedata.category(character)[0] in "LN" for character in beyond):
+            message = (
+                f"{self.within!r} is no text the form stands within: it must hold {self.form!r}"
+                " and a letter or a digit beyond it"
+            )
+            raise ValueError(message)
+        return self
+
+    @property
+    def key(self) -> tuple[str, str]:
+        """The form the exception keeps: its place and its form in any letter case."""
+        return form_key(self.place, self.form)
+
+
+class Register(Declared):
+    """The forms the film keeps against the engine's register style, each within a text at one
+    place.
+
+    The forms are the engine's and the film adds none. An exception answers the error-level
+    occurrences of its form that lie inside its text at its place; every other occurrence is
+    refused, and an exception whose place does not hold its text is stale (`filmkit.register`).
+    A warning stays the reviewers' to read and no exception removes it.
+    """
+
+    exceptions: tuple[RegisterException, ...] = ()
+
+    @field_validator("exceptions")
+    @classmethod
+    def distinct_texts(
+        cls, exceptions: tuple[RegisterException, ...]
+    ) -> tuple[RegisterException, ...]:
+        """Refuse two exceptions of one form within one text at one place, and two of one form at
+        one place of which one text holds the other, which adds nothing."""
+        keys = {(*e.key, e.within.casefold()) for e in exceptions}
+        if len(keys) != len(exceptions):
+            message = "two exceptions name the same form within one text at one place"
+            raise ValueError(message)
+        for first, second in itertools.combinations(exceptions, 2):
+            texts = (first.within.casefold(), second.within.casefold())
+            if first.key == second.key and (texts[0] in texts[1] or texts[1] in texts[0]):
+                message = (
+                    f"two exceptions of {first.form!r} at {first.place} name {first.within!r} and"
+                    f" {second.within!r}, and one holds the other"
+                )
+                raise ValueError(message)
+        return exceptions
+
+
 class Film(Declared):
     """A bilingual film: its file prefix, delivery folder, entry page, sources, fonts, player
     colours and review.
 
-    A film may name a concept contract, which `filmkit.concepts` checks its narration against.
+    A film may name a concept contract, which `filmkit.concepts` checks its narration against,
+    and keep forms against its register (`filmkit.register`).
     """
 
     slug: Name
@@ -502,6 +577,8 @@ class Film(Declared):
     review: Review
     narration: Narration = Field(default_factory=Narration)
     captions: Captions = Field(default_factory=Captions)
+    # Declared as [register]: `register` would shadow the model class's own (ABCMeta's).
+    formal_register: Register = Field(default_factory=Register, alias="register")
 
 
 def named_files(film: Film) -> list[tuple[str, str]]:

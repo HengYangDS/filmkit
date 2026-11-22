@@ -1,0 +1,91 @@
+# R3 of the formal register (`standard.md`), English, a class the document names:
+#   > English: no contractions in narration or text ("does not", not "doesn't")
+# Its members here: every contraction, the informal ones (gonna, wanna, gotta, y'all, 'tis,
+# 'twas) among them, with any apostrophe a keyboard gives (', ’, ʼ, ′, ＇, ` and ´). A possessive is
+# standard written English, so an apostrophe-s counts only after a pronoun or an adverb it
+# contracts; one after another word (everyone's, the team's) is left to the reviewers, and so is a
+# contraction whose parts a space divides ("does n't").
+extends: existence
+message: "'%s' is a contraction (R3)"
+level: error
+scope: paragraph
+nonword: true
+ignorecase: true
+tokens:
+  - '(?<![A-Za-z])[A-Za-z]+n[''’ʼ′＇`´]t(?![A-Za-z])'
+  - '(?<![A-Za-z])[A-Za-z]+[''’ʼ′＇`´](?:re|ve|ll|d|m)(?![A-Za-z])'
+  - '(?<![A-Za-z])(?:it|that|there|here|what|who|where|when|why|how|let|he|she)[''’ʼ′＇`´]s(?![A-Za-z])'
+  - '(?<![A-Za-z])(?:gonna|wanna|gotta)(?![A-Za-z])'
+  - '(?<![A-Za-z])y[''’ʼ′＇`´]all(?![A-Za-z])'
+  - '(?<![A-Za-z])[''’ʼ′＇`´]t(?:is|was)(?![A-Za-z])'
+tests:
+  - name: every contraction and apostrophe
+    input: |
+      It doesn't run.
+      It can’t stop.
+      We're done.
+      They’ll go.
+      I'm here.
+      You'd see.
+      We’ve left.
+      Let's go.
+      It’s late.
+      itʼs late
+      it′s late
+      it＇s late
+      it`s late
+      That's it.
+      There's one.
+      Here's one.
+      What's left.
+      Who's next.
+      Where's it.
+      When's it.
+      Why's it.
+      How's it.
+      He's here.
+      She's here.
+      We are gonna go.
+      I wanna see.
+      You gotta see.
+      Thank y'all.
+      ’Tis done.
+      'Twas done.
+    want: |
+      1:4:register.contractions:'doesn't' is a contraction (R3)
+      2:4:register.contractions:'can’t' is a contraction (R3)
+      3:1:register.contractions:'We're' is a contraction (R3)
+      4:1:register.contractions:'They’ll' is a contraction (R3)
+      5:1:register.contractions:'I'm' is a contraction (R3)
+      6:1:register.contractions:'You'd' is a contraction (R3)
+      7:1:register.contractions:'We’ve' is a contraction (R3)
+      8:1:register.contractions:'Let's' is a contraction (R3)
+      9:1:register.contractions:'It’s' is a contraction (R3)
+      10:1:register.contractions:'itʼs' is a contraction (R3)
+      11:1:register.contractions:'it′s' is a contraction (R3)
+      12:1:register.contractions:'it＇s' is a contraction (R3)
+      13:1:register.contractions:'it`s' is a contraction (R3)
+      14:1:register.contractions:'That's' is a contraction (R3)
+      15:1:register.contractions:'There's' is a contraction (R3)
+      16:1:register.contractions:'Here's' is a contraction (R3)
+      17:1:register.contractions:'What's' is a contraction (R3)
+      18:1:register.contractions:'Who's' is a contraction (R3)
+      19:1:register.contractions:'Where's' is a contraction (R3)
+      20:1:register.contractions:'When's' is a contraction (R3)
+      21:1:register.contractions:'Why's' is a contraction (R3)
+      22:1:register.contractions:'How's' is a contraction (R3)
+      23:1:register.contractions:'He's' is a contraction (R3)
+      24:1:register.contractions:'She's' is a contraction (R3)
+      25:8:register.contractions:'gonna' is a contraction (R3)
+      26:3:register.contractions:'wanna' is a contraction (R3)
+      27:5:register.contractions:'gotta' is a contraction (R3)
+      28:7:register.contractions:'y'all' is a contraction (R3)
+      29:1:register.contractions:'’Tis' is a contraction (R3)
+      30:1:register.contractions:''Twas' is a contraction (R3)
+  - name: an acute accent as the apostrophe
+    input: It doesn´t hold.
+    contains: "'doesn´t'"
+  - name: possessives and names
+    input: |
+      The department's report, ETHOS's gate, the Agent’s answer, the films’ captions, its scope, O'Reilly's book and the 1990's.
+    want: ""

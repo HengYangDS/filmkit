@@ -6,8 +6,8 @@ are narrated, into a receipt, alignment and transcript named after them, such as
 narration-receipt-06-07.json, alignment-06-07.json and asr-06-07.json.
 
 Before any speech model loads, and with --dry-run too, the edition must pass the concept
-check (`filmkit.concepts`) and its readings check (`filmkit.narration.readings`); a refusal
-stops the run and names every failure.
+check (`filmkit.concepts`), the register check (`filmkit.register`) and its readings check
+(`filmkit.narration.readings`); a refusal stops the run and names every failure.
 
 Usage: python -m filmkit.narration.narrate
     --language zh|en [--ids 06,07] [--dry-run | --skip-generation]
@@ -32,6 +32,7 @@ import time
 import filmkit.child_processes as child_processes
 import filmkit.concepts as concepts
 import filmkit.durations as durations
+import filmkit.register as register
 import filmkit.repository as repository
 from filmkit.narration import processes, readings
 from filmkit.narration.snapshots import ALIGNER as ALIGNER_SNAPSHOT
@@ -118,14 +119,19 @@ def steps(code: str, ids: str = "", scope: Scope = Scope.ALL) -> list[tuple[str,
 
 
 def gate(code: str) -> dict:
-    """Refuse an edition whose words depart from the concept contract or leave a reading open.
+    """Refuse an edition whose words depart from the concept contract or the formal register, or
+    leave a reading open.
 
     Returns:
-        The concept check's and the edition's readings check's reports.
+        The concept check's, the register check's and the edition's readings check's reports.
     """
     try:
-        return {"concepts": concepts.check(), "readings": readings.check(code)}
-    except (concepts.ConceptError, readings.ReadingError) as error:
+        return {
+            "concepts": concepts.check(),
+            "register": register.check(),
+            "readings": readings.check(code),
+        }
+    except (concepts.ConceptError, register.RegisterError, readings.ReadingError) as error:
         message = f"Narration refused before synthesis:\n{error}"
         raise SystemExit(message) from None
 
@@ -148,7 +154,8 @@ def main(argv: list[str] | None = None) -> None:
     elif options.skip_generation:
         scope = Scope.CHECKS
     if scope is not Scope.CHECKS:
-        print(json.dumps({"edition": options.language, "gate": gate(options.language)}), flush=True)
+        checked = {"edition": options.language, "gate": gate(options.language)}
+        print(json.dumps(checked, ensure_ascii=False), flush=True)
     stopped = "The narration was stopped by {request}; its running step was ended with it"
     with child_processes.ending(stopped):
         narrate(options.language, options.ids, scope)

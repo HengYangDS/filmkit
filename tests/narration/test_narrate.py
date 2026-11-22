@@ -7,7 +7,10 @@ import pytest
 
 import filmkit.narration.narrate as narration_narrate
 import filmkit.repository as repository
+from filmkit.concepts import Place
 
+# The register check itself, kept before a fixture stands in for it.
+REGISTER_CHECK = narration_narrate.register.check
 BASE = "build/evidence/editions/zh/ear-first"
 RECEIPT = f"{BASE}/narration-receipt-06-07.json"
 PYTHON = [sys.executable, "-B"]
@@ -75,6 +78,7 @@ def gates(monkeypatch) -> list:
     """The editions the narration gate checked, through checks that pass."""
     checked = []
     monkeypatch.setattr(narration_narrate.concepts, "check", lambda: {"concepts": 2})
+    monkeypatch.setattr(narration_narrate.register, "check", lambda: {"warnings": ["我们"]})
     monkeypatch.setattr(
         narration_narrate.readings, "check", lambda code: checked.append(code) or {"edition": code}
     )
@@ -108,10 +112,17 @@ def test_narrate_edition_runs_the_whole_edition_from_the_root(commands, capsys):
     assert run[1][-3:] == [f"{base}/alignment.json", "--language", "English"]
     assert run[2][-3:] == [f"{base}/asr.json", "--language", "English"]
     assert [options for _, options in commands] == [{"cwd": repository.ROOT}] * 3
-    printed = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    out = capsys.readouterr().out
+    # A Chinese form reaches the author as written.
+    assert "我们" in out.splitlines()[0]
+    printed = [json.loads(line) for line in out.splitlines()]
     assert printed[0] == {
         "edition": "en",
-        "gate": {"concepts": {"concepts": 2}, "readings": {"edition": "en"}},
+        "gate": {
+            "concepts": {"concepts": 2},
+            "register": {"warnings": ["我们"]},
+            "readings": {"edition": "en"},
+        },
     }
     assert [line["step"] for line in printed[1:]] == ["narration", "alignment", "transcription"]
 
@@ -194,3 +205,18 @@ def test_a_dry_run_writes_no_duration_record(commands):
     narration_narrate.main(["--language", "zh", "--dry-run"])
     assert not (repository.ROOT / "build/evidence/editions/zh/durations").exists()
     assert len(commands) == 1
+
+
+def test_a_form_the_register_refuses_stops_narration_before_any_step(commands, monkeypatch):
+    monkeypatch.setattr(narration_narrate.register, "check", REGISTER_CHECK)
+    held = {"zh": [Place("zh 01.1", "你们先看。")]}
+    monkeypatch.setattr(narration_narrate.concepts, "places", lambda: held)
+    with pytest.raises(SystemExit) as refusal:
+        narration_narrate.main(["--language", "zh", "--dry-run"])
+    assert str(refusal.value) == (
+        "Narration refused before synthesis:\nzh 01.1: '你们' addresses the audience (R1)\n"
+        "A film keeps a standard word or a quotation at its place by declaring it in "
+        "[[register.exceptions]]: its place, its form, the text the form stands within there "
+        "(within) and a reason"
+    )
+    assert commands == []

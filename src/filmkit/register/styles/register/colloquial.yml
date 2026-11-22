@@ -1,0 +1,59 @@
+# R3 of the formal register (`standard.md`), Chinese: the colloquial words and particles it lists,
+# at error level; the class's other members the engine adds stand in `informal` as warnings. Each
+# form is matched plainly, a particle wherever it stands; the check lowers an occurrence inside a
+# standard word of `standard-words.toml` to a warning that names the word, so no occurrence is
+# silent.
+extends: existence
+message: "'%s' is colloquial (R3)"
+level: error
+scope: paragraph
+nonword: true
+tokens:
+  - '弄'
+  - '搞'
+  - '拿准'
+  - '拿不准'
+  - '跑'
+  - '看一眼'
+  - '现查'
+  - '其实'
+  - '说白了'
+  - '一下'
+  - '吧'
+  - '呢'
+  - '啊'
+  - '呀'
+tests:
+  - name: every form the standard lists, inside a word too
+    input: |
+      先弄清原因。
+      再搞定。
+      拿准了。
+      拿不准质量。
+      再跑一遍。
+      看一眼。
+      只能现查。
+      其实不难。
+      说白了。
+      试一下。
+      好吧，
+      是呢。
+      对啊。
+      来呀 then
+      呢绒
+    want: |
+      1:2:register.colloquial:'弄' is colloquial (R3)
+      2:2:register.colloquial:'搞' is colloquial (R3)
+      3:1:register.colloquial:'拿准' is colloquial (R3)
+      4:1:register.colloquial:'拿不准' is colloquial (R3)
+      5:2:register.colloquial:'跑' is colloquial (R3)
+      6:1:register.colloquial:'看一眼' is colloquial (R3)
+      7:3:register.colloquial:'现查' is colloquial (R3)
+      8:1:register.colloquial:'其实' is colloquial (R3)
+      9:1:register.colloquial:'说白了' is colloquial (R3)
+      10:2:register.colloquial:'一下' is colloquial (R3)
+      11:2:register.colloquial:'吧' is colloquial (R3)
+      12:2:register.colloquial:'呢' is colloquial (R3)
+      13:2:register.colloquial:'啊' is colloquial (R3)
+      14:2:register.colloquial:'呀' is colloquial (R3)
+      15:1:register.colloquial:'呢' is colloquial (R3)

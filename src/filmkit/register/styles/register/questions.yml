@@ -1,0 +1,39 @@
+# R4 of the formal register (`standard.md`): a question states, once, a question the film then
+# answers. A word cannot tell a rhetorical question, so more than one in a thought, a paragraph
+# of the checked text, is a warning for the reviewers. A full-width mark always counts; an ASCII
+# one counts unless a character of an address follows it, as in a URL's query.
+extends: occurrence
+message: "%s questions in one thought (R4)"
+level: warning
+scope: paragraph
+max: 1
+token: '？|\?(?![A-Za-z0-9=&%_/.#-])'
+tests:
+  - name: two questions in one thought
+    input: |
+      它说明了什么？又能证明什么？
+    contains: "2 questions in one thought"
+  - name: two half-width marks before Chinese text
+    input: |
+      这说明什么?为什么?
+    contains: "2 questions in one thought"
+  - name: two half-width marks in quotes
+    input: |
+      「为什么?」「如何?」
+    contains: "2 questions in one thought"
+  - name: two half-width marks in brackets
+    input: |
+      （为什么?）（如何?）
+    contains: "2 questions in one thought"
+  - name: one question in each thought, quoted or not
+    input: |
+      它说明了什么？答案在下文。
+
+      "Is it done?" The next part says.
+
+      What does it prove? The next part says.
+    want: ""
+  - name: the query of an address is no question
+    input: |
+      Read http://x/?a=1 beside http://y/?c=3 today. Why?
+    want: ""

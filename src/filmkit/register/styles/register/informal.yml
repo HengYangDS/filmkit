@@ -1,0 +1,56 @@
+# R3 of the formal register (`standard.md`): colloquial words its list does not name, found by the
+# inventory's second reading, at warning level for the reviewers. The engine may widen what
+# reviewers are told, never what is refused.
+extends: existence
+message: "'%s' may be colloquial (R3)"
+level: warning
+scope: paragraph
+nonword: true
+tokens:
+  - '到底(?![层部线座端稿]|\p{P}|\s|$)'
+  - '顺手(?!牵羊)'
+  - '靠得住'
+  - '提了个'
+  - '(?<![不值变显获取使记觉])得由'
+  - '(?<![主监分托接保掌代网血资纳])管用(?![户途药])'
+tests:
+  - name: every form
+    input: |
+      到底怎么样，顺手改一下，靠得住的路，提了个要求，得由另一个账户，管不管用。
+    contains:
+      - '''到底'''
+      - '''顺手'''
+      - '''靠得住'''
+      - '''提了个'''
+      - '''得由'''
+      - '''管用'''
+  - name: standard words that hold a form
+    input: |
+      将改革进行到底。
+      坚持到底
+      一查到底
+      追溯到底稿
+      回到底线
+      滚动到底端
+      到底座
+      到底层
+      到底部
+      顺手牵羊
+      验收不得由提交者本人完成
+      值得由专人负责
+      变得由数据驱动
+      显得由来已久
+      获得由此
+      取得由来
+      使得由此
+      记得由谁
+      觉得由此
+      尽管用户已经确认
+      不管用户是否在线
+      资管用户
+      纳管用户
+      网管用的工具
+      血管用药
+      主管用户
+      监管用途
+    want: ""

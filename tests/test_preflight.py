@@ -62,6 +62,7 @@ def edition(tmp_path, monkeypatch):
             put(root / source, f"fixture {path}")
     put(root / "content/source-manifest.json", {"members": []})
     put(root / repository.DECLARATION, 'slug = "sample-reel"\n')
+    put(root / FILM.entry, "<title>Sample</title>\n")
     put(root / "VERSION", "1.3.0\n")
     edition = Edition("zh")
     script = {"duration": DURATION, "segments": [{"id": "01", "text": "先看数据。"}]}
@@ -116,6 +117,7 @@ def edition(tmp_path, monkeypatch):
         },
     )
     monkeypatch.setattr(preflight.concepts, "check", lambda: {"status": "not_declared"})
+    monkeypatch.setattr(preflight.register, "check", lambda: {"warnings": []})
     return edition
 
 
@@ -140,6 +142,7 @@ QUESTIONS = [
     "geometry",
     "draft_stills",
     "concepts",
+    "register",
     "film_package",
     "cover",
 ]
@@ -197,7 +200,7 @@ def test_every_stale_input_is_named_at_once_and_refuses(edition, monkeypatch, ca
     # A stale stage paints no cover.
     assert calls == []
     printed = json.loads(capsys.readouterr().out)["inputs"]
-    stale = ("sound_gate", "caption_rate", "geometry", "thought_clarity")
+    stale = ("sound_gate", "caption_rate", "geometry", "thought_clarity", "register")
     assert all(value != "current" for name, value in printed.items() if name not in stale)
     # The receipt holds the refusal and what it was judged on.
     receipt = repository.read(edition.readiness)
@@ -445,6 +448,7 @@ def test_the_receipt_binds_what_the_answer_was_judged_on(edition, monkeypatch):
         "stylesheet": faces["stylesheet_sha256"],
         "fonts": faces["fonts_sha256"],
         "declaration": repository.sha(root / repository.DECLARATION),
+        "entry": repository.sha(root / FILM.entry),
         "script": repository.sha(root / edition.script),
         "cast": repository.sha(root / edition.cast),
         "timeline": repository.sha(edition.timeline),

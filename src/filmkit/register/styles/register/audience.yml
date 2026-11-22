@@ -1,0 +1,27 @@
+# R1 of the formal register (`standard.md`): addresses of the audience its list does not name, at
+# warning level for the reviewers. The engine may widen what reviewers are told, never what is
+# refused.
+extends: existence
+message: "'%s' may address the audience (R1)"
+level: warning
+scope: paragraph
+nonword: true
+tokens:
+  - '咱(?!们)'
+  - '各位(?!于)'
+  - '诸位'
+  - '朋友们'
+tests:
+  - name: every form
+    input: |
+      咱俩先看，各位请看，诸位留意，朋友们好。
+    contains:
+      - '''咱'''
+      - '''各位'''
+      - '''诸位'''
+      - '''朋友们'''
+  - name: forms that are no address
+    input: |
+      咱们
+      两台服务器各位于一个机房。
+    want: ""

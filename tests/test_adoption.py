@@ -221,6 +221,28 @@ def test_the_packaged_record_equals_what_the_repository_holds():
     assert released.load() == released.compute(ENGINE)
 
 
+def test_the_record_states_the_vale_the_mise_configuration_pins(project):
+    config = project / released.MISE_CONFIG
+    with pytest.raises(released.ReleasedError, match=r"\.config/mise/config\.toml pins no Vale"):
+        released.compute(project)
+    config.write_text(f'{TASKS}\n[tools]\nnode = "26.13.1"\n"{released.VALE}" = "9.9.9"\n')
+    assert released.compute(project)["vale"] == "9.9.9"
+    config.write_text(f'{TASKS}\n[tools."{released.VALE}"]\nversion = "9.9.8"\n')
+    assert released.compute(project)["vale"] == "9.9.8"
+
+
+def test_an_engine_whose_record_states_no_vale_refuses_in_one_line(monkeypatch):
+    record = released.load()
+    assert released.vale() == record["vale"]
+    monkeypatch.setattr(released, "load", lambda: {"npm": record["npm"]})
+    with pytest.raises(released.ReleasedError) as refusal:
+        released.vale()
+    line = one_line(refusal)
+    assert "states no Vale version" in line
+    assert str(released.RECORD) in line
+    assert "python -m filmkit.released" in line
+
+
 def test_the_record_names_the_packages_a_film_declares_and_the_runtime_closure():
     record = released.load()
     assert set(record["npm"]) == {"@napi-rs/canvas", "@puppeteer/browsers", "puppeteer-core"}

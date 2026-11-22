@@ -300,6 +300,7 @@ def test_a_child_starts_at_the_films_root_as_a_single_process(root, monkeypatch)
 def narrating(root, monkeypatch):
     """A narration whose gate passes and whose steps are recorded instead of run."""
     monkeypatch.setattr(narration_narrate.concepts, "check", lambda: {})
+    monkeypatch.setattr(narration_narrate.register, "check", lambda: {})
     monkeypatch.setattr(narration_narrate.readings, "check", lambda code: {})
     steps = []
     monkeypatch.setattr(

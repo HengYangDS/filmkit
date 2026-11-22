@@ -1,0 +1,65 @@
+# R1 of the formal register (`standard.md`): the forms it lists for addressing the audience, and
+# their inflections, at error level. Each Chinese form is matched plainly, wherever it stands; an
+# English form occurs where its letters stand with no letter or digit directly before or after,
+# so one joined to a word by a hyphen or an underscore counts. A film keeps a standard word or a
+# quotation that holds a form by declaring the text it stands within (`[[register.exceptions]]`).
+extends: existence
+message: "'%s' addresses the audience (R1)"
+level: error
+scope: paragraph
+nonword: true
+ignorecase: true
+tokens:
+  - '你们?'
+  - '您'
+  - '大家'
+  - '咱们'
+  - '(?<![A-Za-z0-9])you(?:rs?|rself|rselves)?(?![A-Za-z0-9])'
+tests:
+  - name: every Chinese form, inside a word too
+    input: |
+      你们先看。
+      您再看。
+      大家都看。
+      咱们一起看。
+      你也看。
+      迷你主机。
+    want: |
+      1:1:register.address:'你们' addresses the audience (R1)
+      2:1:register.address:'您' addresses the audience (R1)
+      3:1:register.address:'大家' addresses the audience (R1)
+      4:1:register.address:'咱们' addresses the audience (R1)
+      5:1:register.address:'你' addresses the audience (R1)
+      6:2:register.address:'你' addresses the audience (R1)
+  - name: every English form, a contracted one included
+    input: You check your work, the work is yours, so do it yourself, as you’re told; all of you, yourselves.
+    contains:
+      - "'You'"
+      - "'your'"
+      - "'yours'"
+      - "'yourself'"
+      - "'you'"
+      - "'yourselves'"
+  - name: English forms joined to a word
+    input: |
+      Write a thank-you note.
+
+      Thank you-all.
+
+      Then _you_ decide.
+
+      Ask your-team.
+
+      It goes to-you.
+    want: |
+      1:15:register.address:'you' addresses the audience (R1)
+      3:7:register.address:'you' addresses the audience (R1)
+      5:7:register.address:'you' addresses the audience (R1)
+      7:5:register.address:'your' addresses the audience (R1)
+      9:12:register.address:'you' addresses the audience (R1)
+  - name: letters that only hold a form
+    input: |
+      you2
+
+      Young people read the Youth report on the bayou, on YouTube.
+    want: ""

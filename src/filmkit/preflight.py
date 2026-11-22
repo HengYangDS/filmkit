@@ -18,6 +18,7 @@ with `PreflightError` while any remains:
   bind the current timeline and composition; an early warning, since the scan of the film
   itself decides once it is packaged (`filmkit.picture.still_scan.scan_film`);
 - the concepts: the film's words against its concept contract (`filmkit.concepts.check`);
+- the register: the film's words against the formal register (`filmkit.register.check`);
 - the picture gate: a passing gate record bound to the current composition, timeline,
   stylesheet, fonts and engine (`filmkit.picture.rendering.require_passing_gates`);
 - the sound gate: a passing record of `check-sound` bound to the current soundtrack, timeline
@@ -34,11 +35,12 @@ with `PreflightError` while any remains:
 A declared thought or cue that no longer stands under its line is refused as stale.
 
 The answer is written as the edition's readiness receipt (`Edition.readiness`): the verdict, each
-question's answer, the engine version and the SHA-256 of every input the answer was judged on.
+question's answer, the engine version and the SHA-256 of every input the answer was judged on,
+the declaration, which holds the film's register exceptions, and the entry page among them.
 `admitted` reads receipts without repeating the work: it refuses unless the edition's receipt
 passed and each input it bound still holds, and unless the other edition's receipt passed on the
-composition, stylesheet, fonts and declaration as they stand, since both editions render one
-composition and a finding in either changes it for both.
+composition, stylesheet, fonts, declaration and entry page as they stand, since both editions
+render one composition and a finding in either changes it for both.
 
 Usage: python -m filmkit.produce preflight --language zh|en
        python -m filmkit.produce admitted --language zh|en
@@ -49,6 +51,7 @@ from __future__ import annotations
 import json
 from importlib.metadata import version
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import filmkit.concepts as concepts
 import filmkit.delivery.packaging as packaging
@@ -56,6 +59,7 @@ import filmkit.delivery.verification as verification
 import filmkit.picture.renderer as renderer
 import filmkit.picture.rendering as rendering
 import filmkit.picture.still_scan as still_scan
+import filmkit.register as register
 import filmkit.repository as repository
 import filmkit.review.clarity as review_clarity
 import filmkit.sources as sources
@@ -63,6 +67,9 @@ import filmkit.tools as tools
 from filmkit.captions.timing import READING_RATES, captions_above_rate
 from filmkit.film import FILM
 from filmkit.production import CODES, Edition
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # The cover paintings, below the film's root, in a folder for each edition.
 WORK = Path("build/runtime/work/preflight")
@@ -159,11 +166,16 @@ def draft(edition: Edition) -> str | None:
     return f"{named} finds {held} still pictures with {still_scan.limit_words()}" if held else None
 
 
-def concept_check() -> str | None:
+def words(check: Callable[[], object], *refusals: type[Exception]) -> str | None:
+    """Whether a check of the film's words passes: its refusals on one line, or what it misses."""
     try:
-        concepts.check()
-    except (concepts.ConceptError, sources.SourceError) as error:
-        return "; ".join(str(error).splitlines())
+        check()
+    except refusals as error:
+        # A register refusal counts its refusals apart from its advice on keeping a word.
+        lines = (
+            error.lines if isinstance(error, register.RegisterError) else str(error).splitlines()
+        )
+        return "; ".join(lines)
     except FileNotFoundError as error:
         return missing(error)
     return None
@@ -288,6 +300,7 @@ def shared_inputs() -> dict:
         "stylesheet": faces["stylesheet_sha256"],
         "fonts": faces["fonts_sha256"],
         "declaration": repository.sha(repository.ROOT / repository.DECLARATION),
+        "entry": repository.sha(repository.ROOT / FILM.entry),
     }
 
 
@@ -323,7 +336,8 @@ def preflight(edition: Edition) -> dict:
         "caption_rate": caption_rate(edition),
         "geometry": geometry(edition),
         "draft_stills": draft(edition) if FILM.picture.drafts else NO_DRAFTS,
-        "concepts": concept_check(),
+        "concepts": words(concepts.check, concepts.ConceptError, sources.SourceError),
+        "register": words(register.check, register.RegisterError),
         "film_package": package(edition),
         "cover": cover(edition) if staged is None else "not compared: the stage is not current",
     }

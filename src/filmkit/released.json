@@ -65,5 +65,6 @@
     "typing-extensions": "4.16.0",
     "typing-inspection": "0.4.5",
     "urllib3": "2.8.0"
-  }
+  },
+  "vale": "3.27.0"
 }
