@@ -26,12 +26,13 @@
       level by what the check does; and require every error-level form of the style to be a listed one or a declared
       inflection. Done when they fail for a listed form taken out of the style, for a level flipped and for an
       engine-added form raised to an error.
-- [ ] 2.4 No table of standard words: the base style's Chinese rules hold the listed forms alone, and a listed form
+- [x] 2.4 No table of standard words: the base style's Chinese rules hold the listed forms alone, and a listed form
       is refused wherever it stands. Done when `tests/register/test_register_words.py` states the grade of each of its
       sentences in the test itself, holds the colloquial sentences of the second and third reviews as refusals and each
-      standard word that holds a listed form as a refusal that says how a film keeps it, and holds an English form
-      joined by a hyphen or an underscore, an apostrophe written as an acute accent or a grave, and a form with an
-      unseen character inside it as refusals.
+      standard word that holds a listed form as a refusal, and holds an English form joined by a hyphen or an
+      underscore, an apostrophe written as an acute accent or a grave, and a form with an unseen character inside it as
+      refusals; and `tests/register/test_register_check.py` holds that the refusal of a standard word says how a film
+      keeps it.
 
 ## 3. The check
 
@@ -50,11 +51,11 @@
       tests in `tests/register/test_register_runs.py` cover another Vale on the path, each abnormal run (a span beside
       the form, a status its output does not bear out, a rule file missing from an installed layout among them), and
       the checker's arguments and encoding.
-- [ ] 3.3 Call the check from `narrate.gate` and `preflight` beside the concept check, and bind the entry page in the
+- [x] 3.3 Call the check from `narrate.gate` and `preflight` beside the concept check, and bind the entry page in the
       readiness receipt. Done when each refuses a film with an error-level form and `preflight` writes a refused
       receipt for it and for a Vale that is not the pinned one, by the tests in `tests/narration/test_narrate.py` and
-      `tests/test_preflight.py`, `admitted` refuses both editions after the entry page changes, and an entry page that
-      is no text ends both pre-render questions in a refused receipt, not a traceback.
+      `tests/test_preflight_register.py`, `admitted` refuses both editions after the entry page changes, and an entry
+      page that is no text ends both pre-render questions in a refused receipt, not a traceback.
 - [ ] 3.4 `review.round prepare` writes the register report into the round and fills `{register}` with its path and
       the rules from `src/filmkit/register/standard.md`; a template without `{register}` is refused. Done when a prepared
       round holds both and a template without the field is refused, by the tests in `tests/review/test_prepare.py`.
