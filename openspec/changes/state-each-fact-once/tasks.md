@@ -76,14 +76,16 @@
 
 ## 7. The edition's folders and the pictures' frames
 
-- [ ] 7.1 State the editions' artifacts and evidence folders and the stage folder's name once in
-      `src/filmkit/production.py`, leaving the work root `build/runtime/work` to decision D10, and build from them
-      the places of `Edition`, the language index's path, the media server's default folder, the superseded folder
-      and the pattern that finds an edition in a tool's arguments (design decision 9). Done when no statement in
-      `src/` outside `production.py` spells `build/artifacts/film`, `build/evidence/editions` or `final-delivery`,
-      and the tests in `tests/test_production.py`, `tests/test_build_durations.py`, `tests/test_tools.py`,
-      `tests/delivery/test_delivery_index.py`, `tests/delivery/test_media_server.py`, `tests/delivery/test_folder.py`
-      and `tests/review/test_set_aside.py` pass unchanged.
+- [ ] 7.1 State the editions' artifacts and evidence folders once in `src/filmkit/repository.py` and the stage
+      folder's name once in `src/filmkit/production.py`, leaving the work root `build/runtime/work` as every module
+      spells it, and build from them the places of `Edition`, the language index's path, the media server's default
+      folder, the superseded folder and the pattern that finds an edition in a tool's arguments (design decision 9).
+      Done when no statement in `src/` outside those two modules spells `build/artifacts/film`,
+      `build/evidence/editions` or `final-delivery`, the tests in `tests/test_production.py`,
+      `tests/test_build_durations.py`, `tests/test_tools.py`, `tests/delivery/test_delivery_index.py`,
+      `tests/delivery/test_folder.py` and `tests/review/test_set_aside.py` pass unchanged, and
+      `tests/delivery/test_media_server.py` passes, which holds that the server serves a film's built media without
+      loading its declaration.
 - [ ] 7.2 Read the UHD frame from `picture.rendering.PICTURE_SIZE` in `src/filmkit/delivery/verification.py` and
       `src/filmkit/produce.py`; build the viewing film's scale filter in `src/filmkit/production.py` from its width
       and height; state the draft's frame in `src/filmkit/picture/draft.py` as the viewing film's; and let the cover
@@ -98,8 +100,8 @@
 
 - [x] 8.1 Record the Change under `Unreleased` in `CHANGELOG.md`, as `CONTRIBUTING.md` asks. Done when the entry
       says that the engine reads each of these names from one owner, that no film's output, record or command
-      changes, that the renderer's usage text gains `node`, that the cover check refuses a stage whose record and
-      page disagree, and that the media server loads the film's declaration when it starts.
+      changes, that the renderer's usage text gains `node`, and that the cover check refuses a stage whose record
+      and page disagree.
 
 ## 9. Acceptance
 

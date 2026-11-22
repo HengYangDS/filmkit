@@ -6,18 +6,18 @@ Every action takes the edition it produces as an argument; nothing holds a curre
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import filmkit.repository as repository
 from filmkit.film import FILM
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 # The language editions, Chinese first.
 CODES = ("zh", "en")
-# Below the film's root, the folders of the editions' films and documents and of their evidence,
-# each holding a folder for each edition by its code; and the name of an edition's captioned
-# picture's stage below the work folder, which the uncaptioned picture's extends.
-ARTIFACTS = Path("build/artifacts/film")
-EVIDENCE = Path("build/evidence/editions")
+# The name of an edition's captioned picture's stage below the work folder, which the uncaptioned
+# picture's extends.
 STAGE = "final-delivery-{code}-uhd"
 
 
@@ -185,11 +185,11 @@ class Edition:
 
     @property
     def artifacts(self) -> Path:
-        return repository.ROOT / ARTIFACTS / self.code
+        return repository.ROOT / repository.ARTIFACTS / self.code
 
     @property
     def evidence(self) -> Path:
-        return repository.ROOT / EVIDENCE / self.code
+        return repository.ROOT / repository.EVIDENCE / self.code
 
     def rendered(self, captions: bool = True) -> Rendered:
         """The captioned picture's places, or with `captions` False the uncaptioned one's."""

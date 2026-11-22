@@ -7,7 +7,7 @@ See [proposal.md](proposal.md). Line numbers are of `1e4d459`; a source path wit
 **Goals:**
 
 - Each fact in scope is stated once in Python and, where the Node modules need it, once among them; every other place derives it.
-- No film's tracked file, record, delivered byte or command line changes. The printed changes are the renderer's usage text (decision 4) and the cover check's refusal of a stage whose record and page disagree (decision 9); the media server needs the film's declaration to start (decision 9).
+- No film's tracked file, record, delivered byte or command line changes. The printed changes are the renderer's usage text (decision 4) and the cover check's refusal of a stage whose record and page disagree (decision 9).
 
 **Non-Goals:**
 
@@ -69,10 +69,10 @@ See [proposal.md](proposal.md). Line numbers are of `1e4d459`; a source path wit
 9. **The edition's folders and the pictures' frames are read from their owners.**
    - **Rests on:** `production.py:172` (`build/artifacts/film`), `:176` (`build/evidence/editions`) and `:183` (the stage folder `final-delivery-<code>-uhd`, below the work root `build/runtime/work`, which `:290` and 13 statements of other modules spell, among them `delivery/packaging.py:88`, `delivery/folder.py:89` and `preflight.py:75`). The artifacts folder is restated at `delivery/packaging.py:86`, `delivery/media_server.py:88` and `review/set_aside.py:40`; the stage folder and the two folders' last names at `tools.py:76`, in the pattern that finds an edition in a tool's arguments (`tools.py:167-176`). The media server imports only `repository` (`delivery/media_server.py:13`), and importing `production` loads the film's declaration (`production.py:12`, `film.py:666-674`).
    - **Rests on, for the frames:** the UHD frame (`production.py:65`) is derived once as `picture/rendering.py:50` (`PICTURE_SIZE`) and restated at `delivery/verification.py:170` and `produce.py:169-170`; both modules already import `rendering` (`delivery/verification.py:41`, `produce.py:54`). The viewing film's frame (`production.py:67-68`) is restated in its own scale filter (`:72`) and as the draft's frame (`picture/draft.py:41`), which a stage may take only as a delivered film's frame (`picture/rendering.py:51`, `:234`). The cover check paints at 3840 by 2160 (`delivery/player-check.mjs:304`), the frame of the stage it paints, which the stage's record states and `frameContract` reads (`picture/stage-contract.mjs:29-58`), as the geometry check takes it (`picture/geometry-check.mjs:284-289`). Packaging marks a film 1080 lines high as HD video (`delivery/packaging.py:336`, `:353`): the tag's value 2 means 1080 lines, a fact of the tag and not of the viewing film, so it stays.
-   - **Considered:** for the pattern, keeping it by hand, a second statement of three names, or building it from `production`'s values; for the media server, its own spelling of the folder or `production`'s; for the cover's viewport, the UHD frame stated in Node or the stage's frame contract.
-   - **Chosen because:** `production` states each of its folders once as a value its places format, and the pattern, the default folder and the superseded folder are built from those values; the work root stays as every module spells it until D10 gives it an owner. The media server serves a film's built media, which only a film whose declaration loads can build. The cover is painted at the frame of the stage it paints, as the geometry check measures it; a stage whose record and page disagree, which the geometry check already refuses, is then refused by the cover check too, before it paints.
+   - **Considered:** for the pattern, keeping it by hand, a second statement of three names, or building it from `production`'s values; for the two folders, `production`, beside the places that format them, or `repository`, beside the film's root, where no declaration loads; for the cover's viewport, the UHD frame stated in Node or the stage's frame contract.
+   - **Chosen because:** `repository` states the two folders once, beside the film's root and its declaration, and `production` the stage's name; the places of `Edition`, the pattern, the default folder and the superseded folder are built from those values. In `production` the folders would make the media server, which imports only `repository`, load the film's declaration when it starts, so that a film whose declaration does not load could no longer have its built media served; in `repository` the server starts as before, as decision 1 keeps the renderer's imports. The work root stays as every module spells it until the build layout's roots get an owner of their own. The cover is painted at the frame of the stage it paints, as the geometry check measures it; a stage whose record and page disagree, which the geometry check already refuses, is then refused by the cover check too, before it paints.
    - **Applies to:** the statements named, but for `delivery/packaging.py:353`.
-   - **Reopened when:** D10 gives the build layout's roots an owner.
+   - **Reopened when:** the build layout's roots get an owner of their own.
 10. **A test reads an owner only to build an input; an expected value stays a literal.**
     - **Rests on:** the owner's rule of 20 November: a test's expected value standing beside its input is not a second source. The dispositions keep such values [S2].
     - **Chosen because:** a test that asserts the code's constant equals itself checks nothing. A line that writes, places or alters an input may read the owner; an assertion is not rewritten. The lines by role are listed under "Test lines by role" below.
@@ -101,7 +101,6 @@ Inputs, which may read the owner; expectations, which stay literal.
 - [A test input that reads an owner no longer notices a rename] → The expectations stay literal (decision 10), and the acceptance compares bytes.
 - [The renderer's usage text changes] → The Changelog entry names it; no test or caller reads it.
 - [Import order] → Avoided by decision 1 (c): the renderer imports nothing new, so `tools` reports the same error first as before.
-- [The media server now loads the film's declaration when it starts] → A film whose declaration does not load sees the declaration's error instead of a server; such a film can build no media to serve. The Changelog entry names it.
 - [The cover check refuses a stage that it painted before] → Only a stage whose record and page disagree, which the geometry check, run on the same stage before it in a build, already refuses.
 - [The acceptance is host-heavy] → Narration runs once; the pictures and the packages are built on each head, each step under its own host ticket, and the released films' checks under one ticket for each head.
 - [The acceptance's checkout is a second worktree of the repository] → Task 9.7 removes it, with the work below it, once the records are kept.
@@ -118,12 +117,11 @@ The owners the decisions name exist as the design reads them at `1e4d459`: `prod
 - Decision 3: `player.Version`, a named tuple of the five fields the decision lists; `player.kinds_at`, which takes a size's two kinds from `RENDITIONS`; `VERSIONS`; and `OPENING`, the version whose button starts pressed, which the page's video and status line read.
 - Decision 5: `reproduction.release_name(edition, path)`.
 - Decision 8: `Edition.srt`, `vtt`, `transcript`, `chapters` and `chapter_metadata`, and `player.PAGE`.
-- Decision 9: `production.ARTIFACTS`, `EVIDENCE` and `STAGE`, the captioned stage's name as a format of the edition's code, which `tools.py` splits at the code to build its pattern; and `production.VIEWING_SIZE`, from which `VIEWING` and its scale filter are built.
+- Decision 9: `repository.ARTIFACTS` and `EVIDENCE`, and `production.STAGE`, the captioned stage's name as a format of the edition's code, which `tools.py` splits at the code to build its pattern; and `production.VIEWING_SIZE`, from which `VIEWING` and its scale filter are built.
 
 Where the code says more than the design:
 
 - The draft's stage is no `Rendered` (`Edition.draft_stage`), so `picture/draft.py` hands `record_render` its stage's page as `stage / STAGE_PAGE`.
-- `production.py` imported `Path` for type checking only; the folders it now states need it when the module runs.
 - In `tests/test_adoption.py:51-54` and `:553-554` the pin's table key, its tag and the lock entries' name read `released.ENGINE`; the stand-in source URL `https://example.invalid/filmkit` is no read of the engine's name and keeps its words.
 
 Line numbers above remain those of `1e4d459`; the Change moves some of them.

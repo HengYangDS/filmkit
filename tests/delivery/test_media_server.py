@@ -1,6 +1,8 @@
 """Ranged media serving."""
 
 import os
+import select
+import socket
 import subprocess
 import sys
 import threading
@@ -37,22 +39,30 @@ def test_media_ranges_support_seek_and_reject_unsatisfied_range(tmp_path):
         thread.join(timeout=5)
 
 
-def test_the_server_loads_the_film_s_declaration_when_it_starts(tmp_path):
-    # It serves a film's built media, which only a film whose declaration loads can build: a
-    # declaration that does not load stops it before it serves, with the declaration named.
+def test_the_server_serves_a_film_s_built_media_without_loading_its_declaration(tmp_path):
+    # The server serves files and reads no declaration: a film whose declaration does not load
+    # still has its built media served, from the films' folder unless another is named.
     (tmp_path / "content").mkdir()
     (tmp_path / "content/film.toml").write_text('title = "no film"\n')
-    media = tmp_path / "media"
-    media.mkdir()
-    command = [sys.executable, "-B", "-m", "filmkit.delivery.media_server", "--directory"]
-    started = subprocess.run(
-        [*command, str(media), "--port", "0"],
+    films = tmp_path / "build/artifacts/film"
+    films.mkdir(parents=True)
+    (films / "film.bin").write_bytes(b"0123456789")
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    server = subprocess.Popen(
+        [sys.executable, "-B", "-m", "filmkit.delivery.media_server", "--port", str(port)],
         env={**os.environ, "FILMKIT_ROOT": str(tmp_path)},
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        timeout=10,
-        check=False,
     )
-    assert started.returncode == 1
-    assert "FilmError: content/film.toml is not a film declaration" in started.stderr
-    assert started.stdout == ""
+    try:
+        assert select.select([server.stdout], [], [], 10)[0], "the server printed nothing"
+        started = server.stdout.readline()
+        assert started == f"Serving review media at http://127.0.0.1:{port}/\n", started
+        with urlopen(f"http://127.0.0.1:{port}/film.bin", timeout=5) as response:
+            assert response.read() == b"0123456789"
+    finally:
+        server.terminate()
+        server.communicate(timeout=10)

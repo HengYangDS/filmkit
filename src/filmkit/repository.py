@@ -1,4 +1,5 @@
-"""The root of the film the engine builds, and file access from it.
+"""The root of the film the engine builds, the folders below it that hold its editions' builds,
+and file access from it.
 
 The film's root is the folder that `FILMKIT_ROOT` names or, when it is unset, the nearest folder
 at or above the working directory that holds the film's declaration; outside any film the engine
@@ -17,6 +18,12 @@ from pathlib import Path
 
 # The film's declaration, below its root.
 DECLARATION = "content/film.toml"
+# Below the root, the folders of the editions' films and documents and of their evidence, each
+# holding a folder for each edition by its code (`filmkit.production.Edition`). They stand here,
+# where no declaration loads, so that a module that serves or finds those folders, such as the
+# media server, needs no film whose declaration loads.
+ARTIFACTS = Path("build/artifacts/film")
+EVIDENCE = Path("build/evidence/editions")
 # The variable that names the film's root, wherever the engine runs.
 ROOT_VARIABLE = "FILMKIT_ROOT"
 
