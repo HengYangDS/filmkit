@@ -69,7 +69,7 @@
 - [x] 4.2 The release record states Vale's version; the adoption reader reports a film that pins another or none.
       Done when the tests in `tests/test_adoption.py` cover the record and those in `tests/test_adoption_vale.py` the
       reader.
-- [ ] 4.3 The README's command table, requirements and its sentence on what narration checks first, and the
+- [x] 4.3 The README's command table, requirements and its sentence on what narration checks first, and the
       Changelog's adoption sentences: a film adopting this release passes the register check before it narrates and
       declares its exceptions by place; pins Vale as `github:vale-cli/vale` in the Mise file of its tasks and has that
       Vale on the path for narration, the pre-render check and a review round; cites `{register}` in its prompt

@@ -4,8 +4,24 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- `python -m filmkit.register` checks a film's words against the formal register and refuses every error-level form the film does not excuse by its place; it prints the Vale version, the count of places read, the warnings and the exceptions it applied. It reads the words a viewer meets outside the picture: each edition's title, chapter and segment titles, thoughts, caption terms, release synopsis, comment and description and player summary, and the entry page's text with the words of its `alt`, `title` and `aria-label` attributes. The engine carries the register's standard in `filmkit/register/standard.md`, and Vale 3.27.0, pinned in the engine's Mise configuration and lock, applies the engine's rules; the engine's release record states that version, and the check refuses another Vale.
+- A film keeps a listed form at one place by `[[register.exceptions]]`: the `place` as the check names it, the `form`, the text the form stands `within` there and a `reason`. An exception whose place no longer holds its text, or that excuses no refusal, is refused.
+- `review.round prepare` writes the register check's report into the round as `register.json` and fills the template's `{register}` field with the report's place, what it holds and the rules R1 to R6.
+- `python -m filmkit.adoption` reads a film's pin of Vale, the entry `"github:vale-cli/vale"` under `[tools]` in the Mise configuration its tasks are read from, and reports a file that holds another version under that name than the release record's, or none, and a film that has no Mise configuration.
+
 ### Changed
 
+- **Breaking for a film that adopts this release: every film is asked the register check before it narrates.** Narration, a dry run included, and `preflight` run it beside the concept check and refuse a film whose words hold an error-level form it has not excused; `review.round prepare` asks it too and prepares no round for such a film. A film that adopts this release:
+  - pins Vale in the Mise configuration that holds its tasks, under `[tools]` as `"github:vale-cli/vale"` at 3.27.0, and adds it to its Mise lock where its settings are `locked`, as each released film's are: narration, `preflight` and `review.round prepare` refuse where the Vale on the path is not that version, or none is there;
+  - passes `python -m filmkit.register`, changing its words or declaring each kept form by its place in `[[register.exceptions]]`;
+  - cites `{register}` in its reviewer prompt template: `review.round prepare` refuses a template without the field before it writes anything;
+  - asks for formal standard written language where its review declaration scores language (`language_quality` and the 雅 level, as the sample film now does): the engine puts the rules R1 to R6 into the reviewer's prompt, and a declaration that still asks for plain spoken language asks the reviewer two things at once.
+- `review.round prepare` refuses a template that cites a field with a conversion or a format specification, as `{register:.0}` or `{levels!r}`, naming each such field before it derives anything: the engine fills a field with the text a reviewer reads whole.
+- The concept check reads a film's entry page too, and `preflight` binds the entry page in its readiness record, so `admitted` refuses both editions after the page changes. A caption term's place is named with its term, as `en caption term 'build folder'`.
+- **A film's delivered bytes change where its title, author, comment or chapter titles hold `=`, `;`, `#`, a backslash, a carriage return or a newline.** `chapters.ffmeta` escapes those marks, which FFmpeg reads as the format's own syntax or as the end of a value: a chapter title, the one kind of value a packaged film takes from this file, lost a backslash and ended at a newline or a carriage return (the film's title, artist and comment tags come from the packaging command and were whole). The file gains a backslash before each such mark, and the player page, which holds the file as a download and names its size, changes with it. A film package binds the file by its SHA-256, so an edition whose file changes has a stale package: its four films are set aside and packaged again, and the records that bind them follow. Of the released films that is each English edition, whose comment holds one semicolon; the Chinese editions' members do not change. A title, author, comment or chapter title that ends in a backslash is refused by `assemble` and `refresh-captions` before they write anything, naming the script, the field and the value: FFmpeg reads the line after such a value into it.
+- The engine's Node tests are the files that `tests/**/*.test.mjs` finds: `npm test` names no test file by hand.
 - The hosted GitHub job installs Mise 2026.11.11 instead of 2026.11.10.
 
 ## [0.26.1] - 2026-11-21
