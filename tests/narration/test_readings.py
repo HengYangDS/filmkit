@@ -441,6 +441,7 @@ def test_a_respelled_latin_name_is_declared_as_a_term_before_narration(film, mon
     # The contract's schema version does not spare the name its term.
     say("Hyperfraims", ["Hyperfraims"])
     edit(lambda contract: contract.update(schema_version=1))
-    with pytest.raises(readings.ReadingError) as refusal:
-        readings.check("zh")
-    assert str(refusal.value) == owed.format(code="zh")
+    for code in scripts:
+        with pytest.raises(readings.ReadingError) as refusal:
+            readings.check(code)
+        assert str(refusal.value) == owed.format(code=code)

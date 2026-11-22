@@ -322,6 +322,10 @@ def test_a_chinese_bench_reads_the_editions_other_latin_units_from_its_script(
     # The English bench has no rule of other letters, under which any word would pass.
     en = narration_judgment.bench("en", [], asr=None, aligner={}, film=declared)
     assert en.names == Names((NAME,))
+    # Nor has a Chinese bench whose script names no contract: no script units are known.
+    repository.write(Edition("zh").script, {"segments": [segment]})
+    bare = narration_judgment.bench("zh", [], asr=None, aligner={}, film=declared)
+    assert (bare.words, bare.names) == ((), Names((NAME,)))
 
 
 def test_a_take_records_the_unit_that_stood_for_a_term_in_other_letters(narrated, voiced):
