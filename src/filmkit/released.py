@@ -76,12 +76,22 @@ def compute(root: Path) -> dict:
             )
             raise ReleasedError(message)
         python[name] = versions.pop()
-    pin = tomllib.loads((root / MISE_CONFIG).read_text(encoding="utf-8")).get("tools", {}).get(VALE)
-    vale = pin.get("version") if isinstance(pin, dict) else pin
+    tools = tomllib.loads((root / MISE_CONFIG).read_text(encoding="utf-8")).get("tools", {})
+    vale = pinned_vale(tools)
     if not isinstance(vale, str):
         message = f"{MISE_CONFIG} pins no Vale: [tools] holds no {VALE} version"
         raise ReleasedError(message)
     return {"npm": npm, "python": python, "vale": vale}
+
+
+def pinned_vale(tools: dict) -> object:
+    """What the `[tools]` table of a Mise configuration states as the version of the Vale the
+    engine pins: the value of that tool's entry, or of the entry's `version` where it is a
+    table; None where the table holds no such entry or the entry no version. The engine's own
+    configuration and a film's (`filmkit.adoption`) are read alike. A pin of Vale under another
+    tool name is not this tool's and is not read."""
+    pin = tools.get(VALE)
+    return pin.get("version") if isinstance(pin, dict) else pin
 
 
 def written_by() -> str:

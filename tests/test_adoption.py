@@ -30,12 +30,15 @@ run = [
 [tasks."film:deliver"]
 run = ["uv run python -m filmkit.delivery.folder"]
 """
+# The film's pin of the Vale this release was released on, as its Mise configuration states it.
+PIN = f'\n[tools]\n"{released.VALE}" = "{released.vale()}"\n'
 
 
 @pytest.fixture
 def project(tmp_path):
     """A film that holds what this release asks: the sample film's declaration, the files it
-    names and its picture template, with the engine's own manifests, locks and a task list."""
+    names and its picture template, with the engine's own manifests, locks, a task list and
+    the release's pin of Vale."""
     for _field, path in film.named_files(film.FILM):
         target = tmp_path / path
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -50,7 +53,7 @@ def project(tmp_path):
         f'tag = "v{version("filmkit")}" }}\n'
     )
     (tmp_path / ".config/mise").mkdir(parents=True)
-    (tmp_path / ".config/mise/config.toml").write_text(TASKS)
+    (tmp_path / ".config/mise/config.toml").write_text(TASKS + PIN)
     return tmp_path
 
 
@@ -108,6 +111,7 @@ def test_every_finding_of_every_question_is_listed_in_one_run(project):
         "</head>",
         '<script src="node_modules/gsap/dist/gsap.min.js"></script></head>',
     )
+    rewrite(project / ".config/mise/config.toml", PIN, PIN.replace(released.vale(), "9.9.9"))
     findings = found(project)
     assert all(findings[name] for name in adoption.QUESTIONS), findings
     assert "declares documents_folder" in " ".join(findings["declaration"])
@@ -192,6 +196,9 @@ def test_a_film_whose_tasks_no_mise_configuration_holds_is_named_and_refuses_not
     result = adoption.report(project)
     assert result["findings"]["tasks"] == []
     assert any("tasks" in note for note in result["not_read"])
+    # A film without a Mise configuration pins no Vale, which is a finding and not unread.
+    (absent,) = result["findings"]["vale"]
+    assert absent.startswith("no Mise configuration (.config/mise/config.toml, mise.toml, ")
 
 
 def test_the_template_is_asked_for_every_anchor_at_once(project):
@@ -221,8 +228,37 @@ def test_the_packaged_record_equals_what_the_repository_holds():
     assert released.load() == released.compute(ENGINE)
 
 
+# The finding for a film whose Mise configuration holds no pin of the tool the engine pins.
+ABSENT = (
+    'config.toml pins no Vale ([tools] holds no "{tool}" version); {on}: '
+    'pin "{tool}" = "{asked}" under [tools]'
+)
+# What a film's Mise configuration states of Vale, and the finding that names it: its pin, or its
+# absence, with the version the release record states. A pin under another name, in another form
+# or of no one version is not the release's.
+PINS = [
+    ('[tools]\n"{tool}" = "{asked}"\n', None),
+    ('[tools."{tool}"]\nversion = "{asked}"\n', None),
+    ('[tools]\n"{tool}" = "9.9.9"\n', "config.toml pins Vale 9.9.9; {on}"),
+    ('[tools."{tool}"]\nversion = "9.9.8"\n', "config.toml pins Vale 9.9.8; {on}"),
+    ('[tools]\n"{tool}" = ["{asked}"]\n', "config.toml pins Vale ['{asked}']; {on}"),
+    ('[tools]\nnode = "26.13.1"\n', ABSENT),
+    ('[tools]\nvale = "{asked}"\n', ABSENT),
+    ("", ABSENT),
+]
+
+
+@pytest.mark.parametrize(("tools", "finding"), PINS)
+def test_a_film_that_pins_another_vale_or_none_is_named(project, tools, finding):
+    tool, asked = released.VALE, released.vale()
+    words = {"tool": tool, "asked": asked, "on": f"the engine was released on Vale {asked}"}
+    (project / ".config/mise/config.toml").write_text(TASKS + tools.format(**words))
+    assert found(project)["vale"] == ([finding.format(**words)] if finding else [])
+
+
 def test_the_record_states_the_vale_the_mise_configuration_pins(project):
     config = project / released.MISE_CONFIG
+    config.write_text(TASKS)
     with pytest.raises(released.ReleasedError, match=r"\.config/mise/config\.toml pins no Vale"):
         released.compute(project)
     config.write_text(f'{TASKS}\n[tools]\nnode = "26.13.1"\n"{released.VALE}" = "9.9.9"\n')
@@ -385,16 +421,17 @@ def test_a_film_outside_any_repository_is_asked_at_its_root_alone(tmp_path, proj
         ("package-lock.json", "npm_packages"),
         ("uv.lock", "python_lock"),
         ("pyproject.toml", "python_lock"),
-        (".config/mise/config.toml", "tasks"),
+        (".config/mise/config.toml", "tasks vale"),
         (film.DECLARATION, "declaration"),
     ],
 )
 def test_a_file_that_cannot_be_read_is_a_finding_of_its_question(project, path, question):
     (project / path).write_bytes(b"\xff\xfe not text {")
     result = adoption.report(project)
-    (finding,) = result["findings"][question]
-    assert Path(path).name in finding
-    others = [name for name in adoption.QUESTIONS if name != question]
+    for asked in question.split():
+        (finding,) = result["findings"][asked]
+        assert Path(path).name in finding
+    others = [name for name in adoption.QUESTIONS if name not in question.split()]
     assert all(result["findings"][name] == [] for name in others), result["findings"]
 
 

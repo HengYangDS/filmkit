@@ -65,7 +65,7 @@
 - [x] 4.1 The sample film's words pass the check, its prompt template cites `{register}`, and its review declaration's
       `language_quality` and `雅` ask for formal standard written language. Done when `python -m filmkit.register` passes on
       the sample and a test in `tests/register/test_register_check.py` reads the two declarations.
-- [ ] 4.2 The release record states Vale's version; the adoption reader reports a film that pins another or none.
+- [x] 4.2 The release record states Vale's version; the adoption reader reports a film that pins another or none.
       Done when the tests in `tests/test_adoption.py` cover both.
 - [ ] 4.3 The README's command table, requirements and its sentence on what narration checks first, and the
       Changelog's adoption sentences: a film adopting this release passes the register check before it narrates and

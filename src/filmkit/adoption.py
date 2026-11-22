@@ -3,7 +3,7 @@
 Usage: python -m filmkit.adoption
 Run at the film's root, or anywhere with `FILMKIT_ROOT` naming it, in any environment that holds
 the engine. The command reads tracked files only: it needs no declaration that loads, none of
-the film's npm packages, no supply and no build. It asks five questions and prints one JSON line
+the film's npm packages, no supply and no build. It asks six questions and prints one JSON line
 with every finding of each; while one stands it exits with status 1 and names them all. A file
 of the film that cannot be read is a finding of the question that reads it.
 
@@ -25,6 +25,13 @@ of the film that cannot be read is a finding of the question that reads it.
 - `template`: `picture/index.html` holds each text staging replaces as often as staging
   expects, and names no script or stylesheet that staging does not inline
   (`filmkit.picture.template`).
+- `vale`: the film's Mise configuration, the file its tasks are read from, pins under `[tools]`
+  the Vale the engine was released on, which the register check runs and beside which it
+  refuses every other (`filmkit.register`). The finding names the film's pin, or its absence,
+  and the release's version. Only the tool the engine itself pins is read
+  (`filmkit.released.VALE`), as one version: a pin of Vale under another name, in a list or
+  in another file of Mise's is not the release's and is named as none or as it stands, and a
+  film without a Mise configuration pins none.
 
 What the engine was released on is its own record (`filmkit.released`). The manifests, the locks
 and the tasks are read at the film's root or above it, up to the folder that holds the film's
@@ -48,7 +55,7 @@ import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.picture import template
 
-QUESTIONS = ("declaration", "npm_packages", "python_lock", "tasks", "template")
+QUESTIONS = ("declaration", "npm_packages", "python_lock", "tasks", "template", "vale")
 # Where a film's Mise tasks stand, in the order Mise's own documentation lists the files.
 TASK_FILES = (".config/mise/config.toml", "mise.toml", ".mise.toml")
 PRODUCE = "filmkit.produce"
@@ -353,6 +360,24 @@ def picture_template(root: Path) -> list[str]:
         return [f"{path.name} cannot be read: {error}"]
 
 
+def vale(root: Path) -> list[str]:
+    """The film's pin of the Vale that the register check runs, against the engine's record:
+    another version, another form of pin or none, each named with the release's version."""
+    asked = released.vale()
+    on = f"the engine was released on Vale {asked}"
+    pin = f'pin "{released.VALE}" = "{asked}" under [tools]'
+    config = held(root, *TASK_FILES)
+    if config is None:
+        places = ", ".join(TASK_FILES)
+        return [f"no Mise configuration ({places}) at or above the film pins Vale; {on}: {pin}"]
+    tools = table(read_toml(config).get("tools"), f"{config.name}: tools")
+    pinned = released.pinned_vale(tools)
+    if pinned is None:
+        absent = f'[tools] holds no "{released.VALE}" version'
+        return [f"{config.name} pins no Vale ({absent}); {on}: {pin}"]
+    return [] if pinned == asked else [f"{config.name} pins Vale {pinned}; {on}"]
+
+
 def report(root: Path) -> dict:
     """Every finding of each question for the film at a root, and what could not be compared."""
     not_read: list[str] = []
@@ -362,6 +387,7 @@ def report(root: Path) -> dict:
         "python_lock": lambda: python_lock(root, not_read),
         "tasks": lambda: tasks(root, not_read),
         "template": lambda: picture_template(root),
+        "vale": lambda: vale(root),
     }
     findings = {}
     for name, ask in questions.items():
