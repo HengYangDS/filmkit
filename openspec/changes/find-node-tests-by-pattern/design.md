@@ -25,7 +25,9 @@ engine's Node tests.
   compares it with the folder, which keeps a second copy of one fact beside a check; and the
   runner's default discovery with no argument, which searches the whole repository by several name
   patterns and is not limited to `tests/`.
-- The pattern is the one place that says which files are the engine's Node tests.
+- The pattern is the one place in the repository that says which files `npm test` runs. The proof
+  selects the test files by ETHOS's own rule, a tracked JavaScript file below `tests/` that no Git
+  attribute declares as tooling, and refuses a run that enters other files than those.
 
 ## Risks / Trade-offs
 
@@ -37,6 +39,11 @@ engine's Node tests.
   are no quotation; the pinned Node, given the pattern with its quotes kept, runs no test and exits
   0] → The engine runs on Apple-silicon macOS, and both forges' jobs run there; nothing runs the
   script under `cmd.exe`. A consumer on another shell changes the quotation with it.
+- [A run that enters no test file passes] → Under `npm test` and `mise run check` it does: the
+  pinned Node exits 0 for a pattern that finds nothing, and nothing in the repository refuses a
+  run of no tests. The proof is the guard: ETHOS's JavaScript gate refuses a run that does not
+  enter every test file it selects, naming each file, and a run in which no test passed. Both
+  forges' jobs run the proof; `npm test` alone has no such guard.
 
 ## Migration Plan
 
