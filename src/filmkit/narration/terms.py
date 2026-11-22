@@ -89,6 +89,13 @@ def named(reference: TermReference) -> str:
     return f"{reference.thought} #{reference.index}"
 
 
+def another_reference(term: NarrationTerm, code: str) -> str:
+    """What a film does where its reference occurrence gives no first vowel to hold others to."""
+    return (
+        f"declare another occurrence of {term.term} as its {code} reference in [[narration.terms]]"
+    )
+
+
 def spoken_forms(term: NarrationTerm) -> frozenset[str]:
     """The term and its declared spoken form, casefolded."""
     return frozenset({term.term.casefold(), term.spoken.casefold()})

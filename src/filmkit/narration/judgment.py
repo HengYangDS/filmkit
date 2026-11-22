@@ -286,7 +286,11 @@ def checked(script: dict, cast: dict, records: list[dict], targets: dict) -> lis
 
 
 def standards(code: str, references: list, aligner: dict, language: str) -> list:
-    """Each declared term's reference vowel, measured on the receipt's thought take that says it."""
+    """Each declared term's reference vowel, measured on the receipt's thought take that says it.
+
+    A reference that shows no two formants there stops the command in one line, which says to
+    declare another occurrence: no take could be held to it.
+    """
     found_standards = []
     for term, forms, reference, child in references:
         path = repository.ROOT / child["path"]
@@ -299,8 +303,11 @@ def standards(code: str, references: list, aligner: dict, language: str) -> list
             word, after = words[reference.index]
             vowel = terms.first_vowel(flow.Recording.read(path), word["start"], word["end"], after)
         if vowel is None:
-            msg = f"{code}: the {term.term} reference {reference} shows no two formants on its take"
-            raise terms.TermError(msg)
+            msg = (
+                f"{code}: the {term.term} reference {terms.named(reference)} shows no two formants "
+                f"on its take; {terms.another_reference(term, code)}"
+            )
+            raise SystemExit(msg)
         found_standards.append(terms.Standard(term, forms, reference, vowel))
     return found_standards
 
@@ -501,7 +508,9 @@ def gate_refused(code: str, script: dict, records: list[dict], aligned: dict, fi
     `aligned` holds each segment's alignment record by id. The pauses and the declared terms
     are judged as `filmkit.narration.selection` judges them before it binds the recordings,
     each segment aligned with its display text and measured against its own speech: the basis
-    a bound take is held to, which a take judged alone cannot give.
+    a bound take is held to, which a take judged alone cannot give. A declared reference that
+    gives no first vowel there names no thought, so it stops the command in one line, which
+    says to declare another occurrence.
     """
     film = film or FILM
     edition = Edition(code)
@@ -512,10 +521,19 @@ def gate_refused(code: str, script: dict, records: list[dict], aligned: dict, fi
     refused: dict[str, list[str]] = {}
     for row in flow.judge(code, found, film.narration.flow).refused:
         refused.setdefault(row["thought"], []).append("pause")
-    for record in terms.records(edition.code, film.narration.terms, narrated):
+    declared = film.narration.terms
+    lost = []
+    for term, record in zip(declared, terms.records(edition.code, declared, narrated), strict=True):
+        if term.reference.get(code) is not None and record["reference"] is None:
+            lost.append(
+                f"{record['failures'][0]} as the selection aligns its segment; "
+                f"{terms.another_reference(term, code)}"
+            )
         for occurrence in record["occurrences"]:
             if not occurrence["passes"]:
                 refused.setdefault(occurrence["thought"], []).append("terms")
+    if lost:
+        raise SystemExit("\n".join(lost))
     return {name: sorted(set(lines)) for name, lines in refused.items()}
 
 

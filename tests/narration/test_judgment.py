@@ -311,6 +311,37 @@ def test_a_complete_receipt_with_an_undeclared_respelled_name_is_refused_before_
     )
 
 
+def test_a_reference_take_without_two_formants_is_refused_in_one_line(
+    narrated, voiced, monkeypatch
+):
+    import converging
+
+    record = says_name(narrated, voiced, monkeypatch)
+    another = "declare another occurrence of NAME as its en reference in [[narration.terms]]"
+    # On its take alone the reference shows no two formants: no take can be held to it.
+    monkeypatch.setattr(narration_terms, "first_vowel", lambda *_: None)
+    with pytest.raises(SystemExit) as refused:
+        narration_judge.main(["--language", "en"])
+    assert str(refused.value) == (
+        f"en: the NAME reference 26.1 #0 shows no two formants on its take; {another}"
+    )
+    # The take alone shows two, the segment as the selection aligns it none: the gate stops
+    # before any thought is judged, where it would otherwise settle every thought.
+    converging.write_checks("en", [record], converging.placed)
+
+    def vowel(recording, *_):
+        return CLOSE if len(recording.mono) < 3 * 24000 else None
+
+    monkeypatch.setattr(narration_terms, "first_vowel", vowel)
+    with pytest.raises(SystemExit) as refused:
+        narration_judge.main(["--language", "en"])
+    assert str(refused.value) == (
+        "en: the NAME reference 26.1 #0 shows no two formants as the selection aligns its "
+        f"segment; {another}"
+    )
+    assert not (Edition("en").ear_first / narration_judge.RECORD).exists()
+
+
 def test_judge_refuses_every_thought_with_every_failing_line_and_writes_one_record(
     narrated, voiced, capsys
 ):
