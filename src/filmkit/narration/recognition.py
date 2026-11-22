@@ -10,15 +10,20 @@ units are also compared by reading (`reading_distance`), as a listener hears the
 
 - two Han characters are alike when they are the same character, or have the same reading in
   their own context, tone kept. A character's reading is the one the film's pronunciation
-  contract declares for the word it stands in, and otherwise the dictionary's reading in
-  context (`filmkit.narration.readings`). Chinese holds many characters to a sound: a
-  transcript that reads 再 where the text has 在 holds what a listener heard;
+  contract declares for the word it stands in, or the reading of a word's spoken form where a
+  `homophone` rule respells the word (`readings.compared_words`), and otherwise the
+  dictionary's reading in context (`filmkit.narration.readings`). Chinese holds many
+  characters to a sound: a transcript that reads 再 where the text has 在 holds what a listener
+  heard;
 - 的, 地 and 得 are alike where the text says one of them as a particle: its reading there is
   the neutral `de`, or it stands as a word of its own in the dictionary's division of the text
   and under no declared word. 地 in 土地 and 得 under a declared reading are no particles;
 - two Latin units are alike when their letters and digits are, so an apostrophe is no
   difference (`check's` for `checks`), and adjacent Latin units are joined where the other side
   writes them as one (`back test` for `backtest`): spelling and spacing are the recognizer's;
+- a Latin unit that says a term the film declares, its display form or its spoken form in any
+  case, reads as that term, its possessive kept (`terms.said_form`): a respelling is how the
+  narrator is told the name, and a recognizer writes the name in its own spelling;
 - a Latin unit and a Han character are never alike.
 
 A number said and its digits (`ten`, `10`) stay different: neither the engine nor a film's
@@ -31,9 +36,12 @@ import re
 from typing import TYPE_CHECKING, NamedTuple
 
 import filmkit.narration.readings as readings
+import filmkit.narration.terms as terms
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
+
+    from filmkit.film import NarrationTerm
 
 UNIT = re.compile(r"[\u4e00-\u9fff]|[a-z0-9']+")
 HAN_UNIT = re.compile(r"[\u4e00-\u9fff]")
@@ -47,17 +55,30 @@ JOINED = 3
 class Read(NamedTuple):
     """A recognition unit as it is heard.
 
-    A Han character has its reading; a Latin unit has its letters and digits. `particle` says
-    that the text says 的, 地 or 得 as a particle at this place.
+    A Han character has its reading; a Latin unit has its letters and digits, or, where it says
+    a declared term, `term` names the term and the reading is the letters of its spoken form,
+    with an `s` for a possessive. `particle` says that the text says 的, 地 or 得 as a particle
+    at this place.
     """
 
     unit: str
     reading: str
     particle: bool = False
+    term: str | None = None
 
     @property
     def han(self) -> bool:
         return HAN_UNIT.fullmatch(self.unit) is not None
+
+
+class Names(NamedTuple):
+    """What an edition's Latin units are read by beside their letters: the terms the film
+    declares (`filmkit.narration.terms`)."""
+
+    terms: tuple[NarrationTerm, ...] = ()
+
+
+NO_NAMES = Names()
 
 
 def recognition_units(text: str) -> list[str]:
@@ -92,22 +113,35 @@ def unit_distance(
     return row[-1]
 
 
-def read_units(text: str, words: Sequence[readings.Word] = ()) -> list[Read]:
+def _latin(unit: str, declared: Sequence[NarrationTerm]) -> Read:
+    """A Latin unit as it is heard: as the declared term it says, its possessive kept, or by its
+    letters and digits."""
+    for term in declared:
+        said = terms.said_form(unit, terms.spoken_forms(term))
+        if said is not None:
+            letters = "".join(recognition_units(term.spoken)).replace("'", "")
+            return Read(unit, letters + ("s" if said[1] else ""), term=term.term)
+    return Read(unit, unit.replace("'", ""))
+
+
+def read_units(
+    text: str, words: Sequence[readings.Word] = (), declared: Sequence[NarrationTerm] = ()
+) -> list[Read]:
     """Each recognition unit of a text as it is heard.
 
     A Han character under a declared word takes that word's reading, and any other the
-    dictionary's reading in its context.
+    dictionary's reading in its context. A Latin unit that says a declared term reads as it.
     """
     text = text.lower()
-    declared, dictionary = readings.coverage(text, list(words)), readings.contextual(text)
+    covered, dictionary = readings.coverage(text, list(words)), readings.contextual(text)
     alone = {start for start, end in readings.segments(text) if end - start == 1}
     found = []
     for match in UNIT.finditer(text):
         unit, at = match.group(), match.start()
         if HAN_UNIT.fullmatch(unit) is None:
-            found.append(Read(unit, unit.replace("'", "")))
+            found.append(_latin(unit, declared))
             continue
-        word, _start, offset = declared.get(at, (None, 0, 0))
+        word, _start, offset = covered.get(at, (None, 0, 0))
         reading = dictionary.get(at, unit) if word is None else word.syllables[offset]
         particle = unit in PARTICLES and (
             reading == PARTICLE_READING or (word is None and at in alone)
@@ -144,12 +178,16 @@ def _joined(units: Sequence[Read], end: int, other: Read) -> list[int]:
     return found
 
 
-def reading_distance(expected: str, observed: str, words: Sequence[readings.Word] = ()) -> int:
+def reading_distance(
+    expected: str, observed: str, words: Sequence[readings.Word] = (), names: Names = NO_NAMES
+) -> int:
     """The fewest unit edits between a text and a transcript, units compared by reading.
 
-    Adjacent Latin units that one side writes as one are joined at no cost.
+    Adjacent Latin units that one side writes as one are joined at no cost. `words` are the
+    Chinese words compared by their readings, and `names` the edition's names.
     """
-    want, got = read_units(expected, words), read_units(observed, words)
+    want = read_units(expected, words, names.terms)
+    got = read_units(observed, words, names.terms)
     cost = [[0] * (len(got) + 1) for _ in range(len(want) + 1)]
     for i in range(len(want) + 1):
         for j in range(len(got) + 1):

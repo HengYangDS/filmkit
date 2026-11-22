@@ -210,6 +210,15 @@ def test_a_term_is_said_by_its_spoken_form_and_possessives():
     assert not any(terms.says(word, forms) for word in ("Ethernet", "the"))
 
 
+def test_one_function_says_which_form_a_unit_says_and_whether_it_is_possessive():
+    forms = terms.spoken_forms(NarrationTerm(term="NAME", spoken="Naim", ipa="ˈneɪm"))
+    assert terms.said_form("Name's", forms) == ("name", True)
+    assert terms.said_form("name", forms) == ("name", False)
+    assert terms.said_form("“Naim’s”,", forms) == ("naim", True)
+    assert terms.said_form("Nime", forms) is None
+    assert terms.says("Name's", forms) and not terms.says("Nime", forms)
+
+
 def test_every_language_gives_a_term_its_declared_spoken_form():
     def rule(display, spoken):
         return {"display": display, "spoken": spoken, "kind": "english-name"}

@@ -92,9 +92,18 @@ def spoken_forms(term: NarrationTerm) -> frozenset[str]:
     return frozenset({term.term.casefold(), term.spoken.casefold()})
 
 
+def said_form(word: str, forms: frozenset[str]) -> tuple[str, bool] | None:
+    """The form of a term that a word says, casefolded, and whether it says that form's
+    possessive; None where it says none of the forms."""
+    bare = word.strip(EDGE_MARKS)
+    stem = POSSESSIVE.sub("", bare)
+    form = stem.casefold()
+    return (form, stem != bare) if form in forms else None
+
+
 def says(word: str, forms: frozenset[str]) -> bool:
     """Whether a word says a term: one of its forms, or that form's possessive."""
-    return POSSESSIVE.sub("", word.strip(EDGE_MARKS)).casefold() in forms
+    return said_form(word, forms) is not None
 
 
 def parity_failures(terms: tuple[NarrationTerm, ...], languages: dict, contract: str) -> list[str]:

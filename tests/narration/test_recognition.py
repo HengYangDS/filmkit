@@ -4,6 +4,10 @@ import pytest
 
 import filmkit.narration.readings as narration_readings
 import filmkit.narration.recognition as narration_recognition
+from filmkit.film import NarrationTerm
+
+# A term written for the tests, respelled for the narrator as `terms` describes it.
+NAME = NarrationTerm(term="NAME", spoken="Naim", ipa="ˈneɪm")
 
 
 def test_units_fold_case_and_drop_punctuation_in_both_languages():
@@ -104,3 +108,37 @@ def test_a_respelled_word_is_refused_where_the_text_holds_the_reading_it_respell
     text, heard = "他要去众人那里。", "他要去重人那里。"
     assert narration_recognition.reading_distance(text, heard) == 0
     assert narration_recognition.reading_distance(text, heard, words) == 1
+
+
+def by_reading(text: str, heard: str, names=None) -> int:
+    """Differing units by reading: as today without `names`, else with the edition's names."""
+    if names is None:
+        return narration_recognition.reading_distance(text, heard)
+    return narration_recognition.reading_distance(text, heard, (), names)
+
+
+def test_a_declared_term_is_one_unit_under_its_display_and_spoken_forms():
+    names = narration_recognition.Names((NAME,))
+    said, possessive = "Naim is built for it.", "It is Naim's aim."
+    passing = [
+        (said, "Name is built for it.", 1),
+        (said, "NAME is built for it.", 1),
+        (said, "NaMe is built for it.", 1),
+        (possessive, "It is Name's aim.", 1),
+        # The text's curly apostrophe parts its units; the term's possessive joins them again.
+        ("It is Naim’s aim.", "It is Name's aim.", 2),
+    ]
+    for text, heard, today in passing:
+        assert (by_reading(text, heard), by_reading(text, heard, names)) == (today, 0), heard
+    guards = [
+        (said, "Nime is built for it.", 1),
+        (said, "Nine is built for it.", 1),
+        (said, "is built for it.", 1),
+        (said, "Name Name is built for it.", 1),
+        (said, "Na me is built for it.", 2),
+        (possessive, "It is Name aim.", 1),
+        ("Naim aims.", "Name's aims.", 1),
+        (possessive, "It is Name' aim.", 1),
+    ]
+    for text, heard, after in guards:
+        assert by_reading(text, heard, names) == after, heard

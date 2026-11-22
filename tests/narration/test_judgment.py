@@ -11,6 +11,7 @@ import filmkit.narration.group_generation as narration_group_generation
 import filmkit.narration.judge as narration_judge
 import filmkit.narration.judgment as narration_judgment
 import filmkit.narration.readings as narration_readings
+import filmkit.narration.terms as narration_terms
 import filmkit.preflight as preflight
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as soundtrack_assembly
@@ -253,6 +254,46 @@ def test_a_chinese_take_is_compared_by_the_readings_the_film_declares(monkeypatc
     assert bench.words == narration_readings.compared_words(
         contract["pronunciation"]["languages"]["Chinese"]
     )
+
+
+NAME = film.NarrationTerm(
+    term="NAME", spoken="Naim", ipa="ˈneɪm", reference={"en": {"thought": "26.1", "index": 0}}
+)
+SAYS_NAME = ("Naim is built.", " Second thought.")
+CLOSE = narration_terms.Vowel(250.0, 2750.0, 6)
+
+
+def says_name(narrated, voiced, monkeypatch, *, term: bool = True) -> dict:
+    """An English edition whose first thought says NAME as its contract respells it, Naim.
+
+    With `term`, the film declares NAME with its reference in that thought. The receipt's
+    texts are its spoken texts, as the retained records hold them.
+    """
+    record = narrated([voiced(), voiced()], [{"text": t, "spoken_text": t} for t in SAYS_NAME])
+    rule = {"display": "NAME", "spoken": "Naim", "kind": "english-name"}
+    languages = {"English": {"normalization": [rule]}}
+    repository.write("content/voice-performance.json", {"pronunciation": {"languages": languages}})
+    narrated.recognizer.thoughts[:2] = SAYS_NAME
+    if term:
+        update = {"narration": film.Narration(terms=(NAME,))}
+        monkeypatch.setattr(
+            narration_judgment, "FILM", narration_judgment.FILM.model_copy(update=update)
+        )
+    return record
+
+
+def test_a_take_that_says_a_declared_term_is_held_to_the_term_and_not_to_its_respelling(
+    narrated, voiced, monkeypatch
+):
+    says_name(narrated, voiced, monkeypatch)
+    # The recognizer writes the name as it is displayed; the stand-in voice is a tone, so the
+    # term's first vowel is stood in for.
+    narrated.recognizer.thoughts[0] = "Name is built."
+    monkeypatch.setattr(narration_terms, "first_vowel", lambda *_: CLOSE)
+    narration_judge.main(["--language", "en"])
+    first = repository.read(Edition("en").ear_first / narration_judge.RECORD)["thoughts"][0]
+    assert (first["differing_units"], first["differing_units_by_reading"]) == (1, 0)
+    assert first["failed"] == []
 
 
 def test_judge_refuses_every_thought_with_every_failing_line_and_writes_one_record(

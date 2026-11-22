@@ -65,7 +65,13 @@ from filmkit.narration.alignment import verify_aligner
 from filmkit.narration.group_generation import too_short
 from filmkit.narration.narrate import ALIGNER
 from filmkit.narration.pronunciation import pronunciation_contract
-from filmkit.narration.recognition import reading_distance, recognition_units, unit_distance
+from filmkit.narration.recognition import (
+    NO_NAMES,
+    Names,
+    reading_distance,
+    recognition_units,
+    unit_distance,
+)
 from filmkit.narration.retakes import thought_text
 from filmkit.narration.run_on import run_on_cut, thought_bounds
 from filmkit.narration.selection import validate_voice_record
@@ -121,8 +127,8 @@ class Bench:
     """What every take of an edition is measured with.
 
     The recognizer, the pinned aligner with its identity, each declared term's reference vowel,
-    the Chinese words a transcript is compared by (`readings.compared_words`), and the film's
-    flow limits.
+    the Chinese words a transcript is compared by (`readings.compared_words`), the film's flow
+    limits, and the names a transcript's Latin units are read by (`recognition.Names`).
     """
 
     code: str
@@ -132,6 +138,7 @@ class Bench:
     standards: list
     words: tuple = ()
     flow: object = None
+    names: Names = NO_NAMES
 
 
 @dataclasses.dataclass(frozen=True)
@@ -168,8 +175,9 @@ def bench(code: str, references: list, *, asr, aligner: dict, film=None) -> Benc
         contract, _ = pronunciation_contract(script, edition.language)
         words = readings.compared_words(contract)
     measured_standards = standards(code, references, aligner, edition.language)
+    names = Names(tuple(film.narration.terms))
     return Bench(
-        code, edition.language, asr, aligner, measured_standards, words, film.narration.flow
+        code, edition.language, asr, aligner, measured_standards, words, film.narration.flow, names
     )
 
 
@@ -297,7 +305,9 @@ def measured(path: Path, thought: str, spoken_text: str, bench: Bench) -> dict:
         "phrase_stops": _phrase_stops(pcm, rate, items, spoken_text),
         "heard": heard,
         "differing_units": unit_distance(recognition_units(spoken_text), recognition_units(heard)),
-        "differing_units_by_reading": reading_distance(spoken_text, heard, bench.words),
+        "differing_units_by_reading": reading_distance(
+            spoken_text, heard, bench.words, bench.names
+        ),
         **flow.take_flow(bench.code, thought, spoken_text, words, recording, bench.flow),
         **terms.take_terms(bench.standards, words, recording, thought),
         "short": too_short(len(pcm), rate),
