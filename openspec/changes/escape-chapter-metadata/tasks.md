@@ -17,5 +17,9 @@
 - [x] 2.2 A value that ends in a backslash is refused before a document is written, and `assemble` and
       `refresh-captions` ask the refusal before they write. Done when the tests in `tests/captions/test_documents.py`,
       `tests/soundtrack/test_assembly.py` and `tests/captions/test_refresh.py` pass; each failed before the repair.
-- [ ] 2.3 A test in `tests/captions/test_documents.py` reads the written metadata back with FFmpeg and compares each
+- [x] 2.3 A test in `tests/captions/test_documents.py` reads the written metadata back with FFmpeg and compares each
       value, and is skipped by name where the host has no FFmpeg. Done when it passes on a host that has FFmpeg.
+- [x] 2.4 The refusal and the escape run on the values the three released films declare at their release tags. Done
+      when no edition is refused and the escape changes each English edition's comment by one backslash and no other
+      value, by the record in `build/evidence/escape-chapter-metadata/` (`released-values.json` and the command that
+      wrote it).
