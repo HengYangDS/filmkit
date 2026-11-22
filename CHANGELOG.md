@@ -4,6 +4,16 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- A take's judgment record names, under `terms_in_other_letters`, each unit of its transcript that stood for a declared term in other letters in the Chinese edition, so that a listening plan can list those takes.
+
+### Changed
+
+- **Breaking for a film that respells a Latin name in other letters and declares no term for it.** A name that an edition says and that its normalization respells in other letters, not only spaced or recased, must be a `[[narration.terms]]` term. The readings check refuses one that is not, whatever the contract's schema version, and so do `judge`, `converge` and `audition` before any model loads, naming the name, its spoken form and the thoughts that say it. The film declares the term, its spoken form, its IPA and a reference occurrence for each edition; no recording is narrated again for it.
+- A take is held to its words, not to its respelling. A Han word that a `homophone` rule respells reads as the rule's spoken form reads, in the text and in the transcript. A unit that says a declared term, its display form or its spoken form in any case, is the term, its possessive kept. In the Chinese edition a declared term is also alike one Latin unit of other letters that holds a letter and is no other Latin unit of the edition's script; a word the script never says, written in Latin letters, then passes in the name's place, and the term line holds its first vowel. One take that passed before is refused: a transcript that writes a respelled Han word where the text holds another character with the reading the film respells against.
+- A term's reference occurrence that shows no two formants, on its take or as the selection aligns its segment, stops `judge`, `converge` and `audition` in one line that says to declare another occurrence, in place of a traceback or a convergence that settled every thought and was refused at the count.
+
 ## [0.27.0] - 2026-11-22
 
 ### Added
