@@ -4,7 +4,7 @@
       backslash and a newline in the title, the author, the comment and a chapter title; it failed before the repair.
 - [x] 1.2 `_metadata_value` escapes them, and `_chapter_metadata` writes the title, the author, the comment and each
       chapter title through it. Done when the tests in `tests/captions/test_documents.py` pass.
-- [ ] 1.3 The Changelog's entry, after group 2 and the release's other Changes. It says that each English edition's
+- [x] 1.3 The Changelog's entry, after group 2 and the release's other Changes. It says that each English edition's
       `chapters.ffmeta` gains a backslash before its comment's semicolon and that its player page, which holds that
       file, changes with it; that the edition's film package is stale and is built again, with the records that
       follow; and that a value that ends in a backslash is refused.
