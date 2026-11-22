@@ -70,7 +70,8 @@ and an independent review of this design's first draft found two of its decision
      一下, 测试跑通了). The third review [S8]: the second build's table of 264 "standard words", which lowered a
      form inside one of them to a warning, lowered the standard's own colloquial uses the same way (喝点水吧 by 水吧,
      一起跑测试 by 起跑, 其实效果一般 by 其实效, 看一下发布记录 by 一下发): 13 of the 52 sentences its own test held, 9
-     of the 29 refusals the build before it had held; 44 entries were joins of two words, 32 of them a form and one more character; and no test could see the
+     of the 29 refusals the build before it had held; 44 entries were joins of two words and 82 more a form and one more
+     character; and no test could see the
      table widen. Plain text cannot tell 水吧 from 水 and 吧: every entry is a judgment about a word boundary that the
      matching cannot make. Counted by the check itself on 21 November 2026 over every place of the three released films
      (824 places) and the sentences proposed for December (137) [S8]: one standard word holds a listed form,
