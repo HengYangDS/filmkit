@@ -30,7 +30,7 @@ Judge the film as a first-time viewer by three levels, each as a whole; a strong
 {levels}
 
 ## Every sentence
-{sentences} lists every sentence of this edition with its id and its start and end in the timeline. Hear each one as speech, at the pace of the narration, and judge it at each level: is it true to the source, understood the first time it is heard, and what a fluent speaker would say? Give every sentence a verdict: "ok", or the ids of the findings that concern it.
+{sentences} lists every sentence of this edition with its id and its start and end in the timeline. Hear each one as speech, at the pace of the narration, and judge it at each level: is it true to the source, understood the first time it is heard, and formal standard written language as the rules of the formal register state it? Give every sentence a verdict: "ok", or the ids of the findings that concern it.
 
 ## Output
 Write {out}/{code}-review.md and {out}/review-{code}.json with: {{"reviewer", "editions": {{"{code}": {{"media": [{{"path","sha256"}}], "scores": {{...}}, "overall", "levels": {{"信": {{"verdict": "pass" | "fail", "findings": [ids]}}, "达": {{...}}, "雅": {{...}}}}, "findings": [{{"id","severity","level","segment","start","end","observation","impact","repair","reverification"}}], "sentences": {{"<id>": "ok" | [finding ids]}}, "human_listening_checklist": [...]}}}}}}. Put working files under {out}/{code}/.

@@ -287,7 +287,7 @@ def test_another_capture_is_refused_naming_its_field(declared):
         film.load(declared)
 
 
-# Review levels that hold the sample film's five dimensions.
+# Review levels that hold the sample film's six dimensions.
 LEVELS = """[review.levels."信"]
 asks = "true to the source, to the other edition and to the words"
 dimensions = ["subject_and_faithfulness", "concept_fidelity"]
@@ -298,7 +298,7 @@ dimensions = ["narration_and_language", "picture_and_sync"]
 
 [review.levels."雅"]
 asks = "natural, restrained and finished"
-dimensions = ["deliverable_craft"]
+dimensions = ["language_quality", "deliverable_craft"]
 
 """
 
@@ -325,8 +325,8 @@ def test_review_levels_hold_each_declared_dimension_once(declared):
     ("old", "new", "named"),
     [
         (', "concept_fidelity"]', "]", "concept_fidelity stands in no level"),
-        ('["deliverable_craft"]', '["deliverable_craft", "concept_fidelity"]', "in two levels"),
-        ('["deliverable_craft"]', '["deliverable_craft", "taste"]', "taste is no declared"),
+        ('"deliverable_craft"]', '"deliverable_craft", "concept_fidelity"]', "in two levels"),
+        ('"deliverable_craft"]', '"deliverable_craft", "taste"]', "taste is no declared"),
     ],
 )
 def test_review_levels_refuse_a_dimension_missed_repeated_or_unknown(declared, old, new, named):

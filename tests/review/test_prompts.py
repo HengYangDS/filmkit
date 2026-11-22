@@ -135,7 +135,8 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
             "the subject;"
         ),
         "\n2. concept_fidelity: each concept the film names keeps its source meaning",
-        "\n5. deliverable_craft: cover, credits and metadata name the film and its author;",
+        "\n5. language_quality: formal standard written language (规范书面语) in each edition,",
+        "\n6. deliverable_craft: cover, credits and metadata name the film and its author;",
         "and ROOT/build/evidence/reviews/round-5/review-zh.json with:",
         "Put working files under ROOT/build/evidence/reviews/round-5/zh/.",
         # The delivery format is the specification's, at the soundtracks' program level.

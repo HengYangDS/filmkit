@@ -62,7 +62,7 @@
 
 ## 4. The sample film, the release record and the documents
 
-- [ ] 4.1 The sample film's words pass the check, its prompt template cites `{register}`, and its review declaration's
+- [x] 4.1 The sample film's words pass the check, its prompt template cites `{register}`, and its review declaration's
       `language_quality` and `雅` ask for formal standard written language. Done when `python -m filmkit.register` passes on
       the sample and a test in `tests/register/test_register_check.py` reads the two declarations.
 - [ ] 4.2 The release record states Vale's version; the adoption reader reports a film that pins another or none.

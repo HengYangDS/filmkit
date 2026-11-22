@@ -20,7 +20,7 @@ from filmkit.review import ReviewError
 LEVELS = {
     "信": Level(asks="true", dimensions=("subject_and_faithfulness", "concept_fidelity")),
     "达": Level(asks="understood", dimensions=("narration_and_language", "picture_and_sync")),
-    "雅": Level(asks="graceful", dimensions=("deliverable_craft",)),
+    "雅": Level(asks="graceful", dimensions=("language_quality", "deliverable_craft")),
 }
 # Each edition's sentences, as its timeline gives them.
 SENTENCES = ["01.1.1", "01.2.1", "02.1.1"]
@@ -214,7 +214,10 @@ def test_the_prompts_state_each_level_with_its_dimensions_and_name_the_sentences
         f"  - concept_fidelity: {dimensions['concept_fidelity']}\n"
         "- 达: understood\n"
     ) in text
-    assert f"- 雅: graceful\n  - deliverable_craft: {dimensions['deliverable_craft']}\n" in text
+    assert (
+        f"- 雅: graceful\n  - language_quality: {dimensions['language_quality']}\n"
+        f"  - deliverable_craft: {dimensions['deliverable_craft']}\n"
+    ) in text
     assert "Sentences: ROOT/build/evidence/reviews/round-1/sentences-zh.json\n" in text
     written = json.loads((out / "sentences-en.json").read_text())
     assert written == {

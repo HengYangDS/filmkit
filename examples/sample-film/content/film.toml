@@ -83,11 +83,14 @@ concept_fidelity = """\
   the edition's one rendering through narration, captions, titles and picture; no rendering \
   narrows, personifies, substitutes or literally translates a concept."""
 narration_and_language = """\
-  natural delivery with audible phrase tails and distinct thought pauses; idiomatic language in \
-  each edition; consistent terms."""
+  natural delivery with audible phrase tails and distinct thought pauses; consistent terms."""
 picture_and_sync = """\
   each scene shows what the narration names as it is named; captions, cards and scene changes \
   stay in sync; no collisions or clipping."""
+language_quality = """\
+  formal standard written language (规范书面语) in each edition, concise and exact, by the \
+  rules R1 to R6 of the formal register as the prompt states them; each edition idiomatic in \
+  its own language, not a translation of the other."""
 deliverable_craft = """\
   cover, credits and metadata name the film and its author; subtitles and transcript match the \
   speech; chapters and player work."""
@@ -109,6 +112,6 @@ dimensions = ["narration_and_language", "picture_and_sync"]
 
 [review.levels."雅"]
 asks = """\
-  graceful: the words are what a fluent speaker would say, and the cover, credits, files and \
-  player are finished."""
-dimensions = ["deliverable_craft"]
+  graceful: the words are formal standard written language, concise and exact, by the rules \
+  of the formal register; and the cover, credits, files and player are finished."""
+dimensions = ["language_quality", "deliverable_craft"]

@@ -35,6 +35,21 @@ def with_register(*exceptions: dict) -> film.Film:
     )
 
 
+def test_the_sample_film_passes_and_its_review_asks_for_the_formal_register():
+    # The sample's words hold nothing the check refuses or reports, and it declares nothing.
+    report = register.check()
+    assert (report["warnings"], report["excused"]) == ([], [])
+    # Its two declarations of language ask for the standard's register: the dimension that
+    # scores each edition's language, and the level that holds it.
+    review, asked = film.FILM.review, "formal standard written language"
+    assert asked in review.dimensions["language_quality"]
+    assert asked in review.levels["雅"].asks
+    assert "language_quality" in review.levels["雅"].dimensions
+    # Its template cites the field that carries the report and the rules to the reviewers.
+    template = (repository.ROOT / review.prompt).read_text(encoding="utf-8")
+    assert "{register}" in template
+
+
 def test_a_film_excuses_a_form_within_a_text_and_one_without_register_keeps_none():
     # The sample declares no [register]: the engine's style holds with no exception.
     assert film.FILM.formal_register == film.Register()
