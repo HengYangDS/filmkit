@@ -83,14 +83,16 @@ def candidate_picture_inputs(edition: Edition) -> tuple[dict, dict]:
     """Bind a reviewable current render without claiming artistic acceptance.
 
     Returns each input's path and SHA-256, and the timeline parsed from the bytes its hash
-    binds; each JSON input is read once. The script's anchors must keep their rules
-    (`filmkit.narration.anchors`), the timeline must keep its script's authored fields and the
-    soundtrack must be the one its assembly records for that script.
+    binds; each JSON input is read once. The script's anchors must keep their rules and the
+    timeline's anchors be those its marks take from its words (`filmkit.narration.anchors`), the
+    timeline must keep its script's authored fields and the soundtrack must be the one its
+    assembly records for that script.
     """
     script, script_sha256 = read_bound(edition.script)
     timeline, timeline_sha256 = read_bound(edition.timeline)
     try:
         anchors.require(script, edition.code)
+        anchors.require_placed(timeline, edition.code)
     except anchors.AnchorError as error:
         raise PictureError(str(error)) from None
     if not follows_script(timeline, script):

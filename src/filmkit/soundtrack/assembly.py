@@ -10,8 +10,8 @@ quiet and the film's declared credits, rounded up to the next whole second (`all
 fraction the rounding adds goes to the gaps within their ranges and the rest to the credits. The
 laid-out soundtrack is refused, before anything is written, for an unmarked pause above the film's
 limit (`narration.flow`) or a declared term said unlike its reference (`narration.terms`). The
-timeline, which states the runtime and the credits as laid out, the captions and the receipt
-record the result.
+timeline, which states the runtime and the credits as laid out and, where the script marks
+anchors, each anchor's times (`narration.anchors`), the captions and the receipt record the result.
 
 The steps up to the gap allocation, `bound_recordings`, `decode_recordings`, `designed_clips` and
 `allocate`, are the ones that the runtime fit (`filmkit.soundtrack.fit`) runs, so the two cannot
@@ -617,7 +617,6 @@ def assemble(edition: Edition) -> None:
     refused = _speech_refusals(edition, soundtrack, timeline_segments)
     if refused:
         raise AssemblyError("\n".join(refused))
-    soundtrack, program_level, peak = _reach_program_level(soundtrack, edition.soundtrack)
     timeline = {
         **script,
         "segments": timeline_segments,
@@ -627,6 +626,9 @@ def assemble(edition: Edition) -> None:
         "duration": allocation.runtime,
         "credits_duration": allocation.credits / RATE,
     }
+    # The anchors are placed before anything is written, the soundtrack included.
+    anchors.place(timeline, edition.code)
+    soundtrack, program_level, peak = _reach_program_level(soundtrack, edition.soundtrack)
     timeline["captions"] = timed_caption_cues(timeline, edition.code)
     write(edition.timeline, timeline)
     receipt = _receipt(

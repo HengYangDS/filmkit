@@ -418,7 +418,7 @@ def run_audit(tool: str, arguments: list[str], out: Path, environment: dict | No
 
 def check_picture(edition: Edition) -> dict:
     """Audit the edition's current picture, write its gate record and refuse a gated finding."""
-    anchors.require(repository.read(edition.timeline), edition.code)
+    anchors.require_placed(repository.read(edition.timeline), edition.code)
     work = repository.ROOT / WORK / edition.code
     work.mkdir(parents=True, exist_ok=True)
     bound = current_bindings(edition)

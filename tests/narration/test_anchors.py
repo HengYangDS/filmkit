@@ -191,3 +191,26 @@ def test_each_command_refuses_a_broken_anchor_before_it_writes(broken, command):
     with pytest.raises((AnchorError, PictureError, SystemExit), match="zh 01.1 order: opens"):
         command(Edition("zh"))
     assert tree(broken) == before
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        lambda zh: rendering.stage_picture(zh, None, 9, 3840, 2160),
+        lambda zh: gates.check_picture(zh),
+    ],
+    ids=["stage-picture", "check-picture"],
+)
+def test_a_timeline_whose_anchors_are_not_its_words_times_is_refused(broken, command):
+    marked = segment("01", "依据{order}有先后{/order}。")
+    words = [
+        {"text": unit, "start": index, "end": index + 1} for index, unit in enumerate("依据有先后")
+    ]
+    zh = Edition("zh")
+    put(broken / zh.script, {"segments": [marked]})
+    hand = {"order": {"start": 0, "end": 5, "units": [2, 5], "thought": 1}}
+    put(zh.timeline, {"segments": [{**marked, "words": words, "anchors": hand}], "duration": 9})
+    before = tree(broken)
+    with pytest.raises((AnchorError, PictureError), match="run produce refresh-captions"):
+        command(zh)
+    assert tree(broken) == before

@@ -13,7 +13,9 @@ import time
 from pathlib import Path
 
 import pytest
+from assembled import stage
 
+import filmkit.captions.refresh as refresh
 import filmkit.picture.encoding as encoding
 import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
@@ -255,6 +257,21 @@ def test_candidate_inputs_refuse_a_timeline_or_soundtrack_of_other_sources():
     put(edition.soundtrack, "another narration")
     with pytest.raises(PictureError, match="soundtrack differs from its native assembly"):
         picture_rendering.candidate_picture_inputs(edition)
+
+
+def test_an_edition_refreshed_after_an_anchor_is_added_stages_as_following_its_script(
+    tmp_path, monkeypatch
+):
+    words = (("甲", 2.0, 2.4), ("乙", 2.4, 2.8), ("丙", 3.4, 3.8), ("丁", 3.8, 4.2))
+    edition = stage(tmp_path, monkeypatch, "zh", ["甲乙。", "丙丁。"], words)
+    script = repository.read(edition.script)
+    script["segments"][0]["anchored_groups"] = ["甲乙。", "{last}丙丁{/last}。"]
+    put(repository.ROOT / edition.script, script)
+    refresh.refresh_captions(edition)
+    picture_rendering.stage_picture(edition, None, 9, 3840, 2160)
+    staged = repository.read(edition.rendered(True).stage / picture_rendering.DATA)
+    # The stage's data holds the anchor with the times of its words, 丙 to 丁.
+    assert [staged["segments"][0]["anchors"]["last"][key] for key in ("start", "end")] == [3.4, 4.2]
 
 
 def test_staging_refuses_other_frames_durations_and_places(root):

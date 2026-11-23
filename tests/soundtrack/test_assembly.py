@@ -3,11 +3,13 @@ counts the edition's runtime from its narration."""
 
 import json
 import wave
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
+import filmkit.narration.anchors as anchors
 import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as soundtrack_assembly
@@ -15,6 +17,8 @@ from filmkit.captions import CaptionError
 
 REPOSITORY = repository.ROOT
 RATE = 48000
+# The timeline that the assembly wrote for the two chapters before any script marked an anchor.
+GOLDEN = json.loads((Path(__file__).parent / "golden/two-chapters-timeline.json").read_text())
 
 
 @pytest.fixture
@@ -319,3 +323,64 @@ def test_assembly_refuses_an_unmarked_pause_above_its_limit_before_writing(two_c
         soundtrack_assembly.assemble(two_chapters)
     for written in (two_chapters.soundtrack, two_chapters.timeline, two_chapters.audio_assembly):
         assert not written.exists()
+
+
+@pytest.mark.ffmpeg
+def test_a_timeline_without_anchors_keeps_the_bytes_written_before_anchors(two_chapters):
+    soundtrack_assembly.assemble(two_chapters)
+    assert two_chapters.timeline.read_text() == GOLDEN["timeline"]
+
+
+@pytest.mark.ffmpeg
+def test_each_anchor_takes_the_times_of_its_first_and_last_words(two_chapters):
+    path = repository.ROOT / two_chapters.script
+    script = json.loads(path.read_text())
+    script["segments"][0]["anchored_groups"] = ["{pair}甲乙{/pair}。", "丙{last}丁{/last}。"]
+    path.write_text(json.dumps(script, ensure_ascii=False))
+    soundtrack_assembly.assemble(two_chapters)
+    first, second = json.loads(two_chapters.timeline.read_text())["segments"]
+    words = first["words"]
+    assert first["anchored_groups"] == script["segments"][0]["anchored_groups"]
+    # Each id in the order of its open mark: its first word's start, its last word's end, its
+    # units among the segment's and its thought.
+    assert list(first["anchors"].items()) == [
+        (
+            "pair",
+            {"start": words[0]["start"], "end": words[1]["end"], "units": [0, 2], "thought": 1},
+        ),
+        (
+            "last",
+            {"start": words[3]["start"], "end": words[3]["end"], "units": [3, 4], "thought": 2},
+        ),
+    ]
+    # A segment of an edition that marks anchors holds an empty object where it marks none.
+    assert second["anchors"] == {}
+
+
+def test_the_resolver_refuses_words_that_are_not_the_units_of_their_text():
+    segment = {"id": "01", "anchored_groups": ["{a}甲乙{/a}。"], "utterance_groups": ["甲乙。"]}
+    timeline = {
+        "segments": [{**segment, "text": "甲乙。", "words": [{"text": "甲", "start": 1, "end": 2}]}]
+    }
+    with pytest.raises(anchors.AnchorError, match="zh 01: its words are not the units of its text"):
+        anchors.place(timeline, "zh")
+
+
+@pytest.mark.ffmpeg
+def test_assembly_places_the_anchors_before_it_writes_anything(two_chapters, monkeypatch):
+    def refuse(timeline, code):
+        raise anchors.AnchorError(f"{code} 01: its words are not the units of its text")
+
+    monkeypatch.setattr(soundtrack_assembly.anchors, "place", refuse)
+    with pytest.raises(anchors.AnchorError, match="zh 01: its words"):
+        soundtrack_assembly.assemble(two_chapters)
+    for written in (two_chapters.soundtrack, two_chapters.timeline, two_chapters.audio_assembly):
+        assert not written.exists()
+
+
+def test_a_timeline_whose_script_marks_no_anchor_holds_none():
+    words = [{"text": "甲", "start": 1, "end": 2}, {"text": "乙", "start": 2, "end": 3}]
+    unmarked = {"id": "01", "anchored_groups": ["甲乙。"], "utterance_groups": ["甲乙。"]}
+    timeline = {"segments": [{**unmarked, "text": "甲乙。", "words": words}]}
+    anchors.place(timeline, "zh")
+    assert "anchors" not in timeline["segments"][0]

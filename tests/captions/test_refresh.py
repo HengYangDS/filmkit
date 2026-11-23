@@ -1,95 +1,19 @@
 """Caption refresh keeps the assembled waveform and rebinds the cues to the current script."""
 
-import hashlib
 import json
 import re
 
 import pytest
+from assembled import sha256, stage, write_json
 
 import filmkit.captions.documents as captions_documents
 import filmkit.captions.refresh as captions_refresh
 import filmkit.produce as produce
-import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.review.round as review_round
 from filmkit.captions import CaptionError
 
 WORDS = (("甲", 2.0, 2.4), ("乙", 2.4, 2.8), ("丙", 3.4, 3.8), ("丁", 3.8, 4.2))
-
-
-def sha256(path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def write_json(path, value) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, ensure_ascii=False))
-
-
-def stage(tmp_path, monkeypatch, code, groups, words, captions=()):
-    """Stage an assembled edition: script, cast, timeline, waveform, receipt and selection."""
-    release = repository.read(production.Edition(code).script)["release"]
-    monkeypatch.setattr(repository, "ROOT", tmp_path)
-    edition = production.Edition(code)
-    text = "".join(groups)
-    segment = {
-        "id": "01",
-        "chapter": "a",
-        "chapter_title": "A",
-        "title": "Scene 01",
-        "utterance_groups": list(groups),
-        "text": text,
-        "spoken_text": text,
-    }
-    script = {
-        "title": "Sample Reel",
-        "caption_timing": {"tail_seconds": 0.25, "short_cue_lead_seconds": 0.1},
-        "release": release,
-        "segments": [segment],
-    }
-    write_json(tmp_path / edition.script, script)
-    write_json(tmp_path / edition.cast, {"narration_language": "Chinese"})
-    timed = {
-        **segment,
-        "start": 0.0,
-        "voice_start": 2.0,
-        "voice_end": 4.3,
-        "gap_before": 2.0,
-        "gap_kind": "opening",
-        "words": [{"text": word, "start": start, "end": end} for word, start, end in words],
-        "end": 6.0,
-    }
-    # What an assembly writes beside and over the script's keys (`production.ASSEMBLED`).
-    timeline = {
-        **script,
-        "duration": 9,
-        "credits_duration": 3.0,
-        "segments": [timed],
-        "timing_state": "Assembled",
-        "captions": list(captions),
-    }
-    write_json(edition.timeline, timeline)
-    edition.soundtrack.write_bytes(b"RIFF narration")
-    write_json(
-        edition.audio_assembly,
-        {
-            "script_sha256": sha256(tmp_path / edition.script),
-            "soundtrack_sha256": sha256(edition.soundtrack),
-            "caption_count": 0,
-            "alignment_limits": "Model-aligned words",
-            "caption_timing": "Timed",
-            "captions_above_reading_rate": [],
-        },
-    )
-    write_json(
-        edition.narration_selected,
-        {
-            "records": [{"id": "01", "text": text}],
-            "script_sha256": "0" * 64,
-            "cast_sha256": sha256(tmp_path / edition.cast),
-        },
-    )
-    return edition
 
 
 @pytest.fixture
@@ -173,6 +97,43 @@ def test_a_copy_change_needs_a_new_assembly(edition):
             text="甲己。丙丁。", spoken_text="甲己。丙丁。", utterance_groups=["甲己。", "丙丁。"]
         ),
     )
+    with pytest.raises(ValueError, match="requires the exact current script and waveform"):
+        captions_refresh.refresh_captions(edition)
+
+
+def anchor(script) -> None:
+    script["segments"][0]["anchored_groups"] = ["甲乙。", "{last}丙丁{/last}。"]
+
+
+def test_an_anchor_added_alone_is_adopted_with_the_times_of_its_words(edition):
+    soundtrack = sha256(edition.soundtrack)
+    revise_script(edition, anchor)
+    captions_refresh.refresh_captions(edition)
+    segment = read(edition.timeline)["segments"][0]
+    assert segment["anchored_groups"] == ["甲乙。", "{last}丙丁{/last}。"]
+    assert segment["anchors"] == {"last": {"start": 3.4, "end": 4.2, "units": [2, 4], "thought": 2}}
+    receipt = read(edition.audio_assembly)
+    assert receipt["soundtrack_sha256"] == soundtrack == sha256(edition.soundtrack)
+    assert receipt["caption_revision"]["scope"] == captions_refresh.PRESENTATION_SCOPE
+    assert receipt["script_sha256"] == sha256(repository.ROOT / edition.script)
+
+    revise_script(edition, lambda script: script["segments"][0].pop("anchored_groups"))
+    captions_refresh.refresh_captions(edition)
+    segment = read(edition.timeline)["segments"][0]
+    assert "anchored_groups" not in segment and "anchors" not in segment
+
+
+def test_a_word_changed_with_its_anchor_still_needs_a_new_assembly(edition):
+    def reword(script) -> None:
+        groups = ["甲乙。", "丙戊。"]
+        script["segments"][0].update(
+            anchored_groups=["甲乙。", "{last}丙戊{/last}。"],
+            utterance_groups=groups,
+            text="".join(groups),
+            spoken_text="".join(groups),
+        )
+
+    revise_script(edition, reword)
     with pytest.raises(ValueError, match="requires the exact current script and waveform"):
         captions_refresh.refresh_captions(edition)
 

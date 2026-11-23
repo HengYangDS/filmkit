@@ -15,21 +15,21 @@
 
 ## 2. The timeline
 
-- [ ] 2.1 Capture, before any code of this Change, the timeline that `assemble` writes for a fixture script without
+- [x] 2.1 Capture, before any code of this Change, the timeline that `assemble` writes for a fixture script without
       anchors, as a golden file under `tests/soundtrack/`. Done when the file exists and names the engine version and
       commit that wrote it.
-- [ ] 2.2 `produce assemble` writes `anchors` (start, end, units, thought; ids in the order of their open marks) on
+- [x] 2.2 `produce assemble` writes `anchors` (start, end, units, thought; ids in the order of their open marks) on
       every segment of an edition that marks any anchor, empty where a segment marks none, and the resolver refuses a
       mark whose units are not the words'. Done when `tests/soundtrack/test_assembly.py` holds an anchor's start and
       end equal to its first and last words' times, its units and thought, an empty object on a segment without
       marks, the resolver's refusal, and the timeline of the fixture without anchors equal, byte for byte, to the
       golden file of 2.1.
-- [ ] 2.3 `refresh-captions` copies the script's `anchored_groups` into each timeline segment, or removes them where
+- [x] 2.3 `refresh-captions` copies the script's `anchored_groups` into each timeline segment, or removes them where
       the script holds none, with the `anchors` they take from the timeline's words; `anchors` joins
       `GENERATED_SEGMENT_FIELDS` and `anchored_groups` the fields that `narration_source` leaves out. Done when
       `tests/captions/test_refresh.py` holds an anchors-only change adopted with the soundtrack's SHA-256 unchanged and
       the presentation revision recorded, the anchors removed again, and a changed word still refused.
-- [ ] 2.4 An edition staged after an anchors-only refresh follows its script. Done when `tests/picture/test_rendering.py`
+- [x] 2.4 An edition staged after an anchors-only refresh follows its script. Done when `tests/picture/test_rendering.py`
       refreshes a fixture edition after an anchor is added and then stages it: `stage-picture` accepts the timeline and
       the stage's `film.json` holds the anchors; at the engine before 2.3 the same test fails with "Current candidate
       timeline differs from its authored script".

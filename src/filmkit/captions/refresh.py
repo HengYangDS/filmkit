@@ -1,9 +1,10 @@
 """Refresh an edition's caption cues against its current script, keeping the assembled audio.
 
 A refresh runs on an assembled edition. Its receipt must be bound to the current script, or
-become bound: a script that changed only in presentation records a caption revision. A script
-whose copy or performance changed needs a new assembly, so the refresh refuses it. The cues are
-then timed again on the unchanged words and waveform, and the subtitle documents rewritten.
+become bound: a script that changed only in presentation, its caption phrases, its visual events
+or its anchors (`anchored_groups`), records a caption revision, and the timeline takes them. A
+script whose copy or performance changed needs a new assembly, so the refresh refuses it. The cues
+are then timed again on the unchanged words and waveform, and the subtitle documents rewritten.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ GENERATED_SEGMENT_FIELDS = frozenset(
         "thought_spans",
         "visual_event_spans",
         "picture_event_spans",
+        "anchors",
     }
 )
 PRESENTATION_SCOPE = (
@@ -73,7 +75,7 @@ def narration_source(timeline: dict) -> dict:
             {
                 key: value
                 for key, value in segment.items()
-                if key not in {"visual_events", "picture_events"}
+                if key not in {"visual_events", "picture_events", "anchored_groups"}
             }
             for segment in source["segments"]
         ],
@@ -131,13 +133,16 @@ def _rebound_selection(edition: Edition, script: dict, script_sha256: str) -> di
     return {**selected, "script_sha256": script_sha256}
 
 
-def _adopt_caption_authoring(timeline: dict, script: dict) -> None:
-    """Give the timeline the script's authored cue phrases and caption timing, in place."""
+def _adopt_caption_authoring(timeline: dict, script: dict, code: str) -> None:
+    """Give the timeline the script's authored cue phrases, caption timing and anchors, in place;
+    each anchor takes its times from the timeline's words (`filmkit.narration.anchors`)."""
     for timed, source in zip(timeline["segments"], script["segments"], strict=True):
-        if source.get("caption_phrases") is not None:
-            timed["caption_phrases"] = source["caption_phrases"]
-        else:
-            timed.pop("caption_phrases", None)
+        for field in ("caption_phrases", "anchored_groups"):
+            if source.get(field) is not None:
+                timed[field] = source[field]
+            else:
+                timed.pop(field, None)
+    anchors.place(timeline, code)
     if "caption_timing" in script:
         timeline["caption_timing"] = script["caption_timing"]
     else:
@@ -166,7 +171,7 @@ def refresh_captions(edition: Edition) -> None:
     # assembled again, which asks the script; and before anything is written, where the documents
     # step would refuse the value after the timeline and the receipt were.
     require_metadata_values(timeline, relative(edition.timeline), edition)
-    _adopt_caption_authoring(timeline, script)
+    _adopt_caption_authoring(timeline, script, edition.code)
     timeline["captions"] = timed_caption_cues(timeline, edition.code)
     write(edition.timeline, timeline)
     receipt.update(caption_receipt_fields(timeline, edition.code))

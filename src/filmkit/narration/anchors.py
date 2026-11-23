@@ -18,7 +18,12 @@ substitution point (`filmkit.picture.template.ANCHORS`) nor a text's anchor poin
 typography audits.
 
 `require` holds every rule: each command that reads a script's anchors calls it before it writes
-anything, and it names every broken rule at once, by edition, segment, thought and id.
+anything, and it names every broken rule at once, by edition, segment, thought and id. `place`
+gives every segment of a timeline whose script marks any anchor its `anchors`, each id in the
+order of its open mark with the times of its words: `start`, the start of the aligned word that
+holds its first unit; `end`, the end of the word that holds its last; its `units`; and its
+`thought`, counted from 1. A segment that marks none holds an empty object, and a timeline whose
+script marks none holds no `anchors`.
 """
 
 from __future__ import annotations
@@ -171,6 +176,61 @@ def require(script: dict, code: str) -> dict[str, list[Anchor]]:
         msg = "\n".join([f"The {code} script's anchors break their rules:", *problems])
         raise AnchorError(msg)
     return marked
+
+
+def timed(found: list[Anchor], segment: dict, code: str) -> dict:
+    """A segment's anchors with the times of their words, refused unless the segment's words
+    hold exactly the units of its text, so that every anchor's units are its words'."""
+    words = segment.get("words", [])
+    stream, owners = "", []
+    for index, word in enumerate(words):
+        spoken = units(word["text"])
+        stream += spoken
+        owners += [index] * len(spoken)
+    if found and stream != units(segment["text"]):
+        msg = f"{code} {segment['id']}: its words are not the units of its text"
+        raise AnchorError(msg)
+    placed = {}
+    for anchor in found:
+        first, after = anchor.units
+        if stream[first:after] != units(anchor.words):
+            msg = (
+                f"{code} {segment['id']}.{anchor.thought} {anchor.id}: its units are not its words'"
+            )
+            raise AnchorError(msg)
+        placed[anchor.id] = {
+            "start": words[owners[first]]["start"],
+            "end": words[owners[after - 1]]["end"],
+            "units": [first, after],
+            "thought": anchor.thought,
+        }
+    return placed
+
+
+def place(timeline: dict, code: str) -> None:
+    """Give every segment of a timeline the `anchors` its marks take from its words, in place;
+    a timeline whose segments mark none keeps none."""
+    marked = require(timeline, code)
+    for segment in timeline["segments"]:
+        if any(marked.values()):
+            segment["anchors"] = timed(marked.get(segment["id"], []), segment, code)
+        else:
+            segment.pop("anchors", None)
+
+
+def require_placed(timeline: dict, code: str) -> None:
+    """Refuse a timeline whose marks break their rules or whose `anchors` are not those its marks
+    take from its words."""
+    placed = {**timeline, "segments": [dict(segment) for segment in timeline["segments"]]}
+    place(placed, code)
+    if [s.get("anchors") for s in placed["segments"]] != [
+        s.get("anchors") for s in timeline["segments"]
+    ]:
+        msg = (
+            f"The {code} timeline's anchors are not those its marks take from its words; run"
+            f" produce refresh-captions --language {code}"
+        )
+        raise AnchorError(msg)
 
 
 def require_editions() -> dict[str, dict[str, list[Anchor]]]:
