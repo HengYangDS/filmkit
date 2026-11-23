@@ -96,15 +96,17 @@
 
 ## 7. Acceptance on the films
 
-- [ ] 7.1 In a scratch copy of one film whose picture passes `check-picture` on the built engine, migrate one
+- [x] 7.1 In a scratch copy of one film whose picture passes `check-picture` on the built engine, migrate one
       segment: `anchor` edits from the spans its own `cue()` resolves (`count/cue-calls.mjs` of the draft), adopted by
       `refresh-captions`, and the segment's calls rewritten to read `s.anchors`. Compare every frame's paints headlessly
       before and after, then render the edition before and after on the built engine in one render ticket. Done when
       the record under `build/evidence/anchor-picture-cues-in-the-script/` shows the same paints frame by frame and the
       two renders' `drawn_sha256` equal.
-- [ ] 7.2 In scratch copies of the three films at their release tags, with their timelines first refreshed by filmkit
-      0.27.0 on the same inputs and no review round binding them, run the built engine's `refresh-captions` and the
-      check before narration as a dry run on their released and December scripts. Done when the record under
-      `build/evidence/anchor-picture-cues-in-the-script/` shows each edition's timeline and assembly receipt with the
-      SHA-256 that 0.27.0 gave them, no anchor read, and on the December scripts the scenes whose `cue()` throws named
-      as not judged and nothing refused.
+- [x] 7.2 In scratch copies of the three films at their `dev` heads (their released texts, pictures and assembled
+      builds), with only the edits `python -m filmkit.adoption` names that the engine needs to load a film, and of the
+      December trial copies adopted to 0.29.0, run `refresh-captions` with filmkit 0.29.0 and with the built engine on
+      the same inputs, and the check before narration on every copy. Done when the record under
+      `build/evidence/anchor-picture-cues-in-the-script/` shows each assembled edition's timeline, receipt, selection
+      and subtitle documents after the built engine's refresh with the SHA-256 that 0.29.0's refresh gave them, or the
+      same refusal, no `anchors` written and no anchor read, and on the December texts each scene whose `cue()`
+      throws, and each composition that does not load, named as not judged and nothing refused.
