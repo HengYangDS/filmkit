@@ -251,11 +251,12 @@ def boundary(policy: dict) -> str:
 
 
 def clarity_floors() -> str:
-    """The voice-clarity floors the film declares, in dB for each edition."""
+    """The voice-clarity floors the film declares, in dB for each edition in the declared order,
+    each by its language's name."""
     floors = FILM.review.clarity_minimum_db
     if not floors:
         return NOT_DECLARED
-    return f"{floors['zh']:g} dB Chinese, {floors['en']:g} dB English"
+    return ", ".join(f"{floors[code]:g} dB {Edition(code).language}" for code in CODES)
 
 
 def finding_index(findings: list[dict]) -> str:

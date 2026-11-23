@@ -561,7 +561,7 @@ def measure_edition(code: str) -> dict:
 
 
 def measure() -> dict:
-    """Every measurement of both editions, Chinese first."""
+    """Every measurement of every edition, in the declared order."""
     return {
         "scope": SCOPE,
         "editions": {code: measure_edition(code) for code in production.CODES},

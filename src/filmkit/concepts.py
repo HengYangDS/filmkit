@@ -122,7 +122,7 @@ class Concept(Declared):
 
     def words(self, code: str) -> Rendering:
         """The concept's words in one edition."""
-        return self.zh if code == "zh" else self.en
+        return getattr(self, code)
 
 
 class NumberException(Declared):
