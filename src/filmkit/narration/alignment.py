@@ -9,7 +9,9 @@ A cached entry that cannot be read as an alignment is a miss: the recording is a
 the entry replaced.
 
 Usage: python -m filmkit.narration.alignment --model DIR --receipt FILE --output FILE
-    [--language Chinese|English]
+    --language NAME
+NAME is the edition's language as the speech models take it, its declaration's `english_name`
+(`filmkit.languages`).
 Paths are relative to the repository root.
 """
 
@@ -22,6 +24,7 @@ from pathlib import Path
 
 from mlx_audio.stt.utils import load_model
 
+import filmkit.languages as languages
 import filmkit.repository as repository
 from filmkit.narration.alignment_records import alignment_record
 from filmkit.narration.receipts import bound_records
@@ -48,7 +51,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--model", type=Path, required=True, help="The pinned aligner's folder")
     parser.add_argument("--receipt", required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--language", choices=("Chinese", "English"), default="Chinese")
+    parser.add_argument("--language", choices=languages.model_names(), required=True)
     options = parser.parse_args(argv)
     records = bound_records(options.receipt, options.language)
     for record in records:

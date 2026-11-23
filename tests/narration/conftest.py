@@ -323,7 +323,8 @@ def engine(stand_ins, declared, voiced, monkeypatch, tmp_path):
         "full_narration_seed": 4677,
     }
     repository.write(edition.cast, cast)
-    sources = ["--script", edition.script, "--cast", edition.cast, "--folder", paths["folder"]]
+    sources = ["--language", edition.code, "--script", edition.script, "--cast", edition.cast]
+    sources += ["--folder", paths["folder"]]
 
     def narrate(code: str) -> None:
         state.narrations += 1

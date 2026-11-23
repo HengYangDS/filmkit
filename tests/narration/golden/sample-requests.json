@@ -1,0 +1,165 @@
+{
+  "written_by": "filmkit 0.30.0 with treat-languages-as-equals through task 4.2 (a1c28da), synthesis.load_request --dry-run on each sample edition",
+  "editions": {
+    "zh": [
+      {
+        "segment": "01",
+        "fingerprint": "35e0435b04a98fa8124b5e569545438f4312f3eead7fc63ac91e416e3192f6f3",
+        "speech": {
+          "reference_audio": "assets/audio/zh/narration-reference.wav",
+          "reference_sha256": "7ff6347ed4231943944ef27bfc708cfcf796619b3988b2b99bc21be71ae338da",
+          "reference_text": "我们以证据连接人的判断与智能体的行动。规范保存正式接受的意图，证据记录实际发生的事。看清关系，决定下一步；条件改变，就重新判断。",
+          "reference_treatment": null,
+          "seed": 4681,
+          "temperature": 0.46,
+          "max_tokens": 1900,
+          "language": "Chinese",
+          "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+          "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
+          "decoder": "official native chunked_decode",
+          "stream": false,
+          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27",
+          "icl_repetition_penalty": 1.05
+        }
+      },
+      {
+        "segment": "02",
+        "fingerprint": "8435d38801fcac91b5affb679f2a5b2eb1db57c06fe6856a2b757f711db8e57e",
+        "speech": {
+          "reference_audio": "assets/audio/zh/narration-reference.wav",
+          "reference_sha256": "7ff6347ed4231943944ef27bfc708cfcf796619b3988b2b99bc21be71ae338da",
+          "reference_text": "我们以证据连接人的判断与智能体的行动。规范保存正式接受的意图，证据记录实际发生的事。看清关系，决定下一步；条件改变，就重新判断。",
+          "reference_treatment": null,
+          "seed": 4682,
+          "temperature": 0.46,
+          "max_tokens": 1900,
+          "language": "Chinese",
+          "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+          "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
+          "decoder": "official native chunked_decode",
+          "stream": false,
+          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27",
+          "icl_repetition_penalty": 1.05
+        }
+      },
+      {
+        "segment": "03",
+        "fingerprint": "3656e6de59f2135d53819428def2657bda89f2738a0598af4493930308dbe069",
+        "speech": {
+          "reference_audio": "assets/audio/zh/narration-reference.wav",
+          "reference_sha256": "7ff6347ed4231943944ef27bfc708cfcf796619b3988b2b99bc21be71ae338da",
+          "reference_text": "我们以证据连接人的判断与智能体的行动。规范保存正式接受的意图，证据记录实际发生的事。看清关系，决定下一步；条件改变，就重新判断。",
+          "reference_treatment": null,
+          "seed": 4683,
+          "temperature": 0.46,
+          "max_tokens": 1900,
+          "language": "Chinese",
+          "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+          "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
+          "decoder": "official native chunked_decode",
+          "stream": false,
+          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27",
+          "icl_repetition_penalty": 1.05
+        }
+      },
+      {
+        "segment": "04",
+        "fingerprint": "ead18dc191c949e7cd6bef166bc2a06b75c7e94873289be7df642e175aaf637e",
+        "speech": {
+          "reference_audio": "assets/audio/zh/narration-reference.wav",
+          "reference_sha256": "7ff6347ed4231943944ef27bfc708cfcf796619b3988b2b99bc21be71ae338da",
+          "reference_text": "我们以证据连接人的判断与智能体的行动。规范保存正式接受的意图，证据记录实际发生的事。看清关系，决定下一步；条件改变，就重新判断。",
+          "reference_treatment": null,
+          "seed": 4684,
+          "temperature": 0.46,
+          "max_tokens": 1900,
+          "language": "Chinese",
+          "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+          "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
+          "decoder": "official native chunked_decode",
+          "stream": false,
+          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27",
+          "icl_repetition_penalty": 1.05
+        }
+      }
+    ],
+    "en": [
+      {
+        "segment": "01",
+        "fingerprint": "0a9446f7442da8321c358bf445e5ac02e7a9c1966bcc8dc1b7dcb4391e58b035",
+        "speech": {
+          "reference_audio": "assets/audio/en/narration-reference.wav",
+          "reference_sha256": "a763e48e15c5dc8abeda9b47da53c47db628b9ea602c79e657ab04653d318786",
+          "reference_text": "ēthos connects human judgment with Agent action. Open Spec keeps formal intent. A Git reference changes only when its current state permits it.",
+          "reference_treatment": null,
+          "seed": 4678,
+          "temperature": 0.46,
+          "max_tokens": 2100,
+          "language": "English",
+          "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+          "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
+          "decoder": "official native chunked_decode",
+          "stream": false,
+          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27"
+        }
+      },
+      {
+        "segment": "02",
+        "fingerprint": "d538c00a3a73d3a01e694c75eafdd0373e7e7a6bf68f4f266fc5c7c787f569ad",
+        "speech": {
+          "reference_audio": "assets/audio/en/narration-reference.wav",
+          "reference_sha256": "a763e48e15c5dc8abeda9b47da53c47db628b9ea602c79e657ab04653d318786",
+          "reference_text": "ēthos connects human judgment with Agent action. Open Spec keeps formal intent. A Git reference changes only when its current state permits it.",
+          "reference_treatment": null,
+          "seed": 4679,
+          "temperature": 0.46,
+          "max_tokens": 2100,
+          "language": "English",
+          "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+          "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
+          "decoder": "official native chunked_decode",
+          "stream": false,
+          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27"
+        }
+      },
+      {
+        "segment": "03",
+        "fingerprint": "01e17a3f23fb492e4d74457ded707c3cb527baad66aa841e9f62ceacf9adac4a",
+        "speech": {
+          "reference_audio": "assets/audio/en/narration-reference.wav",
+          "reference_sha256": "a763e48e15c5dc8abeda9b47da53c47db628b9ea602c79e657ab04653d318786",
+          "reference_text": "ēthos connects human judgment with Agent action. Open Spec keeps formal intent. A Git reference changes only when its current state permits it.",
+          "reference_treatment": null,
+          "seed": 4680,
+          "temperature": 0.46,
+          "max_tokens": 2100,
+          "language": "English",
+          "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+          "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
+          "decoder": "official native chunked_decode",
+          "stream": false,
+          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27"
+        }
+      },
+      {
+        "segment": "04",
+        "fingerprint": "ece79ea4e48f8b3f72eaa333668b0a859f169154cf7b195739eb29eebd4ec03d",
+        "speech": {
+          "reference_audio": "assets/audio/en/narration-reference.wav",
+          "reference_sha256": "a763e48e15c5dc8abeda9b47da53c47db628b9ea602c79e657ab04653d318786",
+          "reference_text": "ēthos connects human judgment with Agent action. Open Spec keeps formal intent. A Git reference changes only when its current state permits it.",
+          "reference_treatment": null,
+          "seed": 4681,
+          "temperature": 0.46,
+          "max_tokens": 2100,
+          "language": "English",
+          "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+          "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
+          "decoder": "official native chunked_decode",
+          "stream": false,
+          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27"
+        }
+      }
+    ]
+  }
+}

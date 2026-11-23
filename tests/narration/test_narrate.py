@@ -18,6 +18,8 @@ NARRATION = [
     *PYTHON,
     "-m",
     "filmkit.narration.synthesis",
+    "--language",
+    "zh",
     "--script",
     "content/zh/film-script.json",
     "--cast",
@@ -108,7 +110,7 @@ def test_narrate_edition_runs_the_whole_edition_from_the_root(commands, capsys):
         ["-m", "filmkit.narration.alignment"],
         ["-m", "filmkit.narration.transcription"],
     ]
-    assert run[0][4:7] == ["--script", "content/en/film-script.json", "--cast"]
+    assert run[0][4:9] == ["--language", "en", "--script", "content/en/film-script.json", "--cast"]
     assert run[0][-1] == f"{base}/narration-receipt.json"
     assert run[1][-3:] == [f"{base}/alignment.json", "--language", "English"]
     assert run[2][-3:] == [f"{base}/asr.json", "--language", "English"]

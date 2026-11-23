@@ -292,6 +292,11 @@ def language(code: str) -> Language:
         raise LanguageError(message[0].upper() + message[1:]) from None
 
 
+def model_names() -> list[str]:
+    """Each declared language's name as the speech models take it, in the order of the codes."""
+    return [LANGUAGES[code].english_name for code in sorted(LANGUAGES)]
+
+
 def unknown(code: str) -> str:
     """Why a code is no language: the languages the engine declares, named."""
     return (

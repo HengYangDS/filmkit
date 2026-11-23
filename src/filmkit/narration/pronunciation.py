@@ -151,42 +151,38 @@ def _normalized(text: str, rule: dict) -> str:
     raise ValueError(msg)
 
 
-def validate_language_reference(narration: dict, cast: dict) -> str:
-    """Bind the narration language to its clauses and its reference, independent of path.
+def validate_language_reference(narration: dict, cast: dict, code: str) -> str:
+    """Hold an edition's text and its cast's reference transcript to the edition's language.
+
+    The text holds no character of a script that the language neither writes nor reads as
+    another language (`filmkit.languages`), and the reference transcript holds a character of a
+    script the language writes. Every refusal names the segment and the script, or the cast.
 
     Returns:
-        The narration language.
+        The language's name as the speech models take it.
     """
-    segments = narration["segments"]
-    has_mandarin = any(
-        re.search(HAN, item[field])
-        for item in segments
-        for field in ("text", "spoken_text")
-        if field in item
-    )
-    language = cast.get("narration_language", narration.get("language", "auto"))
-    declared = narration.get("language")
-    if has_mandarin and language != "Chinese":
-        msg = "Mandarin clauses require Chinese narration language"
-        raise ValueError(msg)
-    if declared and declared != language:
-        msg = "Declared narration language differs from selected conditioning"
-        raise ValueError(msg)
-    if any(item.get("language", language) != language for item in segments):
-        msg = "Every complete clause must match the selected language"
-        raise ValueError(msg)
+    language = languages.language(code)
+    read = {*language.scripts, *language.embedded}
+    others = [name for name in languages.classes()["scripts"] if name not in read]
+    for item in narration["segments"]:
+        for field in ("text", "spoken_text"):
+            for script in others:
+                found = languages.compiled(script).search(item.get(field, ""))
+                if found:
+                    msg = (
+                        f"{code} {item['id']}: its {field} holds {found[0]!r} of the {script} "
+                        f"script, which {language.english_name} neither writes nor reads as "
+                        "another language"
+                    )
+                    raise ValueError(msg)
     transcript = cast.get("reference_text", "")
-    reference_language = cast.get("reference_language")
-    if language == "English" and (re.search(HAN, transcript) or reference_language != "English"):
-        msg = "English narration requires a qualified English reference"
+    if not languages.compiled(*language.scripts).search(transcript):
+        msg = (
+            f"{code}: the cast's reference transcript holds no character of the "
+            f"{', '.join(language.scripts)} script that {language.english_name} writes"
+        )
         raise ValueError(msg)
-    if language == "Chinese" and (
-        reference_language not in (None, "Chinese")
-        or (transcript and not re.search(HAN, transcript))
-    ):
-        msg = "Mandarin narration requires a Chinese reference"
-        raise ValueError(msg)
-    return language
+    return language.english_name
 
 
 def native_utterance_plan(section: dict, contract: dict) -> list[dict]:

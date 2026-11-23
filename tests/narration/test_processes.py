@@ -12,7 +12,8 @@ import filmkit.narration.processes as processes
 import filmkit.repository as repository
 from filmkit.narration.processes import ProcessesError
 
-SOURCES = ("content/zh/film-script.json", "content/zh/voice-reference.json", "build/recordings")
+SOURCES = ("zh", "content/zh/film-script.json", "content/zh/voice-reference.json")
+SOURCES += ("build/recordings",)
 RECEIPT = "build/evidence/editions/zh/ear-first/narration-receipt.json"
 
 
@@ -127,8 +128,8 @@ def test_each_child_is_the_synthesis_itself_on_its_segments_with_a_receipt_of_it
     ended = processes.narrate(SOURCES, [["01", "04"], ["02", "03"]], receipt)
     work = "build/runtime/work/narration-processes"
     work += "/build-evidence-editions-zh-ear-first-narration-receipt"
-    synthesis = [sys.executable, "-B", "-m", "filmkit.narration.synthesis"]
-    synthesis += ["--script", SOURCES[0], "--cast", SOURCES[1], "--folder", SOURCES[2]]
+    synthesis = [sys.executable, "-B", "-m", "filmkit.narration.synthesis", "--language", "zh"]
+    synthesis += ["--script", SOURCES[1], "--cast", SOURCES[2], "--folder", SOURCES[3]]
     assert [command for command, _ in started] == [
         [*synthesis, "--receipt", f"{work}/process-1.json", "--ids", "01,04"],
         [*synthesis, "--receipt", f"{work}/process-2.json", "--ids", "02,03"],

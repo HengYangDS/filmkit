@@ -10,10 +10,12 @@ host's memory gives, up to three, unless `FILMKIT_NARRATION_PROCESSES` names ano
 (`filmkit.narration.processes`), and the receipt is then written from the retained recordings
 as after any other run.
 
-Usage: python -m filmkit.narration.synthesis --script FILE --cast FILE --folder DIR
-    --receipt FILE [--ids 06,07] [--dry-run]
-With --ids only those segments are narrated, and their records replace theirs in an existing
-receipt. --dry-run prints each segment's plan: its fingerprint, its recording path and whether
+Usage: python -m filmkit.narration.synthesis --language CODE --script FILE --cast FILE
+    --folder DIR --receipt FILE [--ids 06,07] [--dry-run]
+CODE names the edition, whose language the text and the reference must be in
+(`pronunciation.validate_language_reference`) and whose name the speech model takes. With
+--ids only those segments are narrated, and their records replace theirs in an existing receipt.
+--dry-run prints each segment's plan: its fingerprint, its recording path and whether
 it would be reused, generated or refused. Paths are relative to the repository root, and a
 recordings folder or a receipt outside it is refused before anything is read or written.
 """
@@ -71,8 +73,9 @@ class Request:
     receipt: Path
     merge: bool
     dry_run: bool
-    # The script, the cast and the recordings' folder as the command named them.
-    sources: tuple[str, str, str] = ("", "", "")
+    # The edition's code, the script, the cast and the recordings' folder as the command named
+    # them.
+    sources: tuple[str, str, str, str] = ("", "", "", "")
 
 
 @dataclass(frozen=True)
@@ -151,6 +154,7 @@ def load_request(argv: list[str] | None = None) -> Request:
     parser = argparse.ArgumentParser(
         description="Narrate a script's segments with the reference-voice model."
     )
+    parser.add_argument("--language", required=True, help="The edition's code")
     parser.add_argument("--script", required=True)
     parser.add_argument("--cast", required=True)
     parser.add_argument("--folder", required=True, help="Folder of the recordings")
@@ -164,7 +168,7 @@ def load_request(argv: list[str] | None = None) -> Request:
     cast = repository.read(options.cast)
     _check_cast(cast)
     segments = _chosen(script["segments"], options.ids)
-    language = validate_language_reference({**script, "segments": segments}, cast)
+    language = validate_language_reference({**script, "segments": segments}, cast, options.language)
     contract, contract_sha256 = pronunciation_contract(script, language)
     return Request(
         cast=cast,
@@ -180,7 +184,7 @@ def load_request(argv: list[str] | None = None) -> Request:
         receipt=receipt,
         merge=bool(options.ids),
         dry_run=options.dry_run,
-        sources=(options.script, options.cast, options.folder),
+        sources=(options.language, options.script, options.cast, options.folder),
     )
 
 

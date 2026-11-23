@@ -15,10 +15,12 @@ import filmkit.narration.synthesis as narration_synthesis
 import filmkit.narration.thought_groups as narration_thought_groups
 import filmkit.repository as repository
 from filmkit.narration.voice_model import NATIVE_DECODER
+from filmkit.production import CODES, Edition
 
 RATE = 24000
 GROUPS = ["先核验实际工作。", "再说明结论和限度。"]
-ARGUMENTS = ["--script", "script.json", "--cast", "cast.json", "--folder", "audio"]
+ARGUMENTS = ["--language", "zh", "--script", "script.json", "--cast", "cast.json"]
+ARGUMENTS += ["--folder", "audio"]
 ARGUMENTS += ["--receipt", "receipt.json"]
 GOLDEN = json.loads((Path(__file__).parent / "golden/receipts.json").read_text())
 
@@ -185,12 +187,13 @@ def test_narration_entrypoint_preserves_vendor_decoder(tmp_path, voice, capsys):
             raise AssertionError(msg)
 
     voice.speech_tokenizer = Tokenizer()
-    narration_synthesis.main([*ARGUMENTS, "--dry-run"])
+    english = ["--language", "en", *ARGUMENTS[2:]]
+    narration_synthesis.main([*english, "--dry-run"])
     plan = json.loads(capsys.readouterr().out)
     assert plan["decoder"] == NATIVE_DECODER
     assert plan["stream"] is False
     assert "streaming_interval" not in plan
-    narration_synthesis.main(ARGUMENTS)
+    narration_synthesis.main(english)
     result = repository.read("receipt.json")["records"][0]
     assert [call["ref_text"] for call in voice.calls] == ["A retained reference thought."] * 2
     assert all("streaming_interval" not in call for call in voice.calls)
@@ -460,3 +463,26 @@ def test_the_speech_plan_reproduces_the_retained_requests(code):
         child["seed"] if child["seed"] != golden["record"]["seed"] else None
         for child in golden["record"]["utterance_groups"]["records"]
     ]
+
+
+# Each sample edition's requests as the engine planned them before its language came from the
+# edition's declaration: each segment's fingerprint and speech settings.
+SAMPLE_REQUESTS = json.loads((Path(__file__).parent / "golden/sample-requests.json").read_text())
+
+
+@pytest.mark.parametrize("code", CODES)
+def test_every_request_of_the_sample_keeps_its_speech_settings_and_fingerprint(code):
+    edition = Edition(code)
+    argv = ["--language", code, "--script", edition.script, "--cast", edition.cast]
+    argv += ["--folder", "build/requests", "--receipt", "build/requests/receipt.json", "--dry-run"]
+    planned = [
+        {"segment": job.segment["id"], "fingerprint": job.fingerprint, "speech": job.speech}
+        for job in narration_synthesis.speech_plan(narration_synthesis.load_request(argv))
+    ]
+    assert planned == SAMPLE_REQUESTS["editions"][code]
+
+
+def test_a_narration_names_its_edition():
+    with pytest.raises(SystemExit) as refusal:
+        narration_synthesis.load_request(ARGUMENTS[2:])
+    assert refusal.value.code == 2

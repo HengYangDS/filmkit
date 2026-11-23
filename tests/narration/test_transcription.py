@@ -237,3 +237,12 @@ def test_a_transcript_by_another_recognizer_or_library_is_not_reused(receipt, mo
     narration_transcription.main([*ARGUMENTS, "--language", "Chinese"])
     assert len(receipt["calls"]) == 2
     assert len(cache_files()) == 2
+
+
+def test_a_transcription_names_its_language_by_a_declared_model_name(monkeypatch):
+    with pytest.raises(SystemExit) as refusal:
+        narration_transcription.main(list(ARGUMENTS))
+    assert refusal.value.code == 2
+    with pytest.raises(SystemExit) as refusal:
+        narration_transcription.main([*ARGUMENTS, "--language", "Japanese"])
+    assert refusal.value.code == 2

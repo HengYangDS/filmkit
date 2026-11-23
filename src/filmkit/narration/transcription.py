@@ -12,7 +12,9 @@ cannot be read as a transcript is a miss: the recording is transcribed again and
 replaced. The error rate is taken anew from the text.
 
 Usage: python -m filmkit.narration.transcription
-    --receipt FILE --output FILE --language Chinese|English
+    --receipt FILE --output FILE --language NAME
+NAME is the edition's language as the speech models take it, its declaration's `english_name`
+(`filmkit.languages`).
 Paths are relative to the repository root. Every recording must still match the
 SHA-256, text and language its receipt records.
 """
@@ -24,6 +26,7 @@ from pathlib import Path
 
 from mlx_audio.stt.utils import load_model
 
+import filmkit.languages as languages
 import filmkit.repository as repository
 from filmkit.narration.receipts import bound_records
 from filmkit.narration.recognition import recognition_units, unit_distance
@@ -104,7 +107,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Transcribe a narration receipt's recordings.")
     parser.add_argument("--receipt", required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--language", choices=("Chinese", "English"), required=True)
+    parser.add_argument("--language", choices=languages.model_names(), required=True)
     options = parser.parse_args(argv)
     records = bound_records(options.receipt, options.language)
     identity = recognizer()

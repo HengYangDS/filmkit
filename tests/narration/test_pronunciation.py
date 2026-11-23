@@ -227,53 +227,56 @@ def test_a_contract_with_a_contradictory_target_is_not_read(tmp_path, monkeypatc
 
 
 @pytest.mark.parametrize("code", CODES)
-def test_each_edition_narrates_in_its_cast_language(code):
+def test_each_edition_narrates_in_its_language(code):
     edition = Edition(code)
     script, cast = repository.read(edition.script), repository.read(edition.cast)
-    assert narration_pronunciation.validate_language_reference(script, cast) == edition.language
+    validated = narration_pronunciation.validate_language_reference(script, cast, code)
+    assert validated == edition.language
 
 
-ENGLISH = {
-    "language": "English",
-    "segments": [{"id": "01", "text": "A thought.", "spoken_text": "A thought."}],
-}
-ENGLISH_CAST = {
-    "narration_language": "English",
-    "reference_language": "English",
-    "reference_text": "A reference thought.",
-}
-CHINESE = {"language": "Chinese", "segments": [{"id": "01", "text": "先核验。"}]}
-CHINESE_CAST = {
-    "narration_language": "Chinese",
-    "reference_language": "Chinese",
-    "reference_text": "看清事实。",
-}
+ENGLISH = {"segments": [{"id": "01", "text": "A thought.", "spoken_text": "A thought."}]}
+ENGLISH_CAST = {"reference_text": "A reference thought."}
+CHINESE = {"segments": [{"id": "01", "text": "先核验 Agent 的输出。"}]}
+CHINESE_CAST = {"reference_text": "看清事实。"}
 
 
 @pytest.mark.parametrize(
-    ("narration", "cast", "message"),
+    ("narration", "cast", "code", "message"),
     [
-        ({**CHINESE, "language": None}, ENGLISH_CAST, "Mandarin clauses require Chinese"),
-        (ENGLISH, {**ENGLISH_CAST, "narration_language": "Chinese"}, "Declared narration language"),
         (
-            {"segments": [{"id": "01", "text": "A thought.", "language": "Chinese"}]},
+            {"segments": [{"id": "01", "text": "A 核验 thought."}]},
             ENGLISH_CAST,
-            "Every complete clause must match",
+            "en",
+            "en 01: its text holds '核' of the han script, which English neither writes",
         ),
-        (ENGLISH, {**ENGLISH_CAST, "reference_text": "看清事实。"}, "qualified English reference"),
-        (ENGLISH, {**ENGLISH_CAST, "reference_language": "Chinese"}, "qualified English reference"),
         (
             ENGLISH,
-            {key: value for key, value in ENGLISH_CAST.items() if key != "reference_language"},
-            "qualified English reference",
+            {"reference_text": "看清事实。"},
+            "en",
+            "en: the cast's reference transcript holds no character of the latin script",
         ),
-        (CHINESE, {**CHINESE_CAST, "reference_language": "English"}, "Chinese reference"),
-        (CHINESE, {**CHINESE_CAST, "reference_text": "A reference."}, "Chinese reference"),
+        (
+            CHINESE,
+            {"reference_text": "A reference."},
+            "zh",
+            "zh: the cast's reference transcript holds no character of the han script",
+        ),
     ],
 )
-def test_a_narration_and_reference_in_different_languages_are_refused(narration, cast, message):
+def test_a_text_or_reference_in_a_script_its_language_does_not_read_is_refused(
+    narration, cast, code, message
+):
     with pytest.raises(ValueError, match=message):
-        narration_pronunciation.validate_language_reference(narration, cast)
+        narration_pronunciation.validate_language_reference(narration, cast, code)
+
+
+def test_a_chinese_text_that_holds_english_words_is_accepted(test_languages):
+    for code in ("zh", "xa"):
+        assert narration_pronunciation.validate_language_reference(CHINESE, CHINESE_CAST, code) == (
+            test_languages["xa"].english_name if code == "xa" else "Chinese"
+        )
+    with pytest.raises(ValueError, match="xb 01: its text holds '先' of the han script"):
+        narration_pronunciation.validate_language_reference(CHINESE, ENGLISH_CAST, "xb")
 
 
 def test_authored_utterance_groups_refuse_source_or_pronunciation_drift():

@@ -109,7 +109,8 @@ def own_receipt(code: str) -> str:
 def narration_due(code: str) -> bool:
     """Whether the receipt lacks a recording of the cast as it stands, or a check's output."""
     edition, paths = Edition(code), evidence_paths(code)
-    sources = ["--script", edition.script, "--cast", edition.cast, "--folder", paths["folder"]]
+    sources = ["--language", code, "--script", edition.script, "--cast", edition.cast]
+    sources += ["--folder", paths["folder"]]
     jobs = synthesis.speech_plan(synthesis.load_request([*sources, "--receipt", paths["receipt"]]))
     if any(synthesis.reuse_or_refuse(job) is None for job in jobs):
         return True

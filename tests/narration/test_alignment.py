@@ -70,7 +70,7 @@ def aligner(tmp_path, monkeypatch):
     monkeypatch.setattr(narration_alignment, "load_model", load_model)
     model.folder = folder
     model.arguments = ["--model", str(folder), "--receipt", "record.json"]
-    model.arguments += ["--output", "result.json"]
+    model.arguments += ["--output", "result.json", "--language", "Chinese"]
     return model
 
 
@@ -231,9 +231,19 @@ def test_a_cached_alignment_from_another_aligner_is_not_reused(tmp_path, aligner
         narration_alignment.main(aligner.arguments)
 
 
-@pytest.mark.parametrize("missing", ["--model", "--receipt", "--output"])
+@pytest.mark.parametrize("missing", ["--model", "--receipt", "--output", "--language"])
 def test_every_aligner_input_and_output_is_named(aligner, missing):
     at = aligner.arguments.index(missing)
     with pytest.raises(SystemExit):
         narration_alignment.main(aligner.arguments[:at] + aligner.arguments[at + 2 :])
+    assert aligner.loads == []
+
+
+def test_the_language_choices_are_the_declared_languages_model_names(aligner, test_languages):
+    import filmkit.languages as languages
+
+    assert languages.model_names() == ["English", "Xa", "Xb", "Chinese"]
+    at = aligner.arguments.index("--language")
+    with pytest.raises(SystemExit):
+        narration_alignment.main([*aligner.arguments[:at], "--language", "Japanese"])
     assert aligner.loads == []

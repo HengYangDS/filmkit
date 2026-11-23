@@ -128,11 +128,11 @@ def clear_work(receipt: Path) -> None:
         shutil.rmtree(work)
 
 
-def child_command(sources: tuple[str, str, str], ids: list[str], receipt: Path) -> list[str]:
-    """One child's command: the synthesis itself on the given script, cast and folder, for these
-    segments, into a receipt of its own."""
-    script, cast, folder = sources
-    command = [sys.executable, "-B", "-m", "filmkit.narration.synthesis"]
+def child_command(sources: tuple[str, str, str, str], ids: list[str], receipt: Path) -> list[str]:
+    """One child's command: the synthesis itself on the given edition, script, cast and folder,
+    for these segments, into a receipt of its own."""
+    code, script, cast, folder = sources
+    command = [sys.executable, "-B", "-m", "filmkit.narration.synthesis", "--language", code]
     command += ["--script", script, "--cast", cast, "--folder", folder]
     return [*command, "--receipt", repository.relative(receipt), "--ids", ",".join(ids)]
 
