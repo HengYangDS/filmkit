@@ -129,9 +129,9 @@ test("a binding names an absolute destination, the film and exactly its delivery
     "film names no runtime for en",
     "film names a runtime for no edition: fr",
   ]);
-  // A binding of the former shape names one duration for both editions and no editions, and is refused.
+  // A binding of the former shape names one duration for the film and no editions, and is refused.
   assert.deepEqual(bindingProblems({ ...binding(), film: { slug: "sample-reel", duration: 60 } }), [
-    "film names one duration for both editions; a binding names each edition's runtime by its code",
+    "film names one duration for the whole film; a binding names each edition's runtime by its code",
     "film names no editions, each with its code, tag and members",
   ]);
   // The editions are the binding's: a film of three editions asks for each one's runtime and members.

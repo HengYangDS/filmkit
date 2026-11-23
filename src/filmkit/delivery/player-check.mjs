@@ -80,7 +80,7 @@ export function bindingProblems(binding) {
   const runtimes = binding?.film?.runtimes;
   if (binding?.film && Object.hasOwn(binding.film, "duration"))
     problems.push(
-      "film names one duration for both editions; a binding names each edition's runtime by its code",
+      "film names one duration for the whole film; a binding names each edition's runtime by its code",
     );
   const editions = binding?.film?.editions,
     listed = Array.isArray(editions) && editions.length > 0 && editions.every(EDITION);

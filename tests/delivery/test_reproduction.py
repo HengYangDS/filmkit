@@ -532,3 +532,10 @@ def test_each_edition_publishes_its_films_documents_cover_and_review():
     assert [name for name, (layer, _) in published.items() if layer == "film"] == [
         film.name for film in edition.films
     ]
+
+
+def test_a_record_of_a_film_of_three_editions_names_the_edition_it_misses(release, monkeypatch):
+    monkeypatch.setattr(production, "CODES", ("zh", "en", "xb"))
+    with pytest.raises(ReproductionError) as refusal:
+        reproduction.load()
+    assert "records the editions ['en', 'zh']: no record of the xb edition" in str(refusal.value)

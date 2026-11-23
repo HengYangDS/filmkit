@@ -154,7 +154,11 @@ def check(release: Release) -> Release:
     file. The record is returned as it was given.
     """
     if set(release.editions) != set(production.CODES):
-        msg = f"{MANIFEST} records the editions {sorted(release.editions)}"
+        missing = [code for code in production.CODES if code not in release.editions]
+        others = sorted(set(release.editions) - set(production.CODES))
+        named = [f"no record of the {code} edition" for code in missing]
+        named += [f"a record of {code}, which the film does not declare" for code in others]
+        msg = f"{MANIFEST} records the editions {sorted(release.editions)}: " + "; ".join(named)
         raise ReproductionError(msg)
     names = [asset.name for asset in release.assets]
     choices = {

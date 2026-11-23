@@ -59,12 +59,19 @@ MEDIA_POOL = 4
 FPS, RATE = specification.FPS, specification.RATE
 
 
-def bilingual_inputs(files: list[Path]) -> dict[str, list[Path]]:
-    """Require both editions' films under their current language-owned roots."""
+def edition_inputs(files: list[Path]) -> dict[str, list[Path]]:
+    """Require every declared edition's films, each under its edition's current folder, and no
+    other file, naming each edition whose films are missing (a bridge until R2b's `filmkit
+    verify`, which replaces this command's loop over the editions)."""
     groups = {code: production.Edition(code).films for code in production.CODES}
     expected = {path for films in groups.values() for path in films}
     if len(files) != len(expected) or set(files) != expected:
-        msg = "Bilingual acceptance requires both editions' current films"
+        missing = [code for code, films in groups.items() if not set(films) <= set(files)]
+        others = sorted(path.name for path in set(files) - expected)
+        named = [f"the {code} edition's current films are missing" for code in missing]
+        named += [f"{', '.join(others)} belong to no edition's current films"] if others else []
+        named += ["a film is named twice"] if len(files) != len(set(files)) else []
+        msg = "Acceptance of every edition requires each one's current films: " + "; ".join(named)
         raise VerificationError(msg)
     return groups
 
@@ -539,7 +546,7 @@ def main(argv: list[str] | None = None) -> None:
     files = [path.resolve() for path in options.files] or [
         film for code in codes for film in production.Edition(code).films
     ]
-    groups = bilingual_inputs(files) if options.language == "all" else {options.language: files}
+    groups = edition_inputs(files) if options.language == "all" else {options.language: files}
     for language, members in groups.items():
         try:
             with durations.run(language, "verify", record=not options.read_only):

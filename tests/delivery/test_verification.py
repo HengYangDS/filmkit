@@ -9,6 +9,7 @@ import filmkit.picture.still_scan as picture_still_scan
 import filmkit.production as production
 import filmkit.repository as repository
 from filmkit.delivery.verification import VerificationError
+from filmkit.film import FILM
 
 
 @pytest.fixture
@@ -169,7 +170,7 @@ def test_the_command_prints_each_editions_report_and_writes_only_its_duration(tm
     (report,) = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     english = sorted(film.name for film in production.Edition("en").films)
     assert [name for name, _size in report["media"]] == english
-    with pytest.raises(VerificationError, match="both editions' current films"):
+    with pytest.raises(VerificationError, match="requires each one's current films"):
         delivery_verification.main(["--language", "all", *films[1:]])
     with pytest.raises(SystemExit):
         delivery_verification.main(["--language", "fr", *films])
@@ -186,3 +187,19 @@ def test_captions_end_where_the_timeline_s_credits_begin():
         delivery_verification.verify_captions(timeline(1472.45), "zh")
     with pytest.raises(VerificationError, match="states no credits within its runtime"):
         delivery_verification.verify_captions({**timeline(1472.0), "credits_duration": None}, "zh")
+
+
+@pytest.mark.usefixtures("test_languages")
+def test_acceptance_of_a_film_of_three_editions_names_the_edition_whose_films_are_missing(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    monkeypatch.setitem(FILM.editions, "xb", FILM.editions["en"])
+    monkeypatch.setattr(production, "CODES", ("zh", "en", "xb"))
+    films = [film for code in ("zh", "en") for film in production.Edition(code).films]
+    with pytest.raises(VerificationError) as refusal:
+        delivery_verification.edition_inputs(films)
+    assert str(refusal.value) == (
+        "Acceptance of every edition requires each one's current films: the xb edition's current "
+        "films are missing"
+    )
