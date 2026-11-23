@@ -406,3 +406,16 @@ def test_packaging_refuses_a_player_page_left_in_the_sources(tmp_path, monkeypat
     assert "content/en/player.html" in str(refusal.value)
     assert "editions.<code>.summary" in str(refusal.value) and "[player]" in str(refusal.value)
     assert not (tmp_path / "build").exists()
+
+
+@pytest.mark.usefixtures("test_languages")
+@pytest.mark.parametrize(("codes", "links"), [(("zh", "en", "xb"), ["en", "xb"]), (("zh",), [])])
+def test_a_player_links_every_other_editions_player_in_order_then_the_entry_page(
+    delivered, monkeypatch, codes, links
+):
+    monkeypatch.setitem(FILM.editions, "xb", FILM.editions["en"])
+    monkeypatch.setattr(production, "CODES", codes)
+    monkeypatch.setattr(delivery_player, "CODES", codes)
+    page = Page(delivery_player.player_page(production.Edition("zh"), "1.3.0"))
+    expected = [f"../{code}/index.html" for code in links] + ["../index.html"]
+    assert [a["href"] for a in page.all("a", class_="language")] == expected

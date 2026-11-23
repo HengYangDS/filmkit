@@ -393,8 +393,7 @@ def player_page(edition: Edition, version: str) -> str:
     """The edition's player page, from the film's declaration, its version and the edition's
     files."""
     code = edition.code
-    words, other_code = player_words(code), next(c for c in CODES if c != code)
-    other = player_words(other_code)
+    words = player_words(code)
     title = escape(typeset(repository.read(edition.script)["title"]))
     timeline = repository.read(edition.timeline)
     runtime = runtime_label(edition.runtime_in(timeline))
@@ -405,10 +404,16 @@ def player_page(edition: Edition, version: str) -> str:
         download_link(edition, name, media_type, label)
         for name, media_type, label in download_files(edition)
     )
+    # Every other edition's player in the declared order, each in its own language, then the
+    # entry page.
+    others = "".join(
+        f'<a class="language" href="../{other}/{PAGE}" lang="{player_words(other)["lang"]}" '
+        f'hreflang="{player_words(other)["lang"]}">{player_words(other)["language"]}</a>'
+        for other in CODES
+        if other != code
+    )
     languages = (
-        f'<nav id="languages" aria-label="{words["languages"]}">'
-        f'<a class="language" href="../{other_code}/{PAGE}" lang="{other["lang"]}" '
-        f'hreflang="{other["lang"]}">{other["language"]}</a>'
+        f'<nav id="languages" aria-label="{words["languages"]}">{others}'
         f'<a class="language" href="../{PAGE}">{words["entry"]}</a></nav>'
     )
     shown = escape(version_label(code, version))
