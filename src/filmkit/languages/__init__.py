@@ -39,6 +39,9 @@ SCRIPTS_FILE = FOLDER / "scripts.json"
 # The register's rules, one Vale rule file each (`filmkit.register`).
 REGISTER_RULES = FOLDER.parent / "register/styles/register"
 
+# The kinds of reading check a language may declare: its Han characters read by pypinyin's Mandarin
+# readings, and its stress targets held to CMUdict's ARPAbet.
+PINYIN_READINGS, CMUDICT_STRESS = "pinyin-readings", "cmudict-stress"
 # A language's code: a BCP 47 primary subtag of two or three lowercase letters.
 Code = Annotated[str, StringConstraints(pattern=r"^[a-z]{2,3}$")]
 Stated = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -290,6 +293,21 @@ def language(code: str) -> Language:
     except KeyError:
         message = unknown(code)
         raise LanguageError(message[0].upper() + message[1:]) from None
+
+
+def checks(code: str, kind: str) -> bool:
+    """Whether a language declares a kind of reading check."""
+    return kind in language(code).readings
+
+
+def named(english_name: str) -> Language:
+    """The declared language that the speech models take by this name, as a contract keys its
+    part, refused when no declaration takes it."""
+    found = [held for held in LANGUAGES.values() if held.english_name == english_name]
+    if len(found) != 1:
+        message = f"No one language declaration takes the name {english_name!r}"
+        raise LanguageError(message)
+    return found[0]
 
 
 def model_names() -> list[str]:

@@ -1,4 +1,8 @@
-"""The reading of every watched Chinese character, and the spoken form of every name.
+"""The reading of every watched Han character, and the spoken form of every name.
+
+Each edition runs the reading checks its language declares (`filmkit.languages`): the kind
+`pinyin-readings` reads its Han characters by pypinyin's Mandarin readings, as Chinese declares,
+and the kind `cmudict-stress` holds its stress targets to CMUdict's ARPAbet, as English declares.
 
 A pronunciation contract of schema version 2 declares how the narration is read wherever a
 narrator could read it more than one way. The engine's watch list names the Mandarin characters
@@ -15,12 +19,13 @@ declaring word, which must then have two or more characters, records the reason 
 `dictionary_disagreement`. A declared word the narration never says, and a reason no occurrence
 needs, are refused as stale.
 
-Every Latin word in the Chinese narration must be one of the names the Chinese contract lists in
-`embedded_english_targets`, and every word of the English narration written with two or more
-capitals an English target. Every language's normalization must give each Latin-script term the
-film declares in `[[narration.terms]]` the term's declared spoken form, whatever the contract's
-schema version, and the text of each edition that says the term must hold its declared reference
-occurrence (`narration.terms`, which also measures how the recordings say it). A name that an
+Every Latin word in the narration of a language that does not write Latin script, as Chinese, must
+be one of the names its contract lists in `embedded_english_targets`, and every word written with
+two or more capitals in the narration of one that writes it, as English, one of its targets.
+Every language's normalization must give each Latin-script term the film declares in
+`[[narration.terms]]` the term's declared spoken form, whatever the contract's schema version,
+and the text of each edition that says the term must hold its declared reference occurrence
+(`narration.terms`, which also measures how the recordings say it). A name that an
 edition says and that its normalization respells in other letters must be such a term, whatever
 the schema version: its takes are compared and said as the term's.
 
@@ -28,7 +33,8 @@ The check writes each edition's occurrence plan, a view derived on every check, 
 build/evidence/readings/. Every failure is reported at once, and thoughts are numbered from 1
 within their segment.
 
-With --propose, the check instead writes proposed declarations for the Chinese narration: for each
+With --propose, the check instead writes proposed declarations for the narration of each edition
+whose language declares `pinyin-readings`, as `<code>-proposals.json`: for each
 watched occurrence that no declaration resolves, the dictionary's word around it, widened to two
 characters for a word character, with the dictionary's contextual reading. A proposal declares
 nothing; the author reads it and declares what the narration means.
@@ -50,6 +56,7 @@ from pypinyin import Style, pinyin
 from pypinyin.constants import PHRASES_DICT
 from pypinyin.seg.mmseg import seg
 
+import filmkit.languages as languages
 import filmkit.narration.terms as terms
 import filmkit.repository as repository
 from filmkit.film import FILM
@@ -265,13 +272,15 @@ def resolve(thoughts: list[Thought], words: list[Word]) -> tuple[list[dict], lis
     return rows, failures
 
 
-def undeclared_names(thoughts: list[Thought], declared: set[str], *, chinese: bool) -> list[str]:
-    """Each name the narration says without a declared spoken form, with where it is said."""
+def undeclared_names(thoughts: list[Thought], declared: set[str], *, embedded: bool) -> list[str]:
+    """Each name the narration says without a declared spoken form, with where it is said: in a
+    language that writes no Latin script (`embedded`), every Latin word; otherwise every word
+    written with two or more capitals."""
     places: dict[str, list[str]] = {}
     for thought in thoughts:
         for match in LATIN_WORD.finditer(thought.text):
             name = match.group()
-            is_name = chinese or sum(char.isupper() for char in name) >= 2
+            is_name = embedded or sum(char.isupper() for char in name) >= 2
             if is_name and name not in declared:
                 places.setdefault(name, []).append(thought.where)
     return [
@@ -294,7 +303,9 @@ def plan_path(code: str) -> str:
     return f"build/evidence/readings/{code}-plan.json"
 
 
-PROPOSALS = "build/evidence/readings/zh-proposals.json"
+def proposals_path(code: str) -> str:
+    """Where the readings check writes an edition's proposed declarations."""
+    return f"build/evidence/readings/{code}-proposals.json"
 
 
 def segments(text: str) -> list[tuple[int, int]]:
@@ -350,28 +361,32 @@ def proposals(thoughts: list[Thought], words: list[Word]) -> list[dict]:
     return sorted(grouped.values(), key=lambda row: (-row["occurrences"], row["term"]))
 
 
-def propose() -> dict:
-    """Write the proposed declarations for the Chinese narration, whatever its schema version.
+def propose() -> list[dict]:
+    """Write the proposed declarations for the narration of each edition whose language reads its
+    Han characters by their pinyin, whatever its schema version.
 
     Returns:
-        The report: the contract, the proposals' path and their counts.
+        Each such edition's report: the contract, the proposals' path and their counts.
     """
-    edition = Edition("zh")
-    script = repository.read(edition.script)
-    path = script["pronunciation_contract"]
-    contract = repository.read(path)["pronunciation"]["languages"][edition.language]
-    words, _failures = declared_words(contract)
-    rows = proposals(edition_thoughts(script, contract), words)
-    report = {
-        "edition": "zh",
-        "contract": path,
-        "contract_sha256": repository.sha(path),
-        "proposals": len(rows),
-        "occurrences": sum(row["occurrences"] for row in rows),
-        "path": PROPOSALS,
-    }
-    repository.write(PROPOSALS, {**report, "rows": rows})
-    return report
+    reports = []
+    for code in (code for code in CODES if languages.checks(code, languages.PINYIN_READINGS)):
+        edition = Edition(code)
+        script = repository.read(edition.script)
+        path = script["pronunciation_contract"]
+        contract = repository.read(path)["pronunciation"]["languages"][edition.language]
+        words, _failures = declared_words(contract)
+        rows = proposals(edition_thoughts(script, contract), words)
+        report = {
+            "edition": code,
+            "contract": path,
+            "contract_sha256": repository.sha(path),
+            "proposals": len(rows),
+            "occurrences": sum(row["occurrences"] for row in rows),
+            "path": proposals_path(code),
+        }
+        repository.write(proposals_path(code), {**report, "rows": rows})
+        reports.append(report)
+    return reports
 
 
 def term_failures(
@@ -415,15 +430,20 @@ def check(code: str) -> dict:
             "status": "not_applicable",
         }
     contract = performance["languages"][edition.language]
-    if code == "zh":
+    rows, failures = [], []
+    if languages.checks(code, languages.PINYIN_READINGS):
         words, failures = declared_words(contract)
         rows, gaps = resolve(thoughts, words)
-        names = set(contract.get("embedded_english_targets", []))
-        failures += gaps + undeclared_names(thoughts, names, chinese=True)
-    else:
-        rows = []
-        names = {target["term"] for target in contract.get("targets", [])}
-        failures = undeclared_names(thoughts, names, chinese=False)
+        failures += gaps
+    # A language that writes no Latin script says every Latin word as a name its contract lists;
+    # one that writes it, each word written with two or more capitals as one of its targets.
+    embeds = "latin" not in edition.declaration.scripts
+    names = (
+        set(contract.get("embedded_english_targets", []))
+        if embeds
+        else {target["term"] for target in contract.get("targets", [])}
+    )
+    failures += undeclared_names(thoughts, names, embedded=embeds)
     failures += declared
     if failures:
         raise ReadingError("\n".join(failures))
@@ -443,7 +463,9 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Check every declared reading and name.")
     choice = parser.add_mutually_exclusive_group()
     choice.add_argument("--language", choices=CODES)
-    choice.add_argument("--propose", action="store_true", help="Propose Chinese declarations")
+    choice.add_argument(
+        "--propose", action="store_true", help="Propose declarations of Han characters' readings"
+    )
     options = parser.parse_args(argv)
     if options.propose:
         print(json.dumps(propose(), ensure_ascii=False))

@@ -117,14 +117,26 @@ def occurrences(term: str, text: str, code: str) -> Iterator[tuple[int, int]]:
 
 
 def analyst_contract(contract: dict, readings: Readings) -> dict:
-    """The pronunciation contract with the film's analyst-stated readings and variants."""
-    chinese = contract["languages"]["Chinese"]
+    """The pronunciation contract with the film's analyst-stated readings and variants: the
+    Mandarin readings in the part of each edition whose language reads Han characters by their
+    pinyin, the heteronyms and variants in that of each whose language holds stress to CMUdict."""
+    for code in CODES:
+        part = contract["languages"].get(Edition(code).language)
+        if part is not None and languages.checks(code, languages.PINYIN_READINGS):
+            _add_mandarin(contract, part, readings)
+        if part is not None and languages.checks(code, languages.CMUDICT_STRESS):
+            _add_heteronyms(contract, part, readings)
+    return contract
+
+
+def _add_mandarin(contract: dict, part: dict, readings: Readings) -> None:
+    """Add each analyst-stated Mandarin reading a part does not declare, and its source once."""
     if not any(source["id"] == "analyst-mandarin" for source in contract["sources"]):
         contract["sources"].append({"id": "analyst-mandarin", "qualification": MANDARIN_BASIS})
-    known = {target["term"] for target in chinese["targets"]}
+    known = {target["term"] for target in part["targets"]}
     for term, reading in readings.mandarin.items():
         if term not in known:
-            chinese["targets"].append(
+            part["targets"].append(
                 {
                     "term": term,
                     "kind": "contextual-mandarin-word",
@@ -133,7 +145,11 @@ def analyst_contract(contract: dict, readings: Readings) -> dict:
                     "status": "planned-not-listened",
                 }
             )
-    english = contract["languages"]["English"]
+
+
+def _add_heteronyms(contract: dict, english: dict, readings: Readings) -> None:
+    """Add each analyst-stated heteronym a part does not declare and each variant of its targets,
+    and their source once."""
     known = {target["term"] for target in english["targets"]}
     if not any(source["id"] == "analyst-inference" for source in contract["sources"]):
         contract["sources"].append({"id": "analyst-inference", "qualification": BASIS})
@@ -159,7 +175,6 @@ def analyst_contract(contract: dict, readings: Readings) -> dict:
                     **target.get("variant_sources", {}),
                     variant: "analyst-inference",
                 }
-    return contract
 
 
 def target_entries(
@@ -197,7 +212,7 @@ def target_entries(
                 "grammar": target["kind"],
                 "clause": clause,
             }
-            if code == "zh":
+            if languages.checks(code, languages.PINYIN_READINGS):
                 entry |= {
                     "target_reading": target["target_reading"],
                     "target_stress": {},
@@ -286,7 +301,7 @@ def listening_plan(out: Path) -> dict:
     current = {
         (entry["target_owner_term"], f"{entry['section']}:{entry['display_span'][0]}")
         for entry in entries
-        if entry["locale"] == "en"
+        if languages.checks(entry["locale"], languages.CMUDICT_STRESS)
     }
     stale = {
         term: sorted(key for key in keys if (term, key) not in current)
@@ -314,7 +329,11 @@ def listening_plan(out: Path) -> dict:
     return {
         "output": repository.relative(out),
         "occurrences": {code: sum(entry["locale"] == code for entry in entries) for code in CODES},
-        "english_targets": len(contract["languages"]["English"]["targets"]),
+        "stress_targets": sum(
+            len(contract["languages"][Edition(code).language]["targets"])
+            for code in CODES
+            if languages.checks(code, languages.CMUDICT_STRESS)
+        ),
     }
 
 

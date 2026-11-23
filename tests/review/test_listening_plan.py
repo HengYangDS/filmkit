@@ -82,7 +82,7 @@ def test_listening_plan_binds_each_occurrence_and_refuses_unrecorded_readings(ro
     assert review_listening_plan.listening_plan(out) == {
         "output": "plan.json",
         "occurrences": {"zh": 3, "en": 4},
-        "english_targets": 3,
+        "stress_targets": 3,
     }
     plan = json.loads(out.read_text())
     entries = plan["occurrence_plan"]["entries"]
@@ -209,3 +209,13 @@ def test_a_test_language_finds_a_term_as_its_source():
     assert list(occurrences("record", "A record, recorded.", "xb")) == list(
         occurrences("record", "A record, recorded.", "en")
     )
+
+
+@pytest.mark.usefixtures("test_editions")
+def test_a_test_languages_occurrence_takes_its_sources_kind_of_entry():
+    target = {"term": "记录", "kind": "contextual-mandarin-word", "target_reading": "jì lù"}
+    segments = [{"id": "01", "text": "记录了。", "utterance_groups": ["记录了。"]}]
+    zh = review_listening_plan.target_entries("zh", target, segments, {})
+    xa = review_listening_plan.target_entries("xa", target, segments, {})
+    assert [entry | {"locale": "zh"} for entry in xa] == zh
+    assert zh[0]["target_reading"] == "jì lù"

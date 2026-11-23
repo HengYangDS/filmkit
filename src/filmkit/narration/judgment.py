@@ -56,6 +56,7 @@ import numpy as np
 from mlx_audio.audio_io import write
 from mlx_audio.stt.utils import load_model
 
+import filmkit.languages as languages
 import filmkit.narration.flow as flow
 import filmkit.narration.readings as readings
 import filmkit.narration.selection as selection
@@ -173,13 +174,18 @@ def bench(code: str, references: list, *, asr, aligner: dict, film=None) -> Benc
     film = film or FILM
     edition = Edition(code)
     script = repository.read(edition.script)
-    words, texts, chinese = (), [], code == "zh" and bool(script.get("pronunciation_contract"))
-    if chinese:
+    # An edition that reads its Han characters by their pinyin compares its words' readings; one
+    # whose language writes no Latin script hears each Latin unit its texts say as a name.
+    contracted = bool(script.get("pronunciation_contract"))
+    pinyin = contracted and languages.checks(code, languages.PINYIN_READINGS)
+    embeds = contracted and "latin" not in edition.declaration.scripts
+    words, texts = (), []
+    if pinyin or embeds:
         contract, _ = pronunciation_contract(script, edition.language)
-        words = readings.compared_words(contract)
         texts = [thought.text for thought in readings.edition_thoughts(script, contract)]
+        words = readings.compared_words(contract) if pinyin else ()
     measured_standards = standards(code, references, aligner, edition.language)
-    names = edition_names(film.narration.terms, texts, chinese=chinese)
+    names = edition_names(film.narration.terms, texts, chinese=embeds)
     return Bench(
         code, edition.language, asr, aligner, measured_standards, words, film.narration.flow, names
     )

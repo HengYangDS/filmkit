@@ -220,8 +220,10 @@ def test_the_cli_proposes_without_changing_the_contract(film, capsys):
     edit(drop_a_word)
     before = path.read_bytes()
     readings.main(["--propose"])
-    assert json.loads(capsys.readouterr().out)["proposals"] == 1
-    written = json.loads((root / readings.PROPOSALS).read_text(encoding="utf-8"))
+    (report,) = json.loads(capsys.readouterr().out)
+    assert (report["edition"], report["proposals"]) == ("zh", 1)
+    assert report["path"] == "build/evidence/readings/zh-proposals.json"
+    written = json.loads((root / readings.proposals_path("zh")).read_text(encoding="utf-8"))
     assert written["rows"] == [
         {"term": "参考", "target_reading": "cān kǎo", "occurrences": 1, "said_in": ["01.2"]}
     ]
@@ -230,11 +232,11 @@ def test_the_cli_proposes_without_changing_the_contract(film, capsys):
 
 def test_names_need_one_declared_spoken_form():
     zh = [Thought("01.1", "一个 Agent 交回来。"), Thought("05.1", "GitLab 和 GitHub 上。")]
-    assert readings.undeclared_names(zh, {"Agent", "GitHub"}, chinese=True) == [
+    assert readings.undeclared_names(zh, {"Agent", "GitHub"}, embedded=True) == [
         "GitLab has no declared spoken form; it is said in 05.1"
     ]
     en = [Thought("03.1", "ETHOS keeps One OpenSpec Change. Then ETHOS checks.")]
-    assert readings.undeclared_names(en, {"ETHOS"}, chinese=False) == [
+    assert readings.undeclared_names(en, {"ETHOS"}, embedded=False) == [
         "OpenSpec has no declared spoken form; it is said in 03.1"
     ]
 
@@ -445,3 +447,20 @@ def test_a_respelled_latin_name_is_declared_as_a_term_before_narration(film, mon
         with pytest.raises(readings.ReadingError) as refusal:
             readings.check(code)
         assert str(refusal.value) == owed.format(code=code)
+
+
+@pytest.mark.usefixtures("test_languages")
+def test_each_reading_check_is_chosen_by_the_kinds_its_language_declares():
+    import filmkit.languages as languages
+
+    kinds = {code: languages.language(code).readings for code in ("zh", "en", "xa", "xb")}
+    assert kinds == {
+        "zh": ("pinyin-readings",),
+        "en": ("cmudict-stress",),
+        "xa": ("pinyin-readings",),
+        "xb": ("cmudict-stress",),
+    }
+    assert languages.checks("xa", languages.PINYIN_READINGS)
+    assert not languages.checks("xa", languages.CMUDICT_STRESS)
+    assert languages.checks("xb", languages.CMUDICT_STRESS)
+    assert readings.proposals_path("xa") == "build/evidence/readings/xa-proposals.json"

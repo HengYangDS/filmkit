@@ -491,3 +491,29 @@ def test_the_judgment_reads_the_receipt_the_cast_declares(narrated, voiced):
     cast["performance_recording"] = {"receipt": "build/other-receipt.json"}
     repository.write(Edition("en").cast, cast)
     assert narration_judge.receipt_of("en") == "build/other-receipt.json"
+
+
+@pytest.mark.usefixtures("test_editions")
+def test_a_test_languages_bench_takes_its_sources_reading_check(monkeypatch, tmp_path):
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    rule = {"display": "NAME", "spoken": "Naim", "kind": "english-name"}
+    parts = {name: {"normalization": [rule]} for name in ("Chinese", "English", "Xa", "Xb")}
+    repository.write("contract.json", {"pronunciation": {"languages": parts}})
+    groups = ["NAME 和 Agent 一起。", "再用 Node.js 跑。"]
+    text = "".join(groups)
+    segment = {"id": "01", "text": text, "spoken_text": text.replace("NAME", "Naim")}
+    segment["utterance_groups"] = groups
+    for code in ("zh", "xa", "en", "xb"):
+        script = {"pronunciation_contract": "contract.json", "segments": [segment]}
+        repository.write(Edition(code).script, script)
+    monkeypatch.setattr(narration_judgment, "standards", lambda *_: [])
+    declared = narration_judgment.FILM.model_copy(
+        update={"narration": film.Narration(terms=(NAME,))}
+    )
+    benches = {
+        code: narration_judgment.bench(code, [], asr=None, aligner={}, film=declared)
+        for code in ("zh", "xa", "en", "xb")
+    }
+    assert (benches["xa"].words, benches["xa"].names) == (benches["zh"].words, benches["zh"].names)
+    assert (benches["xb"].words, benches["xb"].names) == (benches["en"].words, benches["en"].names)
+    assert benches["xa"].names.chinese and not benches["xb"].names.chinese

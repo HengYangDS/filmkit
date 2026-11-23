@@ -34,8 +34,14 @@ def pronunciation_contract(script: dict, language: str) -> tuple[dict, str]:
 
 
 def validate_pronunciation_targets(performance: dict) -> None:
-    """Reject contradictory lexical stress before loading a speech provider."""
-    targets = performance["pronunciation"]["languages"].get("English", {}).get("targets", [])
+    """Reject contradictory lexical stress before loading a speech provider, in the part of each
+    language that holds its stress to CMUdict (`filmkit.languages`)."""
+    targets = [
+        target
+        for name, part in performance["pronunciation"]["languages"].items()
+        if languages.CMUDICT_STRESS in languages.named(name).readings
+        for target in part.get("targets", [])
+    ]
     for target in targets:
         _check_stress(target.get("lexical_stress", {}), target["term"])
     _check_occurrence_plan(performance["pronunciation"].get("occurrence_plan"), targets)
@@ -114,7 +120,7 @@ def _check_occurrence_plan(occurrence_plan: dict | None, targets: list[dict]) ->
         ):
             msg = "Letter-name target requires an authored label"
             raise ValueError(msg)
-        if entry["locale"] == "en":
+        if languages.checks(entry["locale"], languages.CMUDICT_STRESS):
             _check_stress(entry["target_stress"], term)
 
 
