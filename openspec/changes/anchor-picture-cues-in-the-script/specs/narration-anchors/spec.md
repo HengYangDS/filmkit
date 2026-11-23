@@ -1,3 +1,10 @@
+## Purpose
+
+Key every picture change to words of the narration by naming them in the script, once: a segment marks
+anchors in its own thoughts, the timeline gives each anchor the times of its words, and the picture reads an
+anchor by its id instead of quoting the narration, so an approved change of the words moves the picture with
+them and never strands it.
+
 ## ADDED Requirements
 
 ### Requirement: A segment may mark anchors in its thoughts
