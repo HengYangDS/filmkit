@@ -102,3 +102,12 @@ def test_floors_for_an_undeclared_edition_or_without_a_declared_one_are_refused(
     with pytest.raises(FilmError) as refusal:
         film.load(declared)
     assert "review.clarity_minimum_db states no floor for en" in str(refusal.value)
+
+
+def test_a_flat_list_of_lead_words_is_refused_with_what_to_write_instead(declared):
+    rewrite(declared, "[review]\n", '[picture.wrapping]\nlead_words = ["versus"]\n\n[review]\n')
+    with pytest.raises(FilmError) as refusal:
+        film.load(declared)
+    said = "picture.wrapping.lead_words is a list; key it by the language its words lead in"
+    assert said in str(refusal.value)
+    assert "lead_words = { en = ['versus'] }" in str(refusal.value)

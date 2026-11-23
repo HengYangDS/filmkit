@@ -451,3 +451,20 @@ def test_a_stale_exception_alone_brings_no_advice(monkeypatch):
     refusal = refused()
     stale = "The register exception of '搞' at zh 01.1 is stale: the place does not hold '先搞清楚'"
     assert (str(refusal), list(refusal.lines)) == (stale, [stale])
+
+
+def test_each_place_meets_the_rules_of_the_languages_its_words_are_in(words):
+    contraction = "is a contraction (R3)"
+    # A contraction is English's: refused in an English thought and in a Chinese one, which reads
+    # Latin script as English; 其实 is Chinese's: refused in a Chinese thought, and not looked for
+    # in an English one.
+    say(words, "zh", "其实这一步不复杂，don't 跳过它。")
+    say(words, "en", "It reads 其实 here, so don't skip it.")
+    refusal(
+        f"zh 01.1: '其实' {COLLOQUIAL}",
+        f"zh 01.1: 'don't' {contraction}",
+        f"en 01.1: 'don't' {contraction}",
+    )
+    say(words, "zh", "这一步不复杂。")
+    say(words, "en", "It reads 其实 here, so do not skip it.")
+    assert register.check()["places"] > 0

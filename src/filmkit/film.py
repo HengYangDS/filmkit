@@ -109,7 +109,7 @@ class Player(Declared):
 
 # A share of the widest line of one size in a wrapped label.
 Share = Annotated[float, Field(gt=0, le=1)]
-# A word an English line may not end on.
+# A word a line of a language may not end on.
 LeadWord = Annotated[str, StringConstraints(pattern=r"^\S+$")]
 
 
@@ -126,16 +126,29 @@ class Wrapping(Declared):
     """How the picture's wrapped labels break (`filmkit.picture.gates`).
 
     Among the lines of one size, a line other than the last spans at least `line_share` of the
-    widest and the last at least `last_share`. `lead_words` adds the words an English line may
-    not end on to the engine's. A label of an edition whose lines one of the edition's exceptions
+    widest and the last at least `last_share`. `lead_words`, keyed by a language's code, adds the
+    words a line of that language may not end on to those its declaration names
+    (`filmkit.languages`). A label of an edition whose lines one of the edition's exceptions
     names is recorded with its reason instead of refused, and an exception that no frame of its
     edition paints is refused.
     """
 
     line_share: Share = 0.8
     last_share: Share = 0.6
-    lead_words: tuple[LeadWord, ...] = ()
+    lead_words: dict[Code, tuple[LeadWord, ...]] = Field(default_factory=dict)
     exceptions: tuple[WrappingException, ...] = ()
+
+    @field_validator("lead_words", mode="before")
+    @classmethod
+    def keyed_by_language(cls, words: object) -> object:
+        """Refuse the former flat list, which named no language its words are lead words of."""
+        if isinstance(words, list | tuple):
+            message = (
+                "picture.wrapping.lead_words is a list; key it by the language its words lead "
+                f"in, as lead_words = {{ en = {list(words)!r} }}"
+            )
+            raise ValueError(message)
+        return words
 
     @field_validator("exceptions")
     @classmethod

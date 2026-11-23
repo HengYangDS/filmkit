@@ -13,30 +13,23 @@
  * in FILMKIT_WRAPPING) or the defaults:
  *   - within the lines of one size, a line other than the last spans at least `line_share` of the widest of them, and
  *     the last at least `last_share`;
- *   - an English label, one without a Han character: within the lines of one size, a line other than the last ends on
- *     no lead word, and lines holding three or more words leave more than one word on the last; a name over its
+ *   - a label without a Han character: within the lines of one size, a line other than the last ends on no lead word
+ *     of the language the label is written in (`leadWords`: the edition's own where the label holds a script it writes,
+ *     else the language it reads the label's script in, else none), and lines holding three or more words leave more
+ *     than one word on the last; a name over its
  *     smaller gloss is thus two blocks, not one broken phrase;
  *   - a Chinese label, one with a Han character: no line after the first opens on closing punctuation. */
 import { readFileSync } from "node:fs";
 
-import { characterClass } from "../../../languages/scripts.mjs";
+import { characterClass, classTest } from "../../../languages/scripts.mjs";
 import { CJK, CLOSING, HUNG, OPENING } from "./layout.mjs";
 
-/* The words an English line may not end on, as they lead the phrase that follows them: articles, prepositions,
- * coordinating and subordinating conjunctions, determiners, possessives, wh-words and auxiliaries. A film declares
- * more in its `lead_words`. */
-export const LEAD_WORDS = new Set(
-  (
-    "a an the of in on at by to for with from into onto over under about after before between through without " +
-    "within against per via as than like and or but nor if because although though while unless until since " +
-    "whether its their his her our your my this that these those each every any no some which who whose whom what " +
-    "when where why how is are was were be been can will would should may must not"
-  ).split(" "),
-);
 /* The marks that close what precedes them, which a Chinese line may not open on. */
 export const CLOSES = new RegExp(`^[${characterClass("line-closing")}]`, "u");
-/* The rules a film declares in [picture.wrapping], with their defaults. */
-export const WRAPPING = Object.freeze({ line_share: 0.8, last_share: 0.6, lead_words: [] });
+/* The rules a film declares in [picture.wrapping], with their defaults, and the languages a label of the edition may be
+ * written in, as the gate writes them (`filmkit.picture.gates.wrapping_rules`): each with the scripts that choose it,
+ * first the edition's own, and the words a line of it may not end on. Without them no lead word is known. */
+export const WRAPPING = Object.freeze({ line_share: 0.8, last_share: 0.6, languages: [] });
 
 /* Every line stands at this opacity or more when its label is at rest. */
 const REST = 0.9;
@@ -73,7 +66,7 @@ const bare = (v) => word(v).toLowerCase().replaceAll("’", "'");
 const wordsOf = (v) => v.split(/\s+/u).filter((w) => /[\p{L}\p{N}]/u.test(w));
 
 /** The rules of the declaration that FILMKIT_WRAPPING names, a JSON object of `line_share`, `last_share` and
- * `lead_words`, or the defaults without one. */
+ * `languages`, or the defaults without one. */
 export function readWrapping(path = process.env.FILMKIT_WRAPPING) {
   if (!path) return WRAPPING;
   const declared = { ...WRAPPING, ...JSON.parse(readFileSync(path, "utf8")) };
@@ -216,11 +209,21 @@ function blocksOf(lines) {
   return blocks;
 }
 
+/** The lead words of the language a label is written in: the first of the rules' languages one of whose scripts the
+ * label holds a character of; none where it holds none, so that a Latin-script label of a language that declares no
+ * lead words is refused for none. */
+export function leadWords(whole, rules = WRAPPING) {
+  const chosen = (rules.languages ?? []).find(({ scripts }) =>
+    scripts.some((script) => classTest(script)(whole)),
+  );
+  return chosen?.lead_words ?? [];
+}
+
 /** The rules a wrapped label's lines break (wrappedLabels), each named with its line: the share of the widest line of
  * its size a line spans under the declared shares, a lead word at the end of a line, one word left on the last line,
  * and a Chinese line opening on closing punctuation. */
 export function labelBreaks({ whole, lines }, rules = WRAPPING) {
-  const lead = new Set([...LEAD_WORDS, ...rules.lead_words.map(bare)]),
+  const lead = new Set(leadWords(whole, rules).map(bare)),
     chinese = HAN.test(whole),
     found = [];
   for (const block of blocksOf(lines)) {

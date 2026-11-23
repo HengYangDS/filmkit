@@ -52,6 +52,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import filmkit.durations as durations
+import filmkit.languages as languages
 import filmkit.released as released
 import filmkit.repository as repository
 import filmkit.tools as tools
@@ -203,9 +204,25 @@ def shown_lines(lines: tuple[str, ...]) -> str:
     return " / ".join(json.dumps(line, ensure_ascii=False) for line in lines)
 
 
-def wrapping_rules(wrapping: Wrapping) -> dict:
-    """The rules the frame audit judges wrapped labels by: the declared shares and lead words."""
-    return wrapping.model_dump(mode="json", include={"line_share", "last_share", "lead_words"})
+def wrapping_rules(wrapping: Wrapping, code: str) -> dict:
+    """The rules the frame audit judges an edition's wrapped labels by: the declared shares, and
+    the languages a label of the edition may be written in (`languages.written_in`), first the
+    edition's own, then the language it reads each other script in, each with the scripts that
+    choose it and its lead words, its declaration's and those the film adds for it."""
+    edition = languages.language(code)
+    chosen = [(edition, list(edition.scripts))]
+    chosen += [(languages.language(other), [script]) for script, other in edition.embedded.items()]
+    return {
+        **wrapping.model_dump(mode="json", include={"line_share", "last_share"}),
+        "languages": [
+            {
+                "code": language.code,
+                "scripts": scripts,
+                "lead_words": [*language.lead_words, *wrapping.lead_words.get(language.code, ())],
+            }
+            for language, scripts in chosen
+        ],
+    }
 
 
 def wrapping_findings(frame: dict, wrapping: Wrapping, code: str) -> tuple[list[str], list[str]]:
@@ -433,7 +450,7 @@ def check_picture(edition: Edition) -> dict:
     faces = {metrics.VARIABLE: str(metrics.current_table())}
     wrapping = FILM.picture.wrapping
     rules = work / "wrapping.json"
-    repository.write(rules, wrapping_rules(wrapping))
+    repository.write(rules, wrapping_rules(wrapping, edition.code))
     traces = {"TRACE": str(trace), "TEXTS": str(texts_trace), "MARKS": str(marks)}
     traces["TURNS"] = str(turns_path)
     reads_path = work / "anchors.json"
@@ -465,7 +482,8 @@ def check_picture(edition: Edition) -> dict:
     draws = repository.read(turns_path)["draws"]
     if draws:
         run_audit("whole-turns", [str(turns_path)], painted_path)
-    sync = sync_audit.full_report(repository.read(edition.timeline), trace, marks, FRAME_STEP)
+    timeline_data = repository.read(edition.timeline)
+    sync = sync_audit.full_report(timeline_data, trace, marks, FRAME_STEP, edition.code)
     repository.write(sync_path, sync)
     lines = sync_audit.read_trace(texts_trace)
     texts = text_trace.report(repository.read(edition.timeline), lines, FRAME_STEP)

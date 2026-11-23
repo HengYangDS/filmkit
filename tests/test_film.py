@@ -161,7 +161,7 @@ def test_both_editions_are_declared(declared):
 WRAPPING = """[picture.wrapping]
 line_share = 0.75
 last_share = 0.5
-lead_words = ["versus"]
+lead_words = { en = ["versus"] }
 exceptions = [
   { edition = "en", lines = ["Stated", "assumptions"], reason = "a term set as one name" },
 ]
@@ -174,7 +174,7 @@ def test_wrapping_rules_default_and_are_declared_with_their_exceptions(declared)
     rewrite(declared, "[review]\n", WRAPPING + "[review]\n")
     wrapping = film.load(declared).picture.wrapping
     assert (wrapping.line_share, wrapping.last_share) == (0.75, 0.5)
-    assert wrapping.lead_words == ("versus",)
+    assert wrapping.lead_words == {"en": ("versus",)}
     lines, reason = ("Stated", "assumptions"), "a term set as one name"
     kept = film.WrappingException(edition="en", lines=lines, reason=reason)
     assert wrapping.exceptions == (kept,)
@@ -189,7 +189,7 @@ def test_wrapping_rules_default_and_are_declared_with_their_exceptions(declared)
         ('"a term set as one name"', '" "', "picture.wrapping.exceptions.0.reason"),
         ('edition = "en", ', "", "picture.wrapping.exceptions.0.edition"),
         ('["Stated", "assumptions"]', '["Stated assumptions"]', "wrapping.exceptions.0.lines"),
-        ('["versus"]', '["two words"]', "picture.wrapping.lead_words.0"),
+        ('["versus"]', '["two words"]', "picture.wrapping.lead_words.en.0"),
     ],
 )
 def test_a_wrapping_declaration_refuses_naming_its_field(declared, old, new, field):

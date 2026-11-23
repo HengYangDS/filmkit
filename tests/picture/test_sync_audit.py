@@ -3,8 +3,10 @@
 import json
 import re
 
+import derived_languages
 import pytest
 
+import filmkit.languages as languages
 import filmkit.picture.sync_audit as picture_sync_audit
 from filmkit.picture.rendering import PictureError
 
@@ -96,7 +98,8 @@ AVAILABILITY = [("Availability", 338.6, 339.2), ("is", 339.2, 339.3), ("checked.
 
 def test_an_english_label_is_judged_by_its_inflected_words_in_its_own_thought():
     film = scene("05", AVAILABLE, AVAILABILITY)
-    report, judged = picture_sync_audit.audit(film, [line(330.17, "Availability", scene="05")])
+    shown = [line(330.17, "Availability", scene="05")]
+    report, judged = picture_sync_audit.audit(film, shown, code="en")
     assert report["far_from_words"] == []
     assert judged == [
         {
@@ -134,7 +137,7 @@ def test_words_that_only_look_alike_do_not_match():
     publish += [("daily.", 20.6, 21.0)]
     film = scene("09", public, publish)
     trace = [line(10.1, "Publish", scene="09"), line(20.0, "Published", scene="09")]
-    report, judged = picture_sync_audit.audit(film, trace)
+    report, judged = picture_sync_audit.audit(film, trace, code="en")
     assert report["far_from_words"] == [
         {"scene": "09", "label": "Publish", "legible": 10.1, "spoken": [20.1]}
     ]
@@ -148,13 +151,15 @@ def test_an_inflected_match_outside_the_labels_thought_is_not_taken():
     late = [("Availability", 345.0, 345.6), ("matters.", 345.6, 346.2)]
     film = scene("05", AVAILABLE, records, late)
     # Standing in the second thought, the label is not judged by the first thought's "available".
-    report, judged = picture_sync_audit.audit(film, [line(333.0, "Availability", scene="05")])
+    report, judged = picture_sync_audit.audit(
+        film, [line(333.0, "Availability", scene="05")], code="en"
+    )
     assert judged == []
     assert report["far_from_words"] == [
         {"scene": "05", "label": "Availability", "legible": 333.0, "spoken": [345.0]}
     ]
     # Standing in the first thought, it is.
-    first = picture_sync_audit.audit(film, [line(330.17, "Availability", scene="05")])[1]
+    first = picture_sync_audit.audit(film, [line(330.17, "Availability", scene="05")], code="en")[1]
     assert [(row["spoken"], row["match"]) for row in first] == [(330.36, "inflected")]
 
 
@@ -393,3 +398,21 @@ def test_the_summary_keys_are_the_report_counts():
         "ahead-in-clause": 1,
         "after-words": 0,
     }
+
+
+def test_a_label_is_stemmed_by_the_language_it_is_written_in(test_languages, monkeypatch):
+    film = scene("05", AVAILABLE, AVAILABILITY)
+    shown = [line(330.17, "Availability", scene="05")]
+    # An English label of a Chinese edition is English, as Chinese reads Latin script.
+    for code in ("zh", "xa", "en", "xb"):
+        assert picture_sync_audit.audit(film, shown, code=code)[1][0]["match"] == "inflected"
+    # A Latin-script language that declares no stemmer matches the label's exact words alone.
+    plain = derived_languages.declaration("en") | {"tag": "xc", "iso639_2": "qac"}
+    plain |= {"english_name": "Xc", "name": "Xc", "stemmer": "none"}
+    monkeypatch.setitem(languages.LANGUAGES, "xc", languages.parse("xc", plain))
+    # The exact words are said 8.43 s after the label, so the label is far from them.
+    for code in ("xc", None):
+        report, judged = picture_sync_audit.audit(film, shown, code=code)
+        assert judged == [] and [row["label"] for row in report["far_from_words"]] == [
+            "Availability"
+        ]

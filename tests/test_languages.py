@@ -14,7 +14,6 @@ import filmkit.languages as languages
 from filmkit.delivery.player import player_words
 
 REPOSITORY = Path(__file__).resolve().parents[1]
-BREAKS = REPOSITORY / "src/filmkit/picture/frame-audit/typography/breaks.mjs"
 
 
 def test_the_engine_declares_chinese_and_english():
@@ -63,10 +62,12 @@ def test_english_holds_the_values_of_its_table():
     assert "colloquial" not in en.rules and "contractions" in en.rules
 
 
-def test_the_lead_words_are_those_the_frame_audit_names():
-    listed = re.search(r"LEAD_WORDS = new Set\(\s*\((.*?)\)\.split", BREAKS.read_text(), re.S)
-    words = "".join(re.findall(r'"([^"]*)"', listed.group(1))).split(" ")
-    assert languages.language("en").lead_words == tuple(words)
+def test_english_declares_the_words_that_lead_a_phrase():
+    lead = languages.language("en").lead_words
+    assert {"a", "of", "and", "its", "which", "is", "not", "what", "when", "if", "until"} <= set(
+        lead
+    )
+    assert len(lead) == len(set(lead)) == 80
 
 
 @pytest.mark.parametrize("code", ["zh", "en"])

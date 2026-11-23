@@ -35,10 +35,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from filmkit.picture.label_matches import (
-    english,
     exact_matches,
     inflected_matches,
     spoken_index,
+    stemmer,
     thought_words,
     units,
     words,
@@ -160,18 +160,21 @@ def summarize(
 
 
 def audit(
-    timeline: dict, trace_lines: Iterable[str], tolerance: float = 0.3
+    timeline: dict, trace_lines: Iterable[str], tolerance: float = 0.3, code: str | None = None
 ) -> tuple[dict, list[dict]]:
     """Judge each appearance of each legible label against its spoken words; return a report.
 
     An appearance takes the nearest exact occurrence of its label's words within 8 s that no
-    earlier appearance took, and an English label without one its nearest inflected occurrence
-    in its thought, as `filmkit.picture.label_matches` finds them. A label its scene never says
+    earlier appearance took, and a label without one whose language declares a stemmer its
+    nearest inflected occurrence in its thought, as `filmkit.picture.label_matches` finds them.
+    The edition, `code` or else the timeline's `edition`, says what language a label is written
+    in; a timeline of no edition is matched exactly alone. A label its scene never says
     is unspoken, a first appearance whose words are said only farther away is far from them,
     and a later appearance without its words is a recall.
     """
     segments = {segment["id"]: segment for segment in timeline["segments"]}
     index = {key: spoken_index(segment) for key, segment in segments.items()}
+    edition = code or timeline.get("edition")
     judged, far, unmatched, recalls = [], [], [], []
     for (scene, label), appearances in legible_labels(trace_lines).items():
         needle = units(label)
@@ -184,9 +187,10 @@ def audit(
             row = {"scene": scene, "label": label, "legible": round(shown, 3)}
             kind, found = "exact", exact
             match = nearest(found, shown, taken)
-            if match is None and english(label):
+            stemming = stemmer(label, edition) if edition else None
+            if match is None and stemming is not None:
                 kind = "inflected"
-                found = inflected_matches(segments[scene], index[scene], label, shown)
+                found = inflected_matches(segments[scene], index[scene], label, shown, stemming)
                 match = nearest(found, shown, taken)
             if match is None:
                 # A spoken match more than 8 s away names something else: a recap, a heading
@@ -508,14 +512,16 @@ def read_trace(path: Path) -> list[str]:
         return handle.readlines()
 
 
-def full_report(timeline: dict, trace: Path, marks: Path | None, step: float) -> dict:
+def full_report(
+    timeline: dict, trace: Path, marks: Path | None, step: float, code: str | None = None
+) -> dict:
     """The audit of a trace at the default tolerance, as the command writes its report.
 
     The report adds the trace's continuity, the seats of the mark trace when one is given, and
     every judged label.
     """
     lines = read_trace(trace)
-    report, judged = audit(timeline, lines)
+    report, judged = audit(timeline, lines, code=code)
     report["continuity"] = continuity(timeline, lines, step)
     if marks is not None:
         report["continuity"]["seats"] = seats(timeline, read_trace(marks), step)
@@ -532,11 +538,12 @@ def main(argv: list[str] | None = None) -> None:
         "--step", type=float, default=1 / 30, metavar="SECONDS", help="the trace's sampling step"
     )
     parser.add_argument("--marks", type=Path, metavar="FILE", help="the mark trace to judge")
+    parser.add_argument("--language", help="the edition's code, where the timeline states none")
     options = parser.parse_args(argv)
     timeline = json.loads(options.timeline.read_text(encoding="utf-8"))
     lines = read_trace(options.trace)
     try:
-        report, judged = audit(timeline, lines, options.tolerance)
+        report, judged = audit(timeline, lines, options.tolerance, options.language)
     except PictureError as error:
         msg = f"sync audit: {error}"
         raise SystemExit(msg) from None

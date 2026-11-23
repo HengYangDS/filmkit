@@ -7,13 +7,13 @@ import { join } from "node:path";
 
 import {
   CLOSES,
-  LEAD_WORDS,
   labelBreaks,
   readWrapping,
   WRAPPING,
   wrapLayout,
   wrappedLabels,
 } from "../../src/filmkit/picture/frame-audit/typography/breaks.mjs";
+import { english, ENGLISH, rulesOf } from "./lead-words.mjs";
 import { scratchFolder } from "./sample-film.mjs";
 
 /* A text's width in a stand-in face: a CJK character an em, any other character half of one. */
@@ -51,7 +51,7 @@ function wrapped(lines, x = 960, y = 500, { sizes = [], alphas = [], ...rest } =
     return v;
   });
 }
-const breaksOf = (lines, options = {}, rules = WRAPPING) => {
+const breaksOf = (lines, options = {}, rules = english()) => {
   const labels = wrappedLabels(wrapped(lines, 960, 500, options));
   assert.equal(labels.length, 1, lines.join(" / "));
   return labelBreaks(labels[0], rules);
@@ -70,21 +70,20 @@ test("an English line ending on a lead word, or one word left last in three, bre
     'line 1 ends on the lead word "and"',
   ]);
   assert.deepEqual(breaksOf(["Risk versus", "reward taken"]), []);
-  assert.deepEqual(
-    breaksOf(["Risk versus", "reward taken"], {}, { ...WRAPPING, lead_words: ["Versus"] }),
-    ['line 1 ends on the lead word "versus"'],
-  );
+  assert.deepEqual(breaksOf(["Risk versus", "reward taken"], {}, english(["Versus"])), [
+    'line 1 ends on the lead word "versus"',
+  ]);
   // A two-word name stacked on two lines is its layout's to resolve, and a phrase ending on a noun is sound.
   assert.deepEqual(breaksOf(["Manual", "rescue"]), []);
   assert.deepEqual(breaksOf(["Prices arrive", "two hours late"]), []);
-  assert.ok(["a", "of", "and", "its", "which", "is", "not"].every((v) => LEAD_WORDS.has(v)));
+  assert.ok(["a", "of", "and", "its", "which", "is", "not"].every((v) => ENGLISH.includes(v)));
   // DDWG round 33 painted "Cannot prove what / was available then", which EN33-1 named: a wh-word leads its clause.
   assert.deepEqual(breaksOf(["Cannot prove what", "was available then"]), [
     'line 1 ends on the lead word "what"',
   ]);
   assert.ok(
     ["what", "when", "where", "why", "how", "if", "because", "until"].every((v) =>
-      LEAD_WORDS.has(v),
+      ENGLISH.includes(v),
     ),
   );
 });
@@ -190,7 +189,7 @@ test("pieces on one line are read as one, and a name standing in two places is t
     ],
   );
   assert.deepEqual(
-    twice.map((v) => labelBreaks(v)),
+    twice.map((v) => labelBreaks(v, english())),
     [
       ['line 1 ends on the lead word "in"'],
       ["line 1 spans 0.538 of the widest line of its size, under 0.8"],
@@ -214,7 +213,7 @@ test("only names painted on two or more lines by a scene as labels are wrapped l
 });
 
 test("a label is judged once, when every line stands at rest, and a name in two places is one entry", () => {
-  const layout = wrapLayout();
+  const layout = wrapLayout(english());
   const frame = (t, texts) => layout.frame({ t, layout: { texts } });
   const lines = ["A trade in", "the market"];
   frame(1, wrapped(lines, 960, 500, { alphas: [1, 0.6] }));
@@ -249,12 +248,29 @@ test("the declared rules are read from the file FILMKIT_WRAPPING names", async (
   const folder = await scratchFolder(),
     path = join(folder, "wrapping.json");
   assert.equal(readWrapping(""), WRAPPING);
-  await writeFile(path, JSON.stringify({ line_share: 0.75, lead_words: ["versus"] }));
-  assert.deepEqual(readWrapping(path), {
-    line_share: 0.75,
-    last_share: 0.6,
-    lead_words: ["versus"],
-  });
+  const languages = [{ code: "en", scripts: ["latin"], lead_words: ["versus"] }];
+  await writeFile(path, JSON.stringify({ line_share: 0.75, languages }));
+  assert.deepEqual(readWrapping(path), { line_share: 0.75, last_share: 0.6, languages });
   await writeFile(path, JSON.stringify({ last_share: 1.2 }));
   assert.throws(() => readWrapping(path), /last_share is not a share in \(0, 1\]: 1\.2/);
+});
+
+test("a label's lead words are those of the language it is written in, by its edition's scripts", () => {
+  // A Chinese edition, or the test language xa, reads Latin script as English: an English label there is wrapped so.
+  const chinese = (code) =>
+    rulesOf([
+      [code, ["han"], []],
+      ["en", ["latin"], ENGLISH],
+    ]);
+  for (const code of ["zh", "xa"])
+    assert.deepEqual(breaksOf(["A trade in", "the market"], {}, chinese(code)), [
+      'line 1 ends on the lead word "in"',
+    ]);
+  // A language written in Latin script that declares no lead words refuses no line for one.
+  assert.deepEqual(
+    breaksOf(["A trade in", "the market"], {}, rulesOf([["xc", ["latin"], []]])),
+    [],
+  );
+  // Without the edition's languages no lead word is known.
+  assert.deepEqual(breaksOf(["A trade in", "the market"], {}, WRAPPING), []);
 });

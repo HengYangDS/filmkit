@@ -310,6 +310,35 @@ def named(english_name: str) -> Language:
     return found[0]
 
 
+def scripts_in(text: str) -> list[str]:
+    """The scripts of `scripts.json` that a text holds a character of, in the file's order."""
+    return [name for name in classes()["scripts"] if compiled(name).search(text)]
+
+
+def written_in(text: str, code: str) -> Language | None:
+    """The language a text of an edition is written in (design decision 5): the edition's own
+    where the text holds a character of a script that language writes, else the language that
+    it reads the text's script in, else none: such a text is matched exactly and wrapped by no
+    language's rule."""
+    edition, held = language(code), scripts_in(text)
+    if any(script in edition.scripts for script in held):
+        return edition
+    embedded = [edition.embedded[script] for script in held if script in edition.embedded]
+    return language(embedded[0]) if embedded else None
+
+
+def read_in(text: str, code: str) -> list[Language]:
+    """Every language whose words a text of an edition holds: the edition's own, and the language
+    it reads each other script of the text in, in that order."""
+    edition = language(code)
+    found = [edition]
+    for script in scripts_in(text):
+        named = edition.embedded.get(script)
+        if named is not None and language(named) not in found:
+            found.append(language(named))
+    return found
+
+
 def model_names() -> list[str]:
     """Each declared language's name as the speech models take it, in the order of the codes."""
     return [LANGUAGES[code].english_name for code in sorted(LANGUAGES)]

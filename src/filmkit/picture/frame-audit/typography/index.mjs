@@ -19,7 +19,14 @@ import {
   unevenPitch,
 } from "./measures.mjs";
 
-export { labelBreaks, readWrapping, WRAPPING, wrapLayout, wrappedLabels } from "./breaks.mjs";
+export {
+  labelBreaks,
+  leadWords,
+  readWrapping,
+  WRAPPING,
+  wrapLayout,
+  wrappedLabels,
+} from "./breaks.mjs";
 
 /* A run must last this long, so a passing build-up or a fade is not a defect. */
 const RUN_SECONDS = 1;

@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+import filmkit.languages as languages
 import filmkit.picture.gates as gates
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
@@ -187,7 +188,12 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
     assert set(frame_env) == {VARIABLE, gates.WRAPPING_VARIABLE, *traces}
     # The frame audit judges wrapped labels by the declared shares and lead words.
     rules = repository.read(Path(frame_env[gates.WRAPPING_VARIABLE]))
-    assert rules == {"line_share": 0.8, "last_share": 0.6, "lead_words": []}
+    assert rules == gates.wrapping_rules(Wrapping(), edition.code)
+    assert (rules["line_share"], rules["last_share"]) == (0.8, 0.6)
+    assert [(e["code"], e["scripts"]) for e in rules["languages"]] == [
+        ("zh", ["han"]),
+        ("en", ["latin"]),
+    ]
     assert (motion_tool, motion_args[:2]) == ("motion-audit", [str(edition.timeline), "30"])
     assert motion_env == {VARIABLE: frame_env[VARIABLE]}
     table = repository.read(Path(frame_env[VARIABLE]))
@@ -414,7 +420,7 @@ def test_wrapped_labels_are_judged_by_the_declared_rules_and_refused_by_name(fil
     later = wrapped(["Rollback or", "degradation"], ['line 1 ends on the lead word "or"'], 30.5)
     labels = {"11": [later], "10": [clean, BROKEN, entering]}
     calls = audits(monkeypatch, {**CLEAN, "frame": {**CLEAN["frame"], "wrapped_labels": labels}})
-    declaring(monkeypatch, line_share=0.75, last_share=0.5, lead_words=["versus"])
+    declaring(monkeypatch, line_share=0.75, last_share=0.5, lead_words={"en": ["versus"]})
     with pytest.raises(PictureError, match="2 gated findings"):
         gates.check_picture(Edition("zh"))
     record = repository.read(Edition("zh").picture_gates)
@@ -425,7 +431,9 @@ def test_wrapped_labels_are_judged_by_the_declared_rules_and_refused_by_name(fil
     ]
     frame_call = next(call for call in calls if call[0] == "frame-audit")
     rules = repository.read(Path(frame_call[2][gates.WRAPPING_VARIABLE]))
-    assert rules == {"line_share": 0.75, "last_share": 0.5, "lead_words": ["versus"]}
+    declared = Wrapping(line_share=0.75, last_share=0.5, lead_words={"en": ("versus",)})
+    assert rules == gates.wrapping_rules(declared, "zh")
+    assert rules["languages"][1]["lead_words"] == [*languages.language("en").lead_words, "versus"]
 
 
 def test_a_declared_exception_is_recorded_with_its_reason_and_a_stale_one_refuses(

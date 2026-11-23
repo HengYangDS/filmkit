@@ -1,10 +1,13 @@
 """Where a label's words are spoken in its scene: their exact occurrences and inflected ones.
 
 A label's letters and digits, lowercased, are its units, and they occur exactly where its
-scene's spoken units spell them. An English label is also found by the English Snowball stems
-of its words, in order, among the words of one thought, so "Availability" is found in
-"available" while "Publish" and "public" stay apart. Each occurrence is its start, its end and
-the start of its clause; a clause opens after each stop of the segment text. A segment whose
+scene's spoken units spell them. A label written in a language that declares a stemmer, as the
+language registry reads the label in its edition (`languages.written_in`), is also found by
+that stemmer's stems of its words, in order, among the words of one thought, so the English
+"Availability" is found in "available" while "Publish" and "public" stay apart; English labels
+of a Chinese edition are stemmed as English, since Chinese reads Latin script as English. Each
+occurrence is its start, its end and the start of its clause; a clause opens after each stop of
+the segment text. A segment whose
 aligned words do not spell its text raises `PictureError`.
 """
 
@@ -26,8 +29,9 @@ BOUNDARY = set(languages.characters("cue-boundaries"))
 # apostrophes.
 _CJK = languages.pattern("han")
 _WORD = re.compile(rf"[{_CJK}]|[^\W_{_CJK}]+(?:['\u2019][^\W_{_CJK}]+)*")
-# The English Snowball stemmer; it stems lowercase words.
-_ENGLISH = snowballstemmer.stemmer("english")
+# Each stemmer a language may declare, by its kind, as Snowball names its algorithm; it stems
+# lowercase words.
+STEMMERS = {"snowball-english": "english"}
 
 # A scene's spoken units, each unit's start and end, and the unit its clause opens at.
 SpokenIndex = tuple[str, list[float], list[float], list[int]]
@@ -102,18 +106,23 @@ def thought_words(segment: dict) -> list[tuple[int, int]]:
     return [(span.first, span.last) for span in spans]
 
 
-def english(label: str) -> bool:
-    """Whether a label is English: it has letters, and no CJK character."""
-    return any(ch.isalpha() for ch in label) and re.search(f"[{_CJK}]", label) is None
+def stemmer(label: str, code: str):
+    """The stemmer of the language a label of an edition is written in, or None where that
+    language declares none or the label is in no language the edition reads."""
+    if not any(ch.isalpha() for ch in label):
+        return None
+    language = languages.written_in(label, code)
+    kind = None if language is None else STEMMERS.get(language.stemmer)
+    return None if kind is None else snowballstemmer.stemmer(kind)
 
 
-def stems(text: str) -> list[str]:
-    """The English Snowball stems of a text's words."""
-    return _ENGLISH.stemWords(words(text))
+def stems(text: str, stemming) -> list[str]:
+    """The stems of a text's words by a stemmer."""
+    return stemming.stemWords(words(text))
 
 
 def inflected_matches(
-    segment: dict, index: SpokenIndex, label: str, shown: float
+    segment: dict, index: SpokenIndex, label: str, shown: float, stemming
 ) -> list[Occurrence]:
     """The occurrences of a label's words by their stems, in order, in the thought spoken at
     `shown`, or in the next thought when `shown` falls between thoughts."""
@@ -122,11 +131,13 @@ def inflected_matches(
         ((first, last) for first, last in thought_words(segment) if shown <= spoken[last]["end"]),
         None,
     )
-    needle = stems(label)
+    needle = stems(label, stemming)
     if thought is None or not needle:
         return []
     said = [
-        (stem, k) for k in range(thought[0], thought[1] + 1) for stem in stems(spoken[k]["text"])
+        (stem, k)
+        for k in range(thought[0], thought[1] + 1)
+        for stem in stems(spoken[k]["text"], stemming)
     ]
     # The unit each word begins at, whose clause the occurrence starts in.
     begins = list(accumulate((len(units(word["text"])) for word in spoken), initial=0))

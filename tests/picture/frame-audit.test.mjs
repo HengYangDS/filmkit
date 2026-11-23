@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { TEXT_LAYOUT } from "../../src/filmkit/picture/frame-audit/typography/index.mjs";
+import { english } from "./lead-words.mjs";
 import { authoredTimeline, scratchFolder } from "./sample-film.mjs";
 
 // The headless audits run the composition itself on a timeline; a short stretch exercises every measurement.
@@ -386,7 +387,7 @@ test("the frame audit reports each wrapped label with when it first rests and th
     path,
     JSON.stringify({ language: "English", duration: 6, segments: [segment], captions: [] }),
   );
-  await writeFile(rules, JSON.stringify({ lead_words: ["versus"] }));
+  await writeFile(rules, JSON.stringify(english(["versus"])));
   const audit = (env) =>
     JSON.parse(
       execFileSync(process.execPath, [AUDIT_FRAMES, path, "0.25"], {
@@ -420,10 +421,10 @@ test("the frame audit reports each wrapped label with when it first rests and th
       sizes: [30, 30],
     },
   ]);
-  // Without the film's rules the defaults judge them.
+  // Without the film's rules the defaults judge them, which know no language's lead words.
   assert.deepEqual(
     labels(audit({ FILMKIT_WRAPPING: "" })).map((v) => v.breaks),
-    [['line 1 ends on the lead word "in"'], []],
+    [[], []],
   );
 });
 

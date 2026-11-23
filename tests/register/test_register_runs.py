@@ -14,6 +14,7 @@ import pytest
 from placing import placed, refused, refused_lines
 
 import filmkit.concepts as concepts
+import filmkit.languages as languages
 import filmkit.register as register
 import filmkit.released as released
 
@@ -131,12 +132,14 @@ def test_the_checker_runs_alone_on_the_engines_configuration(tmp_path, monkeypat
     stated.read_string(config.read_text(encoding="utf-8"))
     style = config.parent / stated.defaults()["stylespath"] / stated["*.txt"]["basedonstyles"]
     assert (stated.sections(), style) == (["*.txt"], register._STYLE)
-    assert json.loads(Path(f"{vale}.args").read_text()) == [
-        "--no-global",
-        f"--config={config}",
-        "--ext=.txt",
-        "--output=JSON",
+    # Each run applies one language's rules alone, by Vale's filter.
+    arguments = json.loads(Path(f"{vale}.args").read_text())
+    assert arguments[:4] == ["--no-global", f"--config={config}", "--ext=.txt", "--output=JSON"]
+    filters = [
+        "--filter=.Name in [" + ", ".join(f'"register.{rule}"' for rule in language.rules) + "]"
+        for language in (languages.language("zh"), languages.language("en"))
     ]
+    assert arguments[4:] in ([filters[0]], [filters[1]])
 
 
 def test_the_text_reaches_the_checker_as_utf8_under_any_locale(tmp_path, monkeypatch):

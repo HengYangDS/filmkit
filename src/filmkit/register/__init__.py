@@ -51,6 +51,7 @@ import filmkit.concepts as concepts
 import filmkit.languages as languages
 import filmkit.released as released
 from filmkit.film import FILM, form_key
+from filmkit.production import CODES
 
 # The engine's Vale configuration, which the check names to Vale by `--config`, and the folder of
 # its base style. The file is the check's own data and bears the check's name: `vale.ini` is the
@@ -301,16 +302,52 @@ def _alert(found: dict, table: dict[int, tuple[str, str]]) -> _Alert:
     return _Alert(where, form, severity == "error", rule, said, text, start)
 
 
-def _alerts(vale: str, places: list[concepts.Place]) -> list[_Alert]:
-    """Each alert of one Vale run over the places, one place a paragraph, at its place."""
-    table, paragraphs = {}, []
-    for place in places:
+def _alerts(
+    vale: str, places: list[concepts.Place], rules: tuple[str, ...]
+) -> list[tuple[int, _Alert]]:
+    """Each alert of one Vale run over the places, one place a paragraph, at its place, by the
+    named rules alone (Vale's `--filter`), with the index of its place among `places`."""
+    table, paragraphs, indices = {}, [], {}
+    for index, place in enumerate(places):
         paragraph = _paragraph(place.text)
         if paragraph:
-            table[2 * len(paragraphs) + 1] = (place.where, paragraph)
+            line = 2 * len(paragraphs) + 1
+            table[line], indices[line] = (place.where, paragraph), index
             paragraphs.append(paragraph)
+    if not paragraphs:
+        return []
+    named = ", ".join(f'"{_STYLE.name}.{rule}"' for rule in rules)
     command = [vale, "--no-global", f"--config={_CONFIG}", "--ext=.txt", "--output=JSON"]
-    return [_alert(found, table) for found in _found(_run(command, "\n\n".join(paragraphs) + "\n"))]
+    command.append(f"--filter=.Name in [{named}]")
+    linted = _found(_run(command, "\n\n".join(paragraphs) + "\n"))
+    return [(indices.get(found.get("Line"), -1), _alert(found, table)) for found in linted]
+
+
+def _languages_alerts(vale: str, gathered: dict[str, list[concepts.Place]]) -> list[_Alert]:
+    """Each place's alerts by the rules of every language whose words it holds, one Vale run a
+    language: an edition's place meets its language's rules and those of the language it reads
+    each other script of the place in (`languages.read_in`); a place every edition shares, as the
+    entry page, every declared language's. No rule meets a place by its script alone. An alert
+    two languages' rules give alike is kept once."""
+    every = [place for held in gathered.values() for place in held]
+    order = {id(place): rank for rank, place in enumerate(every)}
+    by_language: dict[str, list[concepts.Place]] = {}
+    for name, held in gathered.items():
+        for place in held:
+            codes = (
+                [language.code for language in languages.read_in(place.text, name)]
+                if name in CODES
+                else list(CODES)
+            )
+            for code in codes:
+                by_language.setdefault(code, []).append(place)
+    found = {}
+    for code, places in by_language.items():
+        for index, alert in _alerts(vale, places, languages.language(code).rules):
+            key = (order[id(places[index])], alert.start, alert.rule, alert.form)
+            found.setdefault(key, alert)
+    # In the places' order, and each place's alerts in the order of their text.
+    return [found[key] for key in sorted(found)]
 
 
 def _within(alert: _Alert, within: str) -> bool:
@@ -355,10 +392,11 @@ def check() -> dict:
     vale = _pinned(pinned)
     _styled()
     try:
-        places = [place for held in concepts.places().values() for place in held]
+        gathered = concepts.places()
     except concepts.ConceptError as error:
         raise RegisterError(str(error)) from None
-    alerts = _alerts(vale, places)
+    places = [place for held in gathered.values() for place in held]
+    alerts = _languages_alerts(vale, gathered)
     held: dict[str, list[str]] = {}
     for place in places:
         held.setdefault(place.where, []).append(_paragraph(place.text))
