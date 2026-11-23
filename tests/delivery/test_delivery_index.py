@@ -2,14 +2,19 @@
 
 import os
 import re
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
+import filmkit.delivery.entry as delivery_entry
 import filmkit.delivery.packaging as delivery_packaging
 import filmkit.delivery.player as delivery_player
 import filmkit.production as production
 import filmkit.repository as repository
 from filmkit.delivery.packaging import PackagingError
+from filmkit.film import FILM
 
 # The line under the entry page's title at version 1.3.0.
 ENTRY_VERSION = (
@@ -113,12 +118,9 @@ def test_delivery_index_uses_sibling_languages_and_preserves_language_players(
     assert delivery_packaging.package_language_index("1.3.1")["sha256"] != observed["sha256"]
     assert seen == [output]
     monkeypatch.setattr(os, "fsync", flush)
-    source.write_bytes(template.replace(b'href="en/index.html"', b'href="en.html"'))
-    with pytest.raises(PackagingError, match="both sibling language links"):
-        delivery_packaging.package_language_index("1.3.0")
-    source.write_bytes(template.replace(b"<nav", b"<div").replace(b"</nav>", b"</div>"))
-    with pytest.raises(PackagingError, match="language links in a <nav>"):
-        delivery_packaging.package_language_index("1.3.0")
+    # The page's own rule, its links in their order and its root, is the loader's to refuse
+    # (`filmkit.delivery.entry`); packaging asks it no more.
+    assert "both sibling" not in Path(delivery_packaging.__file__).read_text()
 
 
 def test_the_entry_page_waits_for_both_editions_runtimes(tmp_path, monkeypatch):
@@ -140,3 +142,42 @@ def test_the_entry_page_waits_for_both_editions_runtimes(tmp_path, monkeypatch):
     source.write_bytes(template.replace(b"<footer>", b"<footer>/*RUNTIME*/ "))
     with pytest.raises(PackagingError, match=re.escape("outside its language links")):
         delivery_packaging.package_language_index("1.3.0")
+
+
+def test_the_entry_module_loads_no_declaration_and_judges_a_page_by_its_rule():
+    entry = subprocess.run(
+        [sys.executable, "-I", "-B", "-c", ENTRY_ALONE],
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=60,
+        env={"PYTHONPATH": str(Path(delivery_entry.__file__).parents[2])},
+        cwd="/",
+    )
+    assert entry.returncode == 0, entry.stderr
+    sample = (repository.ROOT / FILM.entry).read_text(encoding="utf-8")
+    tags = {"zh": "zh-CN", "en": "en"}
+    assert delivery_entry.problems(sample, tags, "index.html") == []
+    reordered = sample.replace('href="zh/', 'href="tmp/').replace('href="en/', 'href="zh/')
+    reordered = reordered.replace('href="tmp/', 'href="en/')
+    faults = delivery_entry.problems(
+        reordered.replace('lang="mul"', 'lang="zh-CN"', 1) + "<base href=x>",
+        {**tags, "xb": "xb"},
+        "index.html",
+    )
+    assert faults == [
+        'index.html opens with lang="zh-CN"; its root is <html lang="mul">',
+        "index.html links no xb/index.html in its <nav>",
+        "index.html links en/index.html with lang='zh-CN', not lang=\"en\"",
+        "index.html links zh/index.html with lang='en', not lang=\"zh-CN\"",
+        "index.html holds a <base>, which would choose one language for every link",
+    ]
+    assert delivery_entry.problems(reordered, tags, "index.html")[0] == (
+        "index.html links the editions as en/index.html, zh/index.html, not in the declared order"
+    )
+
+
+# Imports the entry module alone, with no film to load: it needs no declaration.
+ENTRY_ALONE = (
+    "import filmkit.delivery.entry as e; assert 'filmkit.film' not in __import__('sys').modules"
+)

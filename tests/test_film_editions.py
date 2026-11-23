@@ -53,6 +53,13 @@ def test_a_declaration_whose_english_table_comes_first_lists_english_first(decla
     zh = table(declared, "editions.zh")
     rewrite(declared, zh, "")
     rewrite(declared, "[picture]\n", f"{zh}[picture]\n")
+    # The entry page links the editions in the declared order (`filmkit.delivery.entry`).
+    page = declared / film.FILM.entry
+    zh_link, en_link = (
+        next(line for line in page.read_text().splitlines() if f'href="{code}/' in line)
+        for code in ("zh", "en")
+    )
+    page.write_text(page.read_text().replace(f"{zh_link}\n{en_link}", f"{en_link}\n{zh_link}"))
     assert production.codes(film.load(declared)) == ("en", "zh")
 
 
@@ -131,3 +138,17 @@ def test_a_prompt_that_cites_the_former_fields_or_names_an_editions_files_is_ref
     assert f"{name}:{end} names an edition's files by their path; name every edition's" in said
     assert f"{name}:{end} groups the editions' codes in braces;" in said
     assert "slug" in said
+
+
+def test_an_entry_page_that_breaks_its_rule_is_refused_at_load_beside_other_problems(declared):
+    page = declared / film.FILM.entry
+    page.write_text(page.read_text().replace('<html lang="mul">', '<html lang="zh-CN">'))
+    rewrite(declared, 'slug = "sample-reel"', 'slug = "Two Words"')
+    with pytest.raises(FilmError) as refusal:
+        film.load(declared)
+    said = str(refusal.value)
+    assert 'content/index.html opens with lang="zh-CN"; its root is <html lang="mul">' in said
+    assert "slug" in said
+    page.write_text(page.read_text().replace('<html lang="zh-CN">', '<html lang="mul">'))
+    rewrite(declared, 'slug = "Two Words"', 'slug = "sample-reel"')
+    assert film.load(declared) == film.FILM

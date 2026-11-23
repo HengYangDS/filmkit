@@ -4,7 +4,8 @@
 declaration's other problems, before any work, each in one line that says what to write instead.
 The review prompt may cite no field the engine no longer fills, `{other}` or `{other_language}`,
 and may name no edition's files by their path or the declared codes grouped in braces, which
-`{editions}` and `{others}` state for every edition (`filmkit.review.prompts`).
+`{editions}` and `{others}` state for every edition (`filmkit.review.prompts`). The entry page
+must keep its rule (`filmkit.delivery.entry`).
 """
 
 from __future__ import annotations
@@ -73,3 +74,21 @@ def prompt_problems(root: Path, declared: dict) -> list[str]:
                 "{editions}"
             )
     return found
+
+
+def entry_problems(root: Path, declared: dict) -> list[str]:
+    """Each fault of the declared entry page against its rule (`filmkit.delivery.entry`), for the
+    declared editions whose languages the engine declares; none where the page is not named or
+    cannot be read, which the declaration's other problems name."""
+    import filmkit.delivery.entry as entry
+    import filmkit.languages as languages
+
+    page, editions = declared.get("entry"), declared.get("editions")
+    if not isinstance(page, str) or not isinstance(editions, dict):
+        return []
+    try:
+        text = (root / page).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return []
+    tags = {code: languages.LANGUAGES[code].tag for code in editions if code in languages.LANGUAGES}
+    return entry.problems(text, tags, page)

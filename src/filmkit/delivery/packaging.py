@@ -142,26 +142,21 @@ def package_language_index(version: str) -> dict:
     """Derive one neutral entry point for the sibling language deliveries.
 
     Each language link shows its own edition's runtime (`entry_runtimes`), so the page needs
-    both editions' timelines; an anchor outside the links names no edition's and is refused. It
+    every edition's timeline; an anchor outside the links names no edition's and is refused. It
     names the film's version under the film's title, in a line of its own just before the
-    `<nav>` that holds the language links.
+    `<nav>` that holds the language links. The page's own rule, its links and its root, is the
+    loader's (`filmkit.delivery.entry`), which refused a page that breaks it before any work.
     """
     source = repository.ROOT / INDEX
     destination = repository.ROOT / LANGUAGE_INDEX
     template = source.read_text()
     start = template.find("<nav")
     nav = template[start : template.find("</nav>", start)] if start >= 0 else ""
-    if not all(f'href="{code}/{PAGE}"' in nav for code in CODES):
-        msg = "Delivery entry needs both sibling language links in a <nav>"
-        raise PackagingError(msg)
-    if "<base " in template:
-        msg = "Delivery entry must not select a language through base"
-        raise PackagingError(msg)
     page = template[:start] + entry_runtimes(nav) + template[start + len(nav) :]
     if RUNTIME_ANCHOR in page:
         msg = f"{INDEX} holds {RUNTIME_ANCHOR} outside its language links, naming no edition"
         raise PackagingError(msg)
-    # Both editions' packages write this one page; each replaces it whole.
+    # Every edition's package writes this one page; each replaces it whole.
     page = page.replace("<nav", f"{entry_version(version)}\n<nav", 1)
     repository.write_text(LANGUAGE_INDEX, page)
     return {
