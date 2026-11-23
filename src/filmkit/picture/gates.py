@@ -54,6 +54,7 @@ import filmkit.released as released
 import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.film import FILM
+from filmkit.narration import anchors
 from filmkit.picture import metrics, sync_audit, text_trace
 from filmkit.picture.detail_gates import detail_findings
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, PictureError, face_bindings
@@ -417,6 +418,7 @@ def run_audit(tool: str, arguments: list[str], out: Path, environment: dict | No
 
 def check_picture(edition: Edition) -> dict:
     """Audit the edition's current picture, write its gate record and refuse a gated finding."""
+    anchors.require(repository.read(edition.timeline), edition.code)
     work = repository.ROOT / WORK / edition.code
     work.mkdir(parents=True, exist_ok=True)
     bound = current_bindings(edition)

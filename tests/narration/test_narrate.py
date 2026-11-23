@@ -82,6 +82,7 @@ def gates(monkeypatch) -> list:
     monkeypatch.setattr(
         narration_narrate.readings, "check", lambda code: checked.append(code) or {"edition": code}
     )
+    monkeypatch.setattr(narration_narrate.anchors, "require_editions", dict)
     return checked
 
 

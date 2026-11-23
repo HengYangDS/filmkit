@@ -66,6 +66,7 @@ import filmkit.sources as sources
 import filmkit.tools as tools
 from filmkit.captions.timing import READING_RATES, captions_above_rate
 from filmkit.film import FILM
+from filmkit.narration import anchors
 from filmkit.production import CODES, Edition
 
 if TYPE_CHECKING:
@@ -324,8 +325,12 @@ def preflight(edition: Edition) -> dict:
 
     The cover is painted from the stage, so it is compared only once the stage is current. A
     question the film does not ask (`NO_DRAFTS`, `NO_THOUGHT_LINE`) is reported and refuses
-    nothing. A missing input leaves the receipt without digests, and is refused by name.
+    nothing. A missing input leaves the receipt without digests, and is refused by name. A
+    script that breaks an anchor's rule is refused before anything is written
+    (`filmkit.narration.anchors`).
     """
+    if (repository.ROOT / edition.script).is_file():
+        anchors.require(repository.read(edition.script), edition.code)
     staged = stage(edition)
     found = {
         "stage": staged,

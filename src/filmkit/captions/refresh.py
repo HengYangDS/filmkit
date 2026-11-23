@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from filmkit.captions import CaptionError
 from filmkit.captions.documents import require_metadata_values, subtitle_files
 from filmkit.captions.timing import caption_receipt_fields, timed_caption_cues
+from filmkit.narration import anchors
 from filmkit.production import ASSEMBLED
 from filmkit.repository import read, relative, sha, write
 
@@ -145,8 +146,9 @@ def _adopt_caption_authoring(timeline: dict, script: dict) -> None:
 
 def refresh_captions(edition: Edition) -> None:
     """Refresh picture/subtitle cues while preserving the selected assembled audio."""
-    timeline = read(edition.timeline)
     script = read(edition.script)
+    anchors.require(script, edition.code)
+    timeline = read(edition.timeline)
     receipt = read(edition.audio_assembly)
     hashes = _Hashes(
         script=sha(edition.script),

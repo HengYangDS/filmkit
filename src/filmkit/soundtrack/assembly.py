@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+import filmkit.narration.anchors as anchors
 import filmkit.narration.flow as flow
 import filmkit.narration.terms as terms
 import filmkit.repository as repository
@@ -572,6 +573,7 @@ def _receipt(
 def assemble(edition: Edition) -> None:
     """Lay out the edition's selected recordings with designed pauses at program level."""
     script = read(edition.script)
+    anchors.require(script, edition.code)
     policy = designed_pause_policy(script.get("voice_performance", {}))
     segments = script["segments"]
     records, alignments = bound_recordings(script, edition)

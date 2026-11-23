@@ -46,6 +46,7 @@ import filmkit.picture.still_scan as still_scan
 from filmkit.captions.refresh import refresh_captions
 from filmkit.delivery.packaging import PackagingError, package_film, package_metadata
 from filmkit.media import MediaError
+from filmkit.narration.anchors import AnchorError
 from filmkit.narration.selection import select
 from filmkit.picture.draft import render_draft
 from filmkit.picture.equivalence import compare_pictures
@@ -159,6 +160,7 @@ REFUSALS = (
     PreflightError,
     ReviewError,
     UnassembledError,
+    AnchorError,
 )
 
 

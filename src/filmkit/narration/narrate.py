@@ -6,8 +6,9 @@ are narrated, into a receipt, alignment and transcript named after them, such as
 narration-receipt-06-07.json, alignment-06-07.json and asr-06-07.json.
 
 Before any speech model loads, and with --dry-run too, the edition must pass the concept
-check (`filmkit.concepts`), the register check (`filmkit.register`) and its readings check
-(`filmkit.narration.readings`); a refusal stops the run and names every failure.
+check (`filmkit.concepts`), the register check (`filmkit.register`), its readings check
+(`filmkit.narration.readings`) and both scripts' anchors (`filmkit.narration.anchors`); a refusal
+stops the run and names every failure.
 
 Usage: python -m filmkit.narration.narrate
     --language zh|en [--ids 06,07] [--dry-run | --skip-generation]
@@ -34,7 +35,7 @@ import filmkit.concepts as concepts
 import filmkit.durations as durations
 import filmkit.register as register
 import filmkit.repository as repository
-from filmkit.narration import processes, readings
+from filmkit.narration import anchors, processes, readings
 from filmkit.narration.snapshots import ALIGNER as ALIGNER_SNAPSHOT
 from filmkit.production import CODES, Edition
 
@@ -120,20 +121,27 @@ def steps(code: str, ids: str = "", scope: Scope = Scope.ALL) -> list[tuple[str,
 
 def gate(code: str) -> dict:
     """Refuse an edition whose words depart from the concept contract or the formal register, or
-    leave a reading open.
+    leave a reading open, and a film whose scripts break an anchor's rule.
 
     Returns:
         The concept check's, the register check's and the edition's readings check's reports.
     """
     try:
-        return {
+        checked = {
             "concepts": concepts.check(),
             "register": register.check(),
             "readings": readings.check(code),
         }
-    except (concepts.ConceptError, register.RegisterError, readings.ReadingError) as error:
+        anchors.require_editions()
+    except (
+        concepts.ConceptError,
+        register.RegisterError,
+        readings.ReadingError,
+        anchors.AnchorError,
+    ) as error:
         message = f"Narration refused before synthesis:\n{error}"
         raise SystemExit(message) from None
+    return checked
 
 
 def main(argv: list[str] | None = None) -> None:

@@ -1,6 +1,6 @@
 ## 1. The anchored form
 
-- [ ] 1.1 Write `src/filmkit/narration/anchors.py` with `require(script, edition)`: read each segment's
+- [x] 1.1 Write `src/filmkit/narration/anchors.py` with `require(script, edition)`: read each segment's
       `anchored_groups` into its plain thoughts and its anchors (id, thought, span of units of the text), and refuse
       every broken rule of the requirement "The engine refuses a broken anchor before it writes anything" at once, by
       edition, segment, thought and id, naming `script_edits` for plain thoughts edited by hand. Done when

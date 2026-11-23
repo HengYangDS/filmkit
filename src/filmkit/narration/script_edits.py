@@ -7,7 +7,8 @@ thought is "segment.index" (1-based), indexed as before the edits. Each changed
 segment's text is rebuilt from its thoughts and its spoken text derived through the
 script's pronunciation contract, the narration mirror is rewritten, and each bound retake
 follows its exact text to its new index; a retake whose text no longer occurs exactly once
-is released. Nothing is written unless every edit of every edition applies.
+is released. Nothing is written unless every edit of every edition applies, and a script that
+breaks an anchor's rule (`filmkit.narration.anchors`) is refused before and after its edits.
 
 Usage: python -m filmkit.narration.script_edits --edits FILE [--dry-run]
 An edits file: {"replace": {"en": [["13.5", "proves no", "does not prove"]]},
@@ -20,6 +21,7 @@ import copy
 import json
 
 import filmkit.repository as repository
+from filmkit.narration import anchors
 from filmkit.narration.pronunciation import pronunciation_contract, pronunciation_text
 from filmkit.narration.retakes import rebind
 from filmkit.production import CODES, Edition
@@ -65,6 +67,7 @@ def edit(
         if bound:
             cast["retakes"][sid]["groups"] = moved
         changed.append(_change_report(sid, before[sid], groups, moved, released))
+    anchors.require(script, code)
     return script, cast, changed
 
 
@@ -130,6 +133,7 @@ def main(argv: list[str] | None = None) -> None:
         if replace or split:
             edition = Edition(code)
             script = repository.read(edition.script)
+            anchors.require(script, code)
             contract, _ = pronunciation_contract(script, edition.language)
             cast = repository.read(edition.cast)
             edited[code] = edit(script, cast, replace, split, contract=contract, code=code)

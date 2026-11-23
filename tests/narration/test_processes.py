@@ -302,6 +302,7 @@ def narrating(root, monkeypatch):
     monkeypatch.setattr(narration_narrate.concepts, "check", lambda: {})
     monkeypatch.setattr(narration_narrate.register, "check", lambda: {})
     monkeypatch.setattr(narration_narrate.readings, "check", lambda code: {})
+    monkeypatch.setattr(narration_narrate.anchors, "require_editions", dict)
     steps = []
     monkeypatch.setattr(
         narration_narrate.child_processes, "run", lambda command, **options: steps.append(command)
