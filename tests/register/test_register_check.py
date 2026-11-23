@@ -290,13 +290,24 @@ def test_a_form_is_excused_within_its_declared_text_and_nowhere_else(words, monk
 
 
 def test_a_standard_word_is_refused_until_the_film_declares_it(words, monkeypatch):
-    say(words, "zh", title="这个示例名副其实")
+    say(words, "zh", title="示例跑道")
     refusal = refused()
-    assert str(refusal).splitlines() == [f"zh title: '其实' {COLLOQUIAL}", KEEP]
-    assert list(refusal.lines) == [f"zh title: '其实' {COLLOQUIAL}"]
-    kept = {"place": "zh title", "form": "其实", "within": "名副其实", "reason": "an idiom"}
+    assert str(refusal).splitlines() == [f"zh title: '跑' {COLLOQUIAL}", KEEP]
+    assert list(refusal.lines) == [f"zh title: '跑' {COLLOQUIAL}"]
+    kept = {"place": "zh title", "form": "跑", "within": "跑道", "reason": "a standard word"}
     monkeypatch.setattr(register, "FILM", with_register(kept))
     assert register.check()["excused"] == [kept]
+
+
+def test_a_fixed_idiom_the_style_states_needs_no_declaration_and_refuses_one(words, monkeypatch):
+    say(words, "zh", title="这个示例名副其实")
+    assert register.check()["excused"] == []
+    idiom = {"place": "zh title", "form": "其实", "within": "名副其实", "reason": "an idiom"}
+    monkeypatch.setattr(register, "FILM", with_register(idiom))
+    refusal(
+        "The register exception of '其实' at zh title excuses no refusal: no error-level occurrence"
+        " stands within '名副其实'"
+    )
 
 
 def test_an_exception_answers_errors_only_and_any_letter_case(monkeypatch):

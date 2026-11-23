@@ -1,6 +1,6 @@
 """A listed form is refused wherever it stands, in plain speech, inside a standard word, joined
-to another English word or parted by a character the viewer does not see; the grade of each
-sentence is stated here."""
+to another English word or parted by a character the viewer does not see, and nowhere inside a
+fixed idiom that the style states; the grade of each sentence is stated here."""
 
 import pytest
 from placing import placed, refused_lines
@@ -33,7 +33,6 @@ ROWS = [
             "其实验收标准早就写清楚了",
             "其实力度不够",
             "其实例子很多",
-            "这个示例名副其实",
         )
     ),
     *(
@@ -115,9 +114,16 @@ def test_every_listed_form_is_refused_wherever_it_stands(monkeypatch):
 
 
 def test_every_occurrence_in_one_place_is_refused(monkeypatch):
-    placed(monkeypatch, "其实不难，名副其实。再跑一遍，跑道。")
+    placed(monkeypatch, "其实不难，名副其实，其实不易。再跑一遍，跑道。")
     lines = refused_lines()
     assert lines == [f"zh 01.1: '其实' {COLLOQUIAL}"] * 2 + [f"zh 01.1: '跑' {COLLOQUIAL}"] * 2
+
+
+def test_a_fixed_idiom_the_style_states_holds_no_occurrence(monkeypatch):
+    # 名副其实 holds the characters of 其实, not the word R3 lists, also when a character the
+    # viewer does not see parts it.
+    placed(monkeypatch, "这个示例名副其实", "名副\u200b其实")
+    assert register.check()["warnings"] == []
 
 
 @pytest.mark.parametrize(

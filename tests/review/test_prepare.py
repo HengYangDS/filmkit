@@ -114,11 +114,11 @@ def test_prepare_writes_the_round_of_a_ready_build_and_its_prompts_last(
 def test_a_prepared_round_holds_the_register_report_and_each_prompt_names_it_with_the_rules(
     ready, monkeypatch
 ):
-    kept = {"place": "zh title", "form": "其实", "within": "名副其实", "reason": "an idiom"}
+    kept = {"place": "zh title", "form": "跑", "within": "跑道", "reason": "a standard word"}
     declared = {**FILM.model_dump(by_alias=True), "register": {"exceptions": [kept]}}
     monkeypatch.setattr(register, "FILM", Film.model_validate(declared))
     held = [
-        ("zh title", "这个示例名副其实"),
+        ("zh title", "示例跑道"),
         ("zh 01.1", "我们先看。"),
         ("en 01.1", "Why? And how?"),
     ]

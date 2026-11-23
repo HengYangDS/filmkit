@@ -1,8 +1,12 @@
 # R3 of the formal register (`standard.md`), Chinese: the colloquial words and particles it lists,
 # at error level; the class's other members the engine adds stand in `informal` as warnings. Each
-# form is matched plainly, a particle wherever it stands, inside a standard word too. A film keeps
-# a standard word or a quotation that holds a form by declaring the text it stands within
-# (`[[register.exceptions]]`).
+# form is matched plainly, a particle wherever it stands, inside a standard word too, but not inside
+# a fixed idiom stated at its token. A film keeps a standard word or a quotation that holds a form
+# by declaring the text it stands within (`[[register.exceptions]]`).
+#
+# A fixed idiom is stated at a form's token, whole, in a lookaround, where three things hold: a
+# film's text holds it; the form's characters in it are not the word the standard lists; and no
+# sentence reads its characters with that word among them. Its cases stand below with the others.
 extends: existence
 message: "'%s' is colloquial (R3)"
 level: error
@@ -16,7 +20,9 @@ tokens:
   - "跑"
   - "看一眼"
   - "现查"
-  - "其实"
+  # 名副其实 ("true to its name") is a formal idiom: its 其 is "its" and its 实 "reality", not
+  # the adverb 其实 ("actually") that R3 lists, and 名副 ends no phrase that the adverb follows.
+  - "其实(?<!名副其实)"
   - "说白了"
   - "一下"
   - "吧"
@@ -57,3 +63,13 @@ tests:
       13:2:register.colloquial:'啊' is colloquial (R3)
       14:2:register.colloquial:'呀' is colloquial (R3)
       15:1:register.colloquial:'呢' is colloquial (R3)
+  - name: a fixed idiom whose characters hold a form but not the word, and the form beside it
+    input: |
+      这个示例名副其实。
+      其实不难，名副其实。
+      名副其实，其实不难。
+      名副其实其实。
+    want: |
+      2:1:register.colloquial:'其实' is colloquial (R3)
+      3:6:register.colloquial:'其实' is colloquial (R3)
+      4:5:register.colloquial:'其实' is colloquial (R3)
