@@ -456,3 +456,23 @@ def test_the_check_refuses_an_unnumbered_term_until_it_is_declared_and_a_stale_e
     assert (
         str(refused.value) == "Number exception 01.1 Agent is stale: it names no current occurrence"
     )
+
+
+@pytest.mark.usefixtures("test_languages")
+def test_a_test_language_matches_and_numbers_as_its_source():
+    assert (
+        concepts.found("重建影片", "影片", "xa") == concepts.found("重建影片", "影片", "zh") == [2]
+    )
+    assert concepts.found("Rebuild a filmmaker's film", "film", "xb") == [22]
+    segment = {"id": "01", "text": "可以互相替换的 Agent。另一句。"}
+    segment["utterance_groups"] = ["可以互相替换的 Agent。", "另一句。"]
+    english = {"id": "01", "text": "Interchangeable Agents. Another."}
+    english["utterance_groups"] = ["Interchangeable Agents. ", "Another."]
+    found = concepts.unnumbered({"xa": {"segments": [segment]}, "xb": {"segments": [english]}}, ())
+    assert [(item.edition, item.other, item.thought, item.plural) for item in found] == [
+        ("xa", "xb", "01.1", "Agents")
+    ]
+    assert (
+        concepts.unnumbered({"xb": {"segments": [english]}, "en": {"segments": [english]}}, ())
+        == []
+    )

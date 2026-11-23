@@ -197,3 +197,15 @@ def test_the_plan_names_the_pauses_and_steps_of_each_assembled_soundtrack(root, 
     assert moments["steps"] == {"rate_ratio": [], "pitch_semitones": [], "level_db": []}
     assert moments["narration_terms"] == []
     assert review_listening_plan.heard_moments(Edition("en")) == {"status": "not-assembled"}
+
+
+@pytest.mark.usefixtures("test_languages")
+def test_a_test_language_finds_a_term_as_its_source():
+    occurrences = review_listening_plan.occurrences
+    assert list(occurrences("记录", "记录了记录", "xa")) == list(
+        occurrences("记录", "记录了记录", "zh")
+    )
+    assert list(occurrences("record", "A record, recorded.", "xb")) == [(2, 8)]
+    assert list(occurrences("record", "A record, recorded.", "xb")) == list(
+        occurrences("record", "A record, recorded.", "en")
+    )

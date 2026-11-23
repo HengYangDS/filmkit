@@ -402,9 +402,12 @@ def flow_record(code: str, narrated: list[Narrated], policy: Flow) -> dict:
 
 
 def syllables(text: str, code: str) -> int:
-    """A text's spoken syllables: Chinese characters, and each Latin word's vowel groups."""
+    """A text's spoken syllables: each Latin word's vowel groups and, in a language whose speech
+    is counted in characters, a syllable for each character of the scripts it writes."""
     latin = sum(max(1, len(VOWEL_GROUP.findall(word.lower()))) for word in LATIN_WORD.findall(text))
-    return latin + (len(HAN_CHARACTER.findall(text)) if code == "zh" else 0)
+    language = languages.language(code)
+    written = languages.compiled(*language.scripts).findall(text)
+    return latin + (len(written) if language.unit == "characters" else 0)
 
 
 def _windows(recording: Recording, start: float, end: float) -> tuple[np.ndarray, np.ndarray]:

@@ -73,19 +73,11 @@ Id = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")]
 Words = Annotated[str, StringConstraints(min_length=1)]
 # Words that hold more than spaces, kept without their outer spaces.
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-# The marks that bound a Chinese clause.
+# The full-width marks that bound a clause.
 CLAUSE_MARKS = languages.compiled("clause-marks")
-# A Latin-script word, which Chinese narration says in its base form whatever its number.
+# A Latin-script word, which a language that marks no number says in its base form whatever its
+# number, as Chinese narration does.
 LATIN_WORD = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]+(?![A-Za-z0-9])")
-# The words that carry a Chinese clause's number: each of these characters, a pronoun of a group
-# and a count repeated for each member, and a numeral counting with a classifier. The numeral is
-# the whole run before the classifier; a lone 一 states the singular.
-NUMBER_WORDS = (*"们些多几各每众两俩双", "它们", "他们", "一个个")
-SINGULAR = "一"
-COUNTED = re.compile(
-    r"(?<![一二三四五六七八九十百千万])([一二三四五六七八九十百千万]+)"
-    r"[个位名种类款套件条项份张台部本次步层级组批群家支只句段篇章节门处所座轮遍场笔例]"
-)
 
 
 class ConceptError(ValueError):
@@ -142,14 +134,16 @@ class NumberException(Declared):
 
 
 class Number(Declared):
-    """The number words a film adds to `NUMBER_WORDS`, and its reasoned exceptions."""
+    """The number words a film adds to those its languages declare (`filmkit.languages`), and its
+    reasoned exceptions."""
 
     words: tuple[Text, ...] = ()
     exceptions: tuple[NumberException, ...] = ()
 
 
 class Contract(Declared):
-    """The concepts a film names, and how its Chinese carries the number of Latin-script words."""
+    """The concepts a film names, and how its editions whose languages mark no number carry the
+    number of Latin-script words."""
 
     concept: tuple[Concept, ...] = Field(min_length=1)
     number: Number = Number()
@@ -210,9 +204,12 @@ class Shown(HTMLParser):
 
 
 class Unnumbered(NamedTuple):
-    """A Chinese clause that says a Latin-script term with no number word, where the English
-    names the term only by its plural."""
+    """A clause of an edition whose language marks no number, as Chinese, that says a Latin-script
+    term with no number word, where another edition, whose language marks it, names the term only
+    by its plural: the two editions, the thought, the term, the plural and the clause."""
 
+    edition: str
+    other: str
     thought: str
     term: str
     plural: str
@@ -283,8 +280,9 @@ def quotations(contract: Contract, pinned: dict) -> tuple[str, list[str]]:
 
 
 def found(text: str, phrase: str, code: str) -> list[int]:
-    """Where a phrase occurs: anywhere in Chinese, as whole words ignoring case in English."""
-    if code == "zh":
+    """Where a phrase occurs: anywhere in a language whose words spaces do not delimit, as
+    Chinese, and as whole words ignoring case in one whose words they delimit, as English."""
+    if not languages.language(code).spaced:
         pattern, flags = re.escape(phrase), 0
     else:
         pattern, flags = rf"(?<![A-Za-z0-9]){re.escape(phrase)}(?![A-Za-z0-9])", re.IGNORECASE
@@ -403,64 +401,77 @@ def counterexamples(contract: Contract, places: dict[str, list[Place]]) -> list[
     return failures
 
 
-def english_plural(term: str, text: str) -> str | None:
-    """The plural, term+s or term+es, by which English text names a term it never says itself.
-
-    Each is a whole word in its own case.
-    """
+def plural(term: str, text: str, suffixes: tuple[str, ...]) -> str | None:
+    """The plural, the term with one of a language's suffixes, by which text names a term it never
+    says itself. Each is a whole word in its own case."""
 
     def said(word: str) -> bool:
         return re.search(rf"(?<![A-Za-z0-9]){re.escape(word)}(?![A-Za-z0-9])", text) is not None
 
     if said(term):
         return None
-    return next((plural for plural in (f"{term}s", f"{term}es") if said(plural)), None)
+    return next((form for form in (f"{term}{s}" for s in suffixes) if said(form)), None)
 
 
-def counted(clause: str, term: str, words: tuple[str, ...]) -> bool:
-    """Whether a Chinese clause carries the number of a term it says.
+def counted(clause: str, term: str, words: tuple[str, ...], number: languages.Counted) -> bool:
+    """Whether a clause of a language that marks no number carries the number of a term it says.
 
-    A number word or a declared word carries it anywhere in the clause, and a numeral with its
-    classifier only before the term, since a count after the term counts another thing; a lone
-    一 with its classifier states the singular and carries no plural.
+    One of the language's number words or a declared word carries it anywhere in the clause, and
+    a numeral of the language's numerals counting with one of its classifiers only before the
+    term, since a count after the term counts another thing; a lone singular numeral with its
+    classifier states one and carries no plural.
     """
+    numerals = re.escape(number.numerals)
+    count = re.compile(f"(?<![{numerals}])([{numerals}]+)[{re.escape(number.classifiers)}]")
     said = max(match.start() for match in LATIN_WORD.finditer(clause) if match[0] == term)
-    if any(count[1] != SINGULAR for count in COUNTED.finditer(clause[:said])):
+    if any(found[1] != number.singular for found in count.finditer(clause[:said])):
         return True
-    return any(word in clause for word in (*NUMBER_WORDS, *words))
+    return any(word in clause for word in (*number.words, *words))
 
 
 def unnumbered(scripts: dict[str, dict], words: tuple[str, ...]) -> list[Unnumbered]:
-    """Each Chinese clause that says a Latin-script term its English counterpart names only by
-    its plural, and holds no number word."""
-    english = {segment["id"]: authored_groups(segment) for segment in scripts["en"]["segments"]}
+    """Each clause of an edition whose language marks no number that says a Latin-script term its
+    counterpart in an edition whose language marks number names only by its plural, and holds no
+    number word: every such pair of editions, in the declared order."""
+    numbers = {code: languages.language(code).number for code in scripts}
     clauses = []
-    for segment in scripts["zh"]["segments"]:
-        others = english.get(segment["id"])
-        if others is None:
+    for code, other in ((c, o) for c in scripts for o in scripts if c != o):
+        counted_by, marked_by = numbers[code], numbers[other]
+        if counted_by.kind != "counted-by-words" or marked_by.kind != "plural-suffix":
             continue
-        thoughts = authored_groups(segment)
-        for index, thought in enumerate(thoughts, 1):
-            counterpart = others[index - 1] if len(others) == len(thoughts) else " ".join(others)
-            for term in dict.fromkeys(LATIN_WORD.findall(thought)):
-                plural = english_plural(term, counterpart)
-                clauses += [
-                    Unnumbered(f"{segment['id']}.{index}", term, plural, clause.strip())
-                    for clause in CLAUSE_MARKS.split(thought)
-                    if plural
-                    and term in LATIN_WORD.findall(clause)
-                    and not counted(clause, term, words)
-                ]
+        others = {segment["id"]: authored_groups(segment) for segment in scripts[other]["segments"]}
+        for segment in scripts[code]["segments"]:
+            counterparts = others.get(segment["id"])
+            if counterparts is None:
+                continue
+            thoughts = authored_groups(segment)
+            for index, thought in enumerate(thoughts, 1):
+                counterpart = (
+                    counterparts[index - 1]
+                    if len(counterparts) == len(thoughts)
+                    else " ".join(counterparts)
+                )
+                for term in dict.fromkeys(LATIN_WORD.findall(thought)):
+                    form = plural(term, counterpart, marked_by.suffixes)
+                    clauses += [
+                        Unnumbered(
+                            code, other, f"{segment['id']}.{index}", term, form, part.strip()
+                        )
+                        for part in CLAUSE_MARKS.split(thought)
+                        if form
+                        and term in LATIN_WORD.findall(part)
+                        and not counted(part, term, words, counted_by)
+                    ]
     return clauses
 
 
 def number_parity(number: Number, scripts: dict[str, dict]) -> list[str]:
-    """Each unnumbered Chinese clause that no exception excuses, and each stale exception."""
+    """Each unnumbered clause that no exception excuses, and each stale exception."""
     clauses = unnumbered(scripts, number.words)
     excused = {(exception.thought, exception.term) for exception in number.exceptions}
     failures = [
-        f"zh {item.thought}: {item.term!r} in {item.clause!r} carries no number word, where the "
-        f"English says {item.plural!r}"
+        f"{item.edition} {item.thought}: {item.term!r} in {item.clause!r} carries no number word, "
+        f"where the {languages.language(item.other).english_name} says {item.plural!r}"
         for item in clauses
         if (item.thought, item.term) not in excused
     ]

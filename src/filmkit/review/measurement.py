@@ -74,10 +74,12 @@ QUIET_DBFS = -50
 
 
 def units(text: str, code: str) -> list[str]:
-    """Spoken units: Chinese characters, or English words."""
-    if code == "zh":
-        return languages.compiled("han").findall(text)
-    return re.findall(r"[A-Za-z0-9']+", text.lower())
+    """Spoken units, as the edition's language counts its speech: the characters of the scripts
+    it writes, or its words, each a run of its scripts' letters, digits and apostrophes."""
+    language = languages.language(code)
+    if language.unit == "characters":
+        return languages.compiled(*language.scripts).findall(text)
+    return re.findall(f"[{languages.pattern(*language.scripts)}0-9']+", text.lower())
 
 
 def spread(values: list[float]) -> dict:
@@ -345,11 +347,11 @@ def chapter_measures(code: str, mono: np.ndarray, rate: int, chapter: dict) -> d
         "acoustic_syllables_per_articulated_second": round(
             chapter["nuclei"] / chapter["articulated"], 2
         ),
-        # Chinese characters are written syllables, so their ratio validates the
-        # acoustic count.
+        # A language counted in characters writes a syllable a character, so their ratio
+        # validates the acoustic count.
         **(
             {"acoustic_per_written_syllable": round(chapter["nuclei"] / chapter["units"], 3)}
-            if code == "zh"
+            if languages.language(code).unit == "characters"
             else {}
         ),
         "median_f0_hz": round(float(np.median(f0)), 1),
@@ -413,7 +415,7 @@ def recognition(edition: production.Edition) -> dict:
     records = repository.read(edition.narration_selected)["records"]
     selected = {record["id"]: record for record in records}
     asr = repository.read(edition.ear_first / "asr.json")
-    joiner = "" if edition.code == "zh" else " "
+    joiner = " " if edition.declaration.spaced else ""
     differences, script_units, differing = [], 0, 0
     for record in asr["records"]:
         chosen = selected[record["id"]]
@@ -531,7 +533,7 @@ def measure_edition(code: str) -> dict:
             **soundtrack_loudness(soundtrack),
         },
         "speaking_rate": {
-            "unit": "characters" if code == "zh" else "words",
+            "unit": languages.language(code).unit,
             "spoken_units": count,
             "per_minute_over_film": round(count / timeline["duration"] * 60, 1),
             "per_minute_over_voiced_segments": round(count / voiced * 60, 1),

@@ -281,3 +281,10 @@ def test_continuity_steps_measure_rate_pitch_and_level_between_thoughts():
 def test_syllables_count_chinese_characters_and_latin_vowel_groups():
     assert flow.syllables("换成 Agent 来做。", "zh") == 6
     assert flow.syllables("Agents review the data.", "en") == 7
+
+
+@pytest.mark.usefixtures("test_languages")
+def test_a_test_language_counts_its_syllables_as_its_source():
+    text = "这条记录在 Git 里保存。The record stays."
+    assert flow.syllables(text, "xa") == flow.syllables(text, "zh") == 8 + 1 + 4
+    assert flow.syllables(text, "xb") == flow.syllables(text, "en") == 1 + 4

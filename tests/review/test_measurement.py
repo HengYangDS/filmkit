@@ -584,3 +584,13 @@ def test_the_review_tools_and_the_verifier_load_no_speech_runtime():
         timeout=120,
     )
     assert loaded.stdout.strip() == "[]"
+
+
+@pytest.mark.usefixtures("test_languages")
+def test_a_test_language_counts_its_speech_as_its_source():
+    from filmkit.review.measurement import units
+
+    text = "这条记录在 Git 里保存。The record stays in Git, as it's kept."
+    assert units(text, "xa") == units(text, "zh") == list("这条记录在里保存")
+    assert units(text, "xb") == units(text, "en")
+    assert "git" in units(text, "xb") and "it's" in units(text, "xb")

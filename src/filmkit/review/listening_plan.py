@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import Field
 
+import filmkit.languages as languages
 import filmkit.narration.flow as narration_flow
 import filmkit.narration.terms as narration_terms
 import filmkit.repository as repository
@@ -102,8 +103,9 @@ def film_readings() -> Readings:
 
 
 def occurrences(term: str, text: str, code: str) -> Iterator[tuple[int, int]]:
-    """Spans of a term in a segment's text: substrings in Chinese, words in English."""
-    if code == "zh":
+    """Spans of a term in a segment's text: substrings in a language whose words spaces do not
+    delimit, as Chinese, and words in one whose words they delimit, as English."""
+    if not languages.language(code).spaced:
         start = text.find(term)
         while start >= 0:
             yield start, start + len(term)

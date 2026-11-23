@@ -354,3 +354,19 @@ def test_a_replacement_in_an_unknown_segment_is_refused_by_name(tmp_path, write_
     refused(
         tmp_path, paths, {"replace": {"zh": [["99.1", "甲", "乙"]]}}, "zh 99.1: no such thought"
     )
+
+
+@pytest.mark.usefixtures("test_languages")
+def test_a_test_language_finds_words_at_their_edges_as_its_source():
+    from filmkit.narration.anchors import Thought
+
+    english = [Thought("It was last night's work, last night.", ())]
+    chinese = [Thought("昨晚的工作，昨晚。", ())]
+    assert narration_script_edits.occurrences(english, "last night", "xb") == (
+        narration_script_edits.occurrences(english, "last night", "en")
+    )
+    assert (
+        narration_script_edits.occurrences(chinese, "昨晚", "xa")
+        == (narration_script_edits.occurrences(chinese, "昨晚", "zh"))
+        == [(0, 0), (0, 5)]
+    )

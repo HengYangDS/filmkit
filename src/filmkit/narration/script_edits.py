@@ -16,11 +16,11 @@ one whose words are its phrase or hold it, on the new words; it is refused, nami
 its words, when its phrase holds an anchor's boundary and reaches beyond it, unless its new text
 restates the anchor's marks. A split is refused when its seam falls inside an anchor. A rewrite
 moves each anchor whose words, compared by their units, its new thoughts say exactly once, or as
-often as the old thoughts did, to that occurrence or the one of the same rank; in English an
-occurrence begins and ends at a word's edge. Its thoughts must be a nonempty list of strings, each
-saying a spoken unit. Every other anchor is refused by name, with its words
-and their new occurrences, unless the new thoughts restate it. Marks that an edit places stand
-immediately before their first unit and after their last.
+often as the old thoughts did, to that occurrence or the one of the same rank; where spaces
+delimit the language's words, as in English, an occurrence begins and ends at a word's edge. Its
+thoughts must be a nonempty list of strings, each saying a spoken unit. Every other anchor is
+refused by name, with its words and their new occurrences, unless the new thoughts restate it.
+Marks that an edit places stand immediately before their first unit and after their last.
 
 Each segment whose thoughts changed has its text rebuilt from its plain thoughts and its spoken
 text derived through the script's pronunciation contract, the narration mirror is rewritten, and
@@ -44,6 +44,7 @@ import copy
 import json
 from dataclasses import replace as replaced
 
+import filmkit.languages as languages
 import filmkit.repository as repository
 from filmkit.narration import anchors
 from filmkit.narration.anchors import Mark, Thought
@@ -283,8 +284,8 @@ def _unanchor(thoughts: dict, sid: str, name: str, code: str) -> None:
 
 def occurrences(groups: list[Thought], words: str, code: str) -> list[tuple[int, int]]:
     """Each place in a segment's thoughts where words are said, compared by their units, as
-    (thought, first unit), both from 0, in order; in English only those that begin and end at a
-    word's edge."""
+    (thought, first unit), both from 0, in order; in a language whose words spaces delimit, only
+    those that begin and end at a word's edge."""
     wanted, found = units(words), []
     for index, thought in enumerate(groups):
         text, places = thought.text, unit_places(thought.text)
@@ -296,7 +297,7 @@ def occurrences(groups: list[Thought], words: str, code: str) -> list[tuple[int,
             inside = (begin > 0 and _joins(text[begin - 1])) or (
                 end < len(text) and _joins(text[end])
             )
-            if code != "en" or not inside:
+            if not languages.language(code).spaced or not inside:
                 found.append((index, first))
     return found
 
