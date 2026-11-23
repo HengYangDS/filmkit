@@ -1,6 +1,7 @@
 """Anchors: named spans of a script's own words, refused before anything is written when broken."""
 
 import json
+import re
 from itertools import pairwise
 
 import pytest
@@ -454,3 +455,21 @@ def test_a_check_whose_packages_are_missing_refuses_with_its_reason(drawing, tmp
 def test_a_film_without_a_composition_is_not_asked(drawing, tmp_path):
     (tmp_path / "picture/film.js").unlink()
     assert narrate.gate("zh")["picture_reads"] == anchor_reads.NOT_ASKED
+
+
+# The sample film's composition, which every engine test draws.
+SAMPLE_COMPOSITION = repository.ROOT / "picture/film.js"
+
+
+def test_the_sample_composition_keys_its_cues_to_anchors_and_searches_no_words():
+    composition = SAMPLE_COMPOSITION.read_text()
+    assert ".words" not in composition and "indexOf" not in composition
+    # Its anchor helper is given an id, written or taken from a table of ids, and nothing else.
+    given = re.findall(r"cue\(s, ([^)]*)\)", composition)
+    assert given and all(re.fullmatch(r'"[a-z][a-z0-9-]*"|[a-z][A-Za-z]*', arg) for arg in given)
+    marked = anchors.require_editions()
+    ids = {a.id for found in marked.values() for listed in found.values() for a in listed}
+    assert {arg.strip('"') for arg in given if arg.startswith('"')} <= ids
+    # Over each edition's derived timeline it reads only what the edition marks; no scene throws.
+    judged = {"verdict": "pass", "not_judged": {"zh": [], "en": []}, "not_loaded": {}}
+    assert anchor_reads.check() == judged

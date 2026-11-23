@@ -4,6 +4,18 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- A segment may mark anchors in its own words, `anchored_groups` with `{id}words{/id}`, from which its plain thoughts are filled (`filmkit.narration.anchors`). When an edition's script marks any, `produce assemble` gives every segment of its timeline `anchors` with each anchor's `start`, `end`, `units` and `thought`, from its words, so a composition reads `s.anchors[id]` instead of searching for a quoted phrase; `refresh-captions` adopts a change of anchors alone and keeps the soundtrack. Every command that reads anchors refuses a broken mark or plain thoughts edited by hand before it writes anything. A film that marks no anchor keeps its scripts', timelines' and pictures' bytes.
+- `filmkit.narration.script_edits` carries anchors: a replacement keeps an anchor on its words or refuses by name, a split inside an anchor is refused, and the new `rewrite`, `anchor` and `unanchor` edits replace a segment's thoughts whole, moving each anchor to the words it still says or naming it, mark a span of a thought's units and remove an id's marks.
+- `python -m filmkit.narration.anchors` lists both editions' anchors with their times where a timeline holds them and the ids one edition alone marks; `--timeline <folder>` writes the timeline that the engine derives from each script for the checks before narration, and `--place <timeline> --language <edition>` gives a timeline of other words the anchors its marks take from them; times the scripts' marks have left behind are named stale.
+- Narration refuses, before any speech model loads and in a dry run too, a script that does not mark an anchor its edition's picture reads, drawing the composition over the derived timeline with the new tool `anchor-reads`, and names as not judged each scene that throws there and, for its whole edition, a composition that does not load. `check-picture` gates each anchor the picture reads and the edition does not mark, also beside an audit that fails.
+
+### Changed
+
+- **Breaking: narration draws both editions' pictures first.** For every film that has a composition, anchors or not, narration and its dry run now draw `picture/film.js` over a timeline derived from each edition's script before any speech model loads (`filmkit.picture.anchor_reads`): they run the engine's Node tool `anchor-reads`, so the film's npm packages must be installed at the engine's canvas version and the engine's Node modules are copied into the film's tool cache, as for the picture's checks; `converge` pays for the draws on each round (1 to 2 s an edition on the three released films, measured on 23 November 2026); and the gate line narration prints gains `picture_reads`, whose `verdict` is `pass` or `not judged`. A film that adopts this release installs its npm packages before it narrates, as its picture tasks already do, and reads `picture_reads` where it reads that line.
+- The sample film keys its cues to anchors of its scripts; its labels keep their own text.
+
 ## [0.29.0] - 2026-11-23
 
 ### Added

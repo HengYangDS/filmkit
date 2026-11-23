@@ -84,11 +84,11 @@
 
 ## 6. The sample film and the documents
 
-- [ ] 6.1 The sample film keys its cues to anchors in both editions; its labels stay as they are. Done when
+- [x] 6.1 The sample film keys its cues to anchors in both editions; its labels stay as they are. Done when
       `tests/picture/headless-composition.test.mjs` draws every frame of both sample editions with no unmarked id read,
       and a test in `tests/narration/test_anchors.py` holds that `examples/sample-film/picture/film.js` holds no search
       of the segment's words and passes only ids to its anchor helper.
-- [ ] 6.2 Document anchors in the README (the field and its marks; that an anchored segment's plain thoughts are filled
+- [x] 6.2 Document anchors in the README (the field and its marks; that an anchored segment's plain thoughts are filled
       and changed through `script_edits`; the timeline's `anchors`; the refresh; the edits; the report and the derived
       timeline; the checks of what a picture reads; that a composition reads each anchor from the segment's `anchors`
       object; the units and how they differ from a composition's; which meaning of "anchor" is meant) and in the

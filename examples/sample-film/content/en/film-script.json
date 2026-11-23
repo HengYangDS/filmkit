@@ -111,7 +111,11 @@
         "The script holds what is said, a reference recording sets the narrator's voice, and the composition draws every frame."
       ],
       "text": "This short film shows how a film is rebuilt from its sources. The script holds what is said, a reference recording sets the narrator's voice, and the composition draws every frame.",
-      "spoken_text": "This short film shows how a film is rebuilt from its sources. The script holds what is said, a reference recording sets the narrator's voice, and the composition draws every frame."
+      "spoken_text": "This short film shows how a film is rebuilt from its sources. The script holds what is said, a reference recording sets the narrator's voice, and the composition draws every frame.",
+      "anchored_groups": [
+        "This short film shows how {film}a film{/film} is rebuilt from its {sources}sources{/sources}. ",
+        "The {script}script{/script} holds {what-is-said}what is said{/what-is-said}, a {reference}reference{/reference} recording sets the {voice}narrator{/voice}'s voice, and the {composition}composition{/composition} draws {every-frame}every frame{/every-frame}."
+      ]
     },
     {
       "id": "02",
@@ -129,7 +133,12 @@
         "Each part is narrated from a fixed seed, so every rebuild produces the same voice."
       ],
       "text": "The build first narrates the script. It joins the recordings into one soundtrack and times the captions to the speech. Each part is narrated from a fixed seed, so every rebuild produces the same voice.",
-      "spoken_text": "The build first narrates the script. It joins the recordings into one soundtrack and times the captions to the speech. Each part is narrated from a fixed seed, so every rebuild produces the same voice."
+      "spoken_text": "The build first narrates the script. It joins the recordings into one soundtrack and times the captions to the speech. Each part is narrated from a fixed seed, so every rebuild produces the same voice.",
+      "anchored_groups": [
+        "The build first {narration}narrates{/narration} the script. ",
+        "It joins the recordings into one {soundtrack}soundtrack{/soundtrack} and times the {captions}captions{/captions} to the speech. ",
+        "Each part is narrated from a {fixed-seed}fixed seed{/fixed-seed}, so every rebuild produces the {same-voice}same voice{/same-voice}."
+      ]
     },
     {
       "id": "03",
@@ -149,7 +158,11 @@
         "None of these steps reaches the network, and every file they make stays in the build folder."
       ],
       "text": "Then it renders every frame and packages the films. None of these steps reaches the network, and every file they make stays in the build folder.",
-      "spoken_text": "Then it renders every frame and packages the films. None of these steps reaches the network, and every file they make stays in the build folder."
+      "spoken_text": "Then it renders every frame and packages the films. None of these steps reaches the network, and every file they make stays in the build folder.",
+      "anchored_groups": [
+        "Then it {picture}renders{/picture} every frame and packages the {films}films{/films}. ",
+        "None of these steps reaches the {offline}network{/offline}, and every file they make stays in the {build-folder}build folder{/build-folder}."
+      ]
     },
     {
       "id": "04",
@@ -170,7 +183,12 @@
         "Only when everything matches is the rebuild complete."
       ],
       "text": "Last, each film is checked against its sources. The check covers the recordings, the soundtrack, the captions, the picture and the packages, and each must match the inputs it was made from. Only when everything matches is the rebuild complete.",
-      "spoken_text": "Last, each film is checked against its sources. The check covers the recordings, the soundtrack, the captions, the picture and the packages, and each must match the inputs it was made from. Only when everything matches is the rebuild complete."
+      "spoken_text": "Last, each film is checked against its sources. The check covers the recordings, the soundtrack, the captions, the picture and the packages, and each must match the inputs it was made from. Only when everything matches is the rebuild complete.",
+      "anchored_groups": [
+        "Last, each {film}film{/film} is checked against its {sources}sources{/sources}. ",
+        "The check covers the {recordings}recordings{/recordings}, the {soundtrack}soundtrack{/soundtrack}, the {captions}captions{/captions}, the {picture}picture{/picture} and the {packages}packages{/packages}, and each must {match}match{/match} the inputs it was made from. ",
+        "Only when {everything}everything{/everything} matches is the rebuild {complete}complete{/complete}."
+      ]
     }
   ]
 }

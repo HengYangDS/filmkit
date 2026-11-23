@@ -498,3 +498,16 @@ test("a segment's anchors are read through a recorder that names every unmarked 
     process.chdir(SAMPLE);
   }
 });
+
+for (const code of ["zh", "en"]) {
+  test(`every frame of the ${code} sample reads each anchor its script marks and no other`, async () => {
+    const film = await authoredTimeline(code),
+      composition = openComposition(film);
+    for (let frame = 0; frame * 0.25 < film.duration; frame++) composition.render(frame * 0.25);
+    const read = composition.anchorReads().map((v) => `${v.segment} ${v.id} ${v.marked}`),
+      marked = film.segments.flatMap((s) =>
+        Object.keys(s.anchors).map((id) => `${s.id} ${id} true`),
+      );
+    assert.deepEqual(read.sort(), marked.sort());
+  });
+}

@@ -33,7 +33,6 @@ const ease = (q) => {
   return q * q * (3 - 2 * q);
 };
 const ramp = (t, start, duration = FADE) => ease((t - start) / duration);
-const units = (value) => value.replace(/[^\p{L}\p{N}]/gu, "").toLowerCase();
 
 /* What the frame shows, published for the checks: one record per painted text, in paint order. */
 let layout = { texts: [] };
@@ -122,19 +121,13 @@ function outline(x, y, width, height, alpha, color) {
   ctx.globalAlpha = 1;
 }
 
-/* When a segment's voice first says `key`, or the share of its voice when no word matches. */
-function cue(s, key, share) {
-  const wanted = units(key);
-  const owners = [];
-  let joined = "";
-  for (const word of s.words ?? []) {
-    for (const unit of units(word.text)) {
-      owners.push(word);
-      joined += unit;
-    }
-  }
-  const at = joined.indexOf(wanted);
-  return at >= 0 ? owners[at].start : s.voice_start + share * (s.voice_end - s.voice_start);
+/* When a segment's voice says the words that its script marks as the anchor `id`: the start of the first of them.
+ * Each anchor is read from the segment's own `anchors` (filmkit.narration.anchors); an id the script does not mark
+ * there is refused. */
+function cue(s, id) {
+  const anchor = s.anchors?.[id];
+  if (!anchor) throw Error(`Segment ${s.id} marks no anchor ${id}`);
+  return anchor.start;
 }
 
 /* Something named appears as the narration names it. */
@@ -151,27 +144,20 @@ function tag(value, x, y, alpha) {
  * cards that stood from the scene's start left it still for the whole of it. Each card is tagged with its kind of
  * file; the three light as one when the narration names them, and each is named, then explained, as its words are
  * said. */
-const BESIDE = L("影片", "a film");
 const SOURCES = [
-  [
-    L("脚本", "Script"),
-    L("脚本", "script"),
-    L("要说的话", "What is said"),
-    L("要说的话", "what is said"),
-    ".json",
-  ],
+  [L("脚本", "Script"), "script", L("要说的话", "What is said"), "what-is-said", ".json"],
   [
     L("参考录音", "Reference"),
-    L("参考录音", "reference"),
+    "reference",
     L("旁白的嗓音", "The narrator’s voice"),
-    L("旁白的嗓音", "narrator"),
+    "voice",
     ".wav",
   ],
   [
     L("画面合成", "Composition"),
-    L("画面合成", "composition"),
+    "composition",
     L("每一帧画什么", "Every frame"),
-    L("每一帧画什么", "every frame"),
+    "every-frame",
     ".js",
   ],
 ];
@@ -182,29 +168,29 @@ function sourcesScene(s, t, alpha) {
     color: P.muted,
     alpha,
   });
-  const lit = alpha * shown(t, cue(s, L("源文件", "sources"), 0.5));
-  SOURCES.forEach(([name, nameKey, note, noteKey, kind], i) => {
+  const lit = alpha * shown(t, cue(s, "sources"));
+  SOURCES.forEach(([name, nameId, note, noteId, kind], i) => {
     const x = 350 + i * 440;
-    const here = alpha * (i === 1 ? 1 : shown(t, cue(s, BESIDE, 0.15)));
+    const here = alpha * (i === 1 ? 1 : shown(t, cue(s, "film")));
     card(x, 420, 340, 170, here);
     outline(x, 420, 340, 170, lit, P.accent);
-    const named = shown(t, cue(s, nameKey, 0.4 + 0.2 * i));
+    const named = shown(t, cue(s, nameId));
     tag(kind, x, 420, here * (1 - named));
     text(name, x + 170, 495, { size: LABEL, alpha: alpha * named });
     text(note, x + 170, 550, {
       size: NOTE,
       color: P.muted,
-      alpha: alpha * shown(t, cue(s, noteKey, 0.5 + 0.2 * i)),
+      alpha: alpha * shown(t, cue(s, noteId)),
     });
   });
 }
 
 const STAGES = [
-  [L("旁白", "Narration"), L("旁白", "narrates")],
-  [L("音轨", "Soundtrack"), L("音轨", "soundtrack")],
-  [L("字幕", "Captions"), L("字幕", "captions")],
-  [L("画面", "Picture"), L("画面", "renders")],
-  [L("成片", "Films"), L("成片", "films")],
+  [L("旁白", "Narration"), "narration"],
+  [L("音轨", "Soundtrack"), "soundtrack"],
+  [L("字幕", "Captions"), "captions"],
+  [L("画面", "Picture"), "picture"],
+  [L("成片", "Films"), "films"],
 ];
 
 /* The build's five stages stand in a row from its first scene, each tagged with its step; the stages before `from` are
@@ -212,21 +198,21 @@ const STAGES = [
  * first scene shows what keeps a rebuild's voice the same, the second that the build stays offline. */
 function buildScene(s, t, alpha, from, to) {
   text(L("构建的步骤", "Build steps"), 960, 330, { size: NOTE, color: P.muted, alpha });
-  STAGES.forEach(([name, key], i) => {
+  STAGES.forEach(([name, id], i) => {
     const x = 206 + i * 312;
     card(x, 440, 260, 140, alpha);
-    const named = i < from ? 1 : i < to ? shown(t, cue(s, key, 0.15 + 0.3 * (i - from))) : 0;
+    const named = i < from ? 1 : i < to ? shown(t, cue(s, id)) : 0;
     tag(L(`步骤 ${i + 1}`, `Step ${i + 1}`), x, 440, alpha * (1 - named));
     text(name, x + 130, 524, { size: LABEL, alpha: alpha * named });
   });
   if (from === 0) {
-    const seed = alpha * shown(t, cue(s, L("固定的种子", "fixed seed"), 0.6));
+    const seed = alpha * shown(t, cue(s, "fixed-seed"));
     text(L("固定的种子", "A fixed seed"), 336, 630, { size: NOTE, color: P.muted, alpha: seed });
-    const same = alpha * shown(t, cue(s, L("声音都一样", "same voice"), 0.9));
+    const same = alpha * shown(t, cue(s, "same-voice"));
     text(L("声音都一样", "The same voice"), 336, 680, { size: NOTE, color: P.done, alpha: same });
     return;
   }
-  const offline = alpha * shown(t, cue(s, L("不联网", "network"), 0.6));
+  const offline = alpha * shown(t, cue(s, "offline"));
   line(
     [
       [176, 400],
@@ -239,7 +225,7 @@ function buildScene(s, t, alpha, from, to) {
     { color: P.accent, width: 2, dash: [14, 10] },
   );
   text(L("不联网", "Offline"), 960, 385, { size: NOTE, color: P.accent, alpha: offline });
-  const kept = alpha * shown(t, cue(s, L("构建目录", "build folder"), 0.8));
+  const kept = alpha * shown(t, cue(s, "build-folder"));
   text(L("所有文件都留在构建目录", "Everything stays in the build folder"), 960, 680, {
     size: NOTE,
     color: P.muted,
@@ -249,11 +235,11 @@ function buildScene(s, t, alpha, from, to) {
 
 /* What the check covers, as the narration lists it. */
 const CHECKED = [
-  [L("录音", "Recordings"), L("录音", "recordings")],
-  [L("音轨", "Soundtrack"), L("音轨", "soundtrack")],
-  [L("字幕", "Captions"), L("字幕", "captions")],
-  [L("画面", "Picture"), L("画面", "picture")],
-  [L("打包记录", "Packages"), L("打包记录", "packages")],
+  [L("录音", "Recordings"), "recordings"],
+  [L("音轨", "Soundtrack"), "soundtrack"],
+  [L("字幕", "Captions"), "captions"],
+  [L("画面", "Picture"), "picture"],
+  [L("打包记录", "Packages"), "packages"],
 ];
 /* Each check stands from x 870 to 898, and its item starts one gap after it, so the items share one left edge. */
 const CHECK_LEFT = 870;
@@ -264,24 +250,24 @@ const ITEM_LEFT = CHECK_RIGHT + 26;
  * and the check completes when everything does. */
 function checkScene(s, t, alpha) {
   text(L("核对成片", "Checking the films"), 960, 330, { size: NOTE, color: P.muted, alpha });
-  const complete = alpha * shown(t, cue(s, L("全部", "everything"), 0.85));
-  for (const [x, kind, name, key, share] of [
-    [330, ".mp4", L("成片", "Films"), L("成片", "film"), 0.1],
-    [1290, ".json .wav .js", L("源文件", "Sources"), L("源文件", "sources"), 0.15],
+  const complete = alpha * shown(t, cue(s, "everything"));
+  for (const [x, kind, name, id] of [
+    [330, ".mp4", L("成片", "Films"), "film"],
+    [1290, ".json .wav .js", L("源文件", "Sources"), "sources"],
   ]) {
     card(x, 425, 300, 170, alpha);
     outline(x, 425, 300, 170, complete, P.done);
-    const named = shown(t, cue(s, key, share));
+    const named = shown(t, cue(s, id));
     tag(kind, x, 425, alpha * (1 - named));
     text(name, x + 150, 523, { size: LABEL, alpha: alpha * named });
   }
-  const matched = alpha * shown(t, cue(s, L("一致", "match"), 0.7));
-  CHECKED.forEach(([name, key], i) => {
+  const matched = alpha * shown(t, cue(s, "match"));
+  CHECKED.forEach(([name, id], i) => {
     const y = 440 + i * 45;
     text(name, ITEM_LEFT, y, {
       size: NOTE,
       align: "left",
-      alpha: alpha * shown(t, cue(s, key, 0.3 + 0.08 * i)),
+      alpha: alpha * shown(t, cue(s, id)),
     });
     line(
       [
@@ -296,7 +282,7 @@ function checkScene(s, t, alpha) {
   text(L("完成", "Complete"), 960, 700, {
     size: LABEL,
     color: P.done,
-    alpha: alpha * shown(t, cue(s, L("完成", "complete"), 0.95)),
+    alpha: alpha * shown(t, cue(s, "complete")),
   });
 }
 
