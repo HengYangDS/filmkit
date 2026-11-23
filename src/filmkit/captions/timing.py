@@ -17,6 +17,7 @@ import re
 from dataclasses import dataclass
 from itertools import pairwise
 
+import filmkit.languages as languages
 from filmkit.captions import CaptionError
 from filmkit.captions.phrasing import segment_caption_phrases
 from filmkit.narration.spoken_units import (
@@ -27,7 +28,6 @@ from filmkit.narration.spoken_units import (
     thought_ends,
     units,
 )
-from filmkit.specification import CAPTION_LIMITS
 
 # How the assembly receipt describes the cues it counts.
 CAPTION_TIMING = (
@@ -45,9 +45,13 @@ _OPENING_QUOTE = re.compile(r'(?:^|(?<=[\s(\[{\u2013\u2014]))"')
 BRIEF_CUE_SECONDS = 1.0
 # A brief cue joins its neighbour only across less quiet than this.
 CUE_JOIN_QUIET_SECONDS = 0.25
-# The most characters per second, spaces included, at which an edition's cue is read: the
-# measure of the English reviews. Chinese cues have no reading rate.
-READING_RATES = {"en": 25}
+
+
+def reading_rate(code: str) -> int | None:
+    """The most characters per second, spaces included, at which an edition's cue is read, as
+    its language declares it, or None where it declares none (`filmkit.languages`)."""
+    rate = languages.language(code).captions.reading_rate
+    return None if rate == "none" else rate
 
 
 def typeset(text: str) -> str:
@@ -74,7 +78,7 @@ def caption_receipt_fields(timeline: dict, code: str) -> dict:
     return {
         "caption_count": len(captions),
         "caption_timing": CAPTION_TIMING,
-        "captions_above_reading_rate": captions_above_rate(captions, READING_RATES.get(code)),
+        "captions_above_reading_rate": captions_above_rate(captions, reading_rate(code)),
     }
 
 
@@ -97,9 +101,12 @@ def _caption_timing(timeline: dict, code: str) -> CaptionTiming:
     if not policy:
         msg = "Caption timing requires a declared caption_timing policy"
         raise CaptionError(msg)
-    hold_mode = policy.get("hold_mode")
-    if "hold_mode" in policy and (hold_mode != "full-interval" or code != "en"):
-        msg = "Caption hold mode must be full-interval for English"
+    hold_mode, held = policy.get("hold_mode"), languages.language(code).captions.hold
+    if "hold_mode" in policy and held == "none":
+        msg = f"Caption hold mode is declared for {code}, whose language declares no hold"
+        raise CaptionError(msg)
+    if "hold_mode" in policy and hold_mode != held:
+        msg = f"Caption hold mode must be {held} for {code}, as its language declares"
         raise CaptionError(msg)
     for key, maximum in (("tail_seconds", 0.25), ("short_cue_lead_seconds", 0.1)):
         value = policy.get(key, 0)
@@ -212,7 +219,8 @@ def timed_caption_cues(timeline: dict, code: str) -> list[dict]:
     _lead_short_sentence_ends(cues, spans, timing.lead)
     if timing.full_interval:
         _hold_full_interval(cues, timeline["segments"])
-    cues = steady_short_cues(cues, CAPTION_LIMITS[code], rate=READING_RATES.get(code))
+    limit = languages.language(code).captions.limit
+    cues = steady_short_cues(cues, limit, rate=reading_rate(code))
     if any(cue["end"] <= cue["start"] for cue in cues):
         msg = "Caption alignment must have a positive readable interval"
         raise CaptionError(msg)

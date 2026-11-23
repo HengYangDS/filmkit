@@ -303,3 +303,13 @@ def test_the_transcript_parts_give_each_chapter_its_scenes_and_each_scene_its_th
         [("Scene 03", 42.872)],
     ]
     assert parts[1].sections[0].paragraphs == ("One 03.", "Two 03’s.")
+
+
+@pytest.mark.usefixtures("test_languages")
+@pytest.mark.parametrize(
+    ("code", "byline"),
+    [("xa", "Yang HENG · Xa · 27 分钟"), ("xb", "Yang HENG · Xb · 27 min")],
+)
+def test_a_test_language_is_bylined_by_its_declared_name_and_byline(code, byline):
+    transcript = captions_documents._transcript("Title", [], code, 27 * 60 + 30)
+    assert transcript.splitlines()[2] == byline

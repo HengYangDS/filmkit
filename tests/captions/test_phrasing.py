@@ -1,12 +1,13 @@
-"""Caption phrasing for both editions."""
+"""Caption phrasing by each language's declared kind: full-width punctuation and English grammar."""
 
 import json
 
 import pytest
 
-import filmkit.captions.chinese as captions_chinese
-import filmkit.captions.english as captions_english
+import filmkit.captions.english_grammar as english_grammar
+import filmkit.captions.full_width_punctuation as full_width
 import filmkit.captions.phrasing as captions_phrasing
+import filmkit.languages as languages
 import filmkit.repository as repository
 
 # The fixed terms of the English script that the phrasing cases below come from, as that
@@ -34,11 +35,39 @@ SCRIPT_TERMS = (
 )
 
 
+class Terms:
+    """The caption terms the English phrasing binds in a case, as an edition declares them."""
+
+    declared: tuple[str, ...] = ()
+
+
+TERMS = Terms()
+LIMIT = {
+    "zh": languages.language("zh").captions.limit,
+    "en": languages.language("en").captions.limit,
+}
+
+
+def english_sentences(text: str) -> list[str]:
+    """English's caption sentences at its caption limit."""
+    return english_grammar.sentences(text, LIMIT["en"])
+
+
+def english_phrases(text: str) -> list[str]:
+    """English's caption lines at its limit, binding the case's terms."""
+    return english_grammar.phrases(text, LIMIT["en"], TERMS.declared)
+
+
+def chinese_phrases(text: str) -> list[str]:
+    """Chinese's caption lines at its limit."""
+    return full_width.phrases(text, LIMIT["zh"])
+
+
 @pytest.fixture
 def script_terms(monkeypatch):
     """Phrase captions with the fixed terms of the script the cases come from."""
-    terms = captions_english.caption_term_words(SCRIPT_TERMS)
-    monkeypatch.setattr(captions_english, "FIXED_TERMS", terms)
+    monkeypatch.setattr(TERMS, "declared", SCRIPT_TERMS)
+    monkeypatch.setattr(captions_phrasing, "caption_terms", lambda code: SCRIPT_TERMS)
 
 
 def test_a_caption_term_declared_with_capitals_stays_on_one_line(monkeypatch):
@@ -48,16 +77,15 @@ def test_a_caption_term_declared_with_capitals_stays_on_one_line(monkeypatch):
         "An agent that writes to the repository first opens a Work Lane and then writes only "
         "the paths it was admitted."
     )
-    monkeypatch.setattr(captions_english, "FIXED_TERMS", ())
-    assert captions_english.english_caption_phrases(text)[0].endswith("opens a Work ")
+    monkeypatch.setattr(TERMS, "declared", ())
+    assert english_phrases(text)[0].endswith("opens a Work ")
     phrased = {}
     for declared in ("Work Lane", "work lane"):
-        terms = captions_english.caption_term_words((declared,))
-        monkeypatch.setattr(captions_english, "FIXED_TERMS", terms)
-        phrased[declared] = captions_english.english_caption_phrases(text)
+        monkeypatch.setattr(TERMS, "declared", (declared,))
+        phrased[declared] = english_phrases(text)
     assert not any(line.rstrip().endswith("Work") for line in phrased["Work Lane"])
     assert phrased["Work Lane"] == phrased["work lane"]
-    assert captions_english.caption_term_words(("Work Lane", "Agent’s Work")) == (
+    assert english_grammar.caption_term_words(("Work Lane", "Agent’s Work")) == (
         ("work", "lane"),
         ("agent’s", "work"),
     )
@@ -68,14 +96,13 @@ def test_a_caption_term_stays_whole_where_its_only_break_ends_on_a_function_word
     # ends a line on "for" and leaves a short line, and the split inside the name won on cost.
     name = "Evidence-grounded Trust for Human-Agent Operational Stewardship"
     text = f"Its name stands for {name}."
-    monkeypatch.setattr(captions_english, "FIXED_TERMS", ())
-    assert captions_english.english_caption_phrases(text) == [
+    monkeypatch.setattr(TERMS, "declared", ())
+    assert english_phrases(text) == [
         "Its name stands for Evidence-grounded Trust ",
         "for Human-Agent Operational Stewardship.",
     ]
-    terms = captions_english.caption_term_words((name,))
-    monkeypatch.setattr(captions_english, "FIXED_TERMS", terms)
-    assert captions_english.english_caption_phrases(text) == [
+    monkeypatch.setattr(TERMS, "declared", (name,))
+    assert english_phrases(text) == [
         "Its name stands for ",
         f"{name}.",
     ]
@@ -84,9 +111,8 @@ def test_a_caption_term_stays_whole_where_its_only_break_ends_on_a_function_word
 def test_a_caption_term_longer_than_a_line_is_split_once(monkeypatch):
     term = "every request that a member raises with the department and every answer it receives"
     text = f"The register keeps {term}."
-    terms = captions_english.caption_term_words((term,))
-    monkeypatch.setattr(captions_english, "FIXED_TERMS", terms)
-    phrases = captions_english.english_caption_phrases(text)
+    monkeypatch.setattr(TERMS, "declared", (term,))
+    phrases = english_phrases(text)
     assert "".join(phrases) == text
     assert all(len(phrase) <= 66 for phrase in phrases)
     assert len(phrases) == 2
@@ -101,11 +127,11 @@ def test_a_short_quotation_of_two_sentences_stays_on_one_caption(opening, closin
     # quotation, so the reply spanned two captions although its sentence fits one line.
     quoted = f"An Agent hands back one sentence: {opening}Done. All tests pass.{closing} "
     text = quoted + "How much does that sentence actually say?"
-    assert captions_english.english_caption_sentences(text) == [
+    assert english_sentences(text) == [
         quoted,
         "How much does that sentence actually say?",
     ]
-    phrases = captions_english.english_caption_phrases(text)
+    phrases = english_phrases(text)
     assert phrases[0] == quoted
     assert not any(phrase.rstrip().endswith("Done.") for phrase in phrases)
 
@@ -115,7 +141,7 @@ def test_a_quotation_longer_than_a_line_divides_at_its_sentences():
         'The reply read: "Every check in the suite passed. '
         'The release can go out today, as planned." Then it stopped.'
     )
-    assert captions_english.english_caption_sentences(text) == [
+    assert english_sentences(text) == [
         'The reply read: "Every check in the suite passed. ',
         'The release can go out today, as planned." ',
         "Then it stopped.",
@@ -139,7 +165,7 @@ def test_english_caption_cues_preserve_connected_text_and_punctuation():
 
 
 def test_chinese_captions_preserve_the_exact_source():
-    phrases = captions_chinese.caption_phrases("记录到了，能否使用？")
+    phrases = chinese_phrases("记录到了，能否使用？")
     assert "".join(phrases) == "记录到了，能否使用？"
     assert all("\n" not in phrase and len(phrase) <= 33 for phrase in phrases)
 
@@ -182,7 +208,7 @@ def test_chinese_captions_keep_closing_quotes_on_the_line_they_close():
         ],
     }
     for passage, expected in passages.items():
-        assert captions_chinese.caption_phrases(passage) == expected
+        assert chinese_phrases(passage) == expected
 
 
 def test_english_captions_keep_complements_and_rebalance_short_tails():
@@ -199,7 +225,7 @@ def test_english_captions_keep_complements_and_rebalance_short_tails():
         ),
     ]
     for passage in passages:
-        cues = captions_english.english_caption_phrases(passage)
+        cues = english_phrases(passage)
         assert "".join(cues) == passage
         assert all(len(cue) <= 66 and "\n" not in cue for cue in cues)
         assert all(len(cue.split()) >= 3 for cue in cues)
@@ -277,7 +303,7 @@ def test_english_caption_reflow_keeps_closing_punctuation_with_its_sentence(
     assert all(len(cue) <= 66 and "\n" not in cue for cue in cues)
     assert all(any(character.isalnum() for character in cue) for cue in cues)
     assert not any(cue.lstrip().startswith(("”", ")", "]", "}")) for cue in cues)
-    thoughts = captions_english.english_caption_sentences(passage)
+    thoughts = english_sentences(passage)
     assert "".join(thoughts) == passage
     assert not any(group.lstrip().startswith(("”", ")", "]", "}")) for group in thoughts)
 
@@ -285,7 +311,7 @@ def test_english_caption_reflow_keeps_closing_punctuation_with_its_sentence(
 def test_english_caption_reflow_preserves_every_current_paragraph():
     script = json.loads((repository.ROOT / "content/en/film-script.json").read_text())
     for segment in script["segments"]:
-        cues = captions_english.english_caption_phrases(segment["text"])
+        cues = english_phrases(segment["text"])
         assert "".join(cues) == segment["text"]
         assert all(len(cue) <= 66 and "\n" not in cue for cue in cues)
         assert all(any(character.isalnum() for character in cue) for cue in cues)
@@ -308,7 +334,7 @@ def test_english_captions_keep_bound_words_with_their_phrase():
         "and limits are recorded in the authoritative record. ": "only",
     }
     for sentence, bound in sentences.items():
-        cues = captions_english.english_caption_phrases(sentence)
+        cues = english_phrases(sentence)
         assert "".join(cues) == sentence
         assert len(cues) > 1
         assert not any(cue.split()[-1] in {bound, "once"} for cue in cues), cues
@@ -316,7 +342,7 @@ def test_english_captions_keep_bound_words_with_their_phrase():
         "The guidelines bind members, and the Agents that members delegate to: "
         "AI systems that search, reason and act toward a goal. "
     )
-    cues = captions_english.english_caption_phrases(stranded)
+    cues = english_phrases(stranded)
     assert any(cue.rstrip().endswith("delegate to:") for cue in cues), cues
 
 
@@ -354,7 +380,7 @@ def test_chinese_captions_end_lists_at_their_own_punctuation():
         ],
     }
     for passage, expected in passages.items():
-        assert captions_chinese.caption_phrases(passage) == expected
+        assert chinese_phrases(passage) == expected
 
 
 @pytest.mark.parametrize(
@@ -502,7 +528,7 @@ def test_chinese_captions_end_lists_at_their_own_punctuation():
 def test_english_captions_keep_modifiers_terms_and_objects_whole(passage, phrases):
     # Round-11 review EN11-1: a modifier stays with its noun, a fixed term stays
     # whole, and a verb keeps its particle and the object it takes.
-    cues = captions_english.english_caption_phrases(passage)
+    cues = english_phrases(passage)
     assert "".join(cues) == passage
     assert all(len(cue) <= 66 and "\n" not in cue for cue in cues)
     for phrase in phrases:
@@ -519,7 +545,7 @@ def test_english_caption_reflow_refuses_straddled_complete_thoughts():
         "revising it as evidence changes. Before collecting information, ",
         "state which judgment it could change.",
     ]
-    with pytest.raises(ValueError, match="thought-group"):
+    with pytest.raises(ValueError, match="cross a caption sentence"):
         captions_phrasing.segment_caption_phrases(
             {"text": passage, "caption_phrases": straddled}, "en"
         )
@@ -534,8 +560,23 @@ def test_english_caption_reflow_refuses_straddled_complete_thoughts():
     assert all(";" not in cue.rstrip()[:-1] for cue in cues)
 
     qualified = "Compare e.g. records and entities at ratio 1.5: units matter. Verify use."
-    cues = captions_english.english_caption_phrases(qualified)
+    cues = english_phrases(qualified)
     assert "".join(cues) == qualified
     assert any("e.g." in cue for cue in cues)
     assert any("1.5:" in cue for cue in cues)
     assert not any("matter. Verify" in cue for cue in cues)
+
+
+@pytest.mark.usefixtures("test_languages")
+def test_a_test_language_is_phrased_by_its_declared_kind():
+    chinese = {"text": "记录到了，能否使用？这要看它的来源、用途和保存期限，而不是看它有多新。"}
+    english = {
+        "text": "A record that holds every source of the film is kept beside its own sources."
+    }
+    assert captions_phrasing.segment_caption_phrases(chinese, "xa") == (
+        captions_phrasing.segment_caption_phrases(chinese, "zh")
+    )
+    assert captions_phrasing.segment_caption_phrases(english, "xb") == (
+        captions_phrasing.segment_caption_phrases(english, "en")
+    )
+    assert captions_phrasing.caption_terms("xb") == ()

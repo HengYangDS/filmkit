@@ -64,7 +64,7 @@ import filmkit.repository as repository
 import filmkit.review.clarity as review_clarity
 import filmkit.sources as sources
 import filmkit.tools as tools
-from filmkit.captions.timing import READING_RATES, captions_above_rate
+from filmkit.captions.timing import captions_above_rate, reading_rate
 from filmkit.film import FILM
 from filmkit.narration import anchors
 from filmkit.production import CODES, Edition
@@ -260,7 +260,7 @@ def clarity(edition: Edition) -> str | None:
 
 def caption_rate(edition: Edition) -> str | None:
     """Whether each cue above the edition's reading rate is one the film declares by its text."""
-    rate = READING_RATES.get(edition.code)
+    rate = reading_rate(edition.code)
     try:
         cues = repository.read(edition.timeline)["captions"]
     except FileNotFoundError as error:

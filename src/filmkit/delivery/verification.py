@@ -32,6 +32,7 @@ import filmkit.delivery.packaging as packaging
 import filmkit.delivery.player as player
 import filmkit.delivery.spotlight as spotlight
 import filmkit.durations as durations
+import filmkit.languages as languages
 import filmkit.media as media
 import filmkit.narration.selection as narration_selection
 import filmkit.narration.spoken_units as narration_spoken_units
@@ -76,7 +77,7 @@ def verify_sources() -> dict:
 def verify_captions(timeline: dict, code: str) -> int:
     """Captions stay single-line, typeset, within their limit and before the credits: the
     timeline's runtime less its credits as laid out, which must lie within it."""
-    limit, prior_end = specification.CAPTION_LIMITS[code], 0.0
+    limit, prior_end = languages.language(code).captions.limit, 0.0
     runtime, laid = production.Edition(code).runtime_in(timeline), timeline.get("credits_duration")
     if type(laid) not in {int, float} or not 0 <= laid < runtime:
         msg = f"The {code} timeline states no credits within its runtime"

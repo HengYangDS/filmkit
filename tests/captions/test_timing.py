@@ -73,8 +73,8 @@ def segment(**changes) -> dict:
     ("caption_timing", "code", "message"),
     [
         (None, "zh", "requires a declared caption_timing policy"),
-        ({"hold_mode": "full-interval"}, "zh", "full-interval for English"),
-        ({"hold_mode": "sentence"}, "en", "full-interval for English"),
+        ({"hold_mode": "full-interval"}, "zh", "declared for zh, whose language declares no hold"),
+        ({"hold_mode": "sentence"}, "en", "must be full-interval for en, as its language declares"),
         ({"tail_seconds": 0.3}, "zh", "finite bounded seconds"),
         ({"short_cue_lead_seconds": True}, "zh", "finite bounded seconds"),
     ],
@@ -407,3 +407,15 @@ def test_the_receipt_counts_the_cues_and_states_their_timing():
         "caption_timing": captions_timing.CAPTION_TIMING,
         "captions_above_reading_rate": [],
     }
+
+
+@pytest.mark.usefixtures("test_languages")
+@pytest.mark.parametrize(("code", "source"), [("xa", "zh"), ("xb", "en")])
+def test_a_test_language_is_timed_as_its_source(code, source):
+    part = SEGMENTS[source]
+    assert captions_timing.timed_caption_cues(timeline(part), code) == part["cues"]
+    assert captions_timing.reading_rate(code) == captions_timing.reading_rate(source)
+    held = {"caption_timing": {"hold_mode": "full-interval"}, "segments": [segment()]}
+    if source == "zh":
+        with pytest.raises(captions.CaptionError, match=f"declared for {code}, whose language"):
+            captions_timing.timed_caption_cues(held, code)

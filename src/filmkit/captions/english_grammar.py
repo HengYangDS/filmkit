@@ -1,4 +1,5 @@
-"""Set an English passage as caption lines that break at grammatical boundaries.
+"""Set a passage as caption lines that break at English's grammatical boundaries: the phrasing
+`english-grammar`, which a language's declaration chooses (`filmkit.languages`), as English does.
 
 Each sentence, and each long independent clause, is kept together, as is a short quotation of
 several sentences, and its lines take the cheapest breaks: after a phrase mark or before a
@@ -11,7 +12,6 @@ from __future__ import annotations
 import re
 
 from filmkit.captions import CaptionError
-from filmkit.film import FILM
 from filmkit.narration.spoken_units import (
     CLOSING_MARKS,
     PHRASE_BREAKS,
@@ -19,7 +19,6 @@ from filmkit.narration.spoken_units import (
     SENTENCE_ENDS,
     quotation_open,
 )
-from filmkit.specification import CAPTION_LIMITS
 
 _ENDS, _CLOSERS, _SEMICOLONS = (
     re.escape(marks) for marks in (SENTENCE_ENDS, CLOSING_MARKS, SEMICOLONS)
@@ -70,7 +69,7 @@ def _join_open_quotations(text: str, sentences: list[str], limit: int) -> list[s
     return joined
 
 
-def english_caption_sentences(text: str, limit: int = CAPTION_LIMITS["en"]) -> list[str]:
+def sentences(text: str, limit: int) -> list[str]:
     """Keep complete sentences and long independent clauses together.
 
     A sentence that ends inside an open quotation continues into the next while both fit the
@@ -396,11 +395,6 @@ def caption_term_words(terms: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
     return tuple(tuple(_word(word) for word in term.split()) for term in terms)
 
 
-# A term that reads as one name stays on one line; the film declares the terms its English
-# script needs, as it writes them.
-FIXED_TERMS = caption_term_words(FILM.editions["en"].caption_terms)
-
-
 def _break_strength(words: list[str], last: int, tail_end: str) -> int:
     """How strongly the text breaks before word last; a lower strength is a better line end.
 
@@ -463,11 +457,11 @@ def _open_break_penalty(words: list[str], last: int) -> int:
     return penalty
 
 
-def _splits_term(words: list[str], last: int) -> bool:
+def _splits_term(words: list[str], last: int, terms: tuple[tuple[str, ...], ...]) -> bool:
     """Whether a line that ends before word last splits a declared caption term."""
     return last < len(words) and any(
         tuple(words[last - offset : last - offset + len(term)]) == term
-        for term in FIXED_TERMS
+        for term in terms
         for offset in range(1, len(term))
     )
 
@@ -523,19 +517,21 @@ def _cheapest_lines(
     return best[0][1]
 
 
-def english_caption_phrases(text: str, limit: int = CAPTION_LIMITS["en"]) -> list[str]:
-    """Prefer grammatical boundaries over equally sized fragments of a phrase."""
-    phrases: list[str] = []
-    for sentence in english_caption_sentences(text, limit):
+def phrases(text: str, limit: int, terms: tuple[str, ...] = ()) -> list[str]:
+    """Prefer grammatical boundaries over equally sized fragments of a phrase. A line holds at
+    most `limit` characters, the language's caption limit, and a term of `terms`, the ones the
+    edition declares as it writes them, stays on one line where it fits."""
+    bound, lines = caption_term_words(terms), []
+    for sentence in sentences(text, limit):
         tokens = re.findall(r"\S+\s*", sentence)
         if "".join(tokens) != sentence:
             msg = "English caption tokens must preserve exact spacing"
             raise CaptionError(msg)
         words = [_word(token) for token in tokens]
         costs = {last: _break_cost(tokens, words, last) for last in range(1, len(tokens) + 1)}
-        splits = {last for last in range(1, len(tokens)) if _splits_term(words, last)}
-        phrases.extend(_cheapest_lines(tokens, costs, splits, limit))
-    if "".join(phrases) != text:
+        splits = {last for last in range(1, len(tokens)) if _splits_term(words, last, bound)}
+        lines.extend(_cheapest_lines(tokens, costs, splits, limit))
+    if "".join(lines) != text:
         msg = "English captions must retain exact narration"
         raise CaptionError(msg)
-    return phrases
+    return lines

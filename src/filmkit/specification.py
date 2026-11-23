@@ -55,7 +55,6 @@ CREDITS_DURATION: int = FILM.credits_duration
 AUTHOR: str = declared("author", str)
 # The films' chapter count; each edition titles the chapters in its own language.
 CHAPTERS: int = declared("chapters", len)
-CAPTION_LIMITS = {"zh": 33, "en": 66}
 # ISO 639-2 tags of each edition's drawn captions and narration.
 ISO_LANGUAGES = {"zh": "zho", "en": "eng"}
 # Both editions play at one spoken-word level; a single gain reaches it without dynamics

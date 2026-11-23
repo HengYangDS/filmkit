@@ -20,6 +20,7 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import filmkit.languages as languages
 from filmkit.captions import CaptionError
 from filmkit.captions.timing import shown_text, typeset
 from filmkit.repository import relative, write
@@ -148,11 +149,8 @@ def _transcript(title: str, segments: list[dict], code: str, runtime: int) -> st
     """The transcript: the byline, which states the runtime in whole minutes rounded down, so it
     never states more than the film holds; then each chapter and each of its scenes headed by its
     time, and a paragraph for each thought."""
-    byline = (
-        f"{AUTHOR} · 中文 · {runtime // 60} 分钟"
-        if code == "zh"
-        else f"{AUTHOR} · English · {runtime // 60} min"
-    )
+    language = languages.language(code)
+    byline = f"{AUTHOR} · {language.name} · {language.byline.format(minutes=runtime // 60)}"
     transcript = f"# {typeset(title)}\n\n{byline}\n"
     for part in transcript_parts(segments):
         transcript += f"\n## {clock(part.start)} · {part.number:02d} {part.title}\n"

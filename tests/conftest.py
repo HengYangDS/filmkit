@@ -433,3 +433,16 @@ def test_languages(monkeypatch):
     for code in derived_languages.DERIVED:
         monkeypatch.setitem(languages.LANGUAGES, code, derived_languages.derived(code))
     return {code: languages.LANGUAGES[code] for code in derived_languages.DERIVED}
+
+
+@pytest.fixture
+def test_editions(test_languages, monkeypatch):
+    """The sample film with the editions `xa` and `xb` beside its own, in the test languages of
+    those codes: `xa` declared as the Chinese edition is and `xb` as the English one."""
+    import filmkit.production as production
+    from filmkit.film import FILM
+
+    for code, source in (("xa", "zh"), ("xb", "en")):
+        monkeypatch.setitem(FILM.editions, code, FILM.editions[source])
+    monkeypatch.setattr(production, "CODES", (*production.CODES, "xa", "xb"))
+    return test_languages

@@ -252,3 +252,15 @@ def test_a_refresh_typesets_the_cues_and_keeps_the_subtitles(tmp_path, monkeypat
     assert all(timed[key] == value for key, value in script.items())
     assert [word["text"] for word in timed["words"]] == [word for word, _, _ in ENGLISH_WORDS]
     assert read(edition.audio_assembly)["captions_above_reading_rate"] == []
+
+
+@pytest.mark.usefixtures("test_editions")
+def test_an_edition_of_a_test_language_refreshes_as_its_source(tmp_path, monkeypatch):
+    refreshed = {}
+    for code in ("zh", "xa"):
+        root = tmp_path / code
+        root.mkdir()
+        edition = stage(root, monkeypatch, code, ["甲乙。", "丙丁。"], WORDS)
+        captions_refresh.refresh_captions(edition)
+        refreshed[code] = read(edition.timeline)["captions"]
+    assert refreshed["xa"] == refreshed["zh"] != []
