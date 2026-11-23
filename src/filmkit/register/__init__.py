@@ -14,8 +14,9 @@ before it reads any word. It then gathers the words a viewer meets outside the p
 (`filmkit.concepts.places`), renders them as one text, one place a paragraph, its lines joined
 by nothing between Chinese characters and by a space elsewhere, characters a viewer does not see
 and an empty place left out, and runs Vale once on it, mapping each alert back to its place by a
-table. A listed form is an error wherever it stands: the engine holds no list of words that
-excuses one.
+table. A listed form is an error wherever it stands, but inside a fixed idiom that its rule states
+at the form's token, whose characters are not the listed word (其实 in 名副其实, `colloquial.yml`);
+the engine holds no other list of words that excuses one.
 
 A film keeps a form at one place in `[[register.exceptions]]` (`filmkit.film.Register`) by naming
 the text the form stands within there: the check excuses exactly the form's error-level
