@@ -111,3 +111,23 @@ def test_a_flat_list_of_lead_words_is_refused_with_what_to_write_instead(declare
     said = "picture.wrapping.lead_words is a list; key it by the language its words lead in"
     assert said in str(refusal.value)
     assert "lead_words = { en = ['versus'] }" in str(refusal.value)
+
+
+def test_a_prompt_that_cites_the_former_fields_or_names_an_editions_files_is_refused(declared):
+    prompt = declared / film.FILM.review.prompt
+    prompt.parent.mkdir(parents=True, exist_ok=True)
+    text = (repository.ROOT / film.FILM.review.prompt).read_text(encoding="utf-8")
+    text += "- The {other_language} ({other}) edition.\n"
+    text += "- Scripts: ROOT/content/en/film-script.json in ROOT/build/{{zh,en}}/.\n"
+    prompt.write_text(text, encoding="utf-8")
+    rewrite(declared, 'slug = "sample-reel"', 'slug = "Two Words"')
+    with pytest.raises(FilmError) as refusal:
+        film.load(declared)
+    said = str(refusal.value)
+    end = len(text.splitlines())
+    name = film.FILM.review.prompt
+    assert f"{name}:{end - 1} cites {{other}}, which the engine no longer fills; name the" in said
+    assert f"{name}:{end - 1} cites {{other_language}}" in said and "by {others}" in said
+    assert f"{name}:{end} names an edition's files by their path; name every edition's" in said
+    assert f"{name}:{end} groups the editions' codes in braces;" in said
+    assert "slug" in said

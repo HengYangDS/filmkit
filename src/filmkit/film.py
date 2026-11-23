@@ -26,6 +26,7 @@ from pydantic import (
     model_validator,
 )
 
+import filmkit.declared_sources as declared_sources
 import filmkit.languages as languages
 import filmkit.repository as repository
 
@@ -727,6 +728,7 @@ def read(root: Path) -> tuple[Film | None, list[str]]:
     for code in unknown:
         found.append(f"{DECLARATION} declares editions.{code}: {languages.unknown(code)}")
         editions.pop(code)
+    found += declared_sources.prompt_problems(root, declared)
     undeclared = CREDITS not in declared
     if undeclared:
         found.append(

@@ -129,11 +129,11 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
         ),
         "\n- **R1. The film does not address its audience.** No 你、你们、您、大家、咱们;",
         "inner pauses at most 0.33 s Chinese; 0.33 s (0.22 s at commas) English;",
-        "inner pause floors Chinese 。？！ 0.31 s, ， 0.155 s; English none declared;",
-        "breaths Chinese 7.5 s with a 0.26 s pause; English none declared;",
-        "ratios and margins 1.2 and 0.04 s Chinese, 1.62 and 0.00 s English;",
-        "level tolerances 0.75 dB Chinese, 0.75 dB English;",
-        "coda thought pauses 1.40 s Chinese, 0.90 s English.",
+        "inner pause floors 。？！ 0.31 s, ， 0.155 s Chinese; none declared English;",
+        "breaths 7.5 s with a 0.26 s pause Chinese; none declared English;",
+        "ratios and margins 1.2 and 0.04 s Chinese; 1.62 and 0.00 s English;",
+        "level tolerances 0.75 dB Chinese; 0.75 dB English;",
+        "coda thought pauses 1.40 s Chinese; 0.90 s English.",
         (
             "\n1. subject_and_faithfulness: the rebuild of a film from its sources remains "
             "the subject;"
@@ -161,7 +161,12 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
     # An edition whose previous review holds no findings has none to dispose of.
     assert "everything independently.\n- Repairs: 07.6 names all seven checks.\n" in en
     assert "working files are in" not in en
-    assert "The Chinese (zh) edition is the same film in its own language" in en
+    assert "Other editions: the Chinese (zh) edition." in en
+    assert "Other editions: the English (en) edition." in zh
+    # Every edition's files, the prompt's own edition first.
+    own, other = "Chinese (zh): script ROOT/content/zh/film-script.json", "English (en): script"
+    assert zh.index(own) < zh.index(other) and en.index(other) < en.index(own)
+    assert "timeline ROOT/build/artifacts/film/zh/timeline.json" in zh
     for text in (zh, en):
         assert not re.search(r"\{[a-z_]+\}", text)
         # No prompt cites a work folder; the root itself may lie anywhere.
@@ -210,8 +215,8 @@ def test_prompts_name_the_optional_pause_fields_a_script_omits(root, put, monkey
     out = root / "build/evidence/reviews/round-5"
     context = review_prompts.prompt_context(out, root / "build/evidence/reviews/round-4", None)
     assert context["caps"] == "none declared Chinese; 0.60 s English"
-    assert context["ratios"] == "none declared Chinese, 1.62 and 0.00 s English"
-    assert context["codas"] == "none declared Chinese, 1.90 s English"
+    assert context["ratios"] == "none declared Chinese; 1.62 and 0.00 s English"
+    assert context["codas"] == "none declared Chinese; 1.90 s English"
 
 
 def test_prompts_refuse_a_review_that_leaves_out_the_declared_concept_contract(root, monkeypatch):
@@ -504,3 +509,20 @@ def test_each_edition_s_prompt_states_its_dispositions_in_three_groups(
     # Each edition's reviewer is given the dispositions of its own edition's findings.
     assert "EN0-1" not in zh
     assert "R0-" not in en
+
+
+@pytest.mark.usefixtures("test_editions")
+def test_the_other_editions_and_every_editions_files_follow_the_declared_order(monkeypatch):
+    for codes in (("zh", "en", "xb"),):
+        monkeypatch.setattr(review_prompts, "CODES", codes)
+        assert review_prompts.others_text("en") == "the Chinese (zh) and Xb (xb) editions"
+        assert review_prompts.others_text("zh") == "the English (en) and Xb (xb) editions"
+        files = review_prompts.editions_text("xb")
+        assert [part.split(":")[0] for part in files.split("; ")] == [
+            "Xb (xb)",
+            "Chinese (zh)",
+            "English (en)",
+        ]
+    monkeypatch.setattr(review_prompts, "CODES", ("zh",))
+    assert review_prompts.others_text("zh") == "no other edition"
+    assert review_prompts.editions_text("zh").startswith("Chinese (zh): script ")

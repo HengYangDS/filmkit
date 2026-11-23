@@ -299,7 +299,12 @@ def prompt_context(out_dir: Path, previous: Path | None, changes: Path | None) -
     current scripts, assemblies and declaration hold; the previous round's directory only when
     there is one.
     """
-    zh, en = (repository.read(Edition(code).script)["voice_performance"] for code in CODES)
+    policies = {code: repository.read(Edition(code).script)["voice_performance"] for code in CODES}
+
+    def each(value) -> str:
+        """A policy's value for every edition in the declared order, by its language's name."""
+        return "; ".join(f"{value(policies[code])} {Edition(code).language}" for code in CODES)
+
     manifest = sources.manifest()
     assemblies = [repository.read(Edition(code).audio_assembly) for code in CODES]
     levels = {item["program_level"]["policy"]["integrated_lufs"] for item in assemblies}
@@ -318,14 +323,12 @@ def prompt_context(out_dir: Path, previous: Path | None, changes: Path | None) -
         "fps": specification.FPS,
         "rate": f"{specification.RATE / 1000:g}",
         "program": f"{levels.pop():g}",
-        "caps": f"{inner_caps(zh)} Chinese; {inner_caps(en)} English",
-        "floors": f"Chinese {inner_floors(zh)}; English {inner_floors(en)}",
-        "breath": f"Chinese {inner_breath(zh)}; English {inner_breath(en)}",
-        "tolerances": f"{zh['thought_level_tolerance_db']} dB Chinese, "
-        f"{en['thought_level_tolerance_db']} dB English",
-        "ratios": f"{boundary(zh)} Chinese, {boundary(en)} English",
-        "codas": f"{declared_seconds(zh, 'coda_thought_pause_seconds')} Chinese, "
-        f"{declared_seconds(en, 'coda_thought_pause_seconds')} English",
+        "caps": each(inner_caps),
+        "floors": each(inner_floors),
+        "breath": each(inner_breath),
+        "tolerances": each(lambda policy: f"{policy['thought_level_tolerance_db']} dB"),
+        "ratios": each(boundary),
+        "codas": each(lambda policy: declared_seconds(policy, "coda_thought_pause_seconds")),
         "clarity": clarity_floors(),
         "dimensions": "\n".join(
             f"{index}. {name}: {text}" for index, (name, text) in enumerate(DIMENSIONS.items(), 1)
@@ -529,7 +532,6 @@ def read_round(
     context = prompt_context(out_dir, previous, changes)
     fields = {}
     for code in CODES:
-        other = next(name for name in CODES if name != code)
         fields[code] = {
             **context,
             **previous_context(previous, code),
@@ -538,8 +540,8 @@ def read_round(
             "code": code,
             # Each edition's own runtime: the two editions need not last alike.
             RUNTIME_FIELD: Edition(code).runtime,
-            "other": other,
-            "other_language": Edition(other).language,
+            "others": others_text(code),
+            "editions": editions_text(code),
         }
     # A field is filled by its first name: `{root.name}` asks for `root`, and `{}` for none.
     filled = {*fields[CODES[0]], *EDITION_FIELDS}
@@ -551,6 +553,28 @@ def read_round(
         msg = f"{FILM.review.prompt} cites {cites}, which the engine does not fill"
         raise ReviewError(msg)
     return fields, edition_sentences()
+
+
+def others_text(code: str) -> str:
+    """`{others}`: every other edition by its language's name and its code, in the declared order,
+    or the statement that the film has none."""
+    named = [f"{Edition(other).language} ({other})" for other in CODES if other != code]
+    if not named:
+        return "no other edition"
+    listed = named[0] if len(named) == 1 else f"{', '.join(named[:-1])} and {named[-1]}"
+    return f"the {listed} edition{'s' if len(named) > 1 else ''}"
+
+
+def editions_text(code: str) -> str:
+    """`{editions}`: every edition's script, timeline and folder of delivered files, the prompt's
+    own edition first and the others in the declared order."""
+    ordered = [code, *(other for other in CODES if other != code)]
+    return "; ".join(
+        f"{Edition(each).language} ({each}): script {cited(repository.ROOT / Edition(each).script)}"
+        f", timeline {cited(Edition(each).timeline)}, delivered files "
+        f"{cited(Edition(each).artifacts)}/"
+        for each in ordered
+    )
 
 
 def prompts(
