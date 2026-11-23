@@ -75,14 +75,19 @@ def test_a_repeated_id_and_an_unpinned_source_refuse_together(root):
     ]
 
 
-def test_a_malformed_contract_refuses_naming_the_field(root):
+def test_a_concept_renders_every_declared_edition_and_no_other(root):
     path = write_contract(
-        root, ENTRY.format(id="rebuild", path="README.md").replace("zh = ", "z = ")
+        root, ENTRY.format(id="rebuild", path="README.md").replace("zh = ", "ja = ")
     )
-    with pytest.raises(
-        ConceptError, match=r"(?s)is not a concept contract: .*concept\.0\.zh\n  Field required"
-    ):
+    with pytest.raises(ConceptError) as refusal:
         concepts.load(path, PINNED)
+    assert str(refusal.value).splitlines() == [
+        "Concept rebuild has no rendering for the edition zh, which the film declares",
+        "Concept rebuild renders the edition ja, which the film does not declare",
+    ]
+    broken = ENTRY.format(id="rebuild", path="README.md").replace('rendering = "rebuild", ', "")
+    with pytest.raises(ConceptError, match=r"(?s)is not a concept contract: .*rendering"):
+        concepts.load(write_contract(root, broken), PINNED)
 
 
 def test_quotations_are_found_at_the_pinned_commit_of_a_clone(root, tmp_path, monkeypatch):
@@ -152,7 +157,7 @@ def test_declarations_must_be_known_alike_and_said(root):
     assert concepts.declarations(contract, scripts) == [
         "zh 03 declares unknown, which the contract does not hold",
         "en 03 declares unknown, which the contract does not hold",
-        "02 declares different concepts in its editions: rebuild",
+        "02 declares different concepts in zh and en: rebuild",
         "zh 02 declares rebuild but says none of: 重建",
     ]
 
@@ -476,3 +481,29 @@ def test_a_test_language_matches_and_numbers_as_its_source():
         concepts.unnumbered({"xb": {"segments": [english]}, "en": {"segments": [english]}}, ())
         == []
     )
+
+
+def test_a_segment_whose_concepts_differ_in_a_third_edition_is_named_with_it():
+    contract = concepts.Contract.model_validate(
+        {
+            "concept": [
+                {
+                    "id": "rebuild",
+                    "term": "rebuild",
+                    "essence": "Again.",
+                    "source": {"path": "README.md", "quote": "rebuild"},
+                    "zh": {"rendering": "重建"},
+                    "en": {"rendering": "rebuild", "forms": ["rebuilt"]},
+                    "xb": {"rendering": "rebuild"},
+                }
+            ]
+        }
+    )
+    scripts = {
+        "zh": {"segments": [segment("01", ["重建一遍。", "就这样。"], ["rebuild"])]},
+        "en": {"segments": [segment("01", ["It is rebuilt. ", "That is all."], ["rebuild"])]},
+        "xb": {"segments": [segment("01", ["It runs. ", "That is all."], [])]},
+    }
+    assert concepts.declarations(contract, scripts) == [
+        "01 declares different concepts in zh and xb: rebuild"
+    ]

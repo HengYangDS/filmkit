@@ -37,7 +37,14 @@ import tomllib
 from html.parser import HTMLParser
 from typing import Annotated, NamedTuple
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationError,
+    model_validator,
+)
 
 import filmkit.languages as languages
 import filmkit.repository as repository
@@ -111,18 +118,28 @@ class Rendering(Declared):
 
 
 class Concept(Declared):
-    """One concept sense: its source term and passage, its essence and each edition's words."""
+    """One concept sense: its source term and passage, its essence and each edition's words,
+    declared under the edition's code (`zh = { rendering = … }`)."""
 
     id: Id
     term: Words
     essence: Words
     source: Passage
-    zh: Rendering
-    en: Rendering
+    renderings: dict[str, Rendering]
+
+    @model_validator(mode="before")
+    @classmethod
+    def renderings_by_code(cls, data: object) -> object:
+        """Gather every key beside the concept's own fields as an edition's rendering."""
+        if not isinstance(data, dict):
+            return data
+        own = {"id", "term", "essence", "source"}
+        renderings = {key: value for key, value in data.items() if key not in own}
+        return {**{key: data[key] for key in own if key in data}, "renderings": renderings}
 
     def words(self, code: str) -> Rendering:
         """The concept's words in one edition."""
-        return getattr(self, code)
+        return self.renderings[code]
 
 
 class NumberException(Declared):
@@ -235,6 +252,16 @@ def load(path: str, pinned: dict) -> Contract:
                 f"Concept {concept.id} cites {concept.source.path}, "
                 "which the source manifest does not pin"
             )
+        failures += [
+            f"Concept {concept.id} has no rendering for the edition {code}, which the film declares"
+            for code in CODES
+            if code not in concept.renderings
+        ]
+        failures += [
+            f"Concept {concept.id} renders the edition {code}, which the film does not declare"
+            for code in concept.renderings
+            if code not in CODES
+        ]
     pairs = [(exception.thought, exception.term) for exception in contract.number.exceptions]
     failures += [
         f"Number exception {thought} {term} is declared more than once"
@@ -350,7 +377,7 @@ def picture_places() -> list[Place]:
 
 
 def declarations(contract: Contract, scripts: dict[str, dict]) -> list[str]:
-    """Check each segment's declared concepts: known, alike in both editions, and stated."""
+    """Check each segment's declared concepts: known, alike in every edition, and stated."""
     concepts = {concept.id: concept for concept in contract.concept}
     declared = {
         code: {segment["id"]: tuple(segment.get("concepts", ())) for segment in script["segments"]}
@@ -364,13 +391,17 @@ def declarations(contract: Contract, scripts: dict[str, dict]) -> list[str]:
                 for concept_id in ids
                 if concept_id not in concepts
             ]
+    # Each edition's concepts of a segment against the first declared edition's.
+    first, *others = declared
     for segment_id in sorted({key for segments in declared.values() for key in segments}):
         sets = {code: set(declared[code].get(segment_id, ())) for code in declared}
-        if len({frozenset(ids) for ids in sets.values()}) > 1:
-            differing = sorted(set.union(*sets.values()) - set.intersection(*sets.values()))
-            failures.append(
-                f"{segment_id} declares different concepts in its editions: {', '.join(differing)}"
-            )
+        for code in others:
+            differing = sorted(sets[first] ^ sets[code])
+            if differing:
+                failures.append(
+                    f"{segment_id} declares different concepts in {first} and {code}: "
+                    + ", ".join(differing)
+                )
     for code, script in scripts.items():
         for segment in script["segments"]:
             narration = "".join(authored_groups(segment))
