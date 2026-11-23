@@ -7,7 +7,7 @@
       `tests/narration/test_anchors.py` passes, with a case for an unclosed mark, a close without an open, an id used
       twice, an id that is not kebab-case (`Order_2`, `order-`), an anchor without a unit and an anchor across
       thoughts, and with nested and crossing anchors and two ids on the same words read correctly.
-- [ ] 1.2 Call `anchors.require` before anything is written in narration's gate, `assemble`, `refresh-captions`,
+- [x] 1.2 Call `anchors.require` before anything is written in narration's gate, `assemble`, `refresh-captions`,
       `stage-picture`, `check-picture`, `preflight`, `script_edits` and the report. Done when
       `tests/narration/test_anchors.py` holds that each of them refuses a broken script and writes no file; that a
       script without `anchored_groups` passes each as before is held by each command's own tests and by 2.1's golden
@@ -53,14 +53,14 @@
 
 ## 4. The report and the derived timeline
 
-- [ ] 4.1 Add `python -m filmkit.narration.anchors`: for each edition, each segment's anchors with thought, words,
+- [x] 4.1 Add `python -m filmkit.narration.anchors`: for each edition, each segment's anchors with thought, words,
       units and, where the timeline holds them, times, and with `--json` the same as one document; the ids one edition
       alone marks; exit 0 for them. Done when `tests/narration/test_anchors.py` holds the report and the JSON of a
       two-edition fixture with an id in one edition only, with and without timelines.
-- [ ] 4.2 Derive the timeline of the checks from a script (words 0.2 s each, 0.5 s between thoughts, 1.0 s before each
+- [x] 4.2 Derive the timeline of the checks from a script (words 0.2 s each, 0.5 s between thoughts, 1.0 s before each
       segment, anchors by the resolver of 2.2, no captions) and write it with `--timeline <path>`. Done when
       `tests/narration/test_anchors.py` holds the requirement's scenario and the sample film's derived timeline.
-- [ ] 4.3 Give a timeline that other code built of its own words its anchors with
+- [x] 4.3 Give a timeline that other code built of its own words its anchors with
       `--place <timeline> --language <code>`, and let the engine's Node tests take the sample's anchors from it. Done when
       `tests/narration/test_anchors.py` holds the requirement "A timeline of other words takes its anchors from the
       engine" and no file below `tests/` reads the marks or resolves an anchor but through that command.

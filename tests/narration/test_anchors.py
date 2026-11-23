@@ -1,6 +1,7 @@
 """Anchors: named spans of a script's own words, refused before anything is written when broken."""
 
 import json
+from itertools import pairwise
 
 import pytest
 
@@ -15,6 +16,7 @@ import filmkit.preflight as preflight
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as assembly
 from filmkit.narration.anchors import AnchorError
+from filmkit.narration.spoken_units import units
 from filmkit.picture.errors import PictureError
 from filmkit.production import Edition
 
@@ -175,6 +177,7 @@ def broken(tmp_path, monkeypatch):
         lambda zh: preflight.preflight(zh),
         lambda zh: narrate.gate("zh"),
         lambda zh: script_edits.main(["--edits", "edits.json"]),
+        lambda zh: anchors.main(["--timeline", "build/derived"]),
     ],
     ids=[
         "assemble",
@@ -184,6 +187,7 @@ def broken(tmp_path, monkeypatch):
         "preflight",
         "narration",
         "script_edits",
+        "report",
     ],
 )
 def test_each_command_refuses_a_broken_anchor_before_it_writes(broken, command):
@@ -214,3 +218,124 @@ def test_a_timeline_whose_anchors_are_not_its_words_times_is_refused(broken, com
     with pytest.raises((AnchorError, PictureError), match="run produce refresh-captions"):
         command(zh)
     assert tree(broken) == before
+
+
+@pytest.fixture
+def editions(tmp_path, monkeypatch):
+    """Two editions: the Chinese marks `order` in segment 03 and `fails` in 26, the English
+    `order` only."""
+    monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
+    scripts = {
+        "zh": script(
+            segment("03", "依据{order}有先后{/order}。"), segment("26", "{fails}失败{/fails}。")
+        ),
+        "en": script(
+            segment("03", "There is an {order}order{/order}."), segment("26", "It fails.")
+        ),
+    }
+    for code, value in scripts.items():
+        put(tmp_path / Edition(code).script, value)
+    return scripts
+
+
+def test_the_report_lists_each_editions_anchors_and_the_ids_one_edition_marks(editions, capsys):
+    anchors.main(["--json"])
+    report = json.loads(capsys.readouterr().out)
+    assert report["editions"]["zh"] == {
+        "timeline": None,
+        "stale": False,
+        "segments": {
+            "03": [{"id": "order", "thought": 1, "words": "有先后", "units": [2, 5]}],
+            "26": [{"id": "fails", "thought": 1, "words": "失败", "units": [0, 2]}],
+        },
+    }
+    assert report["editions"]["en"]["segments"] == {
+        "03": [{"id": "order", "thought": 1, "words": "order", "units": [9, 14]}]
+    }
+    assert report["one_edition"] == [{"edition": "zh", "segment": "26", "id": "fails"}]
+    anchors.main([])
+    printed = capsys.readouterr().out.splitlines()
+    assert printed[0] == "zh: 2 anchors in 2 segments; no timeline holds their times"
+    assert printed[1].split() == ["03.1", "order", "units", "2-5", "有先后"]
+    assert printed[-2:] == ["Marked in one edition only:", "  zh 26 fails"]
+
+
+def test_the_report_gives_the_times_an_editions_timeline_holds(editions, capsys):
+    zh = Edition("zh")
+    timeline = anchors.derived_timeline(editions["zh"], "zh")
+    put(zh.timeline, timeline)
+    anchors.main(["--json"])
+    listed = json.loads(capsys.readouterr().out)["editions"]["zh"]
+    assert listed["timeline"] == repository.relative(zh.timeline)
+    order = timeline["segments"][0]["anchors"]["order"]
+    assert listed["segments"]["03"][0] | order == {
+        **listed["segments"]["03"][0],
+        "start": order["start"],
+        "end": order["end"],
+    }
+    anchors.main([])
+    assert f"{order['start']:.2f}-{order['end']:.2f} s" in capsys.readouterr().out
+    # A marks edit that no refresh adopted leaves the timeline's times stale: none is given.
+    marked = editions["zh"]
+    marked["segments"][1] = segment("26", "失败。")
+    put(repository.ROOT / zh.script, marked)
+    anchors.main(["--json"])
+    listed = json.loads(capsys.readouterr().out)["editions"]["zh"]
+    assert listed["stale"] is True and "start" not in listed["segments"]["03"][0]
+    anchors.main([])
+    assert "are stale: run produce refresh-captions --language zh" in capsys.readouterr().out
+
+
+def test_the_engine_places_the_anchors_on_a_timeline_of_other_words(editions, tmp_path):
+    words = [
+        {"text": unit, "start": index, "end": index + 1} for index, unit in enumerate("依据有先后")
+    ]
+    timed = {"segments": [{**editions["zh"]["segments"][0], "words": words}]}
+    put(tmp_path / "own.json", timed)
+    anchors.main(["--place", str(tmp_path / "own.json"), "--language", "zh"])
+    placed = json.loads((tmp_path / "own.json").read_text())["segments"][0]["anchors"]
+    assert placed == {"order": {"start": 2, "end": 5, "units": [2, 5], "thought": 1}}
+
+
+def test_the_derived_timeline_is_the_same_twice_and_times_each_anchor_by_its_words(
+    editions, tmp_path, capsys
+):
+    for folder in ("first", "second"):
+        anchors.main(["--timeline", str(tmp_path / folder)])
+    capsys.readouterr()
+    for code in ("zh", "en"):
+        first, second = (tmp_path / folder / f"{code}.json" for folder in ("first", "second"))
+        assert first.read_bytes() == second.read_bytes()
+    derived = json.loads((tmp_path / "first/zh.json").read_text())
+    words = derived["segments"][0]["words"]
+    # One word per Han character, 0.2 s each, after the 1.0 s before the segment.
+    assert [(w["text"], w["start"], w["end"]) for w in words[:3]] == [
+        ("依", 1.0, 1.2),
+        ("据", 1.2, 1.4),
+        ("有", 1.4, 1.6),
+    ]
+    assert derived["segments"][0]["anchors"]["order"] == {
+        "start": words[2]["start"],
+        "end": words[4]["end"],
+        "units": [2, 5],
+        "thought": 1,
+    }
+    assert derived["captions"] == []
+
+
+def test_the_sample_films_derived_timelines_time_every_unit_of_its_thoughts():
+    for code in ("zh", "en"):
+        source = repository.read(Edition(code).script)
+        derived = anchors.derived_timeline(source, code)
+        previous_end = 0.0
+        for timed, scripted in zip(derived["segments"], source["segments"], strict=True):
+            assert {key: timed[key] for key in scripted} == scripted
+            spoken = "".join(units(word["text"]) for word in timed["words"])
+            assert spoken == units(scripted["text"])
+            assert timed["start"] == previous_end and timed["voice_start"] == timed["start"] + 1.0
+            # Thoughts are 0.5 s apart; words within one follow each other.
+            gaps = {round(b["start"] - a["end"], 3) for a, b in pairwise(timed["words"])}
+            assert gaps <= {0.0, 0.5}
+            previous_end = timed["end"]
+        assert derived["duration"] == derived["segments"][-1]["end"] + derived["credits_duration"]
+        assert derived["captions"] == []

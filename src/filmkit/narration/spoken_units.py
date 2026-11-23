@@ -41,6 +41,11 @@ PHRASE_BREAKS = ",;:"
 PHRASE_END_MARKS = frozenset(CLAUSE_MARKS + PHRASE_BREAKS + SENTENCE_ENDS + SEMICOLONS)
 
 
+# The units' characters: the Han characters of the basic block, and Latin letters and digits.
+HAN = "\u4e00-\u9fff"
+LATIN = "A-Za-z0-9"
+
+
 class AlignmentError(ValueError):
     """Aligned items or thought groups that do not fit their narration text exactly."""
 
@@ -60,7 +65,7 @@ def quotation_open(text: str) -> bool:
 
 def units(text: str) -> str:
     """The text's spoken units, lowercased: Chinese characters, Latin letters and digits."""
-    return "".join(re.findall(r"[\u4e00-\u9fffA-Za-z0-9]", text)).lower()
+    return "".join(re.findall(f"[{HAN}{LATIN}]", text)).lower()
 
 
 def _require_cover(stream: str, text: str) -> None:
