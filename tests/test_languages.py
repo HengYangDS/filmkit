@@ -11,7 +11,7 @@ import derived_languages
 import pytest
 
 import filmkit.languages as languages
-from filmkit.delivery.player import WORDS
+from filmkit.delivery.player import player_words
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 BREAKS = REPOSITORY / "src/filmkit/picture/frame-audit/typography/breaks.mjs"
@@ -70,13 +70,13 @@ def test_the_lead_words_are_those_the_frame_audit_names():
 
 
 @pytest.mark.parametrize("code", ["zh", "en"])
-def test_the_player_words_are_those_of_the_player_page(code):
-    page = {key: value for key, value in WORDS[code].items() if key not in ("lang", "language")}
-    assert languages.language(code).player.model_dump() == page
-    assert (WORDS[code]["lang"], WORDS[code]["language"]) == (
-        languages.language(code).tag,
-        languages.language(code).name,
-    )
+def test_the_player_page_takes_its_words_tag_and_name_from_the_declaration(code):
+    declared = languages.language(code)
+    assert player_words(code) == {
+        "lang": declared.tag,
+        "language": declared.name,
+        **declared.player.model_dump(),
+    }
 
 
 @pytest.mark.parametrize(("code", "source"), [("xa", "zh"), ("xb", "en")])

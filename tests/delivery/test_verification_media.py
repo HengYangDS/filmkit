@@ -4,6 +4,7 @@ import pytest
 
 import filmkit.delivery.packaging as delivery_packaging
 import filmkit.delivery.verification as delivery_verification
+import filmkit.languages as languages
 import filmkit.media as media
 import filmkit.production as production
 import filmkit.repository as repository
@@ -23,7 +24,7 @@ def probe(changes: dict) -> dict:
     Each change names its field by keys and list indices joined by slashes; None removes it.
     """
     seconds = f"{RUNTIME:.6f}"
-    language = specification.ISO_LANGUAGES["zh"]
+    language = languages.language("zh").iso639_2
     video = {
         "codec_type": "video",
         "avg_frame_rate": "60/1",

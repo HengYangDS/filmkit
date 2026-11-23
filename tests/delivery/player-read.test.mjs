@@ -2,6 +2,7 @@
  * file, the track a page embeds, the browser's own captions control, the page's captions control and the films it
  * switches between, what each switch paints and how it keeps the time, the sizes its files list names and each page's
  * verdict; and that a read which stops fails only its page. */
+import { SAMPLE_FILM } from "./film.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -25,7 +26,8 @@ import {
 } from "../../src/filmkit/delivery/player-verdict.mjs";
 import { deliveryMembers } from "../../src/filmkit/delivery/player-check.mjs";
 
-const MEMBERS = deliveryMembers("sample-reel");
+const MEMBERS = deliveryMembers(SAMPLE_FILM),
+  CODES = SAMPLE_FILM.editions.map((edition) => edition.code);
 
 test("every link of a page leads to a delivery member, a sibling page or a place in the page", () => {
   assert.deepEqual(
@@ -192,6 +194,8 @@ const LINKED = [
 ];
 const EXPECTED = {
   code: "zh",
+  tag: "zh-CN",
+  codes: CODES,
   slug: "sample-reel",
   duration: 60,
   chapters: [
@@ -334,7 +338,7 @@ test("a player that misses what the delivery holds names each problem", () => {
     "the page's language is en",
     "the chapter buttons differ from chapters.json",
     "sample-reel-zh.srt.bak resolves to zh/sample-reel-zh.srt.bak, which is no delivery member",
-    "the language links do not lead to the other edition's player and the entry page",
+    "the language links do not lead to every other edition's player and the entry page",
     "the files list names 9 files, not 11",
     "sample-reel-zh-uhd.mp4 asks for a download, which a browser ignores on a file beside the page",
     "sample-reel-zh.vtt is no download the page holds",
@@ -503,30 +507,31 @@ test("a paused switch keeps the time to 0.02 s and a playing one plays on from t
 
 test("the entry page leads to both players and nowhere outside the delivery", () => {
   const links = ["zh/index.html", "en/index.html"];
-  assert.deepEqual(entryProblems({ links, language_links: links }, MEMBERS), []);
+  assert.deepEqual(entryProblems({ links, language_links: links }, MEMBERS, CODES), []);
   assert.deepEqual(
     entryProblems(
       { links: ["zh/index.html", "fr/index.html"], language_links: ["zh/index.html"] },
       MEMBERS,
+      CODES,
     ),
     [
       "fr/index.html resolves to fr/index.html, which is no delivery member",
       "the language links are zh/index.html, not zh/index.html, en/index.html",
     ],
   );
-  assert.deepEqual(entryProblems({}, MEMBERS), []);
+  assert.deepEqual(entryProblems({}, MEMBERS, CODES), []);
 });
 
 test("a read that stops fails its page and keeps what it read, and the other pages are still read", async () => {
   // A page that cannot be opened.
   const closed = { goto: async () => Promise.reject(Error("net::ERR_FILE_NOT_FOUND")) };
-  assert.deepEqual(await readEntry(closed, "/nowhere", MEMBERS), {
+  assert.deepEqual(await readEntry(closed, "/nowhere", MEMBERS, CODES), {
     page: "index.html",
     verdict: "fail",
     problems: ["the read stopped: net::ERR_FILE_NOT_FOUND"],
   });
   // A player whose delivery holds no chapters is not judged beyond the stop.
-  const binding = { film: { slug: "sample-reel", runtimes: { zh: 1636, en: 1476 } }, members: [] };
+  const binding = { film: SAMPLE_FILM, members: [] };
   const read = await readPlayer(closed, "/nowhere", "zh", binding, "/nowhere/player-zh.png");
   assert.equal(read.verdict, "fail");
   assert.deepEqual(read.editions, []);

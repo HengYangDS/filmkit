@@ -294,7 +294,7 @@ def verify_media(edition: production.Edition, path: Path, rendition: production.
         raise VerificationError(msg) from error
     audio = next((s for s in data["streams"] if s["codec_type"] == "audio"), None)
     tags = data["format"]["tags"]
-    language = specification.ISO_LANGUAGES[edition.code]
+    language = edition.declaration.iso639_2
     release, names = packaging.delivered_tags(edition, rendition), packaging.track_names(edition)
     tolerance = media.DURATION_TOLERANCE
     if not (

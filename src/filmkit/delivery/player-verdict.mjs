@@ -1,7 +1,8 @@
 /** Judge what a delivery's pages show and do, as the real-browser read collects it (player-read.mjs), a page at a time.
  *
  * Every link of a page must lead to a delivery member, a sibling page or a place in the page. The language entry page
- * leads to both players. A player opens on the viewing film with its captions drawn and its captions control pressed.
+ * leads to every edition's player in the declared order. The editions, their codes, tags and members, are the
+ * delivery binding's (`filmkit.delivery.folder.bound_film`), which the read passes to each verdict. A player opens on the viewing film with its captions drawn and its captions control pressed.
  * The control switches to the other film of the same version, with or without captions, and a version button to its
  * version's film with the captions as they are, each keeping the time and whether the film plays; every film plays at
  * its size and duration and decodes at three seek points. The pictures draw the captions, so a player's one track of
@@ -9,15 +10,13 @@
  * film, and neither the page's controls nor the browser's own can show it. On each version a cue active at its time
  * marks the transcript paragraph that holds it. No switch paints the cover or one flat colour where the film should
  * be (player-frames.mjs). A chapter button and a transcript time play from their time; the
- * language links lead to the other edition's player and to the entry page; each file the list names carries the size
+ * language links lead to every other edition's player, in the film's declared order, and to the entry page; each file the list names carries the size
  * of the member it leads to; each film and cover link carries `target="_blank" rel="noopener"` and, clicked, opens its
  * file in a new tab while the player keeps its own address; no link opens raw text in a tab, and each text file is a
  * download that saves the delivered bytes and leaves the page where it is. */
 import { posix } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
-/* Each edition's page language. */
-export const LANGUAGES = { zh: "zh-CN", en: "en" };
 /* A switch of a paused film keeps its time within 0.02 s, as the page sets it exactly; a playing film plays on from
  * no earlier than SLACK before the time at the click and no later than that time plus the seconds that passed and
  * SLACK. A time button has played from its time within two seconds. */
@@ -162,9 +161,10 @@ export const verdict = (page, problems) => ({
   problems,
 });
 
-/** Why the entry page does not lead to both players, or a link of it leads outside the delivery. */
-export function entryProblems(read, members) {
-  const expected = Object.keys(LANGUAGES).map((code) => `${code}/index.html`),
+/** Why the entry page does not lead to every edition's player in the declared order, `codes`, or a link of it leads
+ * outside the delivery. */
+export function entryProblems(read, members, codes) {
+  const expected = codes.map((code) => `${code}/index.html`),
     problems = read.links ? linkProblems("index.html", read.links, members) : [];
   if (read.language_links && !isDeepStrictEqual(read.language_links, expected))
     problems.push(
@@ -275,9 +275,9 @@ export function switchProblems(step, duration) {
  * film, each version, whether any control can show the track, and the chapter and transcript times. Only what was read
  * is judged, so a read that stopped is judged as far as it got. */
 export function playerProblems(read, expected) {
-  const { code, slug, duration, chapters, members, sizes, vtt, srt_cues } = expected,
+  const { code, tag, codes, slug, duration, chapters, members, sizes, vtt, srt_cues } = expected,
     path = `${code}/index.html`,
-    other = Object.keys(LANGUAGES).find((c) => c !== code),
+    others = codes.filter((c) => c !== code),
     downloads = [
       `${slug}-${code}-transcript.md`,
       "chapters.json",
@@ -288,7 +288,7 @@ export function playerProblems(read, expected) {
     problems = [],
     expect = (ok, problem) => ok || problems.push(problem),
     has = (key) => read[key] !== undefined;
-  if (has("lang")) expect(read.lang === LANGUAGES[code], `the page's language is ${read.lang}`);
+  if (has("lang")) expect(read.lang === tag, `the page's language is ${read.lang}`);
   if (has("chapters"))
     expect(
       isDeepStrictEqual(
@@ -300,8 +300,11 @@ export function playerProblems(read, expected) {
   if (has("links")) problems.push(...linkProblems(path, read.links, members));
   if (has("language_links"))
     expect(
-      isDeepStrictEqual(read.language_links, [`../${other}/index.html`, "../index.html"]),
-      "the language links do not lead to the other edition's player and the entry page",
+      isDeepStrictEqual(read.language_links, [
+        ...others.map((c) => `../${c}/index.html`),
+        "../index.html",
+      ]),
+      "the language links do not lead to every other edition's player and the entry page",
     );
   if (has("files")) {
     problems.push(...fileProblems(path, read.files, sizes));

@@ -72,7 +72,16 @@ def test_a_first_delivery_places_and_reads_back_every_member(film):
     binding = json.loads((root / delivery_folder.PLAYERS_BINDING).read_text())
     assert binding["destination"] == str(root / "build/artifacts/film")
     assert [m["path"] for m in binding["members"]] == members(root)
-    assert report["film"] == {"slug": "sample-reel", "runtimes": {"zh": 1636, "en": 1476}}
+    assert {key: report["film"][key] for key in ("slug", "runtimes")} == {
+        "slug": "sample-reel",
+        "runtimes": {"zh": 1636, "en": 1476},
+    }
+    assert [(e["code"], e["tag"], len(e["members"])) for e in report["film"]["editions"]] == [
+        ("zh", "zh-CN", 12),
+        ("en", "en", 12),
+    ]
+    bound = [f"{e['code']}/{name}" for e in report["film"]["editions"] for name in e["members"]]
+    assert sorted(["index.html", *bound]) == sorted(m["path"] for m in report["members"])
     assert report["destination"] == str(destination)
     assert json.loads((root / delivery_folder.READBACK).read_text()) == report
     assert film.tree(destination) == {path: f"current {path}\n" for path in members(root)}

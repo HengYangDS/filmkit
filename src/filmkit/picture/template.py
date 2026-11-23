@@ -18,7 +18,7 @@ SCRIPT = "film.js"
 INLINED = (f'<link rel="stylesheet" href="{STYLESHEET}">', f'<script src="{SCRIPT}"></script>')
 # Each text staging replaces, in the order it replaces them, and how often the template holds it.
 ANCHORS: tuple[tuple[str, int], ...] = (
-    ('<html lang="zh-CN">', 1),
+    ('<html lang="und">', 1),
     ('data-duration="1200"', 1),
     ('data-width="1920"', 1),
     ('data-height="1080"', 1),

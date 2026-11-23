@@ -1,6 +1,7 @@
 /** Exercise the parts of the delivered-player and cover checks that need no browser: the delivery members, binding
  * verification, PNG decoding and the cover comparison, and how the read clicks the films and covers of a files list,
  * against a stand-in browser. */
+import { boundFilm, SAMPLE_FILM } from "./film.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -26,11 +27,11 @@ import { PAGE, RECORD } from "../../src/filmkit/picture/stage-contract.mjs";
 
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 // The editions last 27:16 and 24:36: a binding names each edition's runtime by its code.
-const FILM = { slug: "sample-reel", runtimes: { zh: 1636, en: 1476 } };
+const FILM = SAMPLE_FILM;
 const binding = (destination = "/delivery") => ({
   destination,
   film: FILM,
-  members: deliveryMembers(FILM.slug).map((path) => ({ path, sha256: sha(path) })),
+  members: deliveryMembers(FILM).map((path) => ({ path, sha256: sha(path) })),
 });
 
 const chunk = (type, body) => {
@@ -100,8 +101,8 @@ test("the delivery has the entry page and twelve members per language", () => {
       "chapters.ffmeta",
       "index.html",
     ].map((name) => `${code}/${name}`);
-  assert.deepEqual(deliveryMembers(FILM.slug), ["index.html", ...edition("zh"), ...edition("en")]);
-  assert.equal(new Set(deliveryMembers(FILM.slug)).size, 25);
+  assert.deepEqual(deliveryMembers(FILM), ["index.html", ...edition("zh"), ...edition("en")]);
+  assert.equal(new Set(deliveryMembers(FILM)).size, 25);
 });
 
 test("a binding names an absolute destination, the film and exactly its delivery members", () => {
@@ -121,20 +122,39 @@ test("a binding names an absolute destination, the film and exactly its delivery
   const unhashed = binding();
   unhashed.members[3].sha256 = "abc";
   assert.deepEqual(bindingProblems(unhashed), [`${unhashed.members[3].path}: no SHA-256`]);
-  const misnamed = { slug: "Sample Reel", runtimes: { zh: 0, en: 1476.5, fr: 60 } };
+  const misnamed = { ...FILM, slug: "Sample Reel", runtimes: { zh: 0, en: 1476.5, fr: 60 } };
   assert.deepEqual(bindingProblems({ ...binding(), film: misnamed }), [
     "film names no file prefix",
     "film names no runtime for zh",
     "film names no runtime for en",
     "film names a runtime for no edition: fr",
   ]);
-  // A binding of the former shape names one duration for both editions, and is refused.
+  // A binding of the former shape names one duration for both editions and no editions, and is refused.
   assert.deepEqual(bindingProblems({ ...binding(), film: { slug: "sample-reel", duration: 60 } }), [
     "film names one duration for both editions; a binding names each edition's runtime by its code",
-    "film names no runtime for zh",
-    "film names no runtime for en",
+    "film names no editions, each with its code, tag and members",
   ]);
-  const another = { ...binding(), film: { slug: "another", runtimes: FILM.runtimes } };
+  // The editions are the binding's: a film of three editions asks for each one's runtime and members.
+  const three = boundFilm("sample-reel", [
+    ...FILM.editions.map((e) => [e.code, e.tag, 60]),
+    ["xb", "xb", 60],
+  ]);
+  assert.equal(deliveryMembers(three).length, 37);
+  assert.deepEqual(
+    bindingProblems({ ...binding(), film: { ...three, runtimes: { zh: 60, en: 60 } } }).slice(0, 2),
+    [
+      "film names no runtime for xb",
+      `missing members: ${deliveryMembers(three)
+        .filter((p) => p.startsWith("xb/"))
+        .join(", ")}`,
+    ],
+  );
+  // Another film's binding names its own members, so this delivery's are missing and unexpected.
+  const other = boundFilm(
+    "another",
+    FILM.editions.map((e) => [e.code, e.tag, FILM.runtimes[e.code]]),
+  );
+  const another = { ...binding(), film: other };
   assert.deepEqual(
     bindingProblems(another).map((problem) => problem.split(":")[0]),
     ["missing members", "unexpected members"],
@@ -142,8 +162,7 @@ test("a binding names an absolute destination, the film and exactly its delivery
   assert.deepEqual(bindingProblems({}), [
     "destination is not an absolute path",
     "film names no file prefix",
-    "film names no runtime for zh",
-    "film names no runtime for en",
+    "film names no editions, each with its code, tag and members",
   ]);
 });
 

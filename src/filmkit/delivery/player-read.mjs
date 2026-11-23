@@ -16,7 +16,6 @@ import { coverSamples, decodePng, watchScreen } from "./player-frames.mjs";
 import {
   embeddedText,
   entryProblems,
-  LANGUAGES,
   parseCues,
   playerProblems,
   seekPoints,
@@ -356,7 +355,7 @@ const sweepControls = (page) =>
   });
 
 /** Read the language entry page; the record holds its links and its verdict. */
-export async function readEntry(page, root, members) {
+export async function readEntry(page, root, members, codes) {
   const read = {};
   let stopped = [];
   try {
@@ -366,13 +365,18 @@ export async function readEntry(page, root, members) {
   } catch (error) {
     stopped = [`the read stopped: ${error.message}`];
   }
-  return { ...verdict("index.html", [...entryProblems(read, members), ...stopped]), ...read };
+  return {
+    ...verdict("index.html", [...entryProblems(read, members, codes), ...stopped]),
+    ...read,
+  };
 }
 
 /** What one edition's player holds by the delivery: its runtime, its chapters, the size of each of its members, its
  * WebVTT, the cues of its SRT and its cover's samples, against which a switch's frames are judged. */
 export async function delivered(root, code, binding) {
-  const { slug } = binding.film,
+  const { slug, editions } = binding.film,
+    { tag } = editions.find((edition) => edition.code === code),
+    codes = editions.map((edition) => edition.code),
     duration = binding.film.runtimes[code],
     members = binding.members.map((member) => member.path),
     sizes = new Map();
@@ -382,7 +386,19 @@ export async function delivered(root, code, binding) {
   const vtt = await readFile(join(root, code, `${slug}-${code}.vtt`), "utf8"),
     srt = await readFile(join(root, code, `${slug}-${code}.srt`), "utf8"),
     cover = coverSamples(decodePng(await readFile(join(root, code, `${slug}-cover.png`))));
-  return { code, slug, duration, chapters, members, sizes, vtt, srt_cues: parseCues(srt), cover };
+  return {
+    code,
+    tag,
+    codes,
+    slug,
+    duration,
+    chapters,
+    members,
+    sizes,
+    vtt,
+    srt_cues: parseCues(srt),
+    cover,
+  };
 }
 
 /** Read one edition's player, `code`, and screenshot it to `screenshot`; the record holds what was read and the
@@ -465,8 +481,9 @@ export async function readPlayer(page, root, code, binding, screenshot) {
  * screenshot beside the receipt is this read's and never one an earlier check left. */
 export async function readDelivery(page, binding, receiptPath, screenshots = []) {
   const members = binding.members.map((member) => member.path);
-  const pages = [await readEntry(page, binding.destination, members)];
-  for (const code of Object.keys(LANGUAGES)) {
+  const codes = binding.film.editions.map((edition) => edition.code);
+  const pages = [await readEntry(page, binding.destination, members, codes)];
+  for (const code of codes) {
     const screenshot = join(dirname(receiptPath), `player-${code}.png`);
     screenshots.push(screenshot);
     await rm(screenshot, { force: true });

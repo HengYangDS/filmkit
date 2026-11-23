@@ -1,5 +1,6 @@
 /** Exercise that each edition's player is read against its own edition's runtime: the binding names each edition's
  * runtime by its code, and the films of each edition are played and sought against their own. */
+import { SAMPLE_FILM } from "./film.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
@@ -39,7 +40,7 @@ test("each edition's player is read against its own edition's runtime", async ()
       await writeFile(join(root, code, "sample-reel-cover.png"), COVER);
     }
     const binding = {
-      film: { slug: "sample-reel", runtimes: { zh: 1636, en: 1476 } },
+      film: SAMPLE_FILM,
       members: [],
     };
     const zh = await delivered(root, "zh", binding),

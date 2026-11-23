@@ -142,8 +142,9 @@ def film_data(
 
 
 def language(edition: Edition) -> str:
-    """The language tag an edition's picture is drawn in, in the document and on the canvas."""
-    return "en" if edition.code == "en" else "zh-CN"
+    """The language tag an edition's picture is drawn in, in the document and on the canvas: its
+    language's BCP 47 tag (`filmkit.languages`)."""
+    return edition.declaration.tag
 
 
 def declared_faces() -> list[dict]:

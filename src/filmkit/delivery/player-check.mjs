@@ -1,7 +1,7 @@
 /** Read the delivered players back in a real browser, and paint the cover from a staged document.
  *
  * players: a binding names the destination, the film's file prefix, each edition's runtime by its code, and the
- * SHA-256 of each of the 25 delivery members (the delivery readback, or a review round's artifacts binding). The member bytes are checked before and after the browser read.
+ * SHA-256 of each of the delivery members (the delivery readback, or a review round's artifacts binding). The member bytes are checked before and after the browser read.
  * The read (player-read.mjs, judged by player-verdict.mjs) opens the language entry page and each language's player, and records each page with a
  * verdict of its own in the receipt's `pages`: every link leads to a member or a sibling page; the captioned viewing
  * edition plays first with its captions control pressed; the control turns the captions off and on, paused and
@@ -28,7 +28,7 @@ import { launchBrowser } from "../picture/headless-browser.mjs";
 import { frameContract, PAGE, StageError } from "../picture/stage-contract.mjs";
 import { decodePng } from "./player-frames.mjs";
 import { digestFile, readDelivery } from "./player-read.mjs";
-import { LANGUAGES, seekPoints } from "./player-verdict.mjs";
+import { seekPoints } from "./player-verdict.mjs";
 
 export { decodePng, digestFile, seekPoints };
 
@@ -45,30 +45,26 @@ const ENDING = "SIGTERM";
 
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
-/** A film's 25 delivery members: the language entry page, then per language its four films, the UHD and the 1080p film
- * with captions and the same two without, the cover as PNG and JPEG, SRT and VTT subtitles, the transcript, chapters as
- * JSON and FFmetadata, and the player. */
-export function deliveryMembers(slug) {
+/** A film's delivery members, as its binding names its editions in the declared order: the language entry page, then
+ * each edition's members below the folder of its code. */
+export function deliveryMembers(film) {
   return [
     "index.html",
-    ...Object.keys(LANGUAGES).flatMap((code) =>
-      [
-        `${slug}-${code}-uhd.mp4`,
-        `${slug}-${code}-1080p-captioned.mp4`,
-        `${slug}-${code}-uhd-uncaptioned.mp4`,
-        `${slug}-${code}-1080p-uncaptioned.mp4`,
-        `${slug}-cover.png`,
-        `${slug}-cover.jpg`,
-        `${slug}-${code}.srt`,
-        `${slug}-${code}.vtt`,
-        `${slug}-${code}-transcript.md`,
-        "chapters.json",
-        "chapters.ffmeta",
-        "index.html",
-      ].map((name) => `${code}/${name}`),
-    ),
+    ...film.editions.flatMap(({ code, members }) => members.map((name) => `${code}/${name}`)),
   ];
 }
+
+/* An edition of a binding: its code, its language's BCP 47 tag and its members' names. */
+const EDITION = (edition) =>
+  typeof edition?.code === "string" &&
+  /^[a-z]{2,3}$/.test(edition.code) &&
+  typeof edition?.tag === "string" &&
+  edition.tag.length > 0 &&
+  Array.isArray(edition?.members) &&
+  edition.members.length > 0 &&
+  edition.members.every(
+    (name) => typeof name === "string" && name.length > 0 && !name.includes("/"),
+  );
 
 /** Why a binding does not name one delivery; none for a binding with an absolute destination, the film's file prefix
  * and each edition's runtime by its code, a positive whole number of seconds, and exactly the film's delivery members,
@@ -86,17 +82,22 @@ export function bindingProblems(binding) {
     problems.push(
       "film names one duration for both editions; a binding names each edition's runtime by its code",
     );
-  for (const code of Object.keys(LANGUAGES))
+  const editions = binding?.film?.editions,
+    listed = Array.isArray(editions) && editions.length > 0 && editions.every(EDITION);
+  if (!listed) problems.push("film names no editions, each with its code, tag and members");
+  const codes = listed ? editions.map((edition) => edition.code) : [];
+  if (new Set(codes).size !== codes.length) problems.push("film names an edition twice");
+  for (const code of codes)
     if (!(Number.isInteger(runtimes?.[code]) && runtimes[code] > 0))
       problems.push(`film names no runtime for ${code}`);
-  const other = Object.keys(runtimes ?? {}).filter((code) => !Object.hasOwn(LANGUAGES, code));
+  const other = Object.keys(runtimes ?? {}).filter((code) => !codes.includes(code));
   if (other.length) problems.push(`film names a runtime for no edition: ${other.join(", ")}`);
   if (binding?.all_match === false) problems.push("the readback does not match its sources");
   if (binding?.unexpected?.length)
     problems.push(`unexpected entries at the destination: ${binding.unexpected.join(", ")}`);
   const members = Array.isArray(binding?.members) ? binding.members : [];
   const paths = members.map((member) => member?.path),
-    expected = named ? deliveryMembers(slug) : paths;
+    expected = named && listed ? deliveryMembers(binding.film) : paths;
   const missing = expected.filter((path) => !paths.includes(path)),
     extra = paths.filter((path) => !expected.includes(path));
   if (missing.length) problems.push(`missing members: ${missing.join(", ")}`);

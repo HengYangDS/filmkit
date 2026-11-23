@@ -1,6 +1,7 @@
 /** Exercise what the player check's receipt lists and how a check ends, against a stand-in browser:
  * the screenshots a read names and wrote, a read that meets its deadline, screenshots an earlier
  * check left, the interrupt the driver is told to leave, and a check asked to end by a signal. */
+import { SAMPLE_FILM } from "./film.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -18,7 +19,7 @@ import {
 import { readDelivery } from "../../src/filmkit/delivery/player-read.mjs";
 
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const FILM = { slug: "sample-reel", runtimes: { zh: 1636, en: 1476 } };
+const FILM = SAMPLE_FILM;
 /* A PNG of one pixel, which an edition's read decodes as the delivery's cover. */
 const COVER = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhf" +
@@ -65,7 +66,7 @@ test("a receipt lists each named screenshot that was written, with its SHA-256, 
 async function boundDelivery(folder) {
   const destination = join(folder, "delivery"),
     members = [];
-  for (const path of deliveryMembers(FILM.slug)) {
+  for (const path of deliveryMembers(FILM)) {
     const body = path.endsWith(".png") ? COVER : path.endsWith(".json") ? '{"chapters": []}' : path;
     await mkdir(dirname(join(destination, path)), { recursive: true });
     await writeFile(join(destination, path), body);

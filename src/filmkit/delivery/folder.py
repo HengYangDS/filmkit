@@ -9,7 +9,7 @@ else ~/Videos; a value there that is no absolute path is passed over. Films are 
 folder is the user's place for them. The readback records the folder and which of these rules
 gave it, with what was passed over.
 
-The destination holds exactly the 25 delivery members: the language entry page and, per
+The destination holds exactly the delivery members: the language entry page and, per
 edition, its four films, the UHD and the 1080p film each with the captions drawn and without
 them, the cover as PNG and JPEG, SRT and VTT subtitles, the transcript, chapters as JSON and
 FFmetadata, and the player. They lie below
@@ -236,14 +236,19 @@ def refuse_unfit(root: Path, destination: Path, rule: str) -> None:
         raise DeliveryRefusedError(msg)
 
 
+def edition_members(edition: Edition) -> list[str]:
+    """An edition's delivery members by name in its folder: its four films, then its viewing
+    members."""
+    return [film.name for film in edition.films] + list(viewing_members(edition))
+
+
 def plan(root: Path) -> list[tuple[Path, str]]:
     """Each delivery member's source and destination-relative path."""
     members = [(root / LANGUAGE_INDEX, LANGUAGE_INDEX.name)]
     for code in CODES:
         edition = Edition(code)
-        names = [film.name for film in edition.films] + list(viewing_members(edition))
         folder = root / edition.artifacts.relative_to(repository.ROOT)
-        members.extend((folder / name, f"{code}/{name}") for name in names)
+        members.extend((folder / name, f"{code}/{name}") for name in edition_members(edition))
     return members
 
 
@@ -318,9 +323,22 @@ def entries(destination: Path, paths: list[str]) -> list[str]:
 
 
 def bound_film() -> dict:
-    """The film that a delivery binding names for the real-browser player check: its file prefix
-    and each edition's runtime by its code, which the two editions need not share."""
-    return {"slug": FILM.slug, "runtimes": {code: Edition(code).runtime for code in CODES}}
+    """The film that a delivery binding names for the real-browser player check: its file prefix,
+    each edition's runtime by its code, which the editions need not share, and its editions in
+    the declared order, each with its code, its language's tag and its members' names, which the
+    check reads instead of a set of languages of its own (`player-check.mjs`)."""
+    return {
+        "slug": FILM.slug,
+        "runtimes": {code: Edition(code).runtime for code in CODES},
+        "editions": [
+            {
+                "code": code,
+                "tag": Edition(code).declaration.tag,
+                "members": edition_members(Edition(code)),
+            }
+            for code in CODES
+        ],
+    }
 
 
 def readback(root: Path, destination: Path) -> dict:

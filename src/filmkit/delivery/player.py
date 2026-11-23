@@ -50,6 +50,7 @@ from pathlib import Path
 from string import Template
 from typing import TYPE_CHECKING, NamedTuple
 
+import filmkit.languages as languages
 import filmkit.repository as repository
 from filmkit.captions.documents import clock, transcript_parts
 from filmkit.captions.timing import shown_text, typeset
@@ -82,7 +83,7 @@ COVER_JPEG = f"{FILM.slug}-cover.jpg"
 class Version(NamedTuple):
     """A version of the film on the page: the kinds of its films with and without captions,
     whether its button starts pressed, which marks the version the page opens on, and the keys
-    of `WORDS` that name its button and its films in the files list."""
+    of the page's words that name its button and its films in the files list."""
 
     captioned: str
     uncaptioned: str
@@ -118,70 +119,15 @@ VERSIONS = (
     Version(*_kinds_at(UHD), pressed=False, button="uhd", films="uhd_film"),
 )
 _OPENING = next(version for version in VERSIONS if version.pressed)
-# The words of each edition's page.
-WORDS = {
-    "zh": {
-        "lang": "zh-CN",
-        "language": "中文",
-        "version": "版本号",
-        "versions": "视频版本",
-        "viewing": "观看版 · 1080p",
-        "uhd": "超高清 4K · 2160p",
-        "captions": "字幕",
-        "captions_on": "：开",
-        "captions_off": "：关",
-        "track": "中文字幕",
-        "chapters": "章节",
-        "transcript": "完整讲稿",
-        "files": "文件",
-        "film": "影片",
-        "viewing_film": "观看版 1080p",
-        "uhd_film": "超高清 4K",
-        "drawn": "画面内含字幕",
-        "undrawn": "无字幕",
-        "downloads": "下载",
-        "labelled": "{kind}（{form}，{purpose}）",
-        "to_download": "供下载",
-        "for_players": "下载后供其他播放器使用",
-        "script": "讲稿",
-        "cover": "封面",
-        "languages": "语言",
-        "entry": "选择语言",
-        "play_from": "从 {} 播放",
-        "unplayable": "这个浏览器播放不了当前的编码，可以用系统的播放器打开文件里的影片。",
-    },
-    "en": {
-        "lang": "en",
-        "language": "English",
-        "version": "Version",
-        "versions": "Video versions",
-        "viewing": "Viewing edition · 1080p",
-        "uhd": "4K UHD · 2160p",
-        "captions": "Captions",
-        "captions_on": ": on",
-        "captions_off": ": off",
-        "track": "English captions",
-        "chapters": "Chapters",
-        "transcript": "Transcript",
-        "files": "Files",
-        "film": "Film",
-        "viewing_film": "Viewing edition 1080p",
-        "uhd_film": "4K UHD",
-        "drawn": "captions in the picture",
-        "undrawn": "no captions",
-        "downloads": "Downloads",
-        "labelled": "{kind} ({form}, {purpose})",
-        "to_download": "download",
-        "for_players": "download for other players",
-        "script": "Transcript",
-        "cover": "Cover",
-        "languages": "Languages",
-        "entry": "Choose a language",
-        "play_from": "Play from {}",
-        "unplayable": "This browser cannot play this encoding; open the film from the files "
-        "below in your system’s player.",
-    },
-}
+
+
+def player_words(code: str) -> dict[str, str]:
+    """The words of an edition's page, from its language's declaration (`filmkit.languages`): its
+    player words, its BCP 47 tag as `lang` and its name as `language`."""
+    language = languages.language(code)
+    return {"lang": language.tag, "language": language.name, **language.player.model_dump()}
+
+
 # The page's style, in the declared colours.
 STYLE = Template(
     ":root{color-scheme:dark;background:$background;color:$text;"
@@ -243,13 +189,14 @@ def entry_runtimes(links: str) -> str:
 
 def version_label(code: str, version: str) -> str:
     """The film's version as an edition names it, with its label: 版本号 1.3.0, Version 1.3.0."""
-    return f"{WORDS[code]['version']} {version}"
+    return f"{player_words(code)['version']} {version}"
 
 
 def entry_version(version: str) -> str:
     """The entry page's line under the film's title: the version with both editions' labels."""
     labels = " / ".join(
-        f'<span lang="{WORDS[code]["lang"]}">{WORDS[code]["version"]}</span>' for code in CODES
+        f'<span lang="{player_words(code)["lang"]}">{player_words(code)["version"]}</span>'
+        for code in CODES
     )
     return f'<p class="version">{labels} {escape(version)}</p>'
 
@@ -272,7 +219,7 @@ def listed_files(edition: Edition) -> list[tuple[str, str]]:
     """Each delivered file a browser shows as a viewer expects, in list order, by name, with its
     kind, version, captions and format in the edition's language: each version's film with its
     captions drawn and without them, then the covers."""
-    words = WORDS[edition.code]
+    words = player_words(edition.code)
     film, cover = words["film"], words["cover"]
     return [
         *(
@@ -288,7 +235,7 @@ def listed_files(edition: Edition) -> list[tuple[str, str]]:
 def download_files(edition: Edition) -> list[tuple[str, str, str]]:
     """Each delivered file a browser would show as raw text, offered as a download: by name, with
     its media type and its label of kind, format and purpose in the edition's language."""
-    words = WORDS[edition.code]
+    words = player_words(edition.code)
     label = words["labelled"].format
     return [
         (path.name, media_type, label(kind=words[kind], form=form, purpose=words[purpose]))
@@ -446,8 +393,8 @@ def player_page(edition: Edition, version: str) -> str:
     """The edition's player page, from the film's declaration, its version and the edition's
     files."""
     code = edition.code
-    words, other_code = WORDS[code], next(c for c in CODES if c != code)
-    other = WORDS[other_code]
+    words, other_code = player_words(code), next(c for c in CODES if c != code)
+    other = player_words(other_code)
     title = escape(typeset(repository.read(edition.script)["title"]))
     timeline = repository.read(edition.timeline)
     runtime = runtime_label(edition.runtime_in(timeline))

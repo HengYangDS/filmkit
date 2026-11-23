@@ -69,7 +69,6 @@ from filmkit.specification import (
     CHAPTERS,
     FPS,
     H264_LEVELS,
-    ISO_LANGUAGES,
     RATE,
 )
 
@@ -429,7 +428,7 @@ def encode_command(
 ) -> list[str]:
     """The FFmpeg command that muxes the rendition's picture, the soundtrack and the chapters
     into one film; the picture it reads is `filmkit.picture.derivation.film_source`'s."""
-    language, names = ISO_LANGUAGES[edition.code], track_names(edition)
+    language, names = edition.declaration.iso639_2, track_names(edition)
     picture, mapped, video = film_source(edition, rendition)
     tags = [
         *(f"{key}={value}" for key, value in release_tags(edition, rendition)),
@@ -568,7 +567,7 @@ def check_delivered_film(path: Path, edition: Edition, rendition: Rendition) -> 
     movie = media.video_stream(info)
     sounds = [stream for stream in streams if stream["codec_type"] == "audio"]
     tags, expected = info["format"].get("tags", {}), delivered_tags(edition, rendition)
-    names, language = track_names(edition), ISO_LANGUAGES[edition.code]
+    names, language = track_names(edition), edition.declaration.iso639_2
     runtime = edition.runtime
     if not (
         sounds
@@ -624,7 +623,7 @@ def package_rendition(
     deadline = max(DEADLINE_FLOOR, edition.runtime * rendition.deadline_ratio)
     encode(edition, package, command, deadline, intermediate)
     commands = [command, *attach_cover_and_keys(edition, intermediate, finished, created_at)]
-    set_chapter_language(finished, ISO_LANGUAGES[edition.code])
+    set_chapter_language(finished, edition.declaration.iso639_2)
     check_delivered_film(finished, edition, rendition)
     target.hardlink_to(finished)
     picture, source = edition.rendered(rendition.captions).name, film_source(edition, rendition)[0]
