@@ -69,7 +69,7 @@ where they meet.
   marked form and removes that copy [S6].
 - `decide-before-heavy-work`, Decision 12, which carries the readings' keys (segment and character offset) through
   `script_edits` to the same occurrence of their term, by a rule unlike this Change's: a second carrier of a place in
-  the text, to be reconciled with anchors in a follow-on Change, not here [S6][S7].
+  the text, to be reconciled with anchors in a follow-on Change, not here [S6], [S7].
 - A picture API in the engine. The template holds no timeline engine, and the films' clause logic differs.
 
 ## Decisions
@@ -234,7 +234,7 @@ where they meet.
   fixes. → They are made once, in the script, beside the words; afterwards a rewrite that keeps the words keeps the
   picture.
 - **Units.** The engine counts Han characters of the basic block, ASCII letters and digits; the films' `units()` counts
-  every letter and number. They agree on all twelve scripts read [S1][S7]. → A film's helper takes `start` and `end`
+  every letter and number. They agree on all twelve scripts read [S1], [S7]. → A film's helper takes `start` and `end`
   from the anchor and uses `units` only for its clause logic; the README names the difference.
 - **Carried over edited words.** An anchor kept over words edited inside it (`轻量档` to `低风险档`) keeps the picture
   change on words whose meaning may have shifted. → The report names every such anchor with its words before and
