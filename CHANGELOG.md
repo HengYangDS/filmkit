@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-23
+
 ### Added
 
 - A segment may mark anchors in its own words, `anchored_groups` with `{id}words{/id}`, from which its plain thoughts are filled (`filmkit.narration.anchors`). When an edition's script marks any, `produce assemble` gives every segment of its timeline `anchors` with each anchor's `start`, `end`, `units` and `thought`, from its words, so a composition reads `s.anchors[id]` instead of searching for a quoted phrase; `refresh-captions` adopts a change of anchors alone and keeps the soundtrack. Every command that reads anchors refuses a broken mark or plain thoughts edited by hand before it writes anything. A film that marks no anchor keeps its scripts', timelines' and pictures' bytes.
@@ -650,7 +652,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.29.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.30.0...HEAD
+[0.30.0]: https://github.com/HengYangDS/filmkit/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/HengYangDS/filmkit/compare/v0.28.0...v0.29.0
 [0.28.0]: https://github.com/HengYangDS/filmkit/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/HengYangDS/filmkit/compare/v0.26.1...v0.27.0
