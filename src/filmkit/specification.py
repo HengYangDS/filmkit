@@ -1,4 +1,6 @@
-"""The delivery format of both editions: duration, rates, levels, limits, tags and credits."""
+"""The delivery format of both editions: rates, levels, limits, tags and the credits' length that
+the film's declaration states; each edition's runtime is its own timeline's
+(`filmkit.production.Edition.runtime`)."""
 
 from __future__ import annotations
 

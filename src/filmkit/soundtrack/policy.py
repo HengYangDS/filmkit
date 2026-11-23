@@ -1,9 +1,9 @@
 """The designed pause contract that each edition's voice performance declares, validated once.
 
-The contract declares the designed pause of each kind, the limits and weights that share the
-remaining runtime among the gaps, the ranges of thought and paragraph pauses, the level
-tolerances, and the caps, floors, breath and releases of the pauses inside thoughts. Its
-validated form, under the names below, is what the assembly receipt records.
+The contract declares the designed pause of each kind, the limits and weights by which the gaps
+share the fraction of a second that rounds the runtime up, the ranges of thought and paragraph
+pauses, the level tolerances, and the caps, floors, breath and releases of the pauses inside
+thoughts. Its validated form, under the names below, is what the assembly receipt records.
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ def _gap_limits(performance: dict, pauses: dict) -> dict:
 
 
 def _weights(performance: dict) -> dict:
-    """The share of the remaining runtime that each kind of gap takes, from 0 to 10."""
+    """The share of the runtime's rounding that each kind of gap takes, from 0 to 10."""
     weights = _by_kind(
         "designed_pause_weights",
         performance.get("designed_pause_weights"),

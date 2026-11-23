@@ -1,7 +1,7 @@
 # The sample film that this repository's tests load and its local acceptance builds. The engine
 # takes every film-specific value from this declaration and the files it names; each edition's
-# script declares its title, author, language, duration, frame rate and chapters. Paths are below
-# this folder.
+# script declares its title, author, language, frame rate and chapters, and each edition lasts as
+# long as its narration. Paths are below this folder.
 
 # The prefix of every delivered file.
 slug = "sample-reel"

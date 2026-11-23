@@ -44,7 +44,7 @@
     "performance_intent": "The DDWG narrator's reference, as ddwg-film selected it; clear, lively connected explanation; firm sentence endings; no theatrical delivery.",
     "energy_curve": "Curious opening, purposeful explanatory body, firmer decisions, settled coda.",
     "assembly_mode": "native-speech-designed-pauses",
-    "pacing_profile": "Ear-first copy spoken at the voice's native rate from the unmodified identity root. Speech is never time-stretched or pitch-shifted. No native pause inside a thought outlasts the declared inner cap. Designed quiet separates complete thoughts and paragraphs, longer after longer ones, each thought boundary outlasts the longest pause inside its thought by at least three fifths, and the coda settles on its own longer pause after every thought; the remaining runtime opens the picture between paragraphs and chapters within declared bounds.",
+    "pacing_profile": "Ear-first copy spoken at the voice's native rate from the unmodified identity root. Speech is never time-stretched or pitch-shifted. No native pause inside a thought outlasts the declared inner cap. Designed quiet separates complete thoughts and paragraphs, longer after longer ones, each thought boundary outlasts the longest pause inside its thought by at least three fifths, and the coda settles on its own longer pause after every thought; the fraction of a second that rounds the runtime up opens the picture between paragraphs and chapters within declared bounds, and the credits take what the gaps cannot.",
     "designed_pauses": {
       "thought": 0.75,
       "question": 0.65,

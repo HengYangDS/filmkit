@@ -1,8 +1,9 @@
 """The film the engine builds: its declaration in `content/film.toml`, checked before any work.
 
 The engine takes every film-specific value from this declaration and the files it names; each
-edition's script declares the edition's title, author, language, duration, frame rate and
-chapters. A declaration that is malformed, incomplete or names a missing file is refused with
+edition's script declares the edition's title, author, language, frame rate and chapters, the
+declaration states the credits' length once, and each edition lasts as long as its narration.
+A declaration that is malformed, incomplete or names a missing file is refused with
 each failing field. A cover is the exception: the engine paints it from the staged picture, so
 a new film names its covers before they exist, and packaging requires them.
 """

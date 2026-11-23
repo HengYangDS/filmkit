@@ -23,8 +23,8 @@
 
 ## 5. The documents
 
-- [ ] 5.1 Reword the docstrings and comments that state the removed facts: `film.py:4`, `specification.py:1`, `examples/sample-film/content/film.toml:3`, `soundtrack/assembly.py:117-136`, `soundtrack/fit.py:1-26`, `narration/fitting.py:1-36` and `narration/converge.py:21,33`. Done when `git grep -n -E 'duration, (frame rate|rates)|misses its runtime|fits its runtime|fits the runtime' -- src examples` lists nothing and the repository's lint passes.
-- [ ] 5.2 State in `README.md` (the scripts' section, "The runtime fit", the convergence's section and the command table) and in `CHANGELOG.md` the runtime in whole seconds, the fraction's way to the gaps and the credits, the editions' own runtimes, the credits in the declaration, the refused `duration`, `credits_duration` and `runtime_fit`, the adoption question, the fit's `runtime_seconds`, the binding by edition, and the breaking changes with what an adopting film does. Done when the repository's Markdown check passes on both files.
+- [x] 5.1 Reword the docstrings and comments that state the removed facts: `film.py:4`, `specification.py:1`, `examples/sample-film/content/film.toml:3`, `soundtrack/assembly.py:117-136`, `soundtrack/fit.py:1-26`, `narration/fitting.py:1-36` and `narration/converge.py:21,33`. Done when `git grep -n -E 'duration, (frame rate|rates)|misses its runtime|fits its runtime|fits the runtime' -- src examples` lists nothing and the repository's lint passes.
+- [x] 5.2 State in `README.md` (the scripts' section, "The runtime fit", the convergence's section and the command table) and in `CHANGELOG.md` the runtime in whole seconds, the fraction's way to the gaps and the credits, the editions' own runtimes, the credits in the declaration, the refused `duration`, `credits_duration` and `runtime_fit`, the adoption question, the fit's `runtime_seconds`, the binding by edition, and the breaking changes with what an adopting film does. Done when the repository's Markdown check passes on both files.
 
 ## 6. Acceptance
 
