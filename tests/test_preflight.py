@@ -233,17 +233,17 @@ def test_a_package_of_the_current_inputs_is_named_for_the_picture_the_render_rep
     [
         (
             painted(identical=False, differing=1834),
-            "assets/cover/sample-reel-cover.png differs in 1834 pixels from the cover the "
+            "assets/cover/sample-reel-cover-zh.png differs in 1834 pixels from the cover the "
             "composition paints; track the painting build/runtime/work/preflight/zh/cover.png",
         ),
         (
             painted(identical=False, cover_sha256=None, differing=None),
-            "no tracked cover at assets/cover/sample-reel-cover.png; track the painting "
+            "no tracked cover at assets/cover/sample-reel-cover-zh.png; track the painting "
             "build/runtime/work/preflight/zh/cover.png",
         ),
         (
             painted(identical=False, differing=None),
-            "assets/cover/sample-reel-cover.png is not the size of the painting "
+            "assets/cover/sample-reel-cover-zh.png is not the size of the painting "
             "build/runtime/work/preflight/zh/cover.png",
         ),
     ],
@@ -459,7 +459,7 @@ def test_the_receipt_binds_what_the_answer_was_judged_on(edition, monkeypatch):
     }
     # A missing input refuses by name and leaves the receipt without digests.
     (root / edition.cast).unlink()
-    with pytest.raises(preflight.PreflightError, match="receipt: missing content/voice-"):
+    with pytest.raises(preflight.PreflightError, match="receipt: missing content/zh/voice-"):
         preflight.preflight(edition)
     receipt = repository.read(edition.readiness)
     assert receipt["verdict"] == "refuse" and receipt["bound"] is None

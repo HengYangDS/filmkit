@@ -9,7 +9,7 @@
   "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
   "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
   "reference_language": "Chinese",
-  "reference_audio": "assets/audio/narration-reference-clear.wav",
+  "reference_audio": "assets/audio/zh/narration-reference.wav",
   "reference_sha256": "7ff6347ed4231943944ef27bfc708cfcf796619b3988b2b99bc21be71ae338da",
   "scope": "The DDWG narrator's reference recording and its transcript, copied unchanged from ddwg-film at 37549a9, where the cast records how it was derived. Voiced audio is native model output: never time-stretched, pitch-shifted or recast.",
   "icl_repetition_penalty": 1.05,

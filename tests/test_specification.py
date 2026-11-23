@@ -44,12 +44,12 @@ LOAD_REFUSALS = {
     ),
     "a script that declares the credits": (
         lambda root: declare(root / Edition("zh").script, credits_duration=3),
-        "ValueError: content/film-script.json declares credits_duration; state the credits' "
+        "ValueError: content/zh/film-script.json declares credits_duration; state the credits' "
         "length once, as credits_duration in content/film.toml",
     ),
     "a script that declares a duration": (
         lambda root: declare(root / Edition("zh").script, duration=1500),
-        "ValueError: content/film-script.json declares duration; remove it: an edition lasts as "
+        "ValueError: content/zh/film-script.json declares duration; remove it: an edition lasts as "
         "long as its narration, which the assembly counts",
     ),
 }
@@ -141,6 +141,6 @@ def test_a_script_that_declares_a_duration_is_refused_when_the_engine_loads(tmp_
     with pytest.raises(ValueError) as refused:
         specification.refuse_withdrawn()
     assert str(refused.value) == (
-        "content/film-script.json declares duration; remove it: an edition lasts as long as its "
+        "content/zh/film-script.json declares duration; remove it: an edition lasts as long as its "
         "narration, which the assembly counts"
     )

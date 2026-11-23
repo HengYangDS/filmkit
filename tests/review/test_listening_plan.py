@@ -105,7 +105,7 @@ def test_listening_plan_binds_each_occurrence_and_refuses_unrecorded_readings(ro
     ]
     assert plan["languages"]["Chinese"]["targets"][-1]["source"] == "analyst-mandarin"
     assert [binding["sha256"] for binding in plan["script_bindings"]] == [
-        repository.sha(root / "content/film-script.json"),
+        repository.sha(root / "content/zh/film-script.json"),
         repository.sha(root / "content/en/film-script.json"),
     ]
     assert plan["derived_from"] == {"path": CONTRACT, "sha256": repository.sha(root / CONTRACT)}

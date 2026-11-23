@@ -112,12 +112,12 @@ def test_every_finding_of_every_question_is_listed_in_one_run(project):
         '<script src="node_modules/gsap/dist/gsap.min.js"></script></head>',
     )
     rewrite(project / ".config/mise/config.toml", PIN, PIN.replace(released.vale(), "9.9.9"))
-    script = project / "content/film-script.json"
+    script = project / "content/zh/film-script.json"
     script.write_text(json.dumps({**json.loads(script.read_text()), "duration": 1500}))
     findings = found(project)
     assert all(findings[name] for name in adoption.QUESTIONS), findings
     assert "declares documents_folder" in " ".join(findings["declaration"])
-    assert "content/film-script.json declares duration" in " ".join(findings["runtime"])
+    assert "content/zh/film-script.json declares duration" in " ".join(findings["runtime"])
     asked = f"{renderer.RENDERER_NAME} {renderer.RENDERER_VERSION}"
     assert asked in " ".join(findings["npm_packages"])
     assert f"transformers 0.0.1 (the engine: {held})" in " ".join(findings["python_lock"])

@@ -9,7 +9,7 @@ examples/sample-film/content/ and examples/sample-film/picture/, is written for 
 repository and is licensed with the code.
 
 The sample film's narrator reference recordings,
-examples/sample-film/assets/audio/narration-reference-clear.wav and
+examples/sample-film/assets/audio/zh/narration-reference.wav and
 examples/sample-film/assets/audio/en/narration-reference.wav, are unchanged copies from the
 DDWG introduction films by Yang HENG
 (https://github.com/HengYangDS/data-department-work-guidelines-film), licensed under the

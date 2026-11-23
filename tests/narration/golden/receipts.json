@@ -15,7 +15,7 @@
       "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
       "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
       "reference_language": "Chinese",
-      "reference_audio": "assets/audio/narration-reference-clear.wav",
+      "reference_audio": "assets/audio/zh/narration-reference.wav",
       "reference_sha256": "7ff6347ed4231943944ef27bfc708cfcf796619b3988b2b99bc21be71ae338da",
       "scope": "The DDWG narrator's reference recording and its transcript, copied unchanged from ddwg-film at 37549a9, where the cast records how it was derived. Voiced audio is native model output: never time-stretched, pitch-shifted or recast.",
       "icl_repetition_penalty": 1.05,
@@ -80,7 +80,7 @@
       "temperature": 0.46,
       "reference_text_sha256": "56bb01f22625ec420f058a31c72813b0507f659a969eb8f7ee2183bb501143f3",
       "language": "Chinese",
-      "reference_audio": "assets/audio/narration-reference-clear.wav",
+      "reference_audio": "assets/audio/zh/narration-reference.wav",
       "pronunciation_contract": "content/voice-performance.json",
       "pronunciation_contract_sha256": "c5e44c36a60216996a12c4f3be1416ddc0452162f1aaeed213d93ef332424eee",
       "reference_treatment": null,
@@ -92,7 +92,7 @@
         "records": [
           {
             "parent_fingerprint": "62f373b284f03cebe2972b548b1cc5cb12fb63b2427fd3508bd788fd1ecbeddd",
-            "reference_audio": "assets/audio/narration-reference-clear.wav",
+            "reference_audio": "assets/audio/zh/narration-reference.wav",
             "reference_sha256": "7ff6347ed4231943944ef27bfc708cfcf796619b3988b2b99bc21be71ae338da",
             "reference_text": "我们以证据连接人的判断与智能体的行动。规范保存正式接受的意图，证据记录实际发生的事。看清关系，决定下一步；条件改变，就重新判断。",
             "reference_treatment": null,
@@ -123,7 +123,7 @@
           },
           {
             "parent_fingerprint": "62f373b284f03cebe2972b548b1cc5cb12fb63b2427fd3508bd788fd1ecbeddd",
-            "reference_audio": "assets/audio/narration-reference-clear.wav",
+            "reference_audio": "assets/audio/zh/narration-reference.wav",
             "reference_sha256": "7ff6347ed4231943944ef27bfc708cfcf796619b3988b2b99bc21be71ae338da",
             "reference_text": "我们以证据连接人的判断与智能体的行动。规范保存正式接受的意图，证据记录实际发生的事。看清关系，决定下一步；条件改变，就重新判断。",
             "reference_treatment": null,

@@ -79,7 +79,7 @@ run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language zh --uncaptioned",
   "uv run --python 3.12 --frozen --offline python -m filmkit.tools geometry-check build/runtime/work/final-delivery-zh-uhd build/evidence/editions/zh/picture-geometry.json 2",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.tools player-check cover build/runtime/work/final-delivery-zh-uhd assets/cover/sample-reel-cover.png build/runtime/work/cover-zh.png",
+  "uv run --python 3.12 --frozen --offline python -m filmkit.tools player-check cover build/runtime/work/final-delivery-zh-uhd assets/cover/sample-reel-cover-zh.png build/runtime/work/cover-zh.png",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce check-picture --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-draft --language zh",
   "uv run --python 3.12 --frozen --offline python -m filmkit.produce preflight --language zh",

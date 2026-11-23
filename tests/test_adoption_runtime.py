@@ -32,7 +32,7 @@ def test_a_declaration_without_the_credits_is_one_finding_of_the_declaration_que
 
 
 def test_each_runtime_or_credits_declaration_a_script_or_cast_holds_is_named(project):
-    declare(project / "content/film-script.json", duration=1500, credits_duration=3)
+    declare(project / "content/zh/film-script.json", duration=1500, credits_duration=3)
     declare(project / "content/en/film-script.json", duration=1500)
     declare(project / "content/en/voice-reference.json", runtime_fit={"reserve_seconds": 0.5})
     rewrite(project / film.DECLARATION, "credits_duration = 3\n", "")
@@ -40,8 +40,8 @@ def test_each_runtime_or_credits_declaration_a_script_or_cast_holds_is_named(pro
     rewrite(project / film.DECLARATION, 'slug = "sample-reel"', 'slug = "Two Words"')
     script, cast = film.WITHDRAWN["film-script.json"], film.WITHDRAWN["voice-reference.json"]
     assert found(project)["runtime"] == [
-        f"content/film-script.json declares duration; {script['duration']}",
-        f"content/film-script.json declares credits_duration; {script['credits_duration']}",
+        f"content/zh/film-script.json declares duration; {script['duration']}",
+        f"content/zh/film-script.json declares credits_duration; {script['credits_duration']}",
         f"content/en/film-script.json declares duration; {script['duration']}",
         f"content/en/voice-reference.json declares runtime_fit; {cast['runtime_fit']}",
     ]

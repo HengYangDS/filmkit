@@ -24,13 +24,13 @@ GOLDEN = json.loads((Path(__file__).parent / "golden/two-chapters-timeline.json"
 @pytest.fixture
 def edition(tmp_path, monkeypatch):
     monkeypatch.setattr(repository, "ROOT", tmp_path)
-    performance = json.loads((REPOSITORY / "content/film-script.json").read_text())[
+    performance = json.loads((REPOSITORY / "content/zh/film-script.json").read_text())[
         "voice_performance"
     ]
 
     def stage(script, recording, wav=b"RIFF"):
-        (tmp_path / "content").mkdir(exist_ok=True)
-        (tmp_path / "content/film-script.json").write_text(json.dumps(script))
+        (tmp_path / "content/zh").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "content/zh/film-script.json").write_text(json.dumps(script))
         (tmp_path / "take.wav").write_bytes(wav)
         evidence = production.Edition("zh").evidence
         evidence.mkdir(parents=True)
@@ -253,7 +253,8 @@ def test_assembly_refuses_a_value_the_chapter_metadata_cannot_hold_before_it_dec
         soundtrack_assembly.assemble(two_chapters)
     # The assembly reads the script, and says so.
     assert str(refusal.value).startswith(
-        'content/film-script.json holds chapter_title of segment 02 "B\\\\": chapters.ffmeta cannot'
+        'content/zh/film-script.json holds chapter_title of segment 02 "B\\\\": '
+        "chapters.ffmeta cannot"
     )
     assert not two_chapters.artifacts.exists()
 

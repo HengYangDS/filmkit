@@ -52,7 +52,7 @@ def test_designed_pause_policy_keeps_the_declared_contract(designed_policy, perf
     ]
 
 
-@pytest.mark.parametrize("script", ["content/film-script.json", "content/en/film-script.json"])
+@pytest.mark.parametrize("script", ["content/zh/film-script.json", "content/en/film-script.json"])
 def test_each_edition_declares_a_complete_pause_contract(script):
     performance = json.loads((repository.ROOT / script).read_text())["voice_performance"]
     policy = soundtrack_policy.designed_pause_policy(performance)

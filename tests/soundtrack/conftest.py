@@ -121,7 +121,7 @@ def two_chapters(tmp_path, monkeypatch, performance):
         "release": release,
         "segments": segments,
     }
-    (tmp_path / "content").mkdir()
+    (tmp_path / edition.script).parent.mkdir(parents=True)
     (tmp_path / edition.script).write_text(json.dumps(script, ensure_ascii=False))
     edition.narration_selected.write_text(json.dumps({"records": records}, ensure_ascii=False))
     edition.alignment_selected.write_text(json.dumps({"records": alignments}, ensure_ascii=False))

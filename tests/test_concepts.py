@@ -307,7 +307,7 @@ def test_the_cli_prints_the_report_and_refuses_with_every_failure(monkeypatch, c
 def test_the_check_refuses_a_counterexample_in_the_sample_film(tmp_path, monkeypatch):
     shutil.copytree(repository.ROOT / "content", tmp_path / "content")
     monkeypatch.setattr(repository, "ROOT", tmp_path)
-    path = tmp_path / "content/film-script.json"
+    path = tmp_path / "content/zh/film-script.json"
     script = json.loads(path.read_text(encoding="utf-8"))
     script["segments"][0]["title"] = "复刻"
     path.write_text(json.dumps(script, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -411,7 +411,7 @@ def test_the_check_refuses_an_unnumbered_term_until_it_is_declared_and_a_stale_e
     shutil.copytree(repository.ROOT / "content", tmp_path / "content")
     monkeypatch.setattr(repository, "ROOT", tmp_path)
     thoughts = {
-        "content/film-script.json": "脚本写着要说的话，运行 Agent 的应用画出画面。",
+        "content/zh/film-script.json": "脚本写着要说的话，运行 Agent 的应用画出画面。",
         "content/en/film-script.json": (
             "The script holds what is said; the apps Agents run in draw."
         ),
@@ -422,7 +422,7 @@ def test_the_check_refuses_an_unnumbered_term_until_it_is_declared_and_a_stale_e
         first = script["segments"][0]
         first["utterance_groups"][1] = thought
         first["text"] = "".join(first["utterance_groups"])
-        if name == "content/film-script.json":
+        if name == "content/zh/film-script.json":
             first["title"] = "复刻"
         path.write_text(json.dumps(script, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     with pytest.raises(ConceptError) as refused:
@@ -440,7 +440,7 @@ def test_the_check_refuses_an_unnumbered_term_until_it_is_declared_and_a_stale_e
     with pytest.raises(ConceptError, match="counterexample") as refused:
         concepts.check()
     assert "carries no number word" not in str(refused.value)
-    path = tmp_path / "content/film-script.json"
+    path = tmp_path / "content/zh/film-script.json"
     script = json.loads(path.read_text(encoding="utf-8"))
     script["segments"][0]["title"] = "重建"
     path.write_text(json.dumps(script, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

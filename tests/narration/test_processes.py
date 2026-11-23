@@ -12,7 +12,7 @@ import filmkit.narration.processes as processes
 import filmkit.repository as repository
 from filmkit.narration.processes import ProcessesError
 
-SOURCES = ("content/film-script.json", "content/voice-reference.json", "build/recordings")
+SOURCES = ("content/zh/film-script.json", "content/zh/voice-reference.json", "build/recordings")
 RECEIPT = "build/evidence/editions/zh/ear-first/narration-receipt.json"
 
 

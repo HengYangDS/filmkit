@@ -20,8 +20,8 @@ concepts = "content/concepts.toml"
 # Each edition's folder of script and cast, its 16:9 cover, and the summary its player shows
 # under the film.
 [editions.zh]
-sources = "content"
-cover = "assets/cover/sample-reel-cover.png"
+sources = "content/zh"
+cover = "assets/cover/sample-reel-cover-zh.png"
 summary = "这部一分钟的短片演示一部影片怎样从源文件重建出来。片中的步骤依据 ddwg-film 的 README。"
 
 [editions.en]

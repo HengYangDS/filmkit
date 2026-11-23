@@ -208,7 +208,7 @@ test("PNG decoding refuses what it does not decode", () => {
 test("the tracked cover decodes at UHD on the film's ground", async () => {
   const cover = decodePng(
     await readFile(
-      new URL("../../examples/sample-film/assets/cover/sample-reel-cover.png", import.meta.url),
+      new URL("../../examples/sample-film/assets/cover/sample-reel-cover-zh.png", import.meta.url),
     ),
   );
   assert.deepEqual([cover.width, cover.height], [3840, 2160]);

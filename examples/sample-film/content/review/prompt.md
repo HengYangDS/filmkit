@@ -9,7 +9,7 @@ Read anything under ROOT={root} and the read-only source {source}. Use ffmpeg, f
 This edition: exactly {duration} s, 16:9 pure 2D, {fps} fps, UHD master and a 1080p viewing edition, each with its captions drawn in the picture and again without captions, {rate} kHz stereo narration at {program} LUFS integrated, no music. The films without captions differ from those with them only by the captions, as the edition's caption-equivalence record shows; the player's captions control switches between them.
 
 ## Context inputs
-- Scripts: ROOT/content/film-script.json, ROOT/content/en/film-script.json. Timelines with word timings and captions: ROOT/build/artifacts/film/{{zh,en}}/timeline.json. Subtitles, transcripts, chapters and players beside the movies in ROOT/build/artifacts/film/{{zh,en}}/.
+- Scripts: ROOT/content/zh/film-script.json, ROOT/content/en/film-script.json. Timelines with word timings and captions: ROOT/build/artifacts/film/{{zh,en}}/timeline.json. Subtitles, transcripts, chapters and players beside the movies in ROOT/build/artifacts/film/{{zh,en}}/.
 - Canonical source: {documents} in {source}. Concept contract: {concepts}; judge each concept's words in narration, captions and picture against it. Reading occurrence plans: {readings}.
 - {previous_review}{scripts}
 {dispositions}{changes}- Pause policy the scripts declare: inner pauses at most {caps}; inner pause floors {floors}; breaths {breath}; thought boundary ratios and margins {ratios}; level tolerances {tolerances}; coda thought pauses {codas}.

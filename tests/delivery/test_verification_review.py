@@ -18,7 +18,7 @@ def current_review(tmp_path, monkeypatch):
     monkeypatch.setattr(repository, "ROOT", tmp_path)
     edition = production.Edition("zh")
     for name, body in (
-        ("content/film-script.json", "{}"),
+        ("content/zh/film-script.json", "{}"),
         (str(picture_rendering.COMPOSITION_SCRIPT), "/* film */"),
         (repository.relative(production.review_report(edition.production_review)), "# Review\n"),
         ("build/artifacts/film/zh/sample-reel-zh-uhd.mp4", "uhd"),

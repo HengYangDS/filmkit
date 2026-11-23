@@ -61,7 +61,7 @@ async function withAnchors(timeline, code) {
 export async function authoredTimeline(code) {
   const script = JSON.parse(
     await readFile(
-      join(SAMPLE, code === "zh" ? "content/film-script.json" : "content/en/film-script.json"),
+      join(SAMPLE, code === "zh" ? "content/zh/film-script.json" : "content/en/film-script.json"),
       "utf8",
     ),
   );

@@ -254,7 +254,7 @@ def test_the_sample_film_resolves_every_reading_and_writes_its_plans(film):
 
 def test_the_chinese_contract_lists_its_names_as_terms(film):
     root, edit = film
-    path = root / "content/film-script.json"
+    path = root / "content/zh/film-script.json"
     script = json.loads(path.read_text(encoding="utf-8"))
     segment = script["segments"][2]
     groups = segment["utterance_groups"]
@@ -306,7 +306,7 @@ def test_dictionary_readings_match_pypinyin():
 
 def test_a_declared_term_is_spelled_alike_and_its_reference_is_in_the_text(film, monkeypatch):
     root, edit = film
-    path = root / "content/film-script.json"
+    path = root / "content/zh/film-script.json"
     script = json.loads(path.read_text(encoding="utf-8"))
     segment = script["segments"][2]
     segment["utterance_groups"][0] = segment["utterance_groups"][0].replace(
@@ -369,7 +369,7 @@ def test_a_declared_term_is_spelled_alike_and_its_reference_is_in_the_text(film,
 
 def test_a_respelled_latin_name_is_declared_as_a_term_before_narration(film, monkeypatch):
     root, edit = film
-    scripts = {"zh": "content/film-script.json", "en": "content/en/film-script.json"}
+    scripts = {"zh": "content/zh/film-script.json", "en": "content/en/film-script.json"}
     places = {
         "zh": ("接着渲染", "接着用 HyperFrames 渲染"),
         "en": ("frame and", "frame with HyperFrames and"),

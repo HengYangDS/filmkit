@@ -9,13 +9,13 @@ paths = [
   "examples/sample-film/content/en/film-script.json",
   "examples/sample-film/content/en/narration.md",
   "examples/sample-film/content/en/voice-reference.json",
-  "examples/sample-film/content/film-script.json",
   "examples/sample-film/content/index.html",
-  "examples/sample-film/content/narration.md",
   "examples/sample-film/content/review/readings.json",
   "examples/sample-film/content/source-manifest.json",
   "examples/sample-film/content/voice-performance.json",
-  "examples/sample-film/content/voice-reference.json",
+  "examples/sample-film/content/zh/film-script.json",
+  "examples/sample-film/content/zh/narration.md",
+  "examples/sample-film/content/zh/voice-reference.json",
   "examples/sample-film/picture/index.html",
 ]
 format_owner = "immutable-carrier"
