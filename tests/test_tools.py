@@ -160,6 +160,7 @@ def test_the_command_names_each_tool_and_refuses_another(capsys):
     assert refused.value.code == 2
     assert "invalid choice: 'render'" in capsys.readouterr().err
     assert sorted(tools.TOOLS) == [
+        "anchor-reads",
         "band-audit",
         "caption-equivalence",
         "detail-audit",

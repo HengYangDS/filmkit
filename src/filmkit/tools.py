@@ -60,6 +60,7 @@ TOOLS = {
     "band-audit": "picture/band-audit.mjs",
     "player-check": "delivery/player-check.mjs",
     "whole-turns": "picture/whole-turns.mjs",
+    "anchor-reads": "picture/anchor-reads.mjs",
 }
 # The copies, below the film's root, in a folder for each engine version.
 CACHE = picture_browser.TOOL_CACHE / released.ENGINE

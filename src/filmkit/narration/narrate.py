@@ -7,8 +7,8 @@ narration-receipt-06-07.json, alignment-06-07.json and asr-06-07.json.
 
 Before any speech model loads, and with --dry-run too, the edition must pass the concept
 check (`filmkit.concepts`), the register check (`filmkit.register`), its readings check
-(`filmkit.narration.readings`) and both scripts' anchors (`filmkit.narration.anchors`); a refusal
-stops the run and names every failure.
+(`filmkit.narration.readings`) and the check of what both editions' pictures read of their
+scripts' anchors (`filmkit.picture.anchor_reads`); a refusal stops the run and names every failure.
 
 Usage: python -m filmkit.narration.narrate
     --language zh|en [--ids 06,07] [--dry-run | --skip-generation]
@@ -37,6 +37,7 @@ import filmkit.register as register
 import filmkit.repository as repository
 from filmkit.narration import anchors, processes, readings
 from filmkit.narration.snapshots import ALIGNER as ALIGNER_SNAPSHOT
+from filmkit.picture import anchor_reads
 from filmkit.production import CODES, Edition
 
 ALIGNER = ALIGNER_SNAPSHOT.folder
@@ -121,10 +122,12 @@ def steps(code: str, ids: str = "", scope: Scope = Scope.ALL) -> list[tuple[str,
 
 def gate(code: str) -> dict:
     """Refuse an edition whose words depart from the concept contract or the formal register, or
-    leave a reading open, and a film whose scripts break an anchor's rule.
+    leave a reading open, and a film whose scripts break an anchor's rule or do not mark what its
+    picture reads.
 
     Returns:
-        The concept check's, the register check's and the edition's readings check's reports.
+        The concept check's, the register check's and the edition's readings check's reports,
+        and the scenes the check of what the pictures read could not judge.
     """
     try:
         checked = {
@@ -132,7 +135,7 @@ def gate(code: str) -> dict:
             "register": register.check(),
             "readings": readings.check(code),
         }
-        anchors.require_editions()
+        checked["picture_reads"] = anchor_reads.check()
     except (
         concepts.ConceptError,
         register.RegisterError,

@@ -318,7 +318,18 @@ export function frameReport({
   };
 }
 
-export function writeRequestedFiles({ trace, texts, turns, thoughts, marks, extents, drawn }) {
+export function writeRequestedFiles({
+  anchors,
+  trace,
+  texts,
+  turns,
+  thoughts,
+  marks,
+  extents,
+  drawn,
+}) {
+  if (process.env.ANCHORS)
+    writeFileSync(process.env.ANCHORS, JSON.stringify({ reads: anchors }) + "\n");
   if (process.env.TRACE) writeFileSync(process.env.TRACE, trace.join("\n") + "\n");
   if (process.env.TURNS) writeFileSync(process.env.TURNS, JSON.stringify({ draws: turns }) + "\n");
   if (process.env.TEXTS) writeFileSync(process.env.TEXTS, texts.join("\n") + "\n");

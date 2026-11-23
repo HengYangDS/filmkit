@@ -10,7 +10,13 @@
  * holds a whole turn the checks' browser may paint without ink (wholeTurnAtRisk) carries each such arc in `turns`,
  * its exact start and end angles and the line of film.js that drew it, which whole-turns.mjs draws in that browser. The
  * stand-in measures a text's width by the advances of the film's declared faces when it is given them
- * (readTextMetrics), and otherwise by an estimate; geometry-check.mjs measures real metrics. */
+ * (readTextMetrics), and otherwise by an estimate; geometry-check.mjs measures real metrics.
+ *
+ * The composition reads each segment's `anchors` (filmkit.narration.anchors) through a recorder of the ids it reads:
+ * one the timeline marks there is given as the timeline holds it, and one it does not mark is given a stand-in at the
+ * segment's voice, so that the scene goes on and every unmarked id of a draw is found. A segment without `anchors`,
+ * as every segment of an edition that marks none, has an empty recorder, so each read there is unmarked. The caller's
+ * timeline is not changed. */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import vm from "node:vm";
@@ -324,7 +330,10 @@ export function canvasStandIn(deliver, faces = null, turned = () => null) {
  * `camera(segment, t)`, that camera of a segment at t; `origin()`, called while a paint is handed over, the line of
  * film.js that drew it, as `film.js:<line>`, or null; `module(origin)`, the module of the bundle that holds such a
  * line, or null; and `declaredCuts()`, the stage cuts film.js has declared for each scene so far, in its own
- * `stageCuts` map of scene to the times of its cuts, as a Map of sets, empty for a composition that keeps none.
+ * `stageCuts` map of scene to the times of its cuts, as a Map of sets, empty for a composition that keeps none;
+ * `anchorReads()`, each id read from a segment's anchors so far, once, as its segment, id, whether the timeline marks
+ * it there and the scene that read it; `drawn()`, the reads of the last frame rendered, a frame that threw included;
+ * and `scene()`, the scene film.js says it is drawing, which after a frame that threw is the scene that threw.
  *
  * The origin is the innermost line of a scene's own code on the call stack, rather than a helper that scenes share:
  * a line in a scene's body, `scenes["NN"] = function`, or in a module the bundle places in a folder below `scenes/`,
@@ -354,6 +363,27 @@ export function compositionScope(window, context, width) {
   });
 }
 
+/* Names a recorder answers without noting a read: those every object inherits, and JSON's. */
+const NO_ANCHOR = new Set([...Object.getOwnPropertyNames(Object.prototype), "toJSON"]);
+
+/* A segment's anchors behind a recorder that notes each id read, whether the segment marks it, and gives a stand-in
+ * at the segment's voice for one it does not mark. */
+function anchorRecorder(segment, note) {
+  const at = segment.voice_start ?? segment.start ?? 0,
+    standIn = Object.freeze({ start: at, end: at, units: Object.freeze([0, 0]), thought: 1 });
+  return new Proxy(
+    { ...segment.anchors },
+    {
+      get(target, key) {
+        if (typeof key !== "string" || NO_ANCHOR.has(key)) return Reflect.get(target, key);
+        const marked = Object.hasOwn(target, key);
+        note(segment.id, key, marked);
+        return marked ? target[key] : standIn;
+      },
+    },
+  );
+}
+
 export function openComposition(timeline, { faces = null } = {}) {
   const composition = resolve(COMPOSITION),
     source = readFileSync(composition, "utf8");
@@ -371,7 +401,18 @@ export function openComposition(timeline, { faces = null } = {}) {
   }
   const sceneCode = (n) =>
     sceneOfLine[n - 1] !== null || /(^|\/)scenes\/[^/]+\//.test(moduleOfLine[n - 1] ?? "");
-  const window = { FILM: timeline };
+  // Every id read from a segment's anchors, once, in the order first read, and those of the last draw.
+  const reads = new Map();
+  let drawn = [];
+  function note(segment, id, marked) {
+    const read = { segment, id, marked, scene: window.__sceneId ?? null };
+    drawn.push(read);
+    if (!reads.has(`${segment}\u0000${id}`)) reads.set(`${segment}\u0000${id}`, read);
+  }
+  const segments = Array.isArray(timeline.segments)
+    ? { segments: timeline.segments.map((s) => ({ ...s, anchors: anchorRecorder(s, note) })) }
+    : {};
+  const window = { FILM: { ...timeline, ...segments } };
   // Paints reach the caller only while it renders a frame, not while film.js paints its first frame on loading.
   let onPaint = null;
   function deliver(paint) {
@@ -399,6 +440,7 @@ export function openComposition(timeline, { faces = null } = {}) {
     framed,
     render(t, paints = () => {}) {
       onPaint = paints;
+      drawn = [];
       try {
         window.renderFrame(t);
       } finally {
@@ -406,6 +448,9 @@ export function openComposition(timeline, { faces = null } = {}) {
       }
       return window.__filmLayout;
     },
+    anchorReads: () => [...reads.values()],
+    drawn: () => drawn.slice(),
+    scene: () => window.__sceneId ?? null,
     camera(segment, t) {
       cameraOf ??= vm.runInContext('typeof cameraOf === "function" ? cameraOf : null', context);
       if (!cameraOf) throw Error("The composition defines no cameraOf");

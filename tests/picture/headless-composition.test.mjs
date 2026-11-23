@@ -453,3 +453,48 @@ test("a composition opened with the declared faces measures its texts by them", 
     await rm(film, { recursive: true, force: true });
   }
 });
+
+test("a segment's anchors are read through a recorder that names every unmarked id of a draw", async () => {
+  const root = await scratchFolder();
+  await mkdir(join(root, "picture"));
+  await writeFile(
+    join(root, "picture/film.js"),
+    [
+      "var ctx = document.getElementById('picture').getContext('2d');",
+      "var P = {};",
+      "window.renderFrame = (t) => {",
+      "  const s = window.FILM.segments[0];",
+      "  window.__sceneId = s.id;",
+      "  const at = [s.anchors.order.start, s.anchors.law.start, s.anchors.kept.start];",
+      "  window.__filmLayout = { time: t, texts: [{ text: at.join(' '), scene: s.id }] };",
+      "  window.__sceneId = null;",
+      "};",
+      "",
+    ].join("\n"),
+  );
+  const kept = { start: 2.4, end: 2.8, units: [1, 2], thought: 1 };
+  const marked = { segments: [{ id: "03", voice_start: 2, anchors: { kept } }] },
+    unmarked = { segments: [{ id: "03", voice_start: 2 }] },
+    bytes = JSON.stringify(marked);
+  process.chdir(root);
+  try {
+    const composition = openComposition(marked),
+      layout = composition.render(3);
+    // Each unmarked id takes a stand-in at the segment's voice, so the scene is drawn to its end.
+    assert.equal(layout.texts[0].text, "2 2 2.4");
+    const read = (segment, id, wasMarked) => ({ segment, id, marked: wasMarked, scene: "03" });
+    const reads = [read("03", "order", false), read("03", "law", false), read("03", "kept", true)];
+    assert.deepEqual(composition.drawn(), reads);
+    assert.deepEqual(composition.anchorReads(), reads);
+    assert.equal(JSON.stringify(marked), bytes);
+    // A timeline whose edition marks none presents an empty recorder: every read is unmarked.
+    const none = openComposition(unmarked);
+    none.render(3);
+    assert.deepEqual(
+      none.anchorReads().map((v) => v.marked),
+      [false, false, false],
+    );
+  } finally {
+    process.chdir(SAMPLE);
+  }
+});

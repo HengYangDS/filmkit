@@ -7,7 +7,9 @@
  * firm marks and repeated members of each voiced frame, with whether a legible name stands at each, for its seat
  * check (src/filmkit/picture/seat-marks.mjs); BOUNDS=<file> writes each scene's drawn extent; BALANCE=<file> writes
  * each thought's lit offsets and band cover at the reviewers' two instants; TURNS=<file> writes each start and end of
- * the stroked whole turns the checks' browser may paint without ink, for whole-turns.mjs to draw there.
+ * the stroked whole turns the checks' browser may paint without ink, for whole-turns.mjs to draw there; ANCHORS=<file>
+ * writes every id the composition read from a segment's anchors and whether the timeline marks it there
+ * (headless-composition.mjs), which filmkit.picture.gates refuses by.
  * FILMKIT_TEXT_METRICS=<file> names the
  * advance widths of the film's declared faces (filmkit.picture.metrics), by which the headless canvas measures text;
  * without it the canvas estimates text metrics (headless-composition.mjs). FILMKIT_WRAPPING=<file> names the film's
@@ -491,6 +493,7 @@ const report = frameReport({
   wholeTurns: [...wholeTurns.values()],
 });
 writeRequestedFiles({
+  anchors: film.anchorReads(),
   trace,
   texts,
   turns: [...turnDraws.values()],

@@ -67,18 +67,18 @@
 
 ## 5. What the picture reads
 
-- [ ] 5.1 The headless runtime presents each segment's `anchors` through a recorder of the ids a composition reads,
+- [x] 5.1 The headless runtime presents each segment's `anchors` through a recorder of the ids a composition reads,
       with a stand-in for an id the edition does not mark and an empty recorder where an edition marks none, and returns
       the reads with each draw. Done when `tests/picture/headless-composition.test.mjs` holds every unmarked id of one
       fixture scene found in one draw, the scene drawn to its end, and the timeline's bytes unchanged by the draw.
-- [ ] 5.2 Narration's prechecks draw the composition for each edition over its derived timeline, after the readings
+- [x] 5.2 Narration's prechecks draw the composition for each edition over its derived timeline, after the readings
       check, before any speech model loads and in a dry run too, and refuse each unmarked id read, by id, segment and
       edition; a scene that throws is named as not judged with the ids it read, and a composition that does not load
       as not judged for the whole edition; a missing tool or package refuses with its reason; a film without a
       composition is not asked. Done when `tests/narration/test_anchors.py` holds each
       scenario of the requirements "Narration refuses a script that does not mark what its picture reads" and "The
       check before narration names what it could not judge", with a model loader that a refusal never calls.
-- [ ] 5.3 `check-picture` records every unmarked id read while its audits draw, and refuses by those ids, also when an
+- [x] 5.3 `check-picture` records every unmarked id read while its audits draw, and refuses by those ids, also when an
       audit exits with an error. Done when `tests/picture/test_gates.py` holds both scenarios of the requirement "The
       picture gate refuses an anchor that the edition does not mark" and `render-picture` refusing the edition.
 

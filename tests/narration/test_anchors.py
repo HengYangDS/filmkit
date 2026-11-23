@@ -15,8 +15,10 @@ import filmkit.picture.rendering as rendering
 import filmkit.preflight as preflight
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as assembly
+import filmkit.tools as tools
 from filmkit.narration.anchors import AnchorError
 from filmkit.narration.spoken_units import units
+from filmkit.picture import anchor_reads
 from filmkit.picture.errors import PictureError
 from filmkit.production import Edition
 
@@ -339,3 +341,116 @@ def test_the_sample_films_derived_timelines_time_every_unit_of_its_thoughts():
             previous_end = timed["end"]
         assert derived["duration"] == derived["segments"][-1]["end"] + derived["credits_duration"]
         assert derived["captions"] == []
+
+
+# A composition that reads `order` in segment 03 of each edition and `fails` in segment 26 of the
+# Chinese one alone; THROWS makes segment 03 throw once it has read `order`.
+COMPOSITION = """var P = {};
+const film = window.FILM;
+const scenes = {
+  "03": (s) => { s.anchors.order.start; THROWS },
+  "26": (s) => (film.edition === "zh" ? s.anchors.fails.start : 0),
+};
+window.renderFrame = (t) => {
+  const s = film.segments.find((v) => v.start <= t && t < v.end);
+  if (s) { window.__sceneId = s.id; scenes[s.id](s); window.__sceneId = null; }
+  window.__filmLayout = { time: t, texts: [] };
+};
+"""
+
+
+@pytest.fixture
+def drawing(editions, tmp_path, monkeypatch):
+    """The two editions with a composition and the canvas package, narration's words checks
+    passing, and a model loader that records each step it would start."""
+    for check in ("concepts", "register"):
+        monkeypatch.setattr(getattr(narrate, check), "check", lambda: {})
+    monkeypatch.setattr(narrate.readings, "check", lambda code: {})
+    package = {"name": renderer.RENDERER_NAME, "version": renderer.RENDERER_VERSION}
+    put(tmp_path / "node_modules" / renderer.RENDERER_PACKAGE, package)
+    (tmp_path / "picture").mkdir()
+    (tmp_path / "picture/film.js").write_text(COMPOSITION.replace("THROWS", ""))
+    started = []
+    monkeypatch.setattr(
+        narrate.child_processes, "run", lambda command, **_: started.append(command)
+    )
+    return started
+
+
+@pytest.mark.parametrize("mode", [["--dry-run"], []])
+def test_narration_refuses_an_anchor_the_english_picture_reads_and_its_script_lacks(
+    drawing, editions, tmp_path, mode
+):
+    english = editions["en"]
+    english["segments"][0] = segment("03", "There is an order.")
+    put(tmp_path / Edition("en").script, english)
+    with pytest.raises(SystemExit, match="Narration refused before synthesis") as refused:
+        narrate.main(["--language", "zh", *mode])
+    assert "en 03 order: the en picture reads it from segment 03" in str(refused.value)
+    assert "zh 03" not in str(refused.value) and "26" not in str(refused.value)
+    assert drawing == []
+
+
+def test_an_anchor_one_editions_picture_reads_is_asked_of_that_edition_alone(drawing, capsys):
+    # Only the Chinese script marks `fails`, which only the Chinese picture reads.
+    narrate.main(["--language", "en", "--dry-run"])
+    gate = json.loads(capsys.readouterr().out.splitlines()[0])["gate"]
+    assert gate["picture_reads"] == {
+        "verdict": "pass",
+        "not_judged": {"zh": [], "en": []},
+        "not_loaded": {},
+    }
+    assert len(drawing) == 1
+
+
+def test_a_scene_that_throws_is_named_as_not_judged_and_narration_goes_on(
+    drawing, tmp_path, capsys
+):
+    thrown = COMPOSITION.replace("THROWS", 'throw Error("Missing spoken cue 03:依据");')
+    (tmp_path / "picture/film.js").write_text(thrown)
+    narrate.main(["--language", "zh", "--dry-run"])
+    judged = json.loads(capsys.readouterr().out.splitlines()[0])["gate"]["picture_reads"]
+    scene = {"scene": "03", "segment": "03", "error": "Missing spoken cue 03:依据", "from": 0}
+    scene["reads"] = ["order"]
+    assert judged["not_judged"]["zh"] == [scene]
+    assert judged["verdict"] == "not judged"
+    assert len(drawing) == 1
+
+
+def test_an_unmarked_id_a_scene_reads_before_it_throws_is_refused(drawing, tmp_path):
+    thrown = 's.anchors.missing.start; throw Error("Missing spoken cue 03:依据");'
+    (tmp_path / "picture/film.js").write_text(COMPOSITION.replace("THROWS", thrown))
+    with pytest.raises(SystemExit, match="zh 03 missing: the zh picture reads it"):
+        narrate.main(["--language", "zh", "--dry-run"])
+    assert drawing == []
+
+
+def test_the_reads_tool_takes_its_step_from_the_check(drawing, editions, tmp_path):
+    put(tmp_path / "zh.json", anchors.derived_timeline(editions["zh"], "zh"))
+    out = tmp_path / "reads.json"
+    assert tools.run("anchor-reads", [str(tmp_path / "zh.json")], stdout=out) == 2
+
+
+def test_a_composition_that_does_not_load_is_not_judged_and_narration_goes_on(
+    drawing, tmp_path, capsys
+):
+    # Both editions' scripts mark anchors; the composition throws as it loads.
+    (tmp_path / "picture/film.js").write_text('throw Error("broken\\nwhile it loads");')
+    narrate.main(["--language", "zh", "--dry-run"])
+    judged = json.loads(capsys.readouterr().out.splitlines()[0])["gate"]["picture_reads"]
+    assert judged["verdict"] == "not judged"
+    loaded = "The composition does not load: broken"
+    assert judged["not_loaded"] == {"zh": loaded, "en": loaded}
+    assert len(drawing) == 1
+
+
+def test_a_check_whose_packages_are_missing_refuses_with_its_reason(drawing, tmp_path):
+    (tmp_path / "node_modules" / renderer.RENDERER_PACKAGE).unlink()
+    with pytest.raises(SystemExit, match=f"cannot draw it: .*no {renderer.RENDERER_NAME}"):
+        narrate.main(["--language", "zh", "--dry-run"])
+    assert drawing == []
+
+
+def test_a_film_without_a_composition_is_not_asked(drawing, tmp_path):
+    (tmp_path / "picture/film.js").unlink()
+    assert narrate.gate("zh")["picture_reads"] == anchor_reads.NOT_ASKED

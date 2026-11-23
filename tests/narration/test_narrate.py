@@ -123,6 +123,8 @@ def test_narrate_edition_runs_the_whole_edition_from_the_root(commands, capsys):
             "concepts": {"concepts": 2},
             "register": {"warnings": ["我们"]},
             "readings": {"edition": "en"},
+            # A film without a composition is not asked what its picture reads of its anchors.
+            "picture_reads": "not asked: the film has no composition",
         },
     }
     assert [line["step"] for line in printed[1:]] == ["narration", "alignment", "transcription"]

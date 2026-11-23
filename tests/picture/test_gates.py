@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 import filmkit.picture.gates as gates
+import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
 from filmkit.film import FILM, Motion, Wrapping
 from filmkit.picture.metrics import VARIABLE
@@ -124,8 +125,9 @@ def film(tmp_path, monkeypatch):
 
 def audits(monkeypatch, reports, *, change=None):
     """Stand in for the audits: each writes its report from `reports`, the frame audit its whole
-    turns from `reports["turns"]` and the browser's draws of them from `reports["painted"]`;
-    `change` edits a file while the frame audit runs."""
+    turns from `reports["turns"]`, its reads of anchors from `reports["anchors"]` and the
+    browser's draws of them from `reports["painted"]`; `change` edits a file while the frame
+    audit runs."""
     calls = []
 
     def run(tool, arguments, *, environment=None, stdout=None):
@@ -134,6 +136,7 @@ def audits(monkeypatch, reports, *, change=None):
             put(stdout, reports["frame"])
             put(Path(environment["TEXTS"]), reports["texts"])
             put(Path(environment["TURNS"]), {"draws": reports.get("turns", [])})
+            put(Path(environment["ANCHORS"]), {"reads": reports.get("anchors", [])})
             if change is not None:
                 change()
         elif tool == "whole-turns":
@@ -180,7 +183,7 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
     assert detail[:2] == ("detail-audit", [str(edition.timeline), "--out", detail[1][2]])
     assert detail[2] == motion_env
     assert (frame_tool, frame_args) == ("frame-audit", [str(edition.timeline), "0.0333333"])
-    traces = {"MARKS", "TEXTS", "TRACE", "TURNS"}
+    traces = {"ANCHORS", "MARKS", "TEXTS", "TRACE", "TURNS"}
     assert set(frame_env) == {VARIABLE, gates.WRAPPING_VARIABLE, *traces}
     # The frame audit judges wrapped labels by the declared shares and lead words.
     rules = repository.read(Path(frame_env[gates.WRAPPING_VARIABLE]))
@@ -366,6 +369,35 @@ def test_a_picture_changed_while_it_is_checked_is_refused(film, monkeypatch):
 def test_a_failed_audit_is_refused_with_its_report(film, monkeypatch):
     monkeypatch.setattr(gates.tools, "run", lambda *arguments, **options: 1)
     with pytest.raises(PictureError, match="frame-audit exited with status 1"):
+        gates.check_picture(Edition("zh"))
+
+
+UNMARKED = [
+    {"segment": "01", "id": "order", "marked": False, "scene": "01"},
+    {"segment": "01", "id": "law", "marked": False, "scene": "01"},
+    {"segment": "01", "id": "kept", "marked": True, "scene": "01"},
+]
+
+
+def test_each_anchor_the_picture_reads_and_the_edition_does_not_mark_is_gated(film, monkeypatch):
+    edition = Edition("zh")
+    audits(monkeypatch, {**CLEAN, "anchors": UNMARKED})
+    with pytest.raises(PictureError, match="zh 01 order: .* zh 01 law: "):
+        gates.check_picture(edition)
+    record = repository.read(edition.picture_gates)
+    assert [f.split(":")[0] for f in record["gated_findings"]] == ["zh 01 order", "zh 01 law"]
+    with pytest.raises(PictureError):
+        rendering.require_passing_gates(edition)
+
+
+def test_an_unmarked_read_is_named_beside_an_audit_that_fails(film, monkeypatch):
+    def run(tool, arguments, *, environment=None, stdout=None):
+        if tool == "frame-audit":
+            put(Path(environment["ANCHORS"]), {"reads": UNMARKED[:1]})
+        return 1 if tool == "frame-audit" else 0
+
+    monkeypatch.setattr(gates.tools, "run", run)
+    with pytest.raises(PictureError, match="zh 01 order: .*; The frame-audit exited with status 1"):
         gates.check_picture(Edition("zh"))
 
 

@@ -24,7 +24,9 @@ end once on a scratch canvas in that browser. A line whose turn paints no ink fr
 starts is gated, and every other is recorded; each finding names the ellipse from 0 that paints
 the turn from any start. A gated finding refuses with `PictureError`, after the record is
 written, and so does an audit that fails or a composition or timeline that changes while it is
-checked.
+checked. Each id the composition reads from a segment's anchors while the frame audit draws and
+the timeline does not mark there is gated by its segment and edition
+(`filmkit.picture.anchor_reads`); when an audit fails, the refusal names them beside its error.
 The motion audit follows every mark as a viewer sees it move, and each of its findings is gated
 by its time, scene, marks and the line that drew it: a halt, start, race, pop or dash snap outside
 a stage cut, a pop that a declared cut keeping its stage brings, the jump of the marks a stage
@@ -55,7 +57,7 @@ import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.film import FILM
 from filmkit.narration import anchors
-from filmkit.picture import metrics, sync_audit, text_trace
+from filmkit.picture import anchor_reads, metrics, sync_audit, text_trace
 from filmkit.picture.detail_gates import detail_findings
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, PictureError, face_bindings
 
@@ -434,17 +436,30 @@ def check_picture(edition: Edition) -> dict:
     repository.write(rules, wrapping_rules(wrapping))
     traces = {"TRACE": str(trace), "TEXTS": str(texts_trace), "MARKS": str(marks)}
     traces["TURNS"] = str(turns_path)
+    reads_path = work / "anchors.json"
+    traces["ANCHORS"] = str(reads_path)
+    reads_path.unlink(missing_ok=True)
     frame_faces = {**traces, WRAPPING_VARIABLE: str(rules), **faces}
     motion = [timeline, str(MOTION_FPS), "--out", str(motion_path)]
     detail = [timeline, "--out", str(detail_path)]
     # The three audits read the composition and the timeline and write files of their own.
-    run_audits(
-        [
-            ("frame-audit", [timeline, f"{FRAME_STEP:.7f}"], frame_path, frame_faces),
-            ("motion-audit", motion, work / "motion-summary.json", faces),
-            ("detail-audit", detail, work / "detail-summary.json", faces),
-        ]
-    )
+    try:
+        run_audits(
+            [
+                ("frame-audit", [timeline, f"{FRAME_STEP:.7f}"], frame_path, frame_faces),
+                ("motion-audit", motion, work / "motion-summary.json", faces),
+                ("detail-audit", detail, work / "detail-summary.json", faces),
+            ]
+        )
+    except PictureError as error:
+        unread = anchor_reads.unmarked(anchor_reads.recorded(reads_path), edition.code)
+        if unread:
+            raise PictureError("; ".join([*unread, str(error)])) from None
+        raise
+    if not reads_path.is_file():
+        msg = "The frame audit wrote no record of what the picture read of its anchors"
+        raise PictureError(msg)
+    unread = anchor_reads.unmarked(anchor_reads.recorded(reads_path), edition.code)
     # The browser draws each start and end of the whole turns once; a picture without one starts
     # no browser.
     draws = repository.read(turns_path)["draws"]
@@ -470,7 +485,7 @@ def check_picture(edition: Edition) -> dict:
         edition.code,
     )
     findings = gated_findings(frame, sync, motion) + turned + text_findings(texts)
-    findings += wrapped + moved + detailed
+    findings += wrapped + moved + detailed + unread
     reports = [
         ("frame", frame_path),
         ("sync", sync_path),
