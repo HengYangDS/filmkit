@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-23
+
 ### Added
 
 - `python -m filmkit.adoption` asks a seventh question, `runtime`: each edition's script that declares `duration` or `credits_duration`, each cast that declares `runtime_fit`, and each line of the review prompt that cites `{duration}` without saying "This edition", each named with what to do instead. It reads the files as text, so it answers before the declaration loads. Its reading of the prompt fails closed: such a line is named whatever else it says. A declaration that states no `credits_duration` is one finding, of the `declaration` question.
@@ -635,7 +637,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.28.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.29.0...HEAD
+[0.29.0]: https://github.com/HengYangDS/filmkit/compare/v0.28.0...v0.29.0
 [0.28.0]: https://github.com/HengYangDS/filmkit/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/HengYangDS/filmkit/compare/v0.26.1...v0.27.0
 [0.26.1]: https://github.com/HengYangDS/filmkit/compare/v0.26.0...v0.26.1
