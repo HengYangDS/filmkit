@@ -1,0 +1,144 @@
+{
+  "_comment": [
+    "Each class of characters the engine reads by its purpose, defined once and read by",
+    "filmkit.languages in Python and by scripts.mjs in Node. A class holds either code-point",
+    "ranges, each as FIRST-LAST in hexadecimal, or the characters it names. The scripts are",
+    "Unicode's Script=Han and Script=Latin as Node 26.13.1's ICU reads them; a language declares",
+    "the scripts it writes by these names."
+  ],
+  "scripts": {
+    "han": {
+      "purpose": "Han characters",
+      "ranges": [
+        "2E80-2E99",
+        "2E9B-2EF3",
+        "2F00-2FD5",
+        "3005-3005",
+        "3007-3007",
+        "3021-3029",
+        "3038-303B",
+        "3400-4DBF",
+        "4E00-9FFF",
+        "F900-FA6D",
+        "FA70-FAD9",
+        "16FE2-16FE3",
+        "16FF0-16FF6",
+        "20000-2A6DF",
+        "2A700-2B81D",
+        "2B820-2CEAD",
+        "2CEB0-2EBE0",
+        "2EBF0-2EE5D",
+        "2F800-2FA1D",
+        "30000-3134A",
+        "31350-33479"
+      ]
+    },
+    "latin": {
+      "purpose": "Latin letters",
+      "ranges": [
+        "0041-005A",
+        "0061-007A",
+        "00AA-00AA",
+        "00BA-00BA",
+        "00C0-00D6",
+        "00D8-00F6",
+        "00F8-02B8",
+        "02E0-02E4",
+        "1D00-1D25",
+        "1D2C-1D5C",
+        "1D62-1D65",
+        "1D6B-1D77",
+        "1D79-1DBE",
+        "1E00-1EFF",
+        "2071-2071",
+        "207F-207F",
+        "2090-209C",
+        "212A-212B",
+        "2132-2132",
+        "214E-214E",
+        "2160-2188",
+        "2C60-2C7F",
+        "A722-A787",
+        "A78B-A7DC",
+        "A7F1-A7FF",
+        "AB30-AB5A",
+        "AB5C-AB64",
+        "AB66-AB69",
+        "FB00-FB06",
+        "FF21-FF3A",
+        "FF41-FF5A",
+        "10780-10785",
+        "10787-107B0",
+        "107B2-107BA",
+        "1DF00-1DF1E",
+        "1DF25-1DF2A"
+      ]
+    }
+  },
+  "marks": {
+    "cjk-punctuation": {
+      "purpose": "CJK symbols and punctuation",
+      "ranges": ["3000-303F"]
+    },
+    "full-width": {
+      "purpose": "half-width and full-width forms",
+      "ranges": ["FF00-FFEF"]
+    },
+    "line-closing": {
+      "purpose": "marks that close what precedes them, which a line may not open on",
+      "characters": "、，。；：！？）」』”》】’…"
+    },
+    "line-opening": {
+      "purpose": "marks that open what follows them, which a line may not end on",
+      "characters": "（「『“《【"
+    },
+    "sentence-ends": {
+      "purpose": "marks that end a sentence",
+      "characters": "。！？.!?"
+    },
+    "semicolons": {
+      "purpose": "marks that end a clause without ending its sentence",
+      "characters": "；;"
+    },
+    "sentence-closers": {
+      "purpose": "closing quotes and brackets that follow a sentence end and belong to its sentence",
+      "characters": "”’\"')]}）"
+    },
+    "quotation-marks": {
+      "purpose": "quotation marks, which are not pauses of their own",
+      "characters": "“”‘’\"'"
+    },
+    "opening-quotes": {
+      "purpose": "marks that open a quotation",
+      "characters": "“‘「『"
+    },
+    "closing-quotes": {
+      "purpose": "marks that close a quotation",
+      "characters": "”’」』"
+    },
+    "question-marks": {
+      "purpose": "marks that end a question",
+      "characters": "？?"
+    },
+    "clause-marks": {
+      "purpose": "full-width marks that close a clause",
+      "characters": "，。；：！？、"
+    },
+    "enumeration-marks": {
+      "purpose": "marks between the items of a list",
+      "characters": "、"
+    },
+    "phrase-breaks": {
+      "purpose": "Latin marks that break a phrase inside a sentence",
+      "characters": ",;:"
+    },
+    "cue-boundaries": {
+      "purpose": "stops and colons, which close a caption cue",
+      "characters": "，。；：！？.;:!?"
+    },
+    "word-edge-marks": {
+      "purpose": "marks an aligned word may carry around its letters",
+      "characters": "\"'“”‘’()（）[]，。；：！？、,.;:!?"
+    }
+  }
+}

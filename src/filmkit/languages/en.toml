@@ -1,0 +1,151 @@
+# English, as the engine builds an edition in it (`filmkit.languages`). Every value and choice
+# specific to the language stands here once; a behaviour that another language could share is
+# named by its basis, and the engine holds it once in code.
+
+# The language's tags: BCP 47 for pages and pictures, ISO 639-2 for the films' tracks.
+tag = "en"
+iso639_2 = "eng"
+# The name the speech models take, and the name the language shows itself by.
+english_name = "English"
+name = "English"
+# The transcript's byline after the author and the name: the runtime in whole minutes.
+byline = "{minutes} min"
+# The scripts the language writes (`scripts.json`); it reads no other script as another language.
+scripts = ["latin"]
+embedded = {}
+# Spaces delimit its words, and its speech is counted in words.
+spaced = true
+unit = "words"
+# Its reading checks: each stressed word's stress against its CMUdict phones.
+readings = ["cmudict-stress"]
+# Snowball's English stemmer finds a label's words in other forms. A wrapped label's line other
+# than the last may not end on a word that leads the phrase after it: an article, preposition,
+# conjunction, determiner, possessive, wh-word or auxiliary.
+stemmer = "snowball-english"
+lead_words = [
+  "a",
+  "an",
+  "the",
+  "of",
+  "in",
+  "on",
+  "at",
+  "by",
+  "to",
+  "for",
+  "with",
+  "from",
+  "into",
+  "onto",
+  "over",
+  "under",
+  "about",
+  "after",
+  "before",
+  "between",
+  "through",
+  "without",
+  "within",
+  "against",
+  "per",
+  "via",
+  "as",
+  "than",
+  "like",
+  "and",
+  "or",
+  "but",
+  "nor",
+  "if",
+  "because",
+  "although",
+  "though",
+  "while",
+  "unless",
+  "until",
+  "since",
+  "whether",
+  "its",
+  "their",
+  "his",
+  "her",
+  "our",
+  "your",
+  "my",
+  "this",
+  "that",
+  "these",
+  "those",
+  "each",
+  "every",
+  "any",
+  "no",
+  "some",
+  "which",
+  "who",
+  "whose",
+  "whom",
+  "what",
+  "when",
+  "where",
+  "why",
+  "how",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "can",
+  "will",
+  "would",
+  "should",
+  "may",
+  "must",
+  "not",
+]
+# The register's rules that its words meet (`filmkit.register`): every rule but Chinese's
+# colloquial words.
+register = ["address", "audience", "contractions", "informal", "marks", "questions", "we"]
+
+# English marks number by inflection: a term's plural is the term with one of these suffixes.
+[number]
+kind = "plural-suffix"
+suffixes = ["s", "es"]
+
+# Its captions: phrased by English grammar, at most 66 characters a line, read at most 25
+# characters a second, spaces included, and a cue may hold over its whole interval.
+[captions]
+phrasing = "english-grammar"
+limit = 66
+reading_rate = 25
+hold = "full-interval"
+
+# The words of its player page and of its line on the entry page (`filmkit.delivery.player`).
+[player]
+version = "Version"
+versions = "Video versions"
+viewing = "Viewing edition · 1080p"
+uhd = "4K UHD · 2160p"
+captions = "Captions"
+captions_on = ": on"
+captions_off = ": off"
+track = "English captions"
+chapters = "Chapters"
+transcript = "Transcript"
+files = "Files"
+film = "Film"
+viewing_film = "Viewing edition 1080p"
+uhd_film = "4K UHD"
+drawn = "captions in the picture"
+undrawn = "no captions"
+downloads = "Downloads"
+labelled = "{kind} ({form}, {purpose})"
+to_download = "download"
+for_players = "download for other players"
+script = "Transcript"
+cover = "Cover"
+languages = "Languages"
+entry = "Choose a language"
+play_from = "Play from {}"
+unplayable = "This browser cannot play this encoding; open the film from the files below in your system’s player."

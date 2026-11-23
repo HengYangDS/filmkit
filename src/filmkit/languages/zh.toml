@@ -1,0 +1,73 @@
+# Chinese, as the engine builds an edition in it (`filmkit.languages`). Every value and choice
+# specific to the language stands here once; a behaviour that another language could share is
+# named by its basis, and the engine holds it once in code.
+
+# The language's tags: BCP 47 for pages and pictures, ISO 639-2 for the films' tracks.
+tag = "zh-CN"
+iso639_2 = "zho"
+# The name the speech models take, and the name the language shows itself by.
+english_name = "Chinese"
+name = "中文"
+# The transcript's byline after the author and the name: the runtime in whole minutes.
+byline = "{minutes} 分钟"
+# The scripts the language writes (`scripts.json`), and the language it reads each other script
+# in: a Chinese text says its Latin-script words as English words.
+scripts = ["han"]
+embedded = { latin = "en" }
+# Spaces do not delimit its words, and its speech is counted in characters.
+spaced = false
+unit = "characters"
+# Its reading checks: each Han character's reading against its pinyin.
+readings = ["pinyin-readings"]
+# No stemmer finds a label's words in other forms, and no lead word ends a line badly.
+stemmer = "none"
+lead_words = []
+# The register's rules that its words meet (`filmkit.register`): every rule but English's
+# contractions.
+register = ["address", "audience", "colloquial", "informal", "marks", "questions", "we"]
+
+# Chinese marks no grammatical number: a clause carries its number by a number word or by a
+# numeral counting with a classifier before the term, and a lone singular numeral states one.
+[number]
+kind = "counted-by-words"
+words = ["们", "些", "多", "几", "各", "每", "众", "两", "俩", "双", "它们", "他们", "一个个"]
+numerals = "一二三四五六七八九十百千万"
+classifiers = "个位名种类款套件条项份张台部本次步层级组批群家支只句段篇章节门处所座轮遍场笔例"
+singular = "一"
+
+# Its captions: phrased at full-width punctuation, at most 33 characters a line, with no reading
+# rate and no hold of a cue over its whole interval.
+[captions]
+phrasing = "full-width-punctuation"
+limit = 33
+reading_rate = "none"
+hold = "none"
+
+# The words of its player page and of its line on the entry page (`filmkit.delivery.player`).
+[player]
+version = "版本号"
+versions = "视频版本"
+viewing = "观看版 · 1080p"
+uhd = "超高清 4K · 2160p"
+captions = "字幕"
+captions_on = "：开"
+captions_off = "：关"
+track = "中文字幕"
+chapters = "章节"
+transcript = "完整讲稿"
+files = "文件"
+film = "影片"
+viewing_film = "观看版 1080p"
+uhd_film = "超高清 4K"
+drawn = "画面内含字幕"
+undrawn = "无字幕"
+downloads = "下载"
+labelled = "{kind}（{form}，{purpose}）"
+to_download = "供下载"
+for_players = "下载后供其他播放器使用"
+script = "讲稿"
+cover = "封面"
+languages = "语言"
+entry = "选择语言"
+play_from = "从 {} 播放"
+unplayable = "这个浏览器播放不了当前的编码，可以用系统的播放器打开文件里的影片。"

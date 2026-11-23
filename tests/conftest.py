@@ -15,6 +15,7 @@ import wave
 from pathlib import Path
 from typing import NamedTuple
 
+import derived_languages
 import numpy as np
 import pytest
 import real_processes
@@ -27,6 +28,7 @@ os.environ["FILMKIT_NARRATION_PROCESSES"] = "1"
 
 import filmkit.child_processes as child_processes
 import filmkit.delivery.folder as delivery_folder
+import filmkit.languages as languages
 from filmkit.narration.thought_groups import join_quiet
 from filmkit.narration.voice_model import MODEL, NATIVE_DECODER, REVISION
 
@@ -422,3 +424,12 @@ def run_on_record(tmp_path):
         return tmp_path, record, plans, settings
 
     return build
+
+
+@pytest.fixture
+def test_languages(monkeypatch):
+    """The engine with the test languages `xa` and `xb` declared beside its own
+    (`derived_languages`)."""
+    for code in derived_languages.DERIVED:
+        monkeypatch.setitem(languages.LANGUAGES, code, derived_languages.derived(code))
+    return {code: languages.LANGUAGES[code] for code in derived_languages.DERIVED}
