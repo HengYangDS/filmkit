@@ -60,7 +60,7 @@ def two_chapters(tmp_path, monkeypatch, performance):
     """Stage two one-segment chapters at different levels; the first declares a level gain."""
     release = repository.read(production.Edition("zh").script)["release"]
     monkeypatch.setattr(repository, "ROOT", tmp_path)
-    monkeypatch.setattr(soundtrack_assembly, "DURATION", 24)
+    # The credits the film declares, four seconds here; the runtime is the narration's.
     monkeypatch.setattr(soundtrack_assembly, "CREDITS_DURATION", 4)
     # Retained-group custody has its own tests; these recordings carry no groups.
     monkeypatch.setattr(soundtrack_assembly, "validate_group_inputs", lambda *_, **__: set())
@@ -112,8 +112,6 @@ def two_chapters(tmp_path, monkeypatch, performance):
     }
     script = {
         "title": "Sample Reel",
-        # The runtime the assembly copies into the timeline, which the documents read.
-        "duration": 24,
         "voice_performance": {
             **performance,
             "thought_level_tolerance_db": 0.75,

@@ -1,6 +1,5 @@
 """What the tests of a narration's convergence share: its thoughts, seeds, records and checks,
-and for the asking of a settled edition the command and its one line, which names the pause
-that the benches' contract declares (`fit_bench`).
+and for the count of a settled edition the command, its report and its one line of refusal.
 
 The module loads the convergence and with it the speech runtime, so only the test modules
 that are collected where that runtime loads import it; the fixtures that use it import it
@@ -11,7 +10,6 @@ import json
 from pathlib import Path
 
 import pytest
-from fit_bench import PERFORMANCE, THOUGHT_PAUSE
 
 import filmkit.durations as durations
 import filmkit.narration.converge as narration_converge
@@ -21,10 +19,8 @@ from filmkit.production import Edition
 RATE = 24000
 THOUGHTS = ("First thought.", " Second thought.")
 SEED = 1
-# What the command's one line for a miss begins with, and how it names the declared pause.
-MISS = "en: the settled narration misses its runtime by "
-LEAST, MOST = PERFORMANCE["thought_pause_range"]
-RANGE = f"declared at {THOUGHT_PAUSE} s in a range from {LEAST} to {MOST} s"
+# What the command's one line for an edition that the assembly refuses begins with.
+REFUSED = "en: the settled narration is refused by the assembly: "
 
 
 def seed_of(k: int) -> int:

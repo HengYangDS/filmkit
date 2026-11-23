@@ -25,6 +25,7 @@ def declared(key: str, read: Callable[[Any], Any]) -> Any:
 
 # What a script may no longer declare, each with what states it instead.
 WITHDRAWN = {
+    "duration": "remove it: an edition lasts as long as its narration, which the assembly counts",
     CREDITS: f"state the credits' length once, as {CREDITS} in {repository.DECLARATION}",
 }
 
@@ -51,7 +52,6 @@ def rendered_rate(fps: int) -> int:
 
 refuse_withdrawn()
 RATE = 48000
-DURATION: int = declared("duration", int)
 # The H.264 levels below are set for this frame rate.
 FPS: int = declared("fps", lambda fps: rendered_rate(int(fps)))
 # The credits' length, which the film's declaration states once for both editions.

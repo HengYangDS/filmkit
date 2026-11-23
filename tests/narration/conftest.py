@@ -347,10 +347,10 @@ def bench(studio, voiced, monkeypatch):
     edition that a test narrates with `bench.begin(first takes)`, which declares what the
     count reads.
 
-    The measure is `fit_bench.Count`, with its `free`, `joins`, `refusal` and `tried`. Beside
-    them `count.binding`, an exception, is what the binding of the recordings raises, and
-    `count.selecting` what the selection raises; `count.selected` and `count.bound` count the
-    questions.
+    The measure is `fit_bench.Count`, with its `counted`, `room`, `joins`, `undesigned` and
+    `tried`. Beside them `count.binding`, an exception, is what the binding of the recordings
+    raises, and `count.selecting` what the selection raises; `count.selected` and `count.bound`
+    count the questions.
     """
     import filmkit.narration.converge as narration_converge
     import filmkit.narration.fitting as fitting

@@ -1,18 +1,17 @@
-"""Ask, of a narration whose thoughts are settled, whether its edition fits the runtime.
+"""Count a narration whose thoughts are settled: the runtime its edition gets.
 
 `read` is asked by the convergence (`filmkit.narration.converge`) when its rounds end. It asks
 the assembly's own count and nothing else: it selects the edition's recordings as
 `produce select` does (`filmkit.narration.selection`) and counts them under the script's pause
 policy as `produce fit` does (`filmkit.soundtrack.fit`). What it returns is the record's `fit`:
 
-- `fits`, with the seconds the count leaves free;
-- `misses`, with the seconds missing and the film's own lever: the largest thought pause of the
-  script's declared range under which the edition would fit (`fit.thought_pause_to_fit`), or
-  that no pause of that range fits. The pause is named and not applied;
-- `refused`, where the selection or the assembly refuses the edition for another reason than
-  its runtime, with that reason in one line: among them a file named by an absolute path
-  that is missing or cannot be read, a recording that is no WAV, and a decode that fails,
-  whatever its cause, with the decoder's own last error line;
+- `fits`, with the runtime the assembly would give, in whole seconds, and the seconds of the
+  rounding's fraction that the gaps and the credits take, as counted: an edition lasts as long
+  as its narration, so no count falls short of a runtime and no thought pause is named for one;
+- `refused`, where the selection or the assembly refuses the edition, with that reason in one
+  line: among them clips that cannot be designed, a file named by an absolute path that is
+  missing or cannot be read, a recording that is no WAV, and a decode that fails, whatever its
+  cause, with the decoder's own last error line;
 - `failed`, where the count ends in a fault that is no refusal of its owners, such as a
   record that lacks a segment, or in an error that names no file by an absolute path, such
   as a decoder that is not installed (`of_the_host`): the fault keeps its traceback, and the
@@ -22,12 +21,8 @@ policy as `produce fit` does (`filmkit.soundtrack.fit`). What it returns is the 
   script. Such an edition is not declared for the assembly yet, and its takes can still be
   judged.
 
-The count is compared as it is counted and rounded only where it is printed: the seconds free
-are the allocation's whole samples over the sample rate, compared unrounded with the reserve.
-An edition fits when the count leaves at least the reserve free: `runtime_fit.reserve_seconds`
-in the edition's cast, a number of seconds from 0, and 0 where the cast declares none.
-`declared` reads it before a run's first effect and refuses there, in one line, a reserve that
-is no such number and a pause policy that the assembly would refuse.
+`declared` refuses, before a run's first effect and in one line, a pause policy that the
+assembly would refuse and a cast that declares `runtime_fit`, which nothing reads.
 
 The reading replaces no take and changes no pause policy and no tracked file. Below `build/` it
 writes what those two commands write for the edition: the selection's two records and the
@@ -39,7 +34,6 @@ from __future__ import annotations
 
 import contextlib
 import io
-import math
 import os
 import subprocess
 import wave
@@ -51,10 +45,11 @@ from filmkit.narration.selection import select
 from filmkit.production import Edition
 from filmkit.soundtrack.policy import PausePolicyError, designed_pause_policy
 
-# The cast's declaration and its one key: the seconds that a settled edition must leave free,
-# which the record's fit and the lever's reading state under the same name.
-DECLARATION, RESERVE = "runtime_fit", soundtrack_fit.RESERVE
-FITS, MISSES, REFUSED, FAILED = "fits", "misses", "refused", "failed"
+# A cast's declaration that nothing reads, since an edition lasts as long as its narration.
+DECLARATION = "runtime_fit"
+FITS, REFUSED, FAILED = soundtrack_fit.FITS, "refused", "failed"
+# What the record's fit states of a counted edition, as the dry run reports them.
+COUNTED = ("runtime_seconds", "free_seconds", "credits_free_seconds")
 UNSETTLED = "not asked: thoughts are unsettled"
 NO_RECORDING = "not asked: the cast declares no performance recording with its alignment"
 NO_POLICY = "not asked: the script declares no pause policy (voice_performance)"
@@ -86,12 +81,10 @@ def of_the_host(error: Exception) -> bool:
         return True
 
 
-def declared(code: str) -> float:
-    """The seconds that the edition's cast declares must stay free; 0 where it declares none.
-
-    Refused here, before a run's first effect: a reserve that is no number of seconds, and a
-    pause policy in the script that the assembly refuses, which the judgment reads too.
-    """
+def declared(code: str) -> None:
+    """Refuse, before a run's first effect, what the count does not take: a pause policy in the
+    script that the assembly refuses, which the judgment reads too, and a cast that declares
+    `runtime_fit`, with any fields or none."""
     performance = repository.read(Edition(code).script).get("voice_performance")
     try:
         if performance:
@@ -99,31 +92,27 @@ def declared(code: str) -> float:
     except PausePolicyError as error:
         msg = f"{code}: the script's pause policy is refused: {one_line(error)}"
         raise SystemExit(msg) from None
-    fields = repository.read(Edition(code).cast).get(DECLARATION, {})
-    known = isinstance(fields, dict) and set(fields) <= {RESERVE}
-    reserve = fields.get(RESERVE, 0.0) if known else math.nan
-    if type(reserve) not in {int, float} or not math.isfinite(reserve) or reserve < 0:
+    if DECLARATION in repository.read(Edition(code).cast):
         msg = (
-            f"{code}: the cast's {DECLARATION} declares {RESERVE}, a number of seconds from 0, "
-            "and nothing else"
+            f"{code}: the cast declares {DECLARATION}, which nothing reads: an edition lasts as "
+            "long as its narration; remove it"
         )
         raise SystemExit(msg)
-    return reserve
 
 
 def not_asked(why: str) -> dict:
     return {"asked": False, "why": why}
 
 
-def asked(reserve: float) -> dict:
-    """The head of the fit of an edition that was asked: the reserve it was held to."""
-    return {"asked": True, RESERVE: reserve}
+def asked() -> dict:
+    """The head of the fit of an edition that was asked."""
+    return {"asked": True}
 
 
-def failed(reserve: float, fault: Exception) -> dict:
+def failed(fault: Exception) -> dict:
     """The fit of a count that ended in a fault, which its caller raises on."""
     words = f"{type(fault).__name__}: {one_line(fault)}"
-    return asked(reserve) | {"verdict": FAILED, "fault": words}
+    return asked() | {"verdict": FAILED, "fault": words}
 
 
 def one_line(error: Exception) -> str:
@@ -149,15 +138,7 @@ def refusal_of(error: Exception) -> str:
     return one_line(error)
 
 
-def pause_to_fit(edition: Edition, reserve: float) -> dict:
-    """The film's lever for a miss, or why it could not be read."""
-    try:
-        return soundtrack_fit.thought_pause_to_fit(edition, reserve)
-    except ANSWERED as error:
-        return {"unread": refusal_of(error)}
-
-
-def read(code: str, reserve: float) -> dict:
+def read(code: str) -> dict:
     """What the assembly's count says of the edition as its narration stands: the record's fit."""
     edition = Edition(code)
     declared = repository.read(edition.cast).get("performance_recording") or {}
@@ -165,7 +146,7 @@ def read(code: str, reserve: float) -> dict:
         return not_asked(NO_RECORDING)
     if not repository.read(edition.script).get("voice_performance"):
         return not_asked(NO_POLICY)
-    found = asked(reserve)
+    found = asked()
     try:
         # The selection prints its own line, which is not among the convergence's reports.
         with contextlib.redirect_stdout(io.StringIO()):
@@ -176,43 +157,9 @@ def read(code: str, reserve: float) -> dict:
         line, refusal = soundtrack_fit.asked(edition)[0]
     except ANSWERED as error:
         return found | {"verdict": REFUSED, "refusal": f"the assembly: {refusal_of(error)}"}
-    free = line["free_seconds"]
-    if free is None:
-        return found | {"verdict": REFUSED, "refusal": f"the assembly: {line['verdict']}"}
-    found["free_seconds"] = free
-    if reserve - free > 0:
-        lever = pause_to_fit(edition, reserve)
-        return found | {"verdict": MISSES, "missing_seconds": reserve - free, "pause": lever}
     if refusal is not None:
         return found | {"verdict": REFUSED, "refusal": f"the assembly: {line['verdict']}"}
-    return found | {"verdict": FITS}
-
-
-def seconds(value: float) -> str:
-    """Seconds in hundredths, or in as many places as a value that is not zero needs to show."""
-    for places in (2, 4, 6):
-        text = f"{value:.{places}f}"
-        if float(text) != 0 or value == 0:
-            return text
-    return f"{value:.3g}"
-
-
-def lever_words(pause: dict) -> str:
-    """The film's lever in words: the pause that would fit, or that none of the range does."""
-    if "unread" in pause:
-        return f"the thought pause that would fit could not be read: {pause['unread']}"
-    least, most = pause["range_seconds"]
-    if pause["fits_at_seconds"] is not None:
-        return (
-            f"a thought pause of {pause['fits_at_seconds']} s, declared at "
-            f"{pause['declared_seconds']} s in a range from {least} to {most} s, would fit "
-            f"with {seconds(pause['free_seconds'])} s free"
-        )
-    tried, free = pause["tried_seconds"], pause["free_seconds"]
-    none = f"no thought pause of the declared range, {least} to {most} s, fits: at {tried} s "
-    if free is not None and free < pause[RESERVE]:
-        return none + f"it still misses by {seconds(pause[RESERVE] - free)} s"
-    return none + f"the assembly refuses it: {pause['refusal']}"
+    return found | {key: line[key] for key in COUNTED} | {"verdict": FITS}
 
 
 def summary(fit: dict) -> str:
@@ -226,12 +173,4 @@ def said(code: str, fit: dict) -> str | None:
         return None
     if fit["verdict"] == REFUSED:
         return f"{code}: the settled narration is refused by {fit['refusal']}"
-    if fit["verdict"] == FAILED:
-        return f"{code}: the count of the settled narration ended in a fault: {fit['fault']}"
-    reserve = fit[RESERVE]
-    held = f", the declared reserve of {seconds(reserve)} s included" if reserve else ""
-    line = (
-        f"{code}: the settled narration misses its runtime by "
-        f"{seconds(fit['missing_seconds'])} s{held}; {lever_words(fit['pause'])}"
-    )
-    return "; ".join(part.strip() for part in line.splitlines() if part.strip())
+    return f"{code}: the count of the settled narration ended in a fault: {fit['fault']}"

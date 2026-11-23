@@ -236,7 +236,7 @@ def test_a_convergence_that_needed_no_narration_is_counted_after_the_narration_t
 
 @pytest.mark.usefixtures("root")
 def test_a_narration_inside_a_convergence_that_did_not_complete_is_still_counted(capsys):
-    # The convergence settled every thought and the edition missed its runtime: the command
+    # The convergence settled every thought and the assembly refused the edition: the command
     # did not complete and is not counted, so its narration is added once, as before.
     record("en", "converge", "2026-11-19T01:00:00+00:00", 343.0, completed=False)
     record("en", "narrate", "2026-11-19T01:04:40+00:00", 41.0)

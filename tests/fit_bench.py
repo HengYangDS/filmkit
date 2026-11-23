@@ -1,5 +1,5 @@
-"""What the benches of the runtime fit share, in the soundtrack's own tests and in the tests of the
-convergence that asks it: the pause contract, and a stand-in for the assembly's count.
+"""What the benches of the runtime's count share, in the soundtrack's own tests and in the tests of
+the convergence that asks it: the pause contract, and a stand-in for the assembly's count.
 
 The module loads no speech runtime, so a test module that is collected where that runtime does
 not load may import it.
@@ -10,7 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from filmkit.soundtrack.pauses import PauseError, allocate_designed_gaps, mean_preserving_pauses
+from filmkit.soundtrack.fit import FITS, MEASURES
+from filmkit.soundtrack.pauses import PauseError, mean_preserving_pauses
 from filmkit.specification import RATE
 
 if TYPE_CHECKING:
@@ -47,12 +48,6 @@ def refusal_of(ask: Callable[..., object], *arguments: object) -> PauseError:
     raise AssertionError(message)
 
 
-def runtime_refusal(frames: int) -> PauseError:
-    """The allocation's own refusal of a narration that is `frames` samples over the runtime."""
-    nothing = {"pauses": {"closing": 0.0}, "limits": {}, "weights": {}}
-    return refusal_of(allocate_designed_gaps, [], frames, nothing, RATE, 0)
-
-
 def design_refusal() -> PauseError:
     """The design's own refusal of thought pauses whose floors the declared mean cannot fund."""
     return refusal_of(mean_preserving_pauses, [1], 0.0, 1.0, 1.0)
@@ -62,16 +57,18 @@ def design_refusal() -> PauseError:
 class Count:
     """A stand-in for the assembly's measure of one policy (`filmkit.soundtrack.fit.measured`).
 
-    The contract's thought pause leaves `free` seconds free, and each second off it frees
-    `joins` times as much, counted in whole samples as the assembly counts. `refusal` is what
-    the allocation refuses an edition with that has room, and `undesigned` says of a thought
-    pause whether its design is refused. A refusal for the runtime and one of the design are
-    asked of their owners. `tried` holds the thought pauses that were measured, in order.
+    The edition's count, the speech with its thought pauses, the designed gaps, the closing quiet
+    and the credits, is `counted` seconds at the contract's thought pause, and each second off
+    that pause shortens it `joins` times as much, counted in whole samples as the assembly
+    counts. The runtime is the count rounded up to the whole second; the gaps take the
+    rounding's fraction up to their `room` seconds, and the credits the rest. `undesigned` says
+    of a thought pause whether its design is refused, which is asked of its owner. `tried`
+    holds the thought pauses that were measured, in order. No count misses a runtime.
     """
 
-    free: float = 0.8
+    counted: float = 1475.14
+    room: float = 2.4
     joins: int = 2
-    refusal: str | None = None
     undesigned: Callable[[float], bool] = lambda _pause: False
     tried: list[float] = field(default_factory=list)
 
@@ -82,11 +79,17 @@ class Count:
         self.tried.append(pause)
         if self.undesigned(pause):
             refusal = design_refusal()
-            return {"policy": name, "free_seconds": None, "verdict": str(refusal)}, refusal
-        frames = round(self.free * RATE) + self.joins * round((THOUGHT_PAUSE - pause) * RATE)
-        if frames < 0:
-            refusal = runtime_refusal(-frames)
-        else:
-            refusal = PauseError(self.refusal) if self.refusal else None
-        verdict = "fits" if refusal is None else str(refusal)
-        return {"policy": name, "free_seconds": frames / RATE, "verdict": verdict}, refusal
+            return {"policy": name, **dict.fromkeys(MEASURES), "verdict": str(refusal)}, refusal
+        count = round(self.counted * RATE) - self.joins * round((THOUGHT_PAUSE - pause) * RATE)
+        runtime = -(-count // RATE)
+        fraction = runtime * RATE - count
+        gaps = min(fraction, round(self.room * RATE))
+        line = {
+            "policy": name,
+            **dict.fromkeys(MEASURES),
+            "runtime_seconds": runtime,
+            "free_seconds": gaps / RATE,
+            "credits_free_seconds": (fraction - gaps) / RATE,
+            "verdict": FITS,
+        }
+        return line, None

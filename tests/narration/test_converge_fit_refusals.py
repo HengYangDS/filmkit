@@ -25,25 +25,21 @@ def begun(*_taken: object) -> None:
 
 @pytest.mark.parametrize(
     "fields",
-    [
-        {"reserve_seconds": -0.1},
-        {"reserve_seconds": "0.1"},
-        {"reserve_seconds": True},
-        {"reserve_seconds": float("inf")},
-        {"reserve_seconds": 0.1, "shorter_by_at_most": 0.03},
-        0.1,
-    ],
+    [{"reserve_seconds": 0.5}, {"reserve_seconds": 0.0}, {}, 0.1, None],
 )
-def test_a_reserve_that_is_no_number_of_seconds_is_refused_before_anything_runs(
+def test_a_cast_that_declares_runtime_fit_is_refused_before_anything_runs(
     count, fields, monkeypatch
 ):
+    # Nothing reads it, since an edition lasts as long as its narration: a reserve, an empty
+    # table and any other value are refused alike.
     cast = repository.read(Edition("en").cast)
     repository.write(Edition("en").cast, {**cast, "runtime_fit": fields})
     monkeypatch.setattr(narration_converge, "begin", begun)
     assert refused() == (
-        "en: the cast's runtime_fit declares reserve_seconds, a number of seconds from 0, and "
-        "nothing else"
+        "en: the cast declares runtime_fit, which nothing reads: an edition lasts as long as its "
+        "narration; remove it"
     )
+    assert not (Edition("en").ear_first / narration_converge.RECORD).exists()
     assert count.selected == 0
 
 
@@ -74,7 +70,6 @@ def test_what_the_count_refuses_is_the_editions_refusal_with_the_record_ended(co
     assert (record["state"], record["unsettled"]) == ("ended", {})
     assert record["fit"] == {
         "asked": True,
-        "reserve_seconds": 0.0,
         "verdict": "refused",
         "refusal": "the assembly: Selected recording waveform differs: 26",
     }
@@ -191,7 +186,6 @@ def test_an_error_of_the_host_is_a_fault_and_no_refusal_of_the_edition(
     assert (record["state"], record["unsettled"]) == ("ended", {})
     assert record["fit"] == {
         "asked": True,
-        "reserve_seconds": 0.0,
         "verdict": "failed",
         "fault": words,
     }
@@ -207,19 +201,9 @@ def test_what_the_selection_refuses_is_said_in_one_line(count):
     assert (record["state"], record["fit"]["verdict"], count.bound) == ("ended", "refused", 0)
 
 
-def test_an_edition_with_room_that_the_allocation_refuses_is_refused_not_missed(count):
-    count.refusal = "The gaps cannot hold the runtime that is left"
-    assert refused() == (
-        "en: the settled narration is refused by the assembly: The gaps cannot hold the "
-        "runtime that is left"
-    )
-    fit = record_of()["fit"]
-    assert (fit["verdict"], fit["free_seconds"]) == ("refused", 0.8)
-
-
 def test_an_edition_whose_clips_cannot_be_designed_is_refused_with_that_reason(count, monkeypatch):
     refusal = LevelError("Thought levels differ by more than the tolerance: 26")
-    line = {"policy": "declared", "free_seconds": None, "verdict": str(refusal)}
+    line = {"policy": "declared", "runtime_seconds": None, "verdict": str(refusal)}
     monkeypatch.setattr(soundtrack_fit, "measured", lambda *_: (line, refusal))
     assert refused() == (
         "en: the settled narration is refused by the assembly: Thought levels differ by more "
@@ -237,23 +221,9 @@ def test_a_fault_of_the_count_keeps_its_traceback_and_the_record_is_ended_first(
     assert (record["state"], record["unsettled"]) == ("ended", {})
     assert record["fit"] == {
         "asked": True,
-        "reserve_seconds": 0.0,
         "verdict": "failed",
         "fault": "KeyError: '27'",
     }
     assert fitting.said("en", record["fit"]) == (
         "en: the count of the settled narration ended in a fault: KeyError: '27'"
     )
-
-
-def test_an_error_of_the_host_while_the_pause_is_read_is_a_fault_too(count, monkeypatch):
-    count.free = -0.1
-
-    def absent(_edition: Edition, _reserve: float) -> dict:
-        raise FileNotFoundError(2, "No such file or directory", "ffmpeg")
-
-    monkeypatch.setattr(soundtrack_fit, "thought_pause_to_fit", absent)
-    with pytest.raises(FileNotFoundError):
-        converge()
-    record = record_of()
-    assert (record["state"], record["fit"]["verdict"]) == ("ended", "failed")

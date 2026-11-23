@@ -1,18 +1,19 @@
-"""Tell, before an edition's soundtrack is assembled, how much of the runtime its narration leaves
-for the designed gaps, under the script's pause policy and under variants of it.
+"""Tell, before an edition's soundtrack is assembled, the runtime its narration gives and how the
+rounding's fraction is laid out, under the script's pause policy and under variants of it.
 
 `fit` runs the assembly's own steps (`filmkit.soundtrack.assembly`) up to the gap allocation. It
 binds and decodes the edition's selected recordings once, writing nothing but the assembly's
-decode work files, then designs the clips and allocates the gaps under the script's pause policy
+decode work files, then designs the clips and counts the runtime under the script's pause policy
 and each declared variant, each on its own copy of the decoded recordings. It prints one JSON
 line per policy, the script's first as `declared`: the speech with its thought pauses, the
-designed gaps before the allocation, the closing quiet and the runtime left free, negative where
-it is missing, all in seconds; the gaps that the allocation gives, as the assembly receipt
-records them, or None where it refuses; and the verdict, `fits` or the allocation's refusal. A
-policy whose clips or gaps cannot be designed, as `assemble` would refuse them for a pause, a
+designed gaps before the allocation and the closing quiet in seconds; the runtime the assembly
+would give, in whole seconds; the seconds of the rounding's fraction that the gaps take beyond
+their designs (`free_seconds`) and that the credits take beyond their declared length
+(`credits_free_seconds`); the gaps as the assembly receipt records them; and the verdict, `fits`.
+A policy whose clips or gaps cannot be designed, as `assemble` would refuse them for a pause, a
 level or a recording, is reported with that refusal as its verdict and no measures. After
-reporting every policy it refuses, with its own refusal, a script whose policy does not fit or
-cannot be designed; a variant never decides the exit.
+reporting every policy it refuses, with its own refusal, a script whose policy cannot be
+designed; a variant never decides the exit, and a fraction the gaps cannot take is no refusal.
 
 A variants file, named below the film's root or absolutely, is a JSON object that maps each
 variant's name to the voice-performance fields it replaces, whole. Every variant is validated as
@@ -21,9 +22,7 @@ policy does not read is refused. The fit judges no take: abrupt endings, pauses 
 with `assemble`.
 
 `asked` gives the same reports and refusals without printing or refusing, for a caller that
-decides by them, and `thought_pause_to_fit` states, for an edition that misses its runtime, the
-largest thought pause of the script's declared range under which it would fit: a reading of the
-film's own lever, which changes nothing.
+decides by them.
 
 Usage: python -m filmkit.produce fit --language zh|en [--variants <file>]
 """
@@ -50,9 +49,19 @@ if TYPE_CHECKING:
 
     from filmkit.production import Edition
 
-# The name that the script's own pause policy is reported by, and the measures of a report.
+# The name that the script's own pause policy is reported by, the measures of a report, and the
+# verdict of a policy whose clips and gaps are designed.
 DECLARED = "declared"
-MEASURES = ("speech_seconds", "gap_seconds", "closing_seconds", "free_seconds", "gaps")
+MEASURES = (
+    "speech_seconds",
+    "gap_seconds",
+    "closing_seconds",
+    "runtime_seconds",
+    "free_seconds",
+    "credits_free_seconds",
+    "gaps",
+)
+FITS = "fits"
 
 
 class VariantsError(ValueError):
@@ -126,24 +135,26 @@ def policies(script: dict, variants: dict[str, dict]) -> dict[str, tuple[dict, d
 
 
 def report(name: str, allocation: assembly.Allocation) -> dict:
-    """The line that reports how the narration fits under one policy."""
-    gaps = allocation.gaps
+    """The line that reports the runtime the narration gives under one policy, and how the
+    rounding's fraction is laid out."""
     return {
         "policy": name,
         "speech_seconds": allocation.speech / RATE,
         "gap_seconds": sum(allocation.designed) / RATE,
         "closing_seconds": allocation.closing / RATE,
+        "runtime_seconds": allocation.runtime,
         "free_seconds": allocation.free / RATE,
-        "gaps": None if gaps is None else assembly.gap_seconds(allocation.kinds, gaps),
-        "verdict": allocation.refusal or "fits",
+        "credits_free_seconds": allocation.credits_free / RATE,
+        "gaps": assembly.gap_seconds(allocation.kinds, allocation.gaps),
+        "verdict": FITS,
     }
 
 
 def measured(
     name: str, policy: dict, releases: dict, bound: tuple[list, dict, dict, dict]
 ) -> tuple[dict, Exception | None]:
-    """The report of one policy on its own copy of the decoded recordings, and its refusal: the
-    design's, where its pauses cannot be designed, or the allocation's."""
+    """The report of one policy on its own copy of the decoded recordings, and the design's
+    refusal where its clips or gaps cannot be designed."""
     segments, records, alignments, decoded = bound
     samples = {key: recording.copy() for key, recording in decoded.items()}
     try:
@@ -151,8 +162,7 @@ def measured(
         allocation = assembly.allocate(segments, clips, policy)
     except (PauseError, LevelError, assembly.AssemblyError) as error:
         return {"policy": name, **dict.fromkeys(MEASURES), "verdict": str(error)}, error
-    refusal = None if allocation.refusal is None else PauseError(allocation.refusal)
-    return report(name, allocation), refusal
+    return report(name, allocation), None
 
 
 def _bound(script: dict, edition: Edition) -> tuple[list, dict, dict, dict]:
@@ -197,8 +207,8 @@ def asked(
 
 
 def fit(edition: Edition, variants: dict[str, dict] | None = None) -> list[dict]:
-    """Report how the edition's narration fits its runtime under the script's pause policy and
-    each variant, each as it is measured; refused where the script's own policy does not fit."""
+    """Report the runtime the edition's narration gives under the script's pause policy and each
+    variant, each as it is measured; refused where the script's own policy cannot be designed."""
     found = []
     for line, refusal in _each(edition, variants):
         print(json.dumps(line, ensure_ascii=False), flush=True)
@@ -206,78 +216,3 @@ def fit(edition: Edition, variants: dict[str, dict] | None = None) -> list[dict]
     if found[0][1] is not None:
         raise found[0][1]
     return [line for line, _ in found]
-
-
-# The step of the thought pauses that `thought_pause_to_fit` tries, in seconds.
-PAUSE_STEP = 0.01
-# The name under which the seconds that must stay free are stated: in that reading's answer,
-# and wherever a caller declares or records them.
-RESERVE = "reserve_seconds"
-
-
-def thought_pause_to_fit(edition: Edition, reserve: float = 0.0) -> dict:
-    """The largest declared-range thought pause that leaves `reserve` seconds free.
-
-    The pauses tried run in steps of 0.01 s up from the least of the script's
-    `thought_pause_range`, itself the first, to the last step that is not above its declared
-    thought pause, each as the script's policy with that thought pause, on the recordings
-    decoded once. A shorter pause leaves more of the runtime free, so the largest pause with
-    room is found by halving. A pause whose design is refused leaves no count and is taken as
-    room, so the halving may end on one, or on one the allocation refuses: the pauses under it
-    are then tried one by one, down to the first that fits, and a refusal between two pauses
-    that fit hides none. The pause named was counted, and so was the step above it, which has
-    no room or is refused. The last step has none above it: where the declared pause lies
-    between two steps, the last step lies under it, and the declared pause is not counted
-    here. The reading changes no file but the assembly's decode work files.
-
-    Returns:
-        The declared pause, its range and the reserve, with `fits_at_seconds`: the pause, as it
-        was counted, and the seconds it leaves free; or None with the pause tried last, the
-        seconds it leaves free where they were counted, and the refusal of its design or its
-        allocation where there is one.
-    """
-    script = repository.read(edition.script)
-    performance = script.get("voice_performance", {})
-    policy = designed_pause_policy(performance)
-    declared, (least, most) = policy["pauses"]["thought"], policy["thought_range"]
-    bound, found = _bound(script, edition), {}
-
-    def tried(step: int) -> tuple[float, float | None, str | None]:
-        if step not in found:
-            pause = least if step == 0 else round(least + step * PAUSE_STEP, 6)
-            pauses = {**performance["designed_pauses"], "thought": pause}
-            try:
-                variant = designed_pause_policy({**performance, "designed_pauses": pauses})
-                releases = segment_releases(variant, script["segments"])
-                line, refusal = measured(str(pause), variant, releases, bound)
-            except PausePolicyError as error:
-                line, refusal = {"free_seconds": None, "verdict": str(error)}, error
-            found[step] = (
-                pause,
-                line["free_seconds"],
-                None if refusal is None else line["verdict"],
-            )
-        return found[step]
-
-    def room(step: int) -> bool:
-        free = tried(step)[1]
-        return free is None or free >= reserve
-
-    said = {"declared_seconds": declared, "range_seconds": [least, most]}
-    said[RESERVE] = reserve
-    low, high = 0, int((declared - least) / PAUSE_STEP + 1e-9)
-    while room(low) and low < high:
-        middle = (low + high + 1) // 2
-        low, high = (middle, high) if room(middle) else (low, middle - 1)
-    for step in range(low, -1, -1):
-        pause, free, refusal = tried(step)
-        if free is not None and free >= reserve and refusal is None:
-            return {**said, "fits_at_seconds": pause, "free_seconds": free}
-    pause, free, refusal = tried(low)
-    return {
-        **said,
-        "fits_at_seconds": None,
-        "tried_seconds": pause,
-        "free_seconds": free,
-        "refusal": refusal,
-    }

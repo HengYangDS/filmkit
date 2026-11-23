@@ -1,7 +1,9 @@
-"""Soundtrack assembly checks every selected recording against its script before mixing."""
+"""Soundtrack assembly checks every selected recording against its script before mixing, and
+counts the edition's runtime from its narration."""
 
 import json
 import wave
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -70,17 +72,30 @@ def test_assembly_lays_out_each_recording_with_its_own_level_and_exact_samples(t
     # Without a declared segment tolerance no segment has a gain of its own.
     assert receipt["designed_pause_policy"]["segment_level_tolerance"] is None
     assert [record["segment_gain_db"] for record in records] == [0.0, 0.0]
-    # The gaps, the speech and the closing quiet fill the runtime before the credits exactly.
     gaps = [round(gap["seconds"] * RATE) for gap in receipt["gaps"]]
     assert [gap["kind"] for gap in receipt["gaps"]] == ["opening", "chapter"]
     assert records[0]["start_sample"] == gaps[0]
     assert records[1]["start_sample"] == gaps[0] + records[0]["frames"] + gaps[1]
-    closing = round(receipt["closing_seconds"] * RATE)
-    assert sum(gaps) + sum(record["frames"] for record in records) + closing == 20 * RATE
-    assert receipt["samples_per_channel"] == 24 * RATE
-    # The timeline states the credits as laid out: the declared four seconds.
-    assert timeline["credits_duration"] == 4
-    assert timeline["segments"][-1]["end"] == 20
+    # The runtime is the count, the speech with its thought pauses, the designed gaps, the
+    # closing quiet and the declared four seconds of credits, rounded up to a whole second; the
+    # gaps, which have room, take the whole fraction, and the credits keep their length.
+    closing, speech = round(receipt["closing_seconds"] * RATE), sum(r["frames"] for r in records)
+    designed = round(3.0 * RATE) + round(3.4 * RATE)
+    count = speech + designed + closing + 4 * RATE
+    runtime = receipt["duration"]
+    assert (type(runtime), runtime, timeline["duration"]) == (int, -(-count // RATE), runtime)
+    assert sum(gaps) - designed == runtime * RATE - count
+    assert receipt["credits_duration"] == timeline["credits_duration"] == 4
+    # The credits as laid out are seconds with a fraction, also where they keep their length.
+    assert type(timeline["credits_duration"]) is type(receipt["credits_duration"]) is float
+    assert sum(gaps) + speech + closing + 4 * RATE == runtime * RATE
+    assert receipt["samples_per_channel"] == runtime * RATE
+    # What the assembly writes beside and over the script's keys is what every comparison of a
+    # timeline with its script leaves out.
+    script = repository.read(two_chapters.script)
+    written = {key for key, value in timeline.items() if script.get(key) != value}
+    assert written == production.ASSEMBLED
+    assert timeline["segments"][-1]["end"] == runtime - 4
     # Each gap keeps its declared pause and stays within its limit.
     assert round(3.0 * RATE) <= gaps[0] <= round(9.0 * RATE)
     assert round(3.4 * RATE) <= gaps[1] <= round(9.0 * RATE)
@@ -102,7 +117,7 @@ def test_assembly_lays_out_each_recording_with_its_own_level_and_exact_samples(t
     with wave.open(str(two_chapters.soundtrack)) as audio:
         assert (audio.getnchannels(), audio.getframerate()) == (2, RATE)
         pcm = np.frombuffer(audio.readframes(audio.getnframes()), "<i2").reshape(-1, 2)
-    assert len(pcm) == 24 * RATE
+    assert len(pcm) == runtime * RATE
     assert not pcm[: records[0]["start_sample"]].any()
     assert not pcm[records[1]["start_sample"] + records[1]["frames"] :].any()
     # Both receipt writers give the caption fields the same place.
@@ -114,6 +129,52 @@ def test_assembly_lays_out_each_recording_with_its_own_level_and_exact_samples(t
     ]
     assert receipt["caption_count"] == len(timeline["captions"]) == 4
     assert receipt["captions_above_reading_rate"] == []
+
+
+# Two segments of one chapter: an opening gap, then a paragraph gap.
+SEGMENTS = [
+    {"id": "01", "chapter": "a", "text": "一二三。"},
+    {"id": "02", "chapter": "a", "text": "四五六。"},
+]
+
+
+def allocated(designed_policy, monkeypatch, *, count: float, room: float):
+    """The allocation of a narration whose speech with its thought pauses, designed gaps and
+    closing quiet come to `count` seconds, with 3 s of credits, where the paragraph gap has
+    `room` seconds up to its range's top and the opening gap none; and its clip's speech."""
+    monkeypatch.setattr(soundtrack_assembly, "CREDITS_DURATION", 3)
+    limits = {"opening": 3.0, "paragraph": 5.5, "chapter": 3.4}
+    policy = designed_policy(designed_pause_limits=limits, paragraph_pause_range=[1.2, 1.6 + room])
+    speech = round(count * RATE) - round(3.0 * RATE) - round(1.6 * RATE) - round(2.6 * RATE)
+    clip = SimpleNamespace(samples=range(speech))
+    return soundtrack_assembly.allocate(SEGMENTS, [clip], policy), speech
+
+
+@pytest.mark.parametrize(
+    ("count", "room", "runtime", "gaps", "credits"),
+    [
+        # The fraction of 0.86 s goes to the gaps, whose ranges have room for 2.40 s.
+        (1472.14, 2.4, 1476, 0.86, 3.0),
+        # The gaps take the 0.30 s they have room for, the credits the other 0.56 s.
+        (1472.14, 0.3, 1476, 0.3, 3.56),
+        # Every gap with a weight stands at its range's top: the credits take it all.
+        (1472.14, 0.0, 1476, 0.0, 3.86),
+        # A count of whole seconds leaves no fraction.
+        (597.0, 2.4, 600, 0.0, 3.0),
+    ],
+)
+def test_the_runtime_is_the_count_rounded_up_and_its_fraction_goes_to_gaps_then_credits(
+    designed_policy, monkeypatch, count, room, runtime, gaps, credits
+):
+    allocation, speech = allocated(designed_policy, monkeypatch, count=count, room=room)
+    assert (type(allocation.runtime), allocation.runtime) == (int, runtime)
+    assert (allocation.free, allocation.credits) == (round(gaps * RATE), round(credits * RATE))
+    assert allocation.credits_free == round((credits - 3) * RATE)
+    # The laid-out parts fill the runtime to the sample. That the thought pauses keep their
+    # designs is read on a laid-out soundtrack, by
+    # `test_assembly_lays_out_each_recording_with_its_own_level_and_exact_samples`.
+    laid = sum(allocation.gaps) + speech + allocation.closing + allocation.credits
+    assert laid == runtime * RATE
 
 
 class Decoded(Exception):

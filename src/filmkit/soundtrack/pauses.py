@@ -2,8 +2,9 @@
 
 A statement pause grows with the thought it follows and a paragraph gap with the paragraph it
 follows, at their declared means. Each thought join is then set to its designed quiet inside the
-part of its native quiet heard as quiet, and the remaining runtime is shared among the gaps
-before each segment within their declared limits. A take's codec onset that follows digital
+part of its native quiet heard as quiet. The fraction of a second that rounding an edition's count
+up to its whole runtime adds is shared among the gaps before each segment within their declared
+ranges, and what they cannot take goes to the credits. A take's codec onset that follows digital
 silence, at a thought join or where a recording's clip begins, is released to digital silence.
 """
 
@@ -432,29 +433,22 @@ def begin_clip(audio: np.ndarray, first_word: float, rate: int) -> tuple[int | N
 
 
 def allocate_designed_gaps(
-    kinds: list[str],
-    speech_frames: int,
-    policy: dict,
-    rate: int,
-    total_frames: int,
-    bases: list[float] | None = None,
+    kinds: list[str], designed: list[int], fraction: int, policy: dict, rate: int
 ) -> tuple[list[int], int]:
-    """Give exact remaining runtime to picture gaps by weight within declared limits.
+    """Share `fraction` samples, what rounding an edition's count up to its whole runtime adds,
+    among the gaps before the segments by their declared weights.
 
-    Each gap starts from its designed seconds (by default its kind's declared pause).
+    Each gap grows from its designed samples, `designed`, up to the top of its declared range: a
+    paragraph gap to the top of `paragraph_range`, an opening or chapter gap to its declared
+    limit. Returns the gaps and the samples they cannot take, which go to the credits.
     """
-    pauses, limits, weights = policy["pauses"], policy["limits"], policy["weights"]
-    bases = [pauses[kind] for kind in kinds] if bases is None else bases
-    if len(bases) != len(kinds):
+    if len(designed) != len(kinds):
         msg = "Every gap requires one designed pause"
         raise PauseError(msg)
-    gaps = [round(base * rate) for base in bases]
-    caps = [round(limits[kind] * rate) for kind in kinds]
-    closing = round(pauses["closing"] * rate)
-    free = total_frames - speech_frames - sum(gaps) - closing
-    if free < 0:
-        msg = f"Narration exceeds the runtime by {-free / rate:.2f} s"
-        raise PauseError(msg)
+    weights = policy["weights"]
+    tops = {**policy["limits"], "paragraph": policy["paragraph_range"][1]}
+    gaps, free = list(designed), fraction
+    caps = [round(tops[kind] * rate) for kind in kinds]
     while free:
         open_gaps = [
             index
@@ -462,8 +456,7 @@ def allocate_designed_gaps(
             if weights[kind] > 0 and gaps[index] < caps[index]
         ]
         if not open_gaps:
-            msg = f"Narration is short by {free / rate:.2f} s for the declared gap limits"
-            raise PauseError(msg)
+            break
         total_weight = sum(weights[kinds[index]] for index in open_gaps)
         grants = {
             index: min(
@@ -477,4 +470,4 @@ def allocate_designed_gaps(
         for index, grant in grants.items():
             gaps[index] += grant
             free -= grant
-    return gaps, closing
+    return gaps, free

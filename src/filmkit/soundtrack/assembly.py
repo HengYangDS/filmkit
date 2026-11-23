@@ -4,10 +4,14 @@ The selected recordings are bound to the script, and every bound thought take mu
 naturally unless the film declares a release for its join. The recordings are then decoded
 and shaped in turn: the pauses inside each thought are capped and lengthened, every thought
 boundary is measured, each thought join takes its designed quiet, each thought and chapter is
-leveled, and the clips are laid out with the designed gaps at one program level. The laid-out
-soundtrack is refused, before anything is written, for an unmarked pause above the film's limit
-(`narration.flow`) or a declared term said unlike its reference (`narration.terms`). The
-timeline, the captions and the receipt record the result.
+leveled, and the clips are laid out with the designed gaps at one program level. The edition's
+runtime is its count, the clips' speech with their thought pauses, the designed gaps, the closing
+quiet and the film's declared credits, rounded up to the next whole second (`allocate`); the
+fraction the rounding adds goes to the gaps within their ranges and the rest to the credits. The
+laid-out soundtrack is refused, before anything is written, for an unmarked pause above the film's
+limit (`narration.flow`) or a declared term said unlike its reference (`narration.terms`). The
+timeline, which states the runtime and the credits as laid out, the captions and the receipt
+record the result.
 
 The steps up to the gap allocation, `bound_recordings`, `decode_recordings`, `designed_clips` and
 `allocate`, are the ones that the runtime fit (`filmkit.soundtrack.fit`) runs, so the two cannot
@@ -46,7 +50,6 @@ from filmkit.soundtrack.level import (
     program_gain,
 )
 from filmkit.soundtrack.pauses import (
-    PauseError,
     allocate_designed_gaps,
     begin_clip,
     design_thought_pauses,
@@ -64,7 +67,7 @@ from filmkit.soundtrack.quiet import (
     release_tail,
     thought_inner_quiet,
 )
-from filmkit.specification import CREDITS_DURATION, DURATION, PROGRAM_LEVEL, RATE
+from filmkit.specification import CREDITS_DURATION, PROGRAM_LEVEL, RATE
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -114,26 +117,34 @@ class Clip:
 
 @dataclass(frozen=True)
 class Allocation:
-    """How the designed gaps share the runtime before the credits, in samples.
+    """An edition's count and its runtime as laid out, in samples but the runtime.
 
     It holds each gap's kind and designed pause, the speech of the clips with their thought
-    pauses, the closing quiet and the runtime, and the gaps that `allocate_designed_gaps` gives,
-    or, where the narration does not fit the runtime or the declared gap limits, its refusal.
+    pauses, the closing quiet and the credits the film declares, whose sum, rounded up to the
+    next whole second, is the runtime, in seconds. `gaps` are the gaps that
+    `allocate_designed_gaps` gives, which take the rounding's fraction within their ranges, and
+    `credits` the credits as laid out, which take what the gaps cannot.
     """
 
     kinds: list[str]
     designed: list[int]
     speech: int
     closing: int
-    total: int
-    gaps: list[int] | None
-    refusal: str | None
+    declared: int
+    runtime: int
+    gaps: list[int]
+    credits: int
 
     @property
     def free(self) -> int:
-        """The runtime the allocation shares among the gaps beyond their designed pauses, as it
-        counts it; negative where the narration exceeds the runtime."""
-        return self.total - self.speech - sum(self.designed) - self.closing
+        """The samples of the rounding's fraction that the gaps take beyond their designs."""
+        return sum(self.gaps) - sum(self.designed)
+
+    @property
+    def credits_free(self) -> int:
+        """The samples of the rounding's fraction that the credits take beyond their declared
+        length."""
+        return self.credits - self.declared
 
 
 def bound_recordings(script: dict, edition: Edition) -> tuple[dict, dict]:
@@ -377,19 +388,22 @@ def designed_clips(
 
 
 def allocate(segments: list[dict], clips: list[Clip], policy: dict) -> Allocation:
-    """Share the runtime before the credits among the gaps before the segments, by the
-    designed pauses, limits and weights of a pause policy."""
+    """Count the edition's runtime and lay out its gaps and credits under a pause policy.
+
+    The count is the clips' speech with their thought pauses, the designed gaps, the closing
+    quiet and the declared credits; the runtime is that count rounded up to the next whole
+    second, and the fraction the rounding adds goes to the gaps by their weights within their
+    ranges, the rest to the credits (`allocate_designed_gaps`). No clip, thought pause or closing
+    quiet changes.
+    """
     kinds = gap_kinds(segments)
-    total = (DURATION - CREDITS_DURATION) * RATE
     speech = sum(len(clip.samples) for clip in clips)
-    bases = gap_pause_targets(segments, policy)
-    designed = [round(base * RATE) for base in bases]
-    try:
-        gaps, closing = allocate_designed_gaps(kinds, speech, policy, RATE, total, bases=bases)
-    except PauseError as error:
-        closing = round(policy["pauses"]["closing"] * RATE)
-        return Allocation(kinds, designed, speech, closing, total, None, str(error))
-    return Allocation(kinds, designed, speech, closing, total, gaps, None)
+    designed = [round(base * RATE) for base in gap_pause_targets(segments, policy)]
+    closing, declared = round(policy["pauses"]["closing"] * RATE), CREDITS_DURATION * RATE
+    count = speech + sum(designed) + closing + declared
+    runtime = -(-count // RATE)
+    gaps, left = allocate_designed_gaps(kinds, designed, runtime * RATE - count, policy, RATE)
+    return Allocation(kinds, designed, speech, closing, declared, runtime, gaps, declared + left)
 
 
 def gap_seconds(kinds: list[str], gaps: list[int]) -> list[dict]:
@@ -445,14 +459,17 @@ def _assembly_record(clip: Clip, start_sample: int) -> dict:
 
 
 def _lay_out(
-    clips: list[Clip], gaps: list[int], kinds: list[str]
+    clips: list[Clip], allocation: Allocation
 ) -> tuple[np.ndarray, list[dict], list[dict]]:
-    """Place each clip after its gap: the soundtrack, its timeline segments and records.
+    """Place each clip after its gap over the runtime: the soundtrack, its timeline segments and
+    records.
 
     A segment's picture ends where the next one's starts, and the last ends with the
-    narration, before the credits.
+    narration, where the credits as laid out begin: the runtime less them, as every reader of
+    the timeline takes it.
     """
-    soundtrack = np.zeros((RATE * DURATION, 2), dtype=np.int16)
+    gaps, kinds = allocation.gaps, allocation.kinds
+    soundtrack = np.zeros((RATE * allocation.runtime, 2), dtype=np.int16)
     segments, records, cursor = [], [], 0
     for index, clip in enumerate(clips):
         cursor += gaps[index]
@@ -462,12 +479,9 @@ def _lay_out(
         records.append(_assembly_record(clip, cursor))
         cursor += len(clip.samples)
         print(json.dumps({"id": clip.segment["id"], "start": begin, "end": end}), flush=True)
+    credits = allocation.runtime - allocation.credits / RATE
     for index, segment in enumerate(segments):
-        segment["end"] = (
-            segments[index + 1]["start"]
-            if index + 1 < len(segments)
-            else float(DURATION - CREDITS_DURATION)
-        )
+        segment["end"] = segments[index + 1]["start"] if index + 1 < len(segments) else credits
     return soundtrack, segments, records
 
 
@@ -520,32 +534,28 @@ def _receipt(
     edition: Edition,
     policy: dict,
     timeline: dict,
+    allocation: Allocation,
     *,
-    kinds: list[str],
-    gaps: list[int],
-    closing: int,
     records: list[dict],
     frames: int,
     peak: int,
     program_level: dict,
 ) -> dict:
-    """The assembly receipt: the policy, the gaps, each record, the program level and the
-    caption fields.
-
-    The gaps before the segments and the closing quiet are given in samples.
-    """
+    """The assembly receipt: the policy, the gaps, each record, the runtime and the credits as
+    laid out, the program level and the caption fields, the times in seconds."""
     captions = caption_receipt_fields(timeline, edition.code)
     return {
         "script_sha256": sha(edition.script),
         "assembly_mode": "native-speech-designed-pauses",
         "designed_pause_policy": policy,
-        "gaps": gap_seconds(kinds, gaps),
-        "closing_seconds": closing / RATE,
+        "gaps": gap_seconds(allocation.kinds, allocation.gaps),
+        "closing_seconds": allocation.closing / RATE,
         "records": records,
         "sample_rate": RATE,
         "channels": 2,
         "samples_per_channel": frames,
-        "duration": DURATION,
+        "duration": allocation.runtime,
+        "credits_duration": allocation.credits / RATE,
         "peak_pcm": peak,
         "program_level": program_level,
         "stereo_mode": "Centered mono narration in two channels",
@@ -597,11 +607,9 @@ def assemble(edition: Edition) -> None:
         for clip in clips
     ]
     allocation = allocate(segments, clips, policy)
-    if allocation.gaps is None:
-        raise PauseError(allocation.refusal)
-    kinds, gaps, closing = allocation.kinds, allocation.gaps, allocation.closing
-    soundtrack, timeline_segments, audio_records = _lay_out(clips, gaps, kinds)
-    if sum(gaps) + allocation.speech + closing != allocation.total:
+    soundtrack, timeline_segments, audio_records = _lay_out(clips, allocation)
+    laid = sum(allocation.gaps) + allocation.speech + allocation.closing + allocation.credits
+    if laid != allocation.runtime * RATE:
         msg = "Designed assembly failed exact sample accounting"
         raise AssemblyError(msg)
     refused = _speech_refusals(edition, soundtrack, timeline_segments)
@@ -612,8 +620,10 @@ def assemble(edition: Edition) -> None:
         **script,
         "segments": timeline_segments,
         "timing_state": "Actual waveform alignment with designed native-speech pauses",
-        # The credits as laid out, whose start every reader takes as the runtime less them.
-        "credits_duration": CREDITS_DURATION,
+        # The runtime in whole seconds, and the credits as laid out, whose start every reader
+        # takes as the runtime less them.
+        "duration": allocation.runtime,
+        "credits_duration": allocation.credits / RATE,
     }
     timeline["captions"] = timed_caption_cues(timeline, edition.code)
     write(edition.timeline, timeline)
@@ -621,9 +631,7 @@ def assemble(edition: Edition) -> None:
         edition,
         policy,
         timeline,
-        kinds=kinds,
-        gaps=gaps,
-        closing=closing,
+        allocation,
         records=audio_records,
         frames=len(soundtrack),
         peak=peak,

@@ -1,7 +1,5 @@
 """Designed pauses between thoughts, paragraphs and chapters."""
 
-import re
-
 import numpy as np
 import pytest
 
@@ -523,37 +521,41 @@ def test_paragraph_pauses_grow_with_the_paragraph_and_keep_their_mean(designed_p
     assert all(low <= value <= high for value in (after_short, after_long, after_new))
 
 
-def test_designed_gaps_fill_exact_runtime_by_weight_within_limits(designed_policy):
+def test_the_rounding_s_fraction_goes_to_the_gaps_by_weight_within_their_ranges(designed_policy):
     policy = designed_policy()
     rate = 100
     kinds = ["opening", "paragraph", "chapter", "paragraph"]
-    minimum = sum(round(policy["pauses"][kind] * rate) for kind in kinds)
-    closing = round(policy["pauses"]["closing"] * rate)
-    total = 10_000
-    speech = total - minimum - closing - 900
-    gaps, tail = soundtrack_pauses.allocate_designed_gaps(kinds, speech, policy, rate, total)
-    assert tail == closing
-    assert sum(gaps) + speech + tail == total
-    assert all(
-        gap >= round(policy["pauses"][kind] * rate) for kind, gap in zip(kinds, gaps, strict=True)
-    )
-    assert all(
-        gap <= round(policy["limits"][kind] * rate) for kind, gap in zip(kinds, gaps, strict=True)
-    )
+    designed = [round(policy["pauses"][kind] * rate) for kind in kinds]
+    gaps, left = soundtrack_pauses.allocate_designed_gaps(kinds, designed, 90, policy, rate)
+    # The gaps take the whole fraction, by weight, none past its range's top.
+    assert (sum(gaps) - sum(designed), left) == (90, 0)
+    assert all(gap >= base for gap, base in zip(gaps, designed, strict=True))
     assert gaps[2] - 340 > gaps[1] - 160
     assert abs(gaps[1] - gaps[3]) <= 1
-    with pytest.raises(ValueError, match=re.escape("exceeds the runtime by 0.01 s")):
-        soundtrack_pauses.allocate_designed_gaps(kinds, speech + 901, policy, rate, total)
-    with pytest.raises(ValueError, match="short by"):
-        soundtrack_pauses.allocate_designed_gaps(kinds, 10, policy, rate, total)
-    bases = [3.0, 1.2, 3.4, 2.0]
-    floor = sum(round(base * rate) for base in bases) + closing
-    gaps, _ = soundtrack_pauses.allocate_designed_gaps(
-        kinds, total - floor, policy, rate, total, bases=bases
+    # No fraction leaves every gap at its design.
+    assert soundtrack_pauses.allocate_designed_gaps(kinds, designed, 0, policy, rate) == (
+        designed,
+        0,
     )
-    assert gaps == [round(base * rate) for base in bases]
     with pytest.raises(ValueError, match="one designed pause"):
-        soundtrack_pauses.allocate_designed_gaps(kinds, speech, policy, rate, total, bases=[1.0])
+        soundtrack_pauses.allocate_designed_gaps(kinds, [100], 90, policy, rate)
+
+
+def test_a_paragraph_gap_stops_at_its_range_s_top_though_its_limit_lies_higher(designed_policy):
+    # The paragraph range ends at 2.0 s and the paragraph limit at 5.5 s; the opening and the
+    # chapter stand at their limits.
+    policy = designed_policy(
+        designed_pause_limits={"opening": 3.0, "paragraph": 5.5, "chapter": 3.4}
+    )
+    rate = 100
+    kinds = ["opening", "paragraph", "chapter"]
+    designed = [300, 160, 340]
+    gaps, left = soundtrack_pauses.allocate_designed_gaps(kinds, designed, 90, policy, rate)
+    # The paragraph gap takes 0.40 s, up to its range's top; the credits take the other 0.50 s.
+    assert (gaps, left) == ([300, 200, 340], 50)
+    # Where every gap with a weight stands at its range's top, the credits take it all.
+    full = soundtrack_pauses.allocate_designed_gaps(kinds, [300, 200, 340], 90, policy, rate)
+    assert full == ([300, 200, 340], 90)
 
 
 def test_thought_pauses_move_only_measured_quiet():

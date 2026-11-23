@@ -17,9 +17,10 @@ The command needs no targets file, no phrase and no seed from a person:
    round. It does so for --rounds rounds, or until none is refused.
 4. For what is still refused it tries one round of run-on takes: the thought narrated on into
    the thought that follows it and cut in the quiet between them (`narration.run_on`).
-5. When no thought is refused it asks the assembly's own count whether the settled edition
-   fits its runtime (`filmkit.narration.fitting`): it selects the recordings and counts them
-   as `produce select` and `produce fit` do, replaces no take and changes no pause policy.
+5. When no thought is refused it counts the settled edition by the assembly's own count
+   (`filmkit.narration.fitting`): it selects the recordings and counts them as `produce select`
+   and `produce fit` do, replaces no take and changes no pause policy. An edition lasts as long
+   as its narration, so the count states its runtime and never misses one.
 
 The record, convergence.json beside the receipt, binds the receipt, the script and the cast it
 was made from and states the rounds and takes asked for. It holds for each thought that was
@@ -29,12 +30,12 @@ candidates is named there as not narratable as written: no line is lowered for i
 text or the film's declarations are its owner's to change. A thought first refused by the
 last narration, when no round is left, is named as refused with no candidate tried. The
 command then exits 1 and names each such thought with what each candidate failed. The record
-of an ended run holds its `fit`: the seconds the count leaves free, or why the count was not
-asked. The command also exits 1, with one line, for a settled edition that misses its runtime,
-naming the seconds missing and the largest thought pause of the script's declared range that
-would fit, which it does not apply, and for one that the selection or the assembly refuses for
-another reason, with that reason. A fault of the count that is no refusal keeps its traceback,
-after the record is ended with it.
+of an ended run holds its `fit`: the runtime the count gives and the seconds of the rounding's
+fraction that the gaps and the credits take, or why the count was not asked. The command also
+exits 1, with one line, for a settled edition that the selection or the assembly refuses, with
+that reason. A fault of the count that is no refusal keeps its traceback, after the record is
+ended with it. A cast that declares `runtime_fit`, which nothing reads, is refused before the
+run's first effect.
 
 A run that changes nothing is a no-op: with nothing missing and nothing refused it narrates
 nothing and leaves the cast as it is, and a candidate whose recording a former run left in
@@ -368,28 +369,28 @@ def begin(code: str, asked: dict, former: dict) -> None:
     repository.write(Edition(code).ear_first / RECORD, record)
 
 
-def admitted(code: str) -> tuple[float, dict]:
+def admitted(code: str) -> dict:
     """What refuses a run before its first effect, each in its own words; then what a run takes
-    from these checks: the reserve that the edition's cast declares, and the record that a
-    former run left. The cast's receipt is the convergence's own, the reserve and the script's
-    pause policy can be read, no narration left a request started, and the former record can
-    be read (`left`).
+    from these checks: the record that a former run left. The cast's receipt is the
+    convergence's own, the script's pause policy can be read and the cast declares nothing the
+    count does not take (`fitting.declared`), no narration left a request started, and the
+    former record can be read (`left`).
 
     The command asks this before it opens its run (`main`), so that such a refusal writes no
     duration record and leaves the record of the convergence that narrated the standing build.
     """
     own_receipt(code)
-    reserve = fitting.declared(code)
+    fitting.declared(code)
     started = leftovers(code)
     if started:
         files = "\n".join(f"  {file}" for file in started)
         raise SystemExit(UNRESOLVED.format(code=code, files=files))
-    return reserve, left(code)
+    return left(code)
 
 
-def converge(code: str, reserve: float, former: dict, *, rounds: int = 2, takes: int = 3) -> dict:
+def converge(code: str, former: dict, *, rounds: int = 2, takes: int = 3) -> dict:
     """Run the rounds and the run-on round, ask the count, and return the record the run ends
-    with. `reserve` and `former` are what the checks gave the caller (`admitted`)."""
+    with. `former` is what the checks gave the caller (`admitted`)."""
     asked = {"rounds": rounds, "takes": takes}
     begin(code, asked, former)
     if narration_due(code):
@@ -420,13 +421,11 @@ def converge(code: str, reserve: float, former: dict, *, rounds: int = 2, takes:
     else:
         try:
             with durations.phase("count"):
-                fit = fitting.read(code, reserve)
+                fit = fitting.read(code)
         except Exception as fault:
             # A fault of the count is no refusal and keeps its traceback; the record of the
             # thoughts, which are settled, is ended first.
-            write_record(
-                code, found, state[1], asked, ended=True, fit=fitting.failed(reserve, fault)
-            )
+            write_record(code, found, state[1], asked, ended=True, fit=fitting.failed(fault))
             raise
     record = write_record(code, found, state[1], asked, ended=True, fit=fit)
     counts = {
@@ -436,7 +435,7 @@ def converge(code: str, reserve: float, former: dict, *, rounds: int = 2, takes:
         "takes_found": session.reused,
         "unsettled": {name: verdict["failed"] for name, verdict in record["unsettled"].items()},
         "fit": fitting.summary(fit),
-        **({"free_seconds": fit["free_seconds"]} if "free_seconds" in fit else {}),
+        **{key: fit[key] for key in fitting.COUNTED if key in fit},
     }
     report(code, step="converge", rounds=rounds, takes=takes, **counts)
     return record
@@ -472,12 +471,12 @@ def main(argv: list[str] | None = None) -> None:
     code = options.language
     stopped = "The convergence was stopped by {request}; what it was running was ended with it"
     # The run is measured inside the block that answers a request to end, so that its record
-    # is written before the command leaves; an edition that ends unsettled, missed or refused
-    # is a run that did not complete.
+    # is written before the command leaves; an edition that ends unsettled or refused is a run
+    # that did not complete.
     with child_processes.ending(stopped):
-        checked = admitted(code)
+        former = admitted(code)
         with durations.run(code, COMMAND) as run:
-            record = converge(code, *checked, rounds=options.rounds, takes=options.takes)
+            record = converge(code, former, rounds=options.rounds, takes=options.takes)
             unsettled = record["unsettled"]
             refused = said(code, record) if unsettled else fitting.said(code, record["fit"])
             if refused:

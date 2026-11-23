@@ -1,14 +1,17 @@
-"""A settled narration is asked whether its edition fits the runtime: what the convergence asks
-of the assembly's count, what it says of a miss, and what it leaves."""
+"""A settled narration is counted for its edition's runtime: what the convergence asks of the
+assembly's count, what it records of the runtime, and what it leaves.
+
+The count here is the bench's stand-in (`fit_bench.Count`), which rounds a given count up and
+lets the gaps take the fraction up to a given room: these tests check what the convergence asks
+and records of a count, not the count. The count itself is tested where the assembly counts
+(`tests/soundtrack/test_assembly.py`, `tests/soundtrack/test_fit.py`)."""
 
 import json
 from pathlib import Path
 
 import pytest
 from converging import (
-    MISS,
-    PERFORMANCE,
-    RANGE,
+    REFUSED,
     converge,
     counts,
     duration_of,
@@ -22,10 +25,7 @@ import filmkit.child_processes as child_processes
 import filmkit.narration.converge as narration_converge
 import filmkit.narration.fitting as fitting
 import filmkit.repository as repository
-import filmkit.soundtrack.fit as soundtrack_fit
 from filmkit.production import Edition
-from filmkit.soundtrack.assembly import AssemblyError
-from filmkit.specification import RATE
 
 
 def kept() -> dict[str, bytes]:
@@ -46,16 +46,13 @@ def test_the_convergence_s_duration_record_says_whether_the_edition_ended_fit(co
     assert [*record["phases"]] == ["judgment", "count"]
     # It is the one duration record that the command writes.
     assert [*duration_path().parent.iterdir()] == [duration_path()]
-    # A miss, and an edition with room that the allocation refuses, did not complete.
-    count.free = -0.1
-    assert refused().startswith(MISS)
+    # An edition whose pauses the assembly cannot design did not complete.
+    count.undesigned = lambda _pause: True
+    assert refused().startswith(REFUSED)
     assert (duration_of()["completed"], [*duration_of()["phases"]]) == (
         False,
         ["judgment", "count"],
     )
-    count.free, count.refusal = 0.8, "The gaps cannot hold the runtime that is left"
-    assert refused().startswith("en: the settled narration is refused by the assembly: ")
-    assert duration_of()["completed"] is False
 
 
 # What may stand in the place of a former run's record that no run can go on from: its text,
@@ -78,9 +75,9 @@ def staged(refusal: str) -> str:
     """Stage what refuses a convergence before its first effect; what its refusal begins with."""
     edition, paths = Edition("en"), narration_converge.evidence_paths("en")
     cast, script = repository.read(edition.cast), repository.read(edition.script)
-    if refusal == "a negative reserve":
-        repository.write(edition.cast, {**cast, "runtime_fit": {"reserve_seconds": -0.1}})
-        return "en: the cast's runtime_fit declares reserve_seconds, a number of seconds from 0"
+    if refusal == "a declared reserve":
+        repository.write(edition.cast, {**cast, "runtime_fit": {"reserve_seconds": 0.5}})
+        return "en: the cast declares runtime_fit, which nothing reads"
     if refusal == "a refused pause policy":
         del script["voice_performance"]["thought_pause_range"]
         repository.write(edition.script, script)
@@ -104,7 +101,7 @@ def staged(refusal: str) -> str:
 @pytest.mark.parametrize(
     "refusal",
     [
-        "a negative reserve",
+        "a declared reserve",
         "a refused pause policy",
         "another receipt",
         *DAMAGED,
@@ -144,24 +141,27 @@ def test_the_former_record_is_read_among_the_checks_and_by_nothing_in_the_run(co
     for name, reader in read.items():
         monkeypatch.setattr(repository, name, unread(reader))
     # The run goes on from the record that the checks read, and reads the file no second time.
-    ended = narration_converge.converge("en", *checked)
+    ended = narration_converge.converge("en", checked)
     assert (ended["state"], ended["fit"]["verdict"]) == ("ended", "fits")
 
 
-def test_a_settled_edition_that_fits_states_the_seconds_free(count, studio, capsys):
+def test_a_settled_edition_is_counted_for_its_runtime(count, studio, capsys):
+    # The speech with its thought pauses, its designed gaps and its closing quiet come to
+    # 1472.14 s, with 3 s of credits: a runtime of 1476 s, whose 0.86 s fraction the gaps take.
     before = kept()
     converge()
     record = record_of()
     assert record["fit"] == {
         "asked": True,
-        "reserve_seconds": 0.0,
-        "free_seconds": 0.8,
+        "runtime_seconds": 1476,
+        "free_seconds": 0.86,
+        "credits_free_seconds": 0.0,
         "verdict": "fits",
     }
     assert (record["state"], record["unsettled"]) == ("ended", {})
     printed = capsys.readouterr().out
     said = json.loads(printed.splitlines()[-1])
-    assert (said["fit"], said["free_seconds"]) == ("fits", 0.8)
+    assert (said["fit"], said["runtime_seconds"], said["free_seconds"]) == ("fits", 1476, 0.86)
     # The count was asked once, of the selection, and the selection's own line is not printed.
     assert (count.selected, count.bound, count.tried) == (1, 1, [0.45])
     assert '"selected"' not in printed
@@ -179,158 +179,48 @@ def test_a_settled_edition_that_fits_states_the_seconds_free(count, studio, caps
     assert counts(capsys)["fit"] == "fits"
 
 
-def test_a_miss_names_the_seconds_missing_and_the_pause_that_would_fit(count, capsys):
-    count.free = -0.1
+def test_a_long_narration_is_counted_and_never_missed(count, capsys):
+    # The speech alone comes to 1590.79 s: the runtime is what its count gives, and no second
+    # is missing and no thought pause is named.
+    count.counted = 1590.79 + 6.4 + 2.6 + 3
     cast = (repository.ROOT / Edition("en").cast).read_bytes()
     script = (repository.ROOT / Edition("en").script).read_bytes()
-    line = refused()
-    # Each 0.01 s off the two thought joins frees 0.02 s of the 0.10 s that are missing.
-    assert line == f"{MISS}0.10 s; a thought pause of 0.4 s, {RANGE}, would fit with 0.00 s free"
-    record = record_of()
-    assert record["fit"] == {
-        "asked": True,
-        "reserve_seconds": 0.0,
-        "free_seconds": -0.1,
-        "verdict": "misses",
-        "missing_seconds": 0.1,
-        "pause": {
-            "declared_seconds": 0.45,
-            "range_seconds": [0.3, 0.6],
-            "reserve_seconds": 0.0,
-            "fits_at_seconds": 0.4,
-            "free_seconds": 0.0,
-        },
-    }
-    assert (record["state"], counts(capsys)["fit"]) == ("ended", "misses")
-    # The pause is named and not applied: the script and the cast are as they were.
+    converge()
+    fit = record_of()["fit"]
+    assert (fit["verdict"], fit["runtime_seconds"]) == ("fits", 1603)
+    assert not {"missing_seconds", "pause", "reserve_seconds"} & set(fit)
+    assert counts(capsys)["fit"] == "fits"
+    # Nothing is applied: the script and the cast are as they were, and one pause was counted.
     assert (repository.ROOT / Edition("en").cast).read_bytes() == cast
     assert (repository.ROOT / Edition("en").script).read_bytes() == script
-    # The pause it names was counted and fits, and the step above it was counted and does not.
-    assert {0.4, 0.41} <= set(count.tried)
-    # A second run says the same line and writes the same record.
-    files = kept()
-    assert (refused(), kept()) == (line, files)
+    assert count.tried == [0.45]
 
 
 @pytest.mark.parametrize(
-    ("frames", "missing"),
-    [(-1, "0.000021"), (-48, "0.0010"), (-240, "0.01")],
+    ("room", "gaps", "credits"),
+    [(2.4, 0.86, 0.0), (0.3, 0.3, 0.56), (0.0, 0.0, 0.86)],
 )
-def test_a_miss_is_compared_as_it_is_counted_and_never_said_as_no_seconds(count, frames, missing):
-    count.free = frames / RATE
-    line = refused()
-    assert line.startswith(f"{MISS}{missing} s; a thought pause of 0.44 s, ")
-    fit = record_of()["fit"]
-    assert (fit["verdict"], fit["free_seconds"], fit["missing_seconds"]) == (
-        "misses",
-        frames / RATE,
-        -frames / RATE,
-    )
-
-
-@pytest.mark.parametrize("reserve", [None, 0, 0.0])
-def test_an_exact_fit_fits_with_no_reserve_or_one_of_nothing(count, capsys, reserve):
-    count.free = 0.0
-    if reserve is not None:
-        cast = repository.read(Edition("en").cast)
-        repository.write(Edition("en").cast, {**cast, "runtime_fit": {"reserve_seconds": reserve}})
+def test_the_rounding_s_fraction_is_recorded_as_the_gaps_and_the_credits_take_it(
+    count, capsys, room, gaps, credits
+):
+    # The gaps take the fraction up to their room, and the credits the rest: never a refusal.
+    count.room = room
     converge()
     fit = record_of()["fit"]
-    assert (fit["verdict"], fit["free_seconds"]) == ("fits", 0.0)
-    assert counts(capsys)["fit"] == "fits"
+    assert (fit["verdict"], fit["runtime_seconds"]) == ("fits", 1476)
+    assert (fit["free_seconds"], fit["credits_free_seconds"]) == (gaps, pytest.approx(credits))
+    assert counts(capsys)["credits_free_seconds"] == pytest.approx(credits)
 
 
-@pytest.mark.parametrize(
-    ("least", "missing", "named"), [(0.3, 0.1, "0.4"), (0.30405, 0.1, "0.39405")]
-)
-def test_the_pause_that_is_printed_fits_when_the_script_declares_it(count, least, missing, named):
-    count.declare(thought_pause_range=[least, 0.6])
-    count.free = -missing
-    line = refused()
-    assert f"; a thought pause of {named} s, " in line
-    # The film declares the pause as the line prints it, and the edition then fits.
-    printed = float(line.split("a thought pause of ")[1].split(" s,")[0])
-    pauses = {**PERFORMANCE["designed_pauses"], "thought": printed}
-    count.declare(designed_pauses=pauses)
+def test_a_count_of_whole_seconds_holds_no_fraction(count):
+    count.counted = 600.0
     converge()
     fit = record_of()["fit"]
-    assert (fit["verdict"], fit["free_seconds"] >= 0) == ("fits", True)
-    # One step more would not have fitted.
-    count.declare(designed_pauses={**pauses, "thought": round(printed + 0.01, 6)})
-    assert refused().startswith(MISS)
-
-
-def test_a_miss_that_no_pause_of_the_range_closes_names_the_range(count):
-    # The range's least pause, 0.3 s, frees 0.30 s of the 0.40 s that are missing.
-    count.free = -0.4
-    assert refused() == (
-        f"{MISS}0.40 s; no thought pause of the declared range, 0.3 to 0.6 s, fits: "
-        "at 0.3 s it still misses by 0.10 s"
+    assert (fit["runtime_seconds"], fit["free_seconds"], fit["credits_free_seconds"]) == (
+        600,
+        0.0,
+        0.0,
     )
-    pause = record_of()["fit"]["pause"]
-    assert (pause["fits_at_seconds"], pause["tried_seconds"], pause["free_seconds"]) == (
-        None,
-        0.3,
-        -0.1,
-    )
-
-
-def test_a_range_of_one_value_holds_no_shorter_pause(count):
-    count.declare(thought_pause_range=[0.45, 0.45])
-    count.free = -0.1
-    assert refused() == (
-        f"{MISS}0.10 s; no thought pause of the declared range, 0.45 to 0.45 s, fits: "
-        "at 0.45 s it still misses by 0.10 s"
-    )
-
-
-def test_a_declared_reserve_must_stay_free_and_the_pause_named_leaves_it(count):
-    cast = repository.read(Edition("en").cast)
-    repository.write(Edition("en").cast, {**cast, "runtime_fit": {"reserve_seconds": 0.05}})
-    # The allocation accepts the edition, which leaves 0.02 s free where 0.05 s must be.
-    count.free = 0.02
-    assert refused() == (
-        f"{MISS}0.03 s, the declared reserve of 0.05 s included; a thought pause of 0.43 s, "
-        f"{RANGE}, would fit with 0.06 s free"
-    )
-    fit = record_of()["fit"]
-    assert (fit["reserve_seconds"], fit["free_seconds"], fit["verdict"]) == (0.05, 0.02, "misses")
-    assert fit["pause"]["free_seconds"] >= 0.05
-    # With the reserve free the edition fits.
-    count.free = 0.05
-    converge()
-    assert record_of()["fit"]["verdict"] == "fits"
-
-
-def test_a_missed_reserve_is_a_miss_though_the_allocation_refuses_the_edition_too(count):
-    cast = repository.read(Edition("en").cast)
-    repository.write(Edition("en").cast, {**cast, "runtime_fit": {"reserve_seconds": 0.05}})
-    # The count leaves 0.02 s free where 0.05 s must be, and the allocation refuses the edition
-    # at every pause: the miss is said first, and the refusal with the largest pause with room.
-    count.free, count.refusal = 0.02, "The gaps cannot hold the runtime that is left"
-    assert refused() == (
-        f"{MISS}0.03 s, the declared reserve of 0.05 s included; no thought pause of the "
-        "declared range, 0.3 to 0.6 s, fits: at 0.43 s the assembly refuses it: The gaps "
-        "cannot hold the runtime that is left"
-    )
-    fit = record_of()["fit"]
-    assert (fit["verdict"], fit["free_seconds"]) == ("misses", 0.02)
-    assert fit["missing_seconds"] == pytest.approx(0.03, abs=1e-9)
-    assert (fit["pause"]["tried_seconds"], fit["pause"]["free_seconds"]) == (0.43, 0.06)
-
-
-def test_a_pause_reading_that_is_refused_leaves_the_miss_said(count, monkeypatch):
-    count.free = -0.1
-
-    def refuse(_edition: Edition, _reserve: float) -> dict:
-        raise AssemblyError("Selected recording waveform differs: 26")
-
-    monkeypatch.setattr(soundtrack_fit, "thought_pause_to_fit", refuse)
-    assert refused() == (
-        f"{MISS}0.10 s; the thought pause that would fit could not be read: Selected recording "
-        "waveform differs: 26"
-    )
-    assert record_of()["state"] == "ended"
 
 
 def test_with_a_thought_unsettled_the_count_is_not_asked(bench, studio, voiced):
@@ -388,14 +278,18 @@ def test_a_run_ended_while_it_counts_leaves_its_record_running_and_the_next_run_
     assert record_of()["fit"]["verdict"] == "fits"
     count.binding = child_processes.Terminated(15)
     with pytest.raises(child_processes.Terminated):
-        narration_converge.converge("en", *narration_converge.admitted("en"))
+        narration_converge.converge("en", narration_converge.admitted("en"))
     # The record says that a run is under way and holds no fit, the former run's neither. The
     # selection's records are whole, as the selection writes them.
     record = record_of()
     assert (record["state"], record["unsettled"], "fit" in record) == ("running", {}, False)
-    count.binding, count.free = None, -0.1
-    assert refused().startswith(f"{MISS}0.10 s; a thought pause of 0.4 s")
-    assert (record_of()["state"], count.selected) == ("ended", 3)
+    count.binding = None
+    converge()
+    assert (record_of()["state"], record_of()["fit"]["verdict"], count.selected) == (
+        "ended",
+        "fits",
+        3,
+    )
 
 
 def test_a_run_without_a_former_record_and_one_with_it_write_the_same_record(count):
