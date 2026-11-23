@@ -36,17 +36,17 @@
 
 ## 3. Script edits
 
-- [ ] 3.1 `script_edits` applies replacements and splits to `anchored_groups` and fills `utterance_groups`, text,
+- [x] 3.1 `script_edits` applies replacements and splits to `anchored_groups` and fills `utterance_groups`, text,
       spoken text and the mirror from them; retakes follow the plain thoughts, and an edit of marks alone is written.
       Done when `tests/narration/test_script_edits.py` holds each scenario of the requirements "Script edits work on
       the anchored thoughts" and "A replacement or a split keeps an anchor on its words or refuses", a retake kept
       across an anchor edit, and a refused edit that writes no file.
-- [ ] 3.2 Add the `rewrite` edit: a segment's thoughts replaced whole, each anchor moved when its units occur once, or
+- [x] 3.2 Add the `rewrite` edit: a segment's thoughts replaced whole, each anchor moved when its units occur once, or
       as often as before by rank, at word boundaries in English, and refused by name otherwise unless restated; the
       report names plain moves, moves by rank and moves into another thought apart. Done when
       `tests/narration/test_script_edits.py` holds each scenario of the requirement "A rewrite moves each anchor to the
       words it still says".
-- [ ] 3.3 Add the `anchor` and `unanchor` edits: an anchor placed at a span of units of its thought, guarded by its
+- [x] 3.3 Add the `anchor` and `unanchor` edits: an anchor placed at a span of units of its thought, guarded by its
       expected words, marks immediately around the span's first and last units. Done when
       `tests/narration/test_script_edits.py` holds each scenario of the requirement "Script edits mark and unmark
       words", an id already marked refused and an unknown id refused.

@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 
 import filmkit.film as film
+import filmkit.narration.anchors as anchors
 import filmkit.repository as repository
 from filmkit.production import Edition
 
@@ -27,7 +28,8 @@ def write_edition(tmp_path, monkeypatch):
     """Write tiny editions under a temporary root.
 
     Each edition gets a script of authored thoughts bound to a shared pronunciation
-    contract, a cast holding only its retakes, and its narration mirror.
+    contract, a cast holding only its retakes, and its narration mirror. A segment whose
+    thoughts are written with anchors holds them as its anchored thoughts.
     """
     monkeypatch.setattr(repository, "ROOT", tmp_path)
 
@@ -42,15 +44,14 @@ def write_edition(tmp_path, monkeypatch):
             "normalization": list(normalization)
         }
         repository.write(CONTRACT, contract)
-        segments = [
-            {
-                "id": sid,
-                "text": "".join(groups),
-                "spoken_text": "".join(groups),
-                "utterance_groups": groups,
-            }
-            for sid, groups in thoughts.items()
-        ]
+        segments = []
+        for sid, groups in thoughts.items():
+            # Thoughts written with marks are a segment's anchored ones, its plain ones filled.
+            plain = anchors.plain(groups)
+            segment = {"id": sid, "text": "".join(plain), "spoken_text": "".join(plain)}
+            segments.append({**segment, "utterance_groups": plain})
+            if plain != groups:
+                segments[-1]["anchored_groups"] = list(groups)
         repository.write(edition.script, {"pronunciation_contract": CONTRACT, "segments": segments})
         repository.write(edition.cast, {"retakes": retakes})
         mirror = tmp_path / edition.mirror
