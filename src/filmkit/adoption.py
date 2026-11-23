@@ -3,11 +3,20 @@
 Usage: python -m filmkit.adoption
 Run at the film's root, or anywhere with `FILMKIT_ROOT` naming it, in any environment that holds
 the engine. The command reads tracked files only: it needs no declaration that loads, none of
-the film's npm packages, no supply and no build. It asks six questions and prints one JSON line
+the film's npm packages, no supply and no build. It asks seven questions and prints one JSON line
 with every finding of each; while one stands it exits with status 1 and names them all. A file
 of the film that cannot be read is a finding of the question that reads it.
 
 - `declaration`: every problem of `content/film.toml` (`filmkit.film.problems`).
+- `runtime`: what the film's scripts, casts and review prompt state of the runtime and the
+  credits that this release removes or moves, read as text: each edition's script that declares
+  `duration` or `credits_duration` and each cast that declares `runtime_fit`
+  (`filmkit.film.WITHDRAWN`), each named with what to do instead; and each line of the review
+  prompt that cites the runtime's field and does not say "This edition", since each prompt fills
+  it with its own edition's runtime and the two editions may differ in length. That reading fails
+  closed: such a line is named whatever else it says. A declaration that states no
+  `credits_duration`, and a script or cast that the declaration names and that is missing, are
+  the `declaration` question's.
 - `npm_packages`: the film's `package.json` declares each package the engine runs at the version
   the engine was released on, and its lock holds each at that version and integrity. A package
   the film alone holds is the film's.
@@ -47,6 +56,7 @@ import argparse
 import ast
 import json
 import re
+import string
 import tomllib
 from pathlib import Path
 
@@ -54,8 +64,9 @@ import filmkit.film as film
 import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.picture import template
+from filmkit.review import RUNTIME_FIELD
 
-QUESTIONS = ("declaration", "npm_packages", "python_lock", "tasks", "template", "vale")
+QUESTIONS = ("declaration", "runtime", "npm_packages", "python_lock", "tasks", "template", "vale")
 # Where a film's Mise tasks stand, in the order Mise's own documentation lists the files.
 TASK_FILES = (".config/mise/config.toml", "mise.toml", ".mise.toml")
 PRODUCE = "filmkit.produce"
@@ -194,6 +205,64 @@ def module_exists(module: str) -> bool:
     """Whether this engine holds a module that `python -m` can run."""
     path = module_path(module)
     return path.with_suffix(".py").is_file() or (path / "__main__.py").is_file()
+
+
+def cited(line: str) -> set[str]:
+    """The fields a line of a `str.format` template cites, by their first names. A line that the
+    format cannot parse is taken to cite every name it holds after a brace, so that it is read,
+    not passed over."""
+    try:
+        fields = [name for _, name, _, _ in string.Formatter().parse(line) if name is not None]
+    except ValueError:
+        return set(re.findall(r"\{([A-Za-z_]\w*)", line))
+    return {re.split(r"[.\[]", name, maxsplit=1)[0] for name in fields}
+
+
+def untied_runtime(root: Path, declared: dict) -> list[str]:
+    """Each line of the film's review prompt that cites the runtime's field and does not say
+    "This edition", in any case: each prompt fills the field with its own edition's runtime."""
+    review = table(declared.get("review"), f"{film.DECLARATION}: review")
+    prompt = review.get("prompt")
+    if not isinstance(prompt, str) or not (root / prompt).is_file():
+        return []
+    try:
+        text = (root / prompt).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        message = f"{Path(prompt).name} cannot be read: {error}"
+        raise UnreadableError(message) from error
+    field = f"{{{RUNTIME_FIELD}}}"
+    return [
+        f'{prompt}:{number} cites {field} in a line that does not say "This edition"; {field} is '
+        "the runtime of the prompt's own edition, and the two editions may differ in length: "
+        f'reword the line, as "This edition: exactly {field} s"'
+        for number, line in enumerate(text.splitlines(), 1)
+        if RUNTIME_FIELD in cited(line) and "this edition" not in line.casefold()
+    ]
+
+
+def runtime(root: Path) -> list[str]:
+    """What the film's scripts, casts and review prompt state of the runtime and the credits that
+    this release removes or moves: edition by edition, each key of `filmkit.film.WITHDRAWN` that
+    the edition's script or cast declares, with what to do instead, then each line of the review
+    prompt that ties the runtime to no one edition (`untied_runtime`). Read as text, so that no
+    declaration need load; the declaration's own `credits_duration` and a file it names that is
+    missing are the `declaration` question's."""
+    declared = read_toml(root / film.DECLARATION)
+    found = []
+    editions = table(declared.get("editions"), f"{film.DECLARATION}: editions")
+    for code, edition in editions.items():
+        sources = table(edition, f"{film.DECLARATION}: editions.{code}").get("sources")
+        for name, keys in film.WITHDRAWN.items():
+            path = root / str(sources) / name
+            if not isinstance(sources, str) or not path.is_file():
+                continue
+            held = read_json(path)
+            found += [
+                f"{sources}/{name} declares {key}; {instead}"
+                for key, instead in keys.items()
+                if key in held
+            ]
+    return found + untied_runtime(root, declared)
 
 
 def npm_packages(root: Path) -> list[str]:
@@ -383,6 +452,7 @@ def report(root: Path) -> dict:
     not_read: list[str] = []
     questions = {
         "declaration": lambda: film.problems(root),
+        "runtime": lambda: runtime(root),
         "npm_packages": lambda: npm_packages(root),
         "python_lock": lambda: python_lock(root, not_read),
         "tasks": lambda: tasks(root, not_read),

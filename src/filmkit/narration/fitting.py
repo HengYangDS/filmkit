@@ -41,12 +41,14 @@ from pathlib import Path
 
 import filmkit.repository as repository
 import filmkit.soundtrack.fit as soundtrack_fit
+from filmkit.film import CAST, WITHDRAWN
 from filmkit.narration.selection import select
 from filmkit.production import Edition
 from filmkit.soundtrack.policy import PausePolicyError, designed_pause_policy
 
-# A cast's declaration that nothing reads, since an edition lasts as long as its narration.
-DECLARATION = "runtime_fit"
+# A cast's declaration that nothing reads, since an edition lasts as long as its narration: the
+# one key a cast may no longer declare (`filmkit.film.WITHDRAWN`).
+(DECLARATION,) = WITHDRAWN[CAST]
 FITS, REFUSED, FAILED = soundtrack_fit.FITS, "refused", "failed"
 # What the record's fit states of a counted edition, as the dry run reports them.
 COUNTED = ("runtime_seconds", "free_seconds", "credits_free_seconds")
@@ -93,11 +95,8 @@ def declared(code: str) -> None:
         msg = f"{code}: the script's pause policy is refused: {one_line(error)}"
         raise SystemExit(msg) from None
     if DECLARATION in repository.read(Edition(code).cast):
-        msg = (
-            f"{code}: the cast declares {DECLARATION}, which nothing reads: an edition lasts as "
-            "long as its narration; remove it"
-        )
-        raise SystemExit(msg)
+        instead = WITHDRAWN[CAST][DECLARATION]
+        raise SystemExit(f"{code}: the cast declares {DECLARATION}; {instead}")
 
 
 def not_asked(why: str) -> dict:

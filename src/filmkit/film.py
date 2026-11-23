@@ -34,12 +34,30 @@ DECLARATION = repository.DECLARATION
 # The declaration's key that states the credits' length, once for both editions: the field
 # `Film.credits_duration`, which a script no longer declares.
 CREDITS = "credits_duration"
-# The files every edition's sources folder holds.
-EDITION_FILES = ("film-script.json", "voice-reference.json")
+# The files every edition's sources folder holds: its script and its cast.
+SCRIPT, CAST = "film-script.json", "voice-reference.json"
+EDITION_FILES = (SCRIPT, CAST)
 # The player template a sources folder once held; the engine renders each edition's player now.
 PLAYER_TEMPLATE = "player.html"
 # The key that named the delivery folder through 0.22.3, refused with the key that names it now.
 RENAMED_FOLDER = "documents_folder"
+# What an edition's script and cast may no longer declare, by file, each with what to do instead:
+# an edition lasts as long as its narration, and this declaration states the credits once. The
+# engine refuses each where it reads the file (`filmkit.specification`,
+# `filmkit.narration.fitting`), and the adoption command names every one at once.
+WITHDRAWN = {
+    SCRIPT: {
+        "duration": (
+            "remove it: an edition lasts as long as its narration, which the assembly counts"
+        ),
+        CREDITS: f"state the credits' length once, as {CREDITS} in {DECLARATION}",
+    },
+    CAST: {
+        "runtime_fit": (
+            "remove it: nothing reads it, since an edition lasts as long as its narration"
+        ),
+    },
+}
 # A lowercase name of words joined by hyphens.
 Name = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")]
 Floor = Annotated[int, Field(ge=0, le=100)]

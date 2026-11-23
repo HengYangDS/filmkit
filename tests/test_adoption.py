@@ -112,9 +112,12 @@ def test_every_finding_of_every_question_is_listed_in_one_run(project):
         '<script src="node_modules/gsap/dist/gsap.min.js"></script></head>',
     )
     rewrite(project / ".config/mise/config.toml", PIN, PIN.replace(released.vale(), "9.9.9"))
+    script = project / "content/film-script.json"
+    script.write_text(json.dumps({**json.loads(script.read_text()), "duration": 1500}))
     findings = found(project)
     assert all(findings[name] for name in adoption.QUESTIONS), findings
     assert "declares documents_folder" in " ".join(findings["declaration"])
+    assert "content/film-script.json declares duration" in " ".join(findings["runtime"])
     asked = f"{renderer.RENDERER_NAME} {renderer.RENDERER_VERSION}"
     assert asked in " ".join(findings["npm_packages"])
     assert f"transformers 0.0.1 (the engine: {held})" in " ".join(findings["python_lock"])
@@ -394,7 +397,7 @@ def test_a_film_outside_any_repository_is_asked_at_its_root_alone(tmp_path, proj
         ("uv.lock", "python_lock"),
         ("pyproject.toml", "python_lock"),
         (".config/mise/config.toml", "tasks vale"),
-        (film.DECLARATION, "declaration"),
+        (film.DECLARATION, "declaration runtime"),
     ],
 )
 def test_a_file_that_cannot_be_read_is_a_finding_of_its_question(project, path, question):

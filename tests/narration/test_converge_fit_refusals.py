@@ -36,8 +36,8 @@ def test_a_cast_that_declares_runtime_fit_is_refused_before_anything_runs(
     repository.write(Edition("en").cast, {**cast, "runtime_fit": fields})
     monkeypatch.setattr(narration_converge, "begin", begun)
     assert refused() == (
-        "en: the cast declares runtime_fit, which nothing reads: an edition lasts as long as its "
-        "narration; remove it"
+        "en: the cast declares runtime_fit; remove it: nothing reads it, since an edition lasts "
+        "as long as its narration"
     )
     assert not (Edition("en").ear_first / narration_converge.RECORD).exists()
     assert count.selected == 0

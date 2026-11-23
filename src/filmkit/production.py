@@ -10,7 +10,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 import filmkit.repository as repository
-from filmkit.film import FILM
+from filmkit.film import CAST, FILM, SCRIPT
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -179,11 +179,11 @@ class Edition:
 
     @property
     def script(self) -> str:
-        return f"{self.sources}/film-script.json"
+        return f"{self.sources}/{SCRIPT}"
 
     @property
     def cast(self) -> str:
-        return f"{self.sources}/voice-reference.json"
+        return f"{self.sources}/{CAST}"
 
     @property
     def shot_plan(self) -> Path:

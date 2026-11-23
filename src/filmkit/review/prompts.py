@@ -52,7 +52,7 @@ import filmkit.specification as specification
 from filmkit.film import FILM
 from filmkit.narration.readings import plan_path
 from filmkit.production import CODES, Edition
-from filmkit.review import ReviewError
+from filmkit.review import RUNTIME_FIELD, ReviewError
 from filmkit.review.files import (
     cited,
     edition_review,
@@ -536,7 +536,7 @@ def read_round(
             "language": Edition(code).language,
             "code": code,
             # Each edition's own runtime: the two editions need not last alike.
-            "duration": Edition(code).runtime,
+            RUNTIME_FIELD: Edition(code).runtime,
             "other": other,
             "other_language": Edition(other).language,
         }

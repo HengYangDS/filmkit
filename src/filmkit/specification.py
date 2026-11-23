@@ -6,7 +6,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import filmkit.repository as repository
-from filmkit.film import CREDITS, FILM
+from filmkit.film import FILM, SCRIPT, WITHDRAWN
 from filmkit.production import CODES, Edition
 
 if TYPE_CHECKING:
@@ -23,20 +23,13 @@ def declared(key: str, read: Callable[[Any], Any]) -> Any:
     return values.pop()
 
 
-# What a script may no longer declare, each with what states it instead.
-WITHDRAWN = {
-    "duration": "remove it: an edition lasts as long as its narration, which the assembly counts",
-    CREDITS: f"state the credits' length once, as {CREDITS} in {repository.DECLARATION}",
-}
-
-
 def refuse_withdrawn() -> None:
     """Refuse, as the engine loads, a script that declares a key the engine no longer reads, in
-    one line that names the script and the key and says what states it instead."""
+    one line that names the script and the key and says what to do instead (`WITHDRAWN`)."""
     for code in CODES:
         path = Edition(code).script
         script = json.loads((repository.ROOT / path).read_text())
-        for key, instead in WITHDRAWN.items():
+        for key, instead in WITHDRAWN[SCRIPT].items():
             if key in script:
                 message = f"{path} declares {key}; {instead}"
                 raise ValueError(message)

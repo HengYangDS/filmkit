@@ -19,7 +19,7 @@
 
 ## 4. What a film is asked to remove
 
-- [ ] 4.1 Add a question to `filmkit.adoption` that names each script declaring `duration` or `credits_duration`, each cast declaring `runtime_fit`, and a declaration without `credits_duration`, reading them as text (decision 11). Done when `tests/test_adoption.py` holds a film with each of the four findings and a film with none, and passes.
+- [x] 4.1 Add a question to `filmkit.adoption` that names each script declaring `duration` or `credits_duration`, each cast declaring `runtime_fit` and each line of the review prompt that cites the runtime's field without saying "This edition", reading them as text, and leaves a declaration without `credits_duration` to the `declaration` question's one finding (decision 11). Done when `tests/test_adoption_runtime.py` holds a film with each of the four findings, a declaration without `credits_duration` named once across the questions, and a film with none, and it and `tests/test_adoption.py` pass.
 
 ## 5. The documents
 

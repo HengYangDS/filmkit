@@ -77,7 +77,7 @@ def staged(refusal: str) -> str:
     cast, script = repository.read(edition.cast), repository.read(edition.script)
     if refusal == "a declared reserve":
         repository.write(edition.cast, {**cast, "runtime_fit": {"reserve_seconds": 0.5}})
-        return "en: the cast declares runtime_fit, which nothing reads"
+        return "en: the cast declares runtime_fit; remove it"
     if refusal == "a refused pause policy":
         del script["voice_performance"]["thought_pause_range"]
         repository.write(edition.script, script)
