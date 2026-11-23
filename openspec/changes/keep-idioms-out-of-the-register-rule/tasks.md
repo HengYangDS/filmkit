@@ -26,7 +26,7 @@
 
 ## 4. Acceptance
 
-- [ ] 4.1 Run the check on the three films' December texts in throwaway copies, with and without their declarations of
+- [x] 4.1 Run the check on the three films' December texts in throwaway copies, with and without their declarations of
       其实 within 名副其实. Done when, without them, no place is refused for 其实 in 名副其实 and every other refusal and
       warning equals the engine's at `v0.29.0`, and, with them, each is refused as one that excuses no refusal; the
       record stands in `build/evidence/keep-idioms-out-of-the-register-rule/acceptance/`.
