@@ -39,6 +39,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+import filmkit.languages as languages
 from filmkit.narration.spoken_units import (
     PHRASE_END_MARKS,
     AlignmentError,
@@ -75,7 +76,7 @@ LISTENING_SECONDS = 0.15
 # The largest steps of each continuity measure that the listening plan lists.
 LISTED_STEPS = 5
 LATIN = re.compile(r"[A-Za-z0-9]")
-HAN_CHARACTER = re.compile(r"[\u4e00-\u9fff]")
+HAN_CHARACTER = languages.compiled("han")
 LATIN_WORD = re.compile(r"[A-Za-z]+")
 VOWEL_GROUP = re.compile(r"[aeiouy]+")
 # The continuity windows: their rate, length and voicing floor, the F0 range and the clarity

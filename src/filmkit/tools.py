@@ -47,8 +47,10 @@ from filmkit.picture import metrics
 from filmkit.picture.errors import PictureError
 from filmkit.production import CODES, STAGE
 
-# The engine's Node modules, which the package carries below this module's folder.
+# The engine's Node modules, which the package carries below this module's folder, and the data
+# they read beside themselves: the classes of characters (`filmkit.languages`).
 PACKAGE = Path(__file__).resolve().parent
+COPIED = ("**/*.mjs", "languages/scripts.json")
 # The tools a film runs by name, as paths below the package; the other modules are libraries
 # that the tools import.
 TOOLS = {
@@ -100,12 +102,13 @@ class ToolFailed(Exception):
 
 
 def stage_tools() -> Path:
-    """Copy the engine's Node modules into the film's tool cache and return the copies' folder.
+    """Copy the engine's Node modules and the data they read into the film's tool cache and
+    return the copies' folder.
 
     A copy whose bytes equal the package's stays untouched; any other is replaced whole.
     """
     cache = repository.ROOT / CACHE / released.version()
-    for module in sorted(PACKAGE.rglob("*.mjs")):
+    for module in sorted({path for named in COPIED for path in PACKAGE.glob(named)}):
         copy = cache / module.relative_to(PACKAGE)
         if copy.is_file() and copy.read_bytes() == module.read_bytes():
             continue

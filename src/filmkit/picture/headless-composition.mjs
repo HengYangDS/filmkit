@@ -21,6 +21,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import vm from "node:vm";
 
+import { characterClass } from "../languages/scripts.mjs";
+
 /* The composition, below the root of the film, the folder an audit runs in. */
 const COMPOSITION = "picture/film.js";
 
@@ -46,8 +48,11 @@ const fontFamily = (font) =>
 const spacingOf = (value) => Number(/(-?\d+(?:\.\d+)?)px/.exec(String(value))?.[1] ?? 0);
 /* The estimate's share of the size for one character: a CJK character as wide as the size, a capital 0.66 of it and
  * any other character 0.54. */
-const estimated = (ch) =>
-  /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/u.test(ch) ? 1 : /[A-Z]/.test(ch) ? 0.66 : 0.54;
+const WIDE = new RegExp(
+  `[${characterClass("han")}${characterClass("cjk-punctuation")}${characterClass("full-width")}]`,
+  "u",
+);
+const estimated = (ch) => (WIDE.test(ch) ? 1 : /[A-Z]/.test(ch) ? 0.66 : 0.54);
 
 /** The advance widths of the film's declared faces (filmkit.picture.metrics), read from the file that
  * `FILMKIT_TEXT_METRICS` names, or null without one: per family, its default advance, its other advances and the

@@ -19,6 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
+import filmkit.languages as languages
 import filmkit.repository as repository
 from filmkit.narration.take_edges import ending
 from filmkit.narration.voice_model import (
@@ -67,7 +68,9 @@ PARENT_SETTINGS = (
 )
 DEFAULT_MAX_TOKENS = 1900
 # A complete thought ends on a sentence end, before any closing quotes or brackets.
-THOUGHT_ENDING = re.compile(r"[。！？.!?][\"'”’）)\]]*$")
+THOUGHT_ENDING = re.compile(
+    f"[{languages.pattern('sentence-ends')}][{languages.pattern('sentence-closers')}]*$"
+)
 JOIN_FRAMES = (
     "after_group",
     "source_sample",

@@ -48,6 +48,7 @@ from pathlib import Path, PurePosixPath
 from typing import NamedTuple
 
 import filmkit.concepts as concepts
+import filmkit.languages as languages
 import filmkit.released as released
 from filmkit.film import FILM, form_key
 
@@ -63,7 +64,7 @@ _RULES = tuple(f"R{number}" for number in range(1, 7))
 # The longest a Vale run may take, in seconds: a film's words take hundredths of one.
 _DEADLINE = 60
 # Han characters and CJK or full-width marks: a line break between two of them joins by nothing.
-_CHINESE = re.compile(r"[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]")
+_CHINESE = languages.compiled("han", "cjk-punctuation", "full-width")
 # Code points a viewer does not see, beside the format characters (category Cf): Unicode's
 # Variation_Selector and Other_Default_Ignorable_Code_Point, as PropList.txt of Unicode 16.0.0
 # lists them (https://www.unicode.org/Public/16.0.0/ucd/PropList.txt), each range first to last.

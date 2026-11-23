@@ -49,6 +49,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+import filmkit.languages as languages
 from filmkit.narration.spoken_units import thought_spans
 from filmkit.soundtrack.quiet import FRAME_SECONDS
 
@@ -59,7 +60,7 @@ if TYPE_CHECKING:
 LATIN_WORD = re.compile(r"[A-Za-z][A-Za-z0-9]*(?:['’.-][A-Za-z0-9]+)*")
 POSSESSIVE = re.compile(r"['’]s$", re.IGNORECASE)
 # The marks an aligned word may carry around its letters.
-EDGE_MARKS = "\"'“”‘’()（）[]，。；：！？、,.;:!?"
+EDGE_MARKS = languages.characters("word-edge-marks")
 # The first-vowel measure: the decimated rate and its filter, the share of the word, the window,
 # the voicing share, the LPC model and the resonances that count as formants.
 VOWEL_RATE = 11025

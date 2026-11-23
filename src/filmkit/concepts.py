@@ -39,6 +39,7 @@ from typing import Annotated, NamedTuple
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
 
+import filmkit.languages as languages
 import filmkit.repository as repository
 import filmkit.sources as sources
 from filmkit.film import FILM
@@ -73,7 +74,7 @@ Words = Annotated[str, StringConstraints(min_length=1)]
 # Words that hold more than spaces, kept without their outer spaces.
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 # The marks that bound a Chinese clause.
-CLAUSE_MARKS = re.compile(r"[，。；：、？！]")
+CLAUSE_MARKS = languages.compiled("clause-marks")
 # A Latin-script word, which Chinese narration says in its base form whatever its number.
 LATIN_WORD = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]+(?![A-Za-z0-9])")
 # The words that carry a Chinese clause's number: each of these characters, a pronoun of a group

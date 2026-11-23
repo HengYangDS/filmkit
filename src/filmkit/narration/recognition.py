@@ -41,6 +41,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, NamedTuple
 
+import filmkit.languages as languages
 import filmkit.narration.readings as readings
 import filmkit.narration.terms as terms
 
@@ -49,8 +50,8 @@ if TYPE_CHECKING:
 
     from filmkit.film import NarrationTerm
 
-UNIT = re.compile(r"[\u4e00-\u9fff]|[a-z0-9']+")
-HAN_UNIT = re.compile(r"[\u4e00-\u9fff]")
+UNIT = re.compile(f"[{languages.pattern('han')}]|[a-z0-9']+")
+HAN_UNIT = languages.compiled("han")
 LETTER = re.compile(r"[a-z]")
 # The particles a speaker says alike, whichever the recognizer writes, and their reading.
 PARTICLES = frozenset("的地得")

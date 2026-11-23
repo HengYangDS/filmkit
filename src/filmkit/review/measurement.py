@@ -34,6 +34,7 @@ from pathlib import Path
 
 import numpy as np
 
+import filmkit.languages as languages
 import filmkit.media as media
 import filmkit.narration.flow as narration_flow
 import filmkit.narration.recognition as narration_recognition
@@ -75,7 +76,7 @@ QUIET_DBFS = -50
 def units(text: str, code: str) -> list[str]:
     """Spoken units: Chinese characters, or English words."""
     if code == "zh":
-        return re.findall(r"[\u4e00-\u9fff]", text)
+        return languages.compiled("han").findall(text)
     return re.findall(r"[A-Za-z0-9']+", text.lower())
 
 

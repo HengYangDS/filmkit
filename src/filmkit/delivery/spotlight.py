@@ -24,11 +24,14 @@ import re
 import shutil
 from typing import TYPE_CHECKING
 
+import filmkit.languages as languages
 import filmkit.repository as repository
-from filmkit.narration.pronunciation import HAN
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+# One Han character, as a regular expression (`filmkit.languages`).
+HAN = f"[{languages.pattern('han')}]"
 
 # The importer's attributes the readback reads, by the name it records them under.
 ATTRIBUTES = {"keywords": "kMDItemKeywords", "authors": "kMDItemAuthors"}

@@ -3,7 +3,7 @@
     "Each class of characters the engine reads by its purpose, defined once and read by",
     "filmkit.languages in Python and by scripts.mjs in Node. A class holds either code-point",
     "ranges, each as FIRST-LAST in hexadecimal, or the characters it names. The scripts are",
-    "Unicode's Script=Han and Script=Latin as Node 26.13.1's ICU reads them; a language declares",
+    "Unicode's scripts Han and Latin, as Node 26.13.1's ICU reads their Script property; a language declares",
     "the scripts it writes by these names."
   ],
   "scripts": {

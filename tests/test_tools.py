@@ -58,6 +58,8 @@ def test_the_copies_keep_their_folders_and_only_changed_bytes_are_replaced(film)
     cache = tools.stage_tools()
     modules = sorted(path.relative_to(tools.PACKAGE) for path in tools.PACKAGE.rglob("*.mjs"))
     assert sorted(path.relative_to(cache) for path in cache.rglob("*.mjs")) == modules
+    classes = tools.PACKAGE / "languages/scripts.json"
+    assert (cache / "languages/scripts.json").read_bytes() == classes.read_bytes()
     assert cache == cached(film, "")
     stale, kept = cache / "picture/geometry-check.mjs", cache / "picture/seat-marks.mjs"
     stale.write_text("an earlier copy")

@@ -10,10 +10,12 @@ from __future__ import annotations
 import json
 import re
 
+import filmkit.languages as languages
 import filmkit.repository as repository
 from filmkit.narration.thought_groups import authored_groups
 
-HAN = r"[\u3400-\u4dbf\u4e00-\u9fff]"
+# One Han character, as a regular expression (`filmkit.languages`).
+HAN = f"[{languages.pattern('han')}]"
 
 
 def pronunciation_contract(script: dict, language: str) -> tuple[dict, str]:

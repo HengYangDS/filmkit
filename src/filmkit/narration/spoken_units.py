@@ -13,36 +13,40 @@ from bisect import bisect_left
 from dataclasses import dataclass
 from itertools import accumulate, pairwise
 
+from filmkit.languages import characters, pattern
+
+# Each mark's role, as the engine's one data file of classes names it (`filmkit.languages`).
 # Marks that end a sentence.
-SENTENCE_ENDS = "。！？.!?"
+SENTENCE_ENDS = characters("sentence-ends")
 # Marks that end a clause without ending its sentence.
-SEMICOLONS = "；;"
+SEMICOLONS = characters("semicolons")
 # Marks after which a caption line ends: a sentence end or a semicolon. Only a sentence end
 # keeps a brief cue from joining the cue after it.
 LINE_ENDS = SENTENCE_ENDS + SEMICOLONS
 # Closing quotes and brackets that follow a sentence end and belong to its sentence.
-CLOSING_MARKS = "”’\"')]}"
+CLOSING_MARKS = characters("sentence-closers")
 # Quotation marks, which are not pauses of their own.
-QUOTATION_MARKS = "“”‘’\"'"
+QUOTATION_MARKS = characters("quotation-marks")
 # Marks that open and close a quotation, inside which no mark ends a sentence. A straight double
 # quote opens a quotation and the next one closes it; a closing single quote outside a quotation
 # is an apostrophe.
-OPENING_QUOTES = "“‘「『"
-CLOSING_QUOTES = "”’」』"
+OPENING_QUOTES = characters("opening-quotes")
+CLOSING_QUOTES = characters("closing-quotes")
 # Marks that end a question.
-QUESTION_MARKS = "？?"
-# Chinese marks that close a clause, where a caption line may break.
-CLAUSE_MARKS = "，。；：！？、"
-# The Chinese enumeration comma: a line that ends there ends inside a list.
-ENUMERATION_MARK = "、"
-# English marks that break a phrase inside a sentence.
-PHRASE_BREAKS = ",;:"
+QUESTION_MARKS = characters("question-marks")
+# Full-width marks that close a clause, where a caption line may break.
+CLAUSE_MARKS = characters("clause-marks")
+# The enumeration comma: a line that ends there ends inside a list.
+ENUMERATION_MARK = characters("enumeration-marks")
+# Latin marks that break a phrase inside a sentence.
+PHRASE_BREAKS = characters("phrase-breaks")
 # Marks after which a phrase ends: a clause, phrase or sentence mark.
 PHRASE_END_MARKS = frozenset(CLAUSE_MARKS + PHRASE_BREAKS + SENTENCE_ENDS + SEMICOLONS)
 
 
-# The units' characters: the Han characters of the basic block, and Latin letters and digits.
-HAN = "\u4e00-\u9fff"
+# The units' characters, as the body of a character class: Han characters, and Latin letters and
+# digits.
+HAN = pattern("han")
 LATIN = "A-Za-z0-9"
 
 

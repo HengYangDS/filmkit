@@ -19,6 +19,7 @@
  *   - a Chinese label, one with a Han character: no line after the first opens on closing punctuation. */
 import { readFileSync } from "node:fs";
 
+import { characterClass } from "../../../languages/scripts.mjs";
 import { CJK, CLOSING, HUNG, OPENING } from "./layout.mjs";
 
 /* The words an English line may not end on, as they lead the phrase that follows them: articles, prepositions,
@@ -33,7 +34,7 @@ export const LEAD_WORDS = new Set(
   ).split(" "),
 );
 /* The marks that close what precedes them, which a Chinese line may not open on. */
-export const CLOSES = /^[，。、；：！？）》」』”’…]/u;
+export const CLOSES = new RegExp(`^[${characterClass("line-closing")}]`, "u");
 /* The rules a film declares in [picture.wrapping], with their defaults. */
 export const WRAPPING = Object.freeze({ line_share: 0.8, last_share: 0.6, lead_words: [] });
 
@@ -50,7 +51,7 @@ const REACH = 2.6,
   ACROSS = 4;
 /* Pieces this share of their em apart, with no space of their own between them, are two words. */
 const WORD_SPACE = 0.25;
-const HAN = /\p{Script=Han}/u;
+const HAN = new RegExp(`[${characterClass("han")}]`, "u");
 
 const squeeze = (v) => v.replace(/\s+/gu, "");
 const sameSize = (a, b) => Math.abs((a.size ?? 0) - (b.size ?? 0)) < 0.5;

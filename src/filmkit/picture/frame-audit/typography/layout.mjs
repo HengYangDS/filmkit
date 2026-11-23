@@ -8,6 +8,7 @@
  * and 0.2 otherwise. A container is a closed outline or panel at least 40 by 24 px, a card one that runs along its
  * box; each line stands in its innermost container or in none. Lines of one size and container stacked within 1.6
  * times their size form a block, and within three times it a column of items. */
+import { characterClass } from "../../../languages/scripts.mjs";
 import { HEAD, VISIBLE } from "../marks.mjs";
 
 /* Text and marks at this opacity or more have settled; fades in and out are not judged. */
@@ -15,12 +16,15 @@ const SETTLED = 0.85;
 /* The frame audit's content band (composition.mjs): below the head band, above the caption band. */
 const BAND = [HEAD, 950];
 /* The characters the headless canvas sets a full size wide, and the ink of a line above and below its baseline. */
-export const CJK = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/u;
+export const CJK = new RegExp(
+  `[${characterClass("han")}${characterClass("cjk-punctuation")}${characterClass("full-width")}]`,
+  "u",
+);
 const INK = { cjk: [0.74, 0.18], latin: [0.72, 0.2] };
 /* Full-width punctuation sets its mark in one half of its em, so a CJK line that ends in a closing mark, or starts
  * with an opening one, may hang that half past its edge for its ink to line up. */
-export const CLOSING = /[、，。；：！？）」』”》】]$/u,
-  OPENING = /^[（「『“《【]/u,
+export const CLOSING = new RegExp(`[${characterClass("line-closing")}]$`, "u"),
+  OPENING = new RegExp(`^[${characterClass("line-opening")}]`, "u"),
   HUNG = 0.5;
 /* Names hold letters; a lone check, cross or question mark is a mark, as a drawn one is. */
 export const LETTER = /\p{L}/u;

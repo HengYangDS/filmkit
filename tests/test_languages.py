@@ -2,7 +2,9 @@
 field or names a kind the engine does not hold, and the test languages equal to theirs but for
 their codes, tags and names."""
 
+import json
 import re
+import subprocess
 from pathlib import Path
 
 import derived_languages
@@ -140,3 +142,76 @@ def test_a_folder_whose_language_reads_a_script_in_an_undeclared_one_is_refused(
     assert str(refusal.value) == (
         "The language declaration zh.toml reads a script in en, which no declaration holds"
     )
+
+
+def edges() -> list[tuple[str, str]]:
+    """Each class with the characters at the edges of its members: each range's first and last
+    point and the points just outside it, and each listed character with the point after it."""
+    probes = []
+    for name, entry in {**languages.classes()["scripts"], **languages.classes()["marks"]}.items():
+        if "ranges" in entry:
+            for span in entry["ranges"]:
+                first, last = (int(point, 16) for point in span.split("-"))
+                points = (first - 1, first, last, last + 1)
+                probes += [
+                    (name, chr(p))
+                    for p in points
+                    if 0 <= p <= 0x10FFFF and not 0xD800 <= p <= 0xDFFF
+                ]
+        else:
+            probes += [(name, ch) for c in entry["characters"] for ch in (c, chr(ord(c) + 1))]
+    return probes
+
+
+def test_each_class_holds_the_first_and_last_point_of_each_range():
+    for name, entry in languages.classes()["scripts"].items():
+        for span in entry["ranges"]:
+            for point in span.split("-"):
+                assert languages.compiled(name).fullmatch(chr(int(point, 16))), (name, point)
+    assert not languages.compiled("han").fullmatch("䷀")  # a Yijing hexagram, no Han
+    assert languages.compiled("han").fullmatch("㐀")  # CJK Extension A
+    assert languages.compiled("han").fullmatch("\U00020000")  # Extension B
+
+
+def test_both_runtimes_give_each_edge_the_same_answer(tmp_path):
+    probes = edges()
+    python = [bool(languages.compiled(name).fullmatch(ch)) for name, ch in probes]
+    reader = REPOSITORY / "src/filmkit/languages/scripts.mjs"
+    script = (
+        f"import {{ classTest }} from {json.dumps(reader.as_uri())};"
+        "import { readFileSync } from 'node:fs';"
+        "const probes = JSON.parse(readFileSync(0, 'utf8'));"
+        "console.log(JSON.stringify(probes.map(([name, ch]) => classTest(name)(ch))));"
+    )
+    (tmp_path / "answers.mjs").write_text(script)
+    node = subprocess.run(
+        ["node", str(tmp_path / "answers.mjs")],
+        input=json.dumps(probes),
+        capture_output=True,
+        check=True,
+        text=True,
+        timeout=60,
+    )
+    assert json.loads(node.stdout) == python
+    assert len(probes) > 100
+
+
+def test_every_python_site_counts_a_character_of_extension_a_as_han():
+    import filmkit.delivery.spotlight as spotlight
+    import filmkit.narration.flow as flow
+    import filmkit.narration.pronunciation as pronunciation
+    import filmkit.narration.recognition as recognition
+    import filmkit.narration.spoken_units as spoken_units
+    import filmkit.picture.label_matches as label_matches
+    import filmkit.review.measurement as measurement
+    from filmkit import register
+
+    character = "㐀"
+    assert spoken_units.units(f"A{character}") == f"a{character}"
+    assert flow.HAN_CHARACTER.fullmatch(character)
+    assert recognition.HAN_UNIT.fullmatch(character)
+    assert measurement.units(character, "zh") == [character]
+    assert re.fullmatch(pronunciation.HAN, character)
+    assert re.fullmatch(spotlight.HAN, character)
+    assert register._CHINESE.match(character)
+    assert label_matches.words(f"{character}a") == [character, "a"]

@@ -17,6 +17,7 @@ The classes of characters the engine reads, its scripts and its marks, stand onc
 from __future__ import annotations
 
 import json
+import re
 import tomllib
 from functools import cache
 from pathlib import Path
@@ -196,6 +197,47 @@ def classes() -> dict[str, dict[str, dict]]:
     """The classes of `scripts.json`, by group (`scripts`, `marks`) and name."""
     data = json.loads(SCRIPTS_FILE.read_text(encoding="utf-8"))
     return {group: data[group] for group in ("scripts", "marks")}
+
+
+def _entry(name: str) -> dict:
+    """A class of `scripts.json` by its name, refused when the file holds none of that name."""
+    for group in classes().values():
+        if name in group:
+            return group[name]
+    message = f"scripts.json holds no class {name}"
+    raise LanguageError(message)
+
+
+def characters(name: str) -> str:
+    """The characters a class of marks names, in the file's order."""
+    entry = _entry(name)
+    if "characters" not in entry:
+        message = f"scripts.json defines {name} by its ranges, not by its characters"
+        raise LanguageError(message)
+    return entry["characters"]
+
+
+def pattern(*names: str) -> str:
+    """The body of a regular expression's character class that holds exactly the members of the
+    named classes."""
+    body = []
+    for name in names:
+        entry = _entry(name)
+        if "characters" in entry:
+            body += [re.escape(character) for character in entry["characters"]]
+            continue
+        for span in entry["ranges"]:
+            first, last = (chr(int(point, 16)) for point in span.split("-"))
+            body.append(
+                re.escape(first) if first == last else f"{re.escape(first)}-{re.escape(last)}"
+            )
+    return "".join(body)
+
+
+@cache
+def compiled(*names: str) -> re.Pattern[str]:
+    """A regular expression that matches one character of the named classes."""
+    return re.compile(f"[{pattern(*names)}]")
 
 
 def parse(code: str, data: dict) -> Language:

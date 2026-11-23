@@ -15,15 +15,16 @@ from itertools import accumulate
 
 import snowballstemmer
 
+import filmkit.languages as languages
 import filmkit.narration.spoken_units as spoken_units
 from filmkit.picture.rendering import PictureError
 
 # Chinese commas close a clause; English commas mostly separate list items, so only
 # stops and colons close one.
-BOUNDARY = set("，。；：！？.;:!?")
+BOUNDARY = set(languages.characters("cue-boundaries"))
 # A cue's and a label's words: each CJK character, or a run of other letters and digits with its
 # apostrophes.
-_CJK = "\u3400-\u9fff\uf900-\ufaff"
+_CJK = languages.pattern("han")
 _WORD = re.compile(rf"[{_CJK}]|[^\W_{_CJK}]+(?:['\u2019][^\W_{_CJK}]+)*")
 # The English Snowball stemmer; it stems lowercase words.
 _ENGLISH = snowballstemmer.stemmer("english")
