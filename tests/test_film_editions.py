@@ -1,0 +1,104 @@
+"""A film's editions are the languages its declaration names, in its order, one or more: each
+needs a language declaration, and everything the declaration states of an edition names one of
+them."""
+
+import shutil
+from pathlib import Path
+
+import pytest
+
+import filmkit.film as film
+import filmkit.production as production
+import filmkit.repository as repository
+from filmkit.film import FilmError
+
+
+@pytest.fixture
+def declared(tmp_path):
+    """A copy of this film's declaration and every file it names, below a new root."""
+    for _field, path in film.named_files(film.FILM):
+        target = tmp_path / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(repository.ROOT / path, target)
+    shutil.copy2(repository.ROOT / film.DECLARATION, tmp_path / film.DECLARATION)
+    return tmp_path
+
+
+def rewrite(root: Path, old: str, new: str) -> None:
+    path = root / film.DECLARATION
+    text = path.read_text()
+    assert old in text
+    path.write_text(text.replace(old, new, 1))
+
+
+def table(root: Path, name: str) -> str:
+    """One table of the declaration, from its header to the next blank line before a header."""
+    text = (root / film.DECLARATION).read_text()
+    start = text.index(f"[{name}]\n")
+    end = text.index("\n\n", start) + 2
+    return text[start:end]
+
+
+def without(root: Path, name: str) -> None:
+    """Remove one table of the declaration."""
+    rewrite(root, table(root, name), "")
+
+
+def test_the_editions_are_the_declarations_in_its_order():
+    assert production.CODES == tuple(film.FILM.editions) == ("zh", "en")
+    assert production.codes(film.FILM) == production.CODES
+
+
+def test_a_declaration_whose_english_table_comes_first_lists_english_first(declared):
+    zh = table(declared, "editions.zh")
+    rewrite(declared, zh, "")
+    rewrite(declared, "[picture]\n", f"{zh}[picture]\n")
+    assert production.codes(film.load(declared)) == ("en", "zh")
+
+
+def test_a_film_of_one_edition_loads(declared):
+    without(declared, "editions.zh")
+    rewrite(
+        declared,
+        "clarity_minimum_db = { zh = 18.0, en = 16.0 }",
+        "clarity_minimum_db = { en = 16.0 }",
+    )
+    loaded = film.load(declared)
+    assert tuple(loaded.editions) == ("en",)
+
+
+def test_a_declaration_of_no_edition_is_refused(declared):
+    without(declared, "editions.zh")
+    without(declared, "editions.en")
+    with pytest.raises(FilmError, match="editions"):
+        film.load(declared)
+
+
+def test_an_edition_without_a_language_declaration_is_refused_in_one_line(declared):
+    rewrite(declared, "[editions.en]", "[editions.xq]")
+    with pytest.raises(FilmError) as refusal:
+        film.load(declared)
+    named = "editions.xq: the engine holds no language declaration for 'xq'; it declares en, zh"
+    assert [line for line in str(refusal.value).splitlines() if named in line]
+
+
+def test_an_exception_of_an_undeclared_edition_is_refused(declared):
+    exception = '[[captions.rate_exceptions]]\nedition = "ja"\ntext = "A cue"\nreason = "Kept."\n\n'
+    rewrite(declared, "[review]\n", f"{exception}[review]\n")
+    with pytest.raises(FilmError) as refusal:
+        film.load(declared)
+    assert (
+        "captions.rate_exceptions names the edition ja, which the film does not declare; it "
+        "declares zh, en"
+    ) in str(refusal.value)
+
+
+def test_floors_for_an_undeclared_edition_or_without_a_declared_one_are_refused(declared):
+    rewrite(declared, "{ zh = 18.0, en = 16.0 }", "{ zh = 18.0, en = 16.0, ja = 17.0 }")
+    with pytest.raises(FilmError) as refusal:
+        film.load(declared)
+    assert "review.clarity_minimum_db names the edition ja" in str(refusal.value)
+    rewrite(declared, "{ zh = 18.0, en = 16.0, ja = 17.0 }", "{ zh = 18.0 }")
+    with pytest.raises(FilmError) as refusal:
+        film.load(declared)
+    assert "review.clarity_minimum_db states no floor for en" in str(refusal.value)

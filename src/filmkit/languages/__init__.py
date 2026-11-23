@@ -288,8 +288,13 @@ def language(code: str) -> Language:
     try:
         return LANGUAGES[code]
     except KeyError:
-        message = (
-            f"The engine holds no language declaration for {code!r}; it declares "
-            f"{', '.join(sorted(LANGUAGES))}"
-        )
-        raise LanguageError(message) from None
+        message = unknown(code)
+        raise LanguageError(message[0].upper() + message[1:]) from None
+
+
+def unknown(code: str) -> str:
+    """Why a code is no language: the languages the engine declares, named."""
+    return (
+        f"the engine holds no language declaration for {code!r}; it declares "
+        f"{', '.join(sorted(LANGUAGES))}"
+    )

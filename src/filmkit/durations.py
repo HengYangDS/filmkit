@@ -92,7 +92,7 @@ class Run:
     """One command's run on one edition: when it started, the host's load then, the seconds of
     its phases, and the settings its owner names as bearing on its time."""
 
-    def __init__(self, code: str, command: str) -> None:
+    def __init__(self, code: str | None, command: str) -> None:
         self.code, self.command = code, command
         self.started_at = datetime.now(UTC)
         self.load_at_start = host_load()
@@ -150,7 +150,7 @@ def current() -> Run | None:
 
 
 @contextlib.contextmanager
-def run(code: str, command: str, *, record: bool = True) -> Iterator[Run]:
+def run(code: str | None, command: str, *, record: bool = True) -> Iterator[Run]:
     """Measure the block as one command's run on an edition and write its record at the end.
 
     The record says that the command completed only when the block ends without raising and

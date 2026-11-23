@@ -26,6 +26,7 @@ from pydantic import (
     model_validator,
 )
 
+import filmkit.languages as languages
 import filmkit.repository as repository
 
 if TYPE_CHECKING:
@@ -62,9 +63,12 @@ WITHDRAWN = {
 # A lowercase name of words joined by hyphens.
 Name = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")]
 Floor = Annotated[int, Field(ge=0, le=100)]
+# An edition's code: a BCP 47 primary subtag, which the film's `[editions.<code>]` tables declare
+# and every exception and floor names (`Film.editions_declared`).
+Code = Annotated[str, StringConstraints(pattern=r"^[a-z]{2,3}$")]
 # A voice-clarity floor in dB of cepstral peak prominence, and one for each edition.
 ClarityFloor = Annotated[float, Field(gt=0, le=60)]
-ClarityFloors = Annotated[dict[Literal["zh", "en"], ClarityFloor], Field(min_length=2)]
+ClarityFloors = Annotated[dict[Code, ClarityFloor], Field(min_length=1)]
 # Declared words: text that holds more than whitespace, kept without its outer spaces.
 Stated = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 # A colour as CSS writes it in hexadecimal, #rrggbb.
@@ -113,7 +117,7 @@ class WrappingException(Declared):
     """One wrapped label an edition keeps against the wrapping rules: its exact painted lines,
     top to bottom, and why they stay."""
 
-    edition: Literal["zh", "en"]
+    edition: Code
     lines: tuple[Stated, ...] = Field(min_length=2)
     reason: Stated
 
@@ -149,7 +153,7 @@ class MotionException(Declared):
     """One motion finding an edition keeps against the motion gate: its scene, the composition's
     `source`, the line that drew it as `film.js:<line>` or its module, its kind and why it stays."""
 
-    edition: Literal["zh", "en"]
+    edition: Code
     scene: Stated
     source: Annotated[str, StringConstraints(pattern=r"^(film\.js:[1-9][0-9]*|[^\s:]+\.m?js)$")]
     kind: Literal["halt", "start", "race", "pop", "jump", "dash", "pace"]
@@ -197,7 +201,7 @@ class DetailException(Declared):
     scene alone, since the cue that keys a stroke moves with every fit of the runtime.
     """
 
-    edition: Literal["zh", "en"]
+    edition: Code
     kind: Literal["ink_drop", "outside_pace", "part_drawn", "racing_tip", "rail", "off_centre_far"]
     scene: Stated
     source: Stated | None = None
@@ -289,7 +293,7 @@ ThoughtName = Annotated[str, StringConstraints(pattern=r"^[^.\s]+\.[1-9][0-9]*$"
 class ClarityException(Declared):
     """One thought of an edition that the film keeps under its clarity floor, and why."""
 
-    edition: Literal["zh", "en"]
+    edition: Code
     thought: ThoughtName
     reason: Stated
 
@@ -405,7 +409,7 @@ class FlowException(Declared):
     side of it; the reason says why the pause stays.
     """
 
-    edition: Literal["zh", "en"]
+    edition: Code
     thought: ThoughtName
     left: FlowText
     right: FlowText
@@ -463,7 +467,7 @@ class NarrationTerm(Declared):
     term: LatinWord
     spoken: LatinWord
     ipa: FlowText
-    reference: dict[Literal["zh", "en"], TermReference] = Field(default_factory=dict)
+    reference: dict[Code, TermReference] = Field(default_factory=dict)
 
 
 class Narration(Declared):
@@ -487,7 +491,7 @@ class RateException(Declared):
     """One caption cue of an edition that the film keeps above the reading rate: its text as the
     assembly record states it, and why."""
 
-    edition: Literal["zh", "en"]
+    edition: Code
     text: Stated
     reason: Stated
 
@@ -581,11 +585,14 @@ class Register(Declared):
 
 
 class Film(Declared):
-    """A bilingual film: its file prefix, delivery folder, entry page, sources, the length of its
-    credits, fonts, player colours and review.
+    """A film: its file prefix, delivery folder, entry page, sources, the length of its credits,
+    its editions, fonts, player colours and review.
 
-    A film may name a concept contract, which `filmkit.concepts` checks its narration against,
-    and keep forms against its register (`filmkit.register`).
+    Its editions are the languages its `[editions.<code>]` tables name, in their order, one or
+    more, each a language the engine declares (`filmkit.languages`); every exception, floor and
+    term reference names one of them. A film may name a concept contract, which
+    `filmkit.concepts` checks its narration against, and keep forms against its register
+    (`filmkit.register`).
     """
 
     slug: Name
@@ -596,7 +603,7 @@ class Film(Declared):
     # composition, and each edition's assembly lays them out after its narration.
     credits_duration: Annotated[int, Field(strict=True, ge=0)]
     concepts: str | None = None
-    editions: dict[Literal["zh", "en"], EditionDeclaration] = Field(min_length=2)
+    editions: dict[Code, EditionDeclaration] = Field(min_length=1)
     picture: Picture
     player: Player
     review: Review
@@ -604,6 +611,38 @@ class Film(Declared):
     captions: Captions = Field(default_factory=Captions)
     # Declared as [register]: `register` would shadow the model class's own (ABCMeta's).
     formal_register: Register = Field(default_factory=Register, alias="register")
+
+    @model_validator(mode="after")
+    def editions_declared(self) -> Film:
+        """Refuse an exception, a floor or a term reference that names an edition the film does
+        not declare, and clarity floors without one for each declared edition."""
+        named = {
+            "picture.wrapping.exceptions": [e.edition for e in self.picture.wrapping.exceptions],
+            "picture.motion.exceptions": [e.edition for e in self.picture.motion.exceptions],
+            "picture.detail.exceptions": [e.edition for e in self.picture.detail.exceptions],
+            "review.clarity_exceptions": [e.edition for e in self.review.clarity_exceptions],
+            "review.clarity_minimum_db": list(self.review.clarity_minimum_db or {}),
+            "narration.flow.exceptions": [e.edition for e in self.narration.flow.exceptions],
+            "narration.terms": [code for t in self.narration.terms for code in t.reference],
+            "captions.rate_exceptions": [e.edition for e in self.captions.rate_exceptions],
+        }
+        declared = ", ".join(self.editions)
+        problems = [
+            f"{field} names the edition {code}, which the film does not declare; it declares "
+            f"{declared}"
+            for field, codes in named.items()
+            for code in dict.fromkeys(codes)
+            if code not in self.editions
+        ]
+        floors = self.review.clarity_minimum_db
+        problems += [
+            f"review.clarity_minimum_db states no floor for {code}"
+            for code in self.editions
+            if floors is not None and code not in floors
+        ]
+        if problems:
+            raise ValueError("; ".join(problems))
+        return self
 
 
 def named_files(film: Film) -> list[tuple[str, str]]:
@@ -664,6 +703,17 @@ def read(root: Path) -> tuple[Film | None, list[str]]:
         )
         renamed = declared.pop(RENAMED_FOLDER)
         declared.setdefault("delivery_folder", renamed)
+    # An edition whose language the engine does not declare is named, and set aside so that its
+    # absence hides no other field; the film is then not loaded.
+    editions = declared.get("editions")
+    unknown = (
+        [code for code in editions if code not in languages.LANGUAGES]
+        if isinstance(editions, dict)
+        else []
+    )
+    for code in unknown:
+        found.append(f"{DECLARATION} declares editions.{code}: {languages.unknown(code)}")
+        editions.pop(code)
     undeclared = CREDITS not in declared
     if undeclared:
         found.append(
@@ -682,7 +732,7 @@ def read(root: Path) -> tuple[Film | None, list[str]]:
     copied = copied_players(root, film)
     if copied:
         found.append(copied)
-    return (None if undeclared else film), found
+    return (None if undeclared or unknown else film), found
 
 
 def problems(root: Path) -> list[str]:

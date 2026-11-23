@@ -9,14 +9,23 @@ import json
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
+import filmkit.languages as languages
 import filmkit.repository as repository
 from filmkit.film import CAST, FILM, SCRIPT
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-# The language editions, Chinese first.
-CODES = ("zh", "en")
+    from filmkit.film import Film
+
+
+def codes(film: Film) -> tuple[str, ...]:
+    """A film's editions, the codes of its `[editions.<code>]` tables in their declared order."""
+    return tuple(film.editions)
+
+
+# The editions of the film the engine builds, in its declared order.
+CODES = codes(FILM)
 # The keys of an assembled timeline that its script does not author: what the assembly writes
 # beside the script's own keys or over them (`filmkit.soundtrack.assembly.assemble`), the laid-out
 # segments and their captions, the timing state, the runtime and the credits as laid out. Every
@@ -165,12 +174,18 @@ class Edition:
 
     def __post_init__(self) -> None:
         if self.code not in CODES:
-            message = "An edition must be zh or en"
+            message = f"The film declares no edition {self.code!r}; it declares {', '.join(CODES)}"
             raise ValueError(message)
 
     @property
+    def declaration(self) -> languages.Language:
+        """The declaration of the edition's language (`filmkit.languages`)."""
+        return languages.language(self.code)
+
+    @property
     def language(self) -> str:
-        return "Chinese" if self.code == "zh" else "English"
+        """The language's name as the speech models take it."""
+        return self.declaration.english_name
 
     @property
     def sources(self) -> str:

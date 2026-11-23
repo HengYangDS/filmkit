@@ -1,5 +1,6 @@
 """The tools command: the engine's Node tools run from a copy below the film, with its packages."""
 
+import contextlib
 import json
 import re
 import shutil
@@ -174,3 +175,19 @@ def test_the_command_names_each_tool_and_refuses_another(capsys):
     ]
     for path in tools.TOOLS.values():
         assert (tools.PACKAGE / path).is_file()
+
+
+def test_a_run_that_names_no_edition_is_measured_under_none(monkeypatch):
+    runs = []
+
+    @contextlib.contextmanager
+    def measured(code, name, *, record):
+        runs.append((code, name, record))
+        yield
+
+    monkeypatch.setattr(tools.durations, "run", measured)
+    monkeypatch.setattr(tools, "run", lambda tool, arguments: 0)
+    with pytest.raises(SystemExit) as ended:
+        tools.main(["frame-audit", "timeline.json"])
+    assert ended.value.code == 0
+    assert runs == [(None, "frame-audit", False)]

@@ -201,7 +201,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("arguments", nargs=argparse.REMAINDER, help="the tool's own arguments")
     options = parser.parse_args(argv)
     build_run = recorded(options.tool, options.arguments)
-    code, name = build_run or (CODES[0], options.tool)
+    # A run by hand names no edition, and is measured under none and recorded nowhere.
+    code, name = build_run or (None, options.tool)
     try:
         # A check of an edition's build is recorded as a command of that build.
         with durations.run(code, name, record=build_run is not None):

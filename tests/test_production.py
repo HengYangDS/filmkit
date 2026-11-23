@@ -104,3 +104,11 @@ def test_a_timeline_that_states_no_whole_number_of_seconds_is_refused(
         "build/artifacts/film/zh/timeline.json states no runtime in whole seconds: "
         "run produce assemble --language zh"
     )
+
+
+def test_an_edition_the_film_does_not_declare_is_refused_naming_the_declared_ones():
+    with pytest.raises(
+        ValueError, match=r"^The film declares no edition 'ja'; it declares zh, en$"
+    ):
+        Edition("ja")
+    assert (Edition("zh").language, Edition("en").language) == ("Chinese", "English")

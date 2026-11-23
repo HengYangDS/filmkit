@@ -484,7 +484,7 @@ def test_narration_flow_limits_default_and_are_declared_with_their_exceptions(de
         (', reason = "A kept pause."', "", r"exceptions\.0\.reason"),
         ('reason = "A kept pause."', 'reason = "  "', r"exceptions\.0\.reason"),
         ('thought = "02.3"', 'thought = "02"', r"exceptions\.0\.thought"),
-        ('edition = "en"', 'edition = "fr"', r"exceptions\.0\.edition"),
+        ('edition = "en"', 'edition = "fr"', r"narration\.flow\.exceptions names the edition fr"),
         ("exceptions = [", "pause = 1\nexceptions = [", r"narration\.flow\.pause"),
     ],
 )
@@ -528,7 +528,7 @@ def test_narration_terms_are_declared_with_their_spoken_form_and_references(decl
         ('ipa = "ˈiːθər"', 'ipa = " "', r"narration\.terms\.0\.ipa"),
         ('thought = "03.7"', 'thought = "03"', r"narration\.terms\.0\.reference\.en\.thought"),
         ("index = 0 } }", "index = -1 } }", r"narration\.terms\.0\.reference\.en\.index"),
-        ("zh = {", "fr = {", r"narration\.terms\.0\.reference\.fr"),
+        ("zh = {", "fr = {", r"narration\.terms names the edition fr"),
         ("[[narration.terms]]\n", '[[narration.terms]]\nsay = "x"\n', r"narration\.terms\.0\.say"),
         (TERMS, TERMS + TERMS.replace('"ETHER"', '"Ether"'), "a term is declared more than once"),
     ],
