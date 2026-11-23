@@ -59,9 +59,11 @@ def stage(tmp_path, monkeypatch, code, groups, words, captions=()):
         "words": [{"text": word, "start": start, "end": end} for word, start, end in words],
         "end": 6.0,
     }
+    # What an assembly writes beside and over the script's keys (`production.ASSEMBLED`).
     timeline = {
         **script,
         "duration": 9,
+        "credits_duration": 3.0,
         "segments": [timed],
         "timing_state": "Assembled",
         "captions": list(captions),

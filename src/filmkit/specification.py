@@ -6,6 +6,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import filmkit.repository as repository
+from filmkit.film import CREDITS, FILM
 from filmkit.production import CODES, Edition
 
 if TYPE_CHECKING:
@@ -22,6 +23,24 @@ def declared(key: str, read: Callable[[Any], Any]) -> Any:
     return values.pop()
 
 
+# What a script may no longer declare, each with what states it instead.
+WITHDRAWN = {
+    CREDITS: f"state the credits' length once, as {CREDITS} in {repository.DECLARATION}",
+}
+
+
+def refuse_withdrawn() -> None:
+    """Refuse, as the engine loads, a script that declares a key the engine no longer reads, in
+    one line that names the script and the key and says what states it instead."""
+    for code in CODES:
+        path = Edition(code).script
+        script = json.loads((repository.ROOT / path).read_text())
+        for key, instead in WITHDRAWN.items():
+            if key in script:
+                message = f"{path} declares {key}; {instead}"
+                raise ValueError(message)
+
+
 def rendered_rate(fps: int) -> int:
     """A script's frame rate, refused unless it is the 60 fps the engine renders and encodes."""
     if fps != 60:
@@ -30,11 +49,13 @@ def rendered_rate(fps: int) -> int:
     return fps
 
 
+refuse_withdrawn()
 RATE = 48000
 DURATION: int = declared("duration", int)
 # The H.264 levels below are set for this frame rate.
 FPS: int = declared("fps", lambda fps: rendered_rate(int(fps)))
-CREDITS_DURATION: int = declared("credits_duration", int)
+# The credits' length, which the film's declaration states once for both editions.
+CREDITS_DURATION: int = FILM.credits_duration
 # The films' author, artist and copyright holder.
 AUTHOR: str = declared("author", str)
 # The films' chapter count; each edition titles the chapters in its own language.

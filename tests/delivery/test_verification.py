@@ -173,3 +173,16 @@ def test_the_command_prints_each_editions_report_and_writes_only_its_duration(tm
         delivery_verification.main(["--language", "all", *films[1:]])
     with pytest.raises(SystemExit):
         delivery_verification.main(["--language", "fr", *films])
+
+
+def test_captions_end_where_the_timeline_s_credits_begin():
+    # A runtime of 1476 s whose credits, as laid out, last 3.56 s: they begin at 1472.44 s.
+    def timeline(end):
+        caption = {"start": 1470.0, "end": end, "text": "数据先行。"}
+        return {"duration": 1476, "credits_duration": 3.56, "captions": [caption]}
+
+    assert delivery_verification.verify_captions(timeline(1472.44), "zh") == 1
+    with pytest.raises(VerificationError, match="caption contract"):
+        delivery_verification.verify_captions(timeline(1472.45), "zh")
+    with pytest.raises(VerificationError, match="states no credits within its runtime"):
+        delivery_verification.verify_captions({**timeline(1472.0), "credits_duration": None}, "zh")

@@ -12,6 +12,8 @@ delivery_folder = "sample-reel"
 entry = "content/index.html"
 # The commit and digest of the document the film explains.
 source_manifest = "content/source-manifest.json"
+# The credits' length in whole seconds, which both editions draw from one composition.
+credits_duration = 3
 # What each concept the film names means in that document, and each edition's words for it.
 concepts = "content/concepts.toml"
 

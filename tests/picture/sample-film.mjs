@@ -19,7 +19,7 @@ export async function scratchFolder() {
 }
 
 /* A timeline as staging builds it from a script: each word 0.2 s after the last, a chapter's first segment after a
- * longer pause, and one caption over each segment's voice. */
+ * longer pause, one caption over each segment's voice, and the credits the film's declaration states. */
 export async function authoredTimeline(code) {
   const script = JSON.parse(
     await readFile(
@@ -27,6 +27,8 @@ export async function authoredTimeline(code) {
       "utf8",
     ),
   );
+  const declaration = await readFile(join(SAMPLE, "content/film.toml"), "utf8");
+  const credits = Number(declaration.match(/^credits_duration = (\d+)$/m)[1]);
   let cursor = 3;
   const segments = script.segments.map((segment, index) => {
     if (index) cursor += script.segments[index - 1].chapter === segment.chapter ? 1.8 : 3.6;
@@ -49,7 +51,7 @@ export async function authoredTimeline(code) {
   });
   const duration = cursor + 6;
   segments.forEach((segment, index) => {
-    segment.end = segments[index + 1]?.start ?? duration - script.credits_duration;
+    segment.end = segments[index + 1]?.start ?? duration - credits;
   });
   const captions = segments.map((segment) => ({
     start: segment.voice_start,
@@ -59,5 +61,13 @@ export async function authoredTimeline(code) {
       .map((v) => v.text)
       .join(code === "zh" ? "" : " "),
   }));
-  return { ...script, segments, captions, duration, edition: code, render_offset: 0 };
+  return {
+    ...script,
+    segments,
+    captions,
+    duration,
+    credits_duration: credits,
+    edition: code,
+    render_offset: 0,
+  };
 }

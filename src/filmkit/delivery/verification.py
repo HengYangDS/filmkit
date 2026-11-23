@@ -55,11 +55,7 @@ class VerificationError(ValueError):
 # How many films' media are verified at the same time: each is one complete decode, which uses a
 # few of the host's cores.
 MEDIA_POOL = 4
-CREDITS_DURATION, FPS, RATE = (
-    specification.CREDITS_DURATION,
-    specification.FPS,
-    specification.RATE,
-)
+FPS, RATE = specification.FPS, specification.RATE
 
 
 def bilingual_inputs(files: list[Path]) -> dict[str, list[Path]]:
@@ -78,10 +74,14 @@ def verify_sources() -> dict:
 
 
 def verify_captions(timeline: dict, code: str) -> int:
-    """Captions stay single-line, typeset, within their limit and before the credits, which end
-    the runtime the timeline states."""
+    """Captions stay single-line, typeset, within their limit and before the credits: the
+    timeline's runtime less its credits as laid out, which must lie within it."""
     limit, prior_end = specification.CAPTION_LIMITS[code], 0.0
-    credits = production.Edition(code).runtime_in(timeline) - CREDITS_DURATION
+    runtime, laid = production.Edition(code).runtime_in(timeline), timeline.get("credits_duration")
+    if type(laid) not in {int, float} or not 0 <= laid < runtime:
+        msg = f"The {code} timeline states no credits within its runtime"
+        raise VerificationError(msg)
+    credits = runtime - laid
     for cue in timeline["captions"]:
         display = cue.get("display_text", cue["text"])
         if not (

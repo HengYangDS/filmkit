@@ -31,7 +31,7 @@ import filmkit.sources as sources
 from filmkit.film import FILM
 from filmkit.picture import encoding, faces, renderer, template
 from filmkit.picture.errors import PictureError
-from filmkit.production import RENDITIONS, STAGE_PAGE, STAGE_RECORD
+from filmkit.production import ASSEMBLED, RENDITIONS, STAGE_PAGE, STAGE_RECORD
 from filmkit.repository import content_sha, read, sha, write
 from filmkit.specification import FPS
 
@@ -65,14 +65,11 @@ def below_root(path: str | Path) -> str:
 
 
 def follows_script(timeline: dict, script: dict) -> bool:
-    """Whether a timeline keeps its script's declarations and each segment's authored fields."""
+    """Whether a timeline keeps its script's declarations, but what the assembly writes over them
+    (`production.ASSEMBLED`), and each segment's authored fields."""
     segments = timeline.get("segments", [])
     return (
-        all(
-            timeline.get(key) == value
-            for key, value in script.items()
-            if key not in {"segments", "timing_state"}
-        )
+        all(timeline.get(key) == value for key, value in script.items() if key not in ASSEMBLED)
         and len(segments) == len(script["segments"])
         and all(
             all(actual.get(key) == value for key, value in source.items())

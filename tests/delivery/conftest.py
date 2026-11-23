@@ -21,7 +21,6 @@ from release_build import Built
 import filmkit.delivery.folder as delivery_folder
 import filmkit.delivery.packaging as delivery_packaging
 import filmkit.delivery.player as delivery_player
-import filmkit.delivery.verification as delivery_verification
 import filmkit.narration.selection as narration_selection
 import filmkit.narration.thought_groups as narration_thought_groups
 import filmkit.picture.derivation as picture_derivation
@@ -203,18 +202,6 @@ class Inputs:
                 picture_still_scan.scan_film(self.edition)
 
 
-def shorten(monkeypatch) -> None:
-    """Verify films whose last CREDITS seconds are credits."""
-    monkeypatch.setattr(delivery_verification, "CREDITS_DURATION", CREDITS)
-
-
-@pytest.fixture
-def short_films(monkeypatch) -> int:
-    """Verify films whose last CREDITS seconds are credits."""
-    shorten(monkeypatch)
-    return CREDITS
-
-
 def narration(inputs: Inputs, texts: dict[str, str]) -> None:
     """The script, cast, mirror, selected recordings, soundtrack, assembly and timeline."""
     root, edition, sha = inputs.root, inputs.edition, repository.sha
@@ -256,7 +243,12 @@ def narration(inputs: Inputs, texts: dict[str, str]) -> None:
         {"start": 0.1, "end": 0.5, "text": "数据先行。"},
         {"start": 0.6, "end": 0.9, "text": "交付在后。"},
     ]
-    timeline = {"segments": segments, "captions": captions, "duration": RUNTIME}
+    timeline = {
+        "segments": segments,
+        "captions": captions,
+        "duration": RUNTIME,
+        "credits_duration": CREDITS,
+    }
     write_input(edition.timeline, timeline)
 
 
@@ -371,14 +363,13 @@ def packages(inputs: Inputs) -> None:
 
 @pytest.fixture
 def inputs(tmp_path, monkeypatch) -> Inputs:
-    """The Chinese edition's current bound inputs, for short films, the passing still scan of
-    its 1080p captioned film among them.
+    """The Chinese edition's current bound inputs, for films of RUNTIME seconds whose last CREDITS
+    seconds are credits, the passing still scan of its 1080p captioned film among them.
 
     The narration and render validators record their calls instead of reading recordings
     and renders, which their own tests cover.
     """
     monkeypatch.setattr(repository, "ROOT", tmp_path)
-    shorten(monkeypatch)
     current = Inputs(tmp_path, production.Edition("zh"))
     monkeypatch.setattr(
         narration_thought_groups,

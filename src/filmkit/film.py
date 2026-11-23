@@ -31,6 +31,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 DECLARATION = repository.DECLARATION
+# The declaration's key that states the credits' length, once for both editions: the field
+# `Film.credits_duration`, which a script no longer declares.
+CREDITS = "credits_duration"
 # The files every edition's sources folder holds.
 EDITION_FILES = ("film-script.json", "voice-reference.json")
 # The player template a sources folder once held; the engine renders each edition's player now.
@@ -559,8 +562,8 @@ class Register(Declared):
 
 
 class Film(Declared):
-    """A bilingual film: its file prefix, delivery folder, entry page, sources, fonts, player
-    colours and review.
+    """A bilingual film: its file prefix, delivery folder, entry page, sources, the length of its
+    credits, fonts, player colours and review.
 
     A film may name a concept contract, which `filmkit.concepts` checks its narration against,
     and keep forms against its register (`filmkit.register`).
@@ -570,6 +573,9 @@ class Film(Declared):
     delivery_folder: Name
     entry: str
     source_manifest: str
+    # The credits' length in whole seconds, stated once: both editions draw them from one
+    # composition, and each edition's assembly lays them out after its narration.
+    credits_duration: Annotated[int, Field(strict=True, ge=0)]
     concepts: str | None = None
     editions: dict[Literal["zh", "en"], EditionDeclaration] = Field(min_length=2)
     picture: Picture
@@ -621,8 +627,11 @@ def read(root: Path) -> tuple[Film | None, list[str]]:
     load.
 
     A key renamed since 0.22.3 is a problem, and the fields are then judged as if it carried its
-    new name, so the rename hides no other field. The files the declaration names and a player
-    page left in its sources are judged only once the fields load.
+    new name, so the rename hides no other field. A declaration that states no `credits_duration`
+    is refused in one line that says to declare it there; its other fields are judged as if it
+    stated one, so that absence hides no other field, and the film is not loaded: the credits
+    are never defaulted. The files the declaration names and a player page left in its sources
+    are judged only once the fields load.
     """
     try:
         declared = tomllib.loads((root / DECLARATION).read_text(encoding="utf-8"))
@@ -636,6 +645,13 @@ def read(root: Path) -> tuple[Film | None, list[str]]:
         )
         renamed = declared.pop(RENAMED_FOLDER)
         declared.setdefault("delivery_folder", renamed)
+    undeclared = CREDITS not in declared
+    if undeclared:
+        found.append(
+            f"{DECLARATION} declares no {CREDITS}; declare the credits' length there once, in "
+            "whole seconds"
+        )
+        declared[CREDITS] = 0
     try:
         film = Film.model_validate(declared)
     except ValidationError as error:
@@ -647,7 +663,7 @@ def read(root: Path) -> tuple[Film | None, list[str]]:
     copied = copied_players(root, film)
     if copied:
         found.append(copied)
-    return film, found
+    return (None if undeclared else film), found
 
 
 def problems(root: Path) -> list[str]:

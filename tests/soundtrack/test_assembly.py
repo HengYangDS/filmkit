@@ -78,6 +78,9 @@ def test_assembly_lays_out_each_recording_with_its_own_level_and_exact_samples(t
     closing = round(receipt["closing_seconds"] * RATE)
     assert sum(gaps) + sum(record["frames"] for record in records) + closing == 20 * RATE
     assert receipt["samples_per_channel"] == 24 * RATE
+    # The timeline states the credits as laid out: the declared four seconds.
+    assert timeline["credits_duration"] == 4
+    assert timeline["segments"][-1]["end"] == 20
     # Each gap keeps its declared pause and stays within its limit.
     assert round(3.0 * RATE) <= gaps[0] <= round(9.0 * RATE)
     assert round(3.4 * RATE) <= gaps[1] <= round(9.0 * RATE)

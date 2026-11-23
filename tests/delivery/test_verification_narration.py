@@ -15,7 +15,7 @@ def cue(start: float, end: float, text: str = "数据先行。", **extra) -> dic
 
 def short(captions: list[dict]) -> dict:
     """A timeline of a film of two seconds, whose last second is credits, with these captions."""
-    return {"duration": 2, "captions": captions}
+    return {"duration": 2, "credits_duration": 1, "captions": captions}
 
 
 # The short films' captions must end by their credits at one second.
@@ -48,28 +48,24 @@ def short(captions: list[dict]) -> dict:
         "straight-text-beside-its-display-copy",
     ],
 )
-@pytest.mark.usefixtures("short_films")
 def test_captions_outside_the_caption_contract_are_refused(captions):
     with pytest.raises(VerificationError, match="caption contract"):
         delivery_verification.verify_captions(short(captions), "zh")
 
 
-@pytest.mark.usefixtures("short_films")
 def test_single_line_captions_within_their_limit_and_before_the_credits_pass():
     captions = [cue(0.0, 0.5, "数" * 33), cue(0.35, 1.0, display_text="数据，先行。")]
     assert delivery_verification.verify_captions(short(captions), "zh") == 2
 
 
-@pytest.mark.usefixtures("short_films")
 def test_typeset_english_captions_pass():
     captions = [cue(0.0, 0.5, "The film’s data. "), cue(0.5, 1.0, "It says “Done.”")]
     assert delivery_verification.verify_captions(short(captions), "en") == 2
 
 
-@pytest.mark.usefixtures("short_films")
 def test_captions_end_by_the_credits_of_the_runtime_their_timeline_states():
     # A runtime of 1477 s, an odd number of seconds, whose last second is credits.
-    timeline = {"duration": 1477, "captions": [cue(1470.0, 1476.0)]}
+    timeline = {"duration": 1477, "credits_duration": 1, "captions": [cue(1470.0, 1476.0)]}
     assert delivery_verification.verify_captions(timeline, "zh") == 1
     timeline["captions"] = [cue(1470.0, 1476.01)]
     with pytest.raises(VerificationError, match="caption contract"):

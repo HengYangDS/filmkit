@@ -612,6 +612,8 @@ def assemble(edition: Edition) -> None:
         **script,
         "segments": timeline_segments,
         "timing_state": "Actual waveform alignment with designed native-speech pauses",
+        # The credits as laid out, whose start every reader takes as the runtime less them.
+        "credits_duration": CREDITS_DURATION,
     }
     timeline["captions"] = timed_caption_cues(timeline, edition.code)
     write(edition.timeline, timeline)

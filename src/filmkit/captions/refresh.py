@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from filmkit.captions import CaptionError
 from filmkit.captions.documents import require_metadata_values, subtitle_files
 from filmkit.captions.timing import caption_receipt_fields, timed_caption_cues
+from filmkit.production import ASSEMBLED
 from filmkit.repository import read, relative, sha, write
 
 if TYPE_CHECKING:
@@ -43,12 +44,13 @@ PRESENTATION_SCOPE = (
 
 def caption_source(timeline: dict) -> dict:
     """Project the source copy from an assembled timeline for caption-only edits: without what
-    the assembly and the captions write, among them the runtime, which no script states."""
+    the assembly writes (`production.ASSEMBLED`) and the caption timing, which a presentation
+    revision may change."""
     return {
         **{
             key: value
             for key, value in timeline.items()
-            if key not in {"segments", "captions", "timing_state", "caption_timing", "duration"}
+            if key not in ASSEMBLED | {"caption_timing"}
         },
         "segments": [
             {
