@@ -95,7 +95,6 @@ def test_a_stage_records_its_faces_and_its_language_and_a_changed_stylesheet_is_
     film_root,
 ):
     from filmkit.production import Edition
-    from filmkit.specification import DURATION
 
     for code, language in (("zh", "zh-CN"), ("en", "en")):
         edition = Edition(code)
@@ -115,4 +114,4 @@ def test_a_stage_records_its_faces_and_its_language_and_a_changed_stylesheet_is_
     # A stylesheet with a rule the reader refuses stages nothing.
     style.write_text(style.read_text() + "@font-face{font-family:X;src:local(X)}")
     with pytest.raises(PictureError, match="does not declare one family and one source"):
-        picture_rendering.stage_picture(Edition("zh"), None, DURATION, 3840, 2160)
+        picture_rendering.stage_picture(Edition("zh"), None, 60, 3840, 2160)

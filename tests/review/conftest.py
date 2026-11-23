@@ -18,6 +18,8 @@ import filmkit.review.round as review_round
 from filmkit.production import CODES, Edition
 
 SCORES = dict.fromkeys(review_record.DIMENSIONS, 96)
+# Each edition's runtime, which its timeline states: the editions last 27:16 and 24:36.
+RUNTIMES = {"zh": 1636, "en": 1476}
 
 
 def write_fixture(path, data):
@@ -38,7 +40,8 @@ def put():
 @pytest.fixture
 def root(tmp_path, monkeypatch):
     """A repository root holding both packaged editions as tiny stand-in files: each edition's
-    four films, its package record and both pictures. Each edition's 1080p captioned film
+    four films, its package record, both pictures and a timeline that states its runtime. Each
+    edition's 1080p captioned film
     passes the requirement of its still scan, which the scan's own tests cover."""
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
@@ -48,6 +51,7 @@ def root(tmp_path, monkeypatch):
         pictures = (edition.picture, edition.rendered(captions=False).file)
         for path in (*edition.films, edition.film_package, *pictures):
             write_fixture(path, f"{code} {path.name}")
+        write_fixture(edition.timeline, {"duration": RUNTIMES[code], "segments": []})
     return root
 
 

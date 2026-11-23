@@ -72,7 +72,7 @@ def test_a_first_delivery_places_and_reads_back_every_member(film):
     binding = json.loads((root / delivery_folder.PLAYERS_BINDING).read_text())
     assert binding["destination"] == str(root / "build/artifacts/film")
     assert [m["path"] for m in binding["members"]] == members(root)
-    assert report["film"] == {"slug": "sample-reel", "duration": 60}
+    assert report["film"] == {"slug": "sample-reel", "runtimes": {"zh": 1636, "en": 1476}}
     assert report["destination"] == str(destination)
     assert json.loads((root / delivery_folder.READBACK).read_text()) == report
     assert film.tree(destination) == {path: f"current {path}\n" for path in members(root)}
@@ -137,6 +137,22 @@ def test_an_edition_whose_film_holds_no_passing_still_scan_is_not_delivered(
     with pytest.raises(DeliveryRefusedError) as refused:
         delivery_folder.deliver(root, destination, dry_run=dry_run)
     assert str(refused.value) == "The zh film has no still scan record; run scan-film"
+    assert not destination.exists()
+
+
+def test_an_edition_without_a_timeline_is_refused_in_one_line_before_rsync(film, monkeypatch):
+    # The player check's binding names each edition's runtime, which only its timeline states:
+    # the command refuses in the one line of the runtime's reading, before rsync changes anything.
+    root, destination = film
+    (root / "build/artifacts/film/en/timeline.json").unlink()
+    monkeypatch.setattr(delivery_folder, "rsync_version", lambda: delivery_folder.RSYNC_3 + "4.1")
+    monkeypatch.setattr(delivery_folder, "run", lambda *_: pytest.fail("the delivery ran rsync"))
+    with pytest.raises(SystemExit) as refused:
+        delivery_folder.main(["--destination", str(destination)])
+    assert str(refused.value) == (
+        "The en edition has no timeline at build/artifacts/film/en/timeline.json, so no runtime: "
+        "run produce assemble --language en"
+    )
     assert not destination.exists()
 
 
@@ -330,7 +346,9 @@ def test_the_players_readback_lies_where_a_delivery_keeps_it_or_where_it_is_told
         *(f"{evidence}/{name}" for name in ("player-check.json", "player-en.png", "player-zh.png")),
     }
     sources = {source.relative_to(root).as_posix() for source, _ in plan}
-    assert set(film.tree(root)) == sources | kept
+    # Beside the members' sources stand the editions' timelines, which state their runtimes.
+    timelines = {f"build/artifacts/film/{code}/timeline.json" for code in ("zh", "en")}
+    assert set(film.tree(root)) == sources | kept | timelines
     delivered = film.tree(root)
     # A readback into another folder, as a review round asks for its own, writes the binding, the
     # receipt and the screenshots there and changes nothing of the delivery's.
@@ -378,8 +396,10 @@ def test_a_folder_is_compared_with_the_builds_members_and_each_that_differs_is_n
         "en/sample-reel-en-uhd.mp4": "holds other bytes",
         "en/chapters.json": "holds other bytes",
     }
-    # The comparison reads: the folder and the build hold what they held.
-    assert film.tree(root) == {
+    # The comparison reads: the folder and the build hold what they held, the editions'
+    # timelines beside the members' sources.
+    held = film.tree(root)
+    assert {name: held[name] for name in held if not name.endswith("/timeline.json")} == {
         source.relative_to(root).as_posix(): f"current {path}\n" for source, path in plan
     }
     assert (destination / "notes.txt").read_text() == "notes\n"

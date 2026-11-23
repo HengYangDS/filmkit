@@ -366,8 +366,12 @@ def other_program_level(root, put, previous, monkeypatch):
 
 
 def missing_timeline(root, put, previous, monkeypatch):
+    # The prompts state each edition's runtime, which only its timeline states.
     Edition("en").timeline.unlink()
-    return previous, "missing build/artifacts/film/en/timeline.json"
+    return previous, (
+        "The en edition has no timeline at build/artifacts/film/en/timeline.json, so no runtime: "
+        "run produce assemble --language en"
+    )
 
 
 def no_register_field(root, put, previous, monkeypatch):

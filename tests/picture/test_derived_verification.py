@@ -9,7 +9,7 @@ import filmkit.picture.equivalence as equivalence
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
-from filmkit.specification import DURATION, FPS
+from filmkit.specification import FPS
 
 pair = test_derived_pair.pair
 compared = test_derived_pair.compared
@@ -29,10 +29,10 @@ def verified(compared):
         "index_sha256": sha(edition.rendered().page),
         "width": 3840,
         "height": 2160,
-        "duration": DURATION,
+        "duration": edition.runtime,
         "fps": FPS,
         "step_frames": 2,
-        "checked": DURATION * FPS // 2,
+        "checked": edition.runtime * FPS // 2,
         "browser": "Chromium",
     }
     repository.write(edition.picture_geometry, geometry)

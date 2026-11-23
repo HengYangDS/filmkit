@@ -6,9 +6,9 @@ import re
 import pytest
 
 import filmkit.delivery.packaging as delivery_packaging
+import filmkit.delivery.player as delivery_player
 import filmkit.production as production
 import filmkit.repository as repository
-import filmkit.specification as specification
 from filmkit.delivery.packaging import PackagingError
 
 # The line under the entry page's title at version 1.3.0.
@@ -18,8 +18,11 @@ ENTRY_VERSION = (
 
 
 def test_the_runtime_and_viewing_members_follow_the_edition():
-    minutes, seconds = divmod(specification.DURATION, 60)
-    assert delivery_packaging.runtime_label() == f"{minutes:02d}:{seconds:02d}"
+    assert [delivery_player.runtime_label(seconds) for seconds in (1636, 1476, 60)] == [
+        "27:16",
+        "24:36",
+        "01:00",
+    ]
     assert delivery_packaging.viewing_members(production.Edition("en")) == (
         "sample-reel-cover.png",
         "sample-reel-cover.jpg",
@@ -76,17 +79,20 @@ def test_delivery_index_uses_sibling_languages_and_preserves_language_players(
     source.parent.mkdir(parents=True)
     source.write_bytes(template)
     root = tmp_path / "build/artifacts/film"
-    for code in ("zh", "en"):
+    for code, runtime in (("zh", 1636), ("en", 1476)):
         player = root / code / "index.html"
         player.parent.mkdir(parents=True)
         player.write_text(f"Existing {code} player")
+        repository.write(production.Edition(code).timeline, {"duration": runtime})
     observed = delivery_packaging.package_language_index("1.3.0")
     output = (root / "index.html").read_text()
     assert 'href="zh/index.html"' in output
     assert 'href="en/index.html"' in output
-    runtime = f"{specification.DURATION // 60:02d}:{specification.DURATION % 60:02d}"
     assert "<base " not in output
-    assert runtime in output
+    # Each language link shows its own edition's runtime.
+    assert '<a href="zh/index.html" lang="zh-CN"><strong>中文</strong><span>27:16 · ' in output
+    assert '<a href="en/index.html" lang="en"><strong>English</strong><span>24:36 · ' in output
+    assert "/*RUNTIME*/" not in output
     # The version stands under the film's title and its subtitle, above the language links.
     assert output.index("</h1>") < output.index("</p>") < output.index(ENTRY_VERSION)
     assert output.index(ENTRY_VERSION) < output.index("<nav")
@@ -112,4 +118,25 @@ def test_delivery_index_uses_sibling_languages_and_preserves_language_players(
         delivery_packaging.package_language_index("1.3.0")
     source.write_bytes(template.replace(b"<nav", b"<div").replace(b"</nav>", b"</div>"))
     with pytest.raises(PackagingError, match="language links in a <nav>"):
+        delivery_packaging.package_language_index("1.3.0")
+
+
+def test_the_entry_page_waits_for_both_editions_runtimes(tmp_path, monkeypatch):
+    template = (repository.ROOT / delivery_packaging.INDEX).read_bytes()
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    source = tmp_path / delivery_packaging.INDEX
+    source.parent.mkdir(parents=True)
+    source.write_bytes(template)
+    repository.write(production.Edition("zh").timeline, {"duration": 1636})
+    with pytest.raises(production.UnassembledError) as refused:
+        delivery_packaging.package_language_index("1.3.0")
+    assert str(refused.value) == (
+        "The en edition has no timeline at build/artifacts/film/en/timeline.json, so no runtime: "
+        "run produce assemble --language en"
+    )
+    assert not (tmp_path / delivery_packaging.LANGUAGE_INDEX).exists()
+    # An anchor outside the language links names no edition's runtime.
+    repository.write(production.Edition("en").timeline, {"duration": 1476})
+    source.write_bytes(template.replace(b"<footer>", b"<footer>/*RUNTIME*/ "))
+    with pytest.raises(PackagingError, match=re.escape("outside its language links")):
         delivery_packaging.package_language_index("1.3.0")

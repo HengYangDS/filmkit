@@ -61,7 +61,7 @@ from filmkit.film import MATERIAL
 from filmkit.narration.spoken_units import AlignmentError
 from filmkit.picture.errors import PictureError
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
-from filmkit.production import CODES, Edition, review_report
+from filmkit.production import CODES, Edition, UnassembledError, review_report
 from filmkit.review import ReviewError
 from filmkit.review.files import edition_review, present, review_files, round_directory
 from filmkit.review.record import DIMENSIONS, SCHEMA_VERSION, overall
@@ -84,6 +84,7 @@ OWNER_REFUSALS = (
     AlignmentError,
     sources.SourceError,
     register.RegisterError,
+    UnassembledError,
 )
 
 HUMAN_LISTENING = (

@@ -21,12 +21,14 @@ import filmkit.picture.rendering as picture_rendering
 import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.production import Edition
-from filmkit.specification import DURATION
 
 # The real composition, found before a test rebinds the repository root.
 COMPOSITION = repository.ROOT / picture_rendering.COMPOSITION
 # Each edition's one segment.
 TEXTS = {"zh": "先看数据。", "en": "Read the data."}
+# The runtime each edition's timeline states: a minute, which the tests that render for real
+# draw whole.
+RUNTIME = 60
 # What npm recorded of the binary package in the fixture's film: a stand-in, since the engine
 # pins that package's library by its bytes and no integrity of the package.
 BINARY_RECORDED = "sha512-as-npm-recorded-the-binary-package"
@@ -79,11 +81,13 @@ class FilmRoot:
     path: Path
     renderer: Path
 
-    def timeline(self, edition: Edition, *, words=(), captions=()) -> None:
-        """Give the edition's timeline these words in its segment and these captions."""
+    def timeline(self, edition: Edition, *, words=(), captions=(), runtime=RUNTIME) -> None:
+        """Give the edition's timeline these words in its segment, these captions and this
+        runtime."""
         script = repository.read(edition.script)
         segment = {**script["segments"][0], "words": list(words)}
-        put(edition.timeline, {**script, "segments": [segment], "captions": list(captions)})
+        timeline = {**script, "duration": runtime, "segments": [segment]}
+        put(edition.timeline, {**timeline, "captions": list(captions)})
 
     def checked(self, edition: Edition) -> None:
         """Record that check-picture passed the edition's current picture."""
@@ -99,7 +103,9 @@ class FilmRoot:
     def staged(self, edition: Edition) -> None:
         """Stage both of the edition's pictures complete and record their passing check."""
         for captions in (True, False):
-            picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160, captions=captions)
+            picture_rendering.stage_picture(
+                edition, None, edition.runtime, 3840, 2160, captions=captions
+            )
         self.checked(edition)
 
     def queue(self, output: Path, *files: Path) -> None:
@@ -170,7 +176,7 @@ def film_root(tmp_path, monkeypatch) -> FilmRoot:
     put(root / "content/source-manifest.json", {"members": []})
     for code, text in TEXTS.items():
         edition = Edition(code)
-        script = {"duration": DURATION, "segments": [{"id": "01", "text": text}]}
+        script = {"segments": [{"id": "01", "text": text}]}
         put(root / edition.script, script)
         put(edition.soundtrack, f"{code} narration")
         assembly = {

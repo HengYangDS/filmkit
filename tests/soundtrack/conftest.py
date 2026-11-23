@@ -112,6 +112,8 @@ def two_chapters(tmp_path, monkeypatch, performance):
     }
     script = {
         "title": "Sample Reel",
+        # The runtime the assembly copies into the timeline, which the documents read.
+        "duration": 24,
         "voice_performance": {
             **performance,
             "thought_level_tolerance_db": 0.75,

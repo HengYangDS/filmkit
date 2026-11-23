@@ -15,7 +15,7 @@ from filmkit.captions import CaptionError
 
 @pytest.mark.parametrize(
     ("code", "byline"),
-    [("zh", "Yang HENG · 中文 · 1 分钟"), ("en", "Yang HENG · English · 1 min")],
+    [("zh", "Yang HENG · 中文 · 27 分钟"), ("en", "Yang HENG · English · 27 min")],
 )
 def test_chapters_land_on_their_cards_and_head_the_transcript(tmp_path, monkeypatch, code, byline):
     release = repository.read(production.Edition(code).script)["release"]
@@ -36,8 +36,10 @@ def test_chapters_land_on_their_cards_and_head_the_transcript(tmp_path, monkeypa
             "utterance_groups": [f"Text {sid}. ", f"More {sid}."],
         }
 
+    # A runtime of 27:16, which the byline states in whole minutes, rounded down.
     timeline = {
         "title": "Sample Reel",
+        "duration": 1636,
         "captions": [{"start": 1.9, "end": 3.0, "text": "Text 01. "}],
         "segments": [
             segment("01", "purpose", "One", 0.0),
@@ -54,7 +56,7 @@ def test_chapters_land_on_their_cards_and_head_the_transcript(tmp_path, monkeypa
     assert [(c["title"], c["start"]) for c in chapters] == [("One", 0.0), ("Two", second)]
     metadata = (output / "chapters.ffmeta").read_text()
     assert f"START={round(second * 1000)}\n" in metadata
-    assert f"END={specification.DURATION * 1000}\n" in metadata
+    assert metadata.endswith("END=1636000\ntitle=Two\n")
     assert f"comment={edition.comment.replace(';', chr(92) + ';')}\n" in metadata
     assert ("示例影片" in metadata) == (code == "zh")
     for name in (f"{edition.prefix}.srt", f"{edition.prefix}.vtt"):
@@ -90,7 +92,7 @@ def test_titles_headings_and_chapters_set_typographic_quotes(tmp_path, monkeypat
         "text": 'It says "Done."',
         "utterance_groups": ['It says "Done."'],
     }
-    timeline = {"title": 'The "Sample" Reel', "captions": [], "segments": [segment]}
+    timeline = {"title": 'The "Sample" Reel', "duration": 60, "captions": [], "segments": [segment]}
     captions_documents.subtitle_files(timeline, edition)
     output = edition.artifacts
     transcript = (output / f"{edition.prefix}-transcript.md").read_text()
@@ -123,7 +125,7 @@ def test_chinese_titles_keep_their_marks(tmp_path, monkeypatch):
         "text": "它交回一句话：“做完了。”",
         "utterance_groups": ["它交回一句话：“做完了。”"],
     }
-    timeline = {"title": "示例影片", "captions": [], "segments": [segment]}
+    timeline = {"title": "示例影片", "duration": 60, "captions": [], "segments": [segment]}
     captions_documents.subtitle_files(timeline, edition)
     transcript = (edition.artifacts / f"{edition.prefix}-transcript.md").read_text()
     assert "### 0:01 · “做完了”\n\n它交回一句话：“做完了。”\n" in transcript
@@ -160,7 +162,7 @@ def marked(tmp_path, monkeypatch, **values) -> tuple[dict, production.Edition]:
         "utterance_groups": ["Text."],
     }
     monkeypatch.setattr(captions_documents, "AUTHOR", held["author"])
-    return {"title": held["title"], "captions": [], "segments": [segment]}, edition
+    return {"title": held["title"], "duration": 60, "captions": [], "segments": [segment]}, edition
 
 
 def test_chapter_metadata_escapes_what_ffmetadata_reads_as_syntax(tmp_path, monkeypatch):

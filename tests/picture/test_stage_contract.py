@@ -14,7 +14,7 @@ from pathlib import Path
 
 import filmkit.picture.rendering as picture_rendering
 from filmkit.production import STAGE_RECORD, Edition
-from filmkit.specification import DURATION, FPS
+from filmkit.specification import FPS
 
 # The contract's reader imports no browser, so it runs wherever the engine's Node tools run.
 CONTRACT = Path(picture_rendering.__file__).with_name("stage-contract.mjs")
@@ -38,7 +38,7 @@ def test_the_geometry_check_reads_its_frame_contract_from_the_engines_own_stage(
     stage = edition.picture_stage
     read = contract(stage)
     assert read.returncode == 0, read.stderr
-    assert json.loads(read.stdout) == [3840, 2160, DURATION, FPS]
+    assert json.loads(read.stdout) == [3840, 2160, edition.runtime, FPS]
     assert "data-fps" not in (stage / "index.html").read_text(encoding="utf-8")
     # A stage restaged at another size and cut short before its record: the page and the record
     # disagree, and the refusal names what to run.

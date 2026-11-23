@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 from filmkit.captions import CaptionError
 from filmkit.captions.timing import shown_text, typeset
 from filmkit.repository import relative, write
-from filmkit.specification import AUTHOR, CHAPTER_CARD_SHOWN, DURATION
+from filmkit.specification import AUTHOR, CHAPTER_CARD_SHOWN
 
 if TYPE_CHECKING:
     from filmkit.production import Edition
@@ -144,13 +144,14 @@ def transcript_parts(segments: list[dict]) -> list[Part]:
     ]
 
 
-def _transcript(title: str, segments: list[dict], code: str) -> str:
-    """The transcript: the byline, then each chapter and each of its scenes headed by its
+def _transcript(title: str, segments: list[dict], code: str, runtime: int) -> str:
+    """The transcript: the byline, which states the runtime in whole minutes rounded down, so it
+    never states more than the film holds; then each chapter and each of its scenes headed by its
     time, and a paragraph for each thought."""
     byline = (
-        f"{AUTHOR} · 中文 · {DURATION // 60} 分钟"
+        f"{AUTHOR} · 中文 · {runtime // 60} 分钟"
         if code == "zh"
-        else f"{AUTHOR} · English · {DURATION // 60} min"
+        else f"{AUTHOR} · English · {runtime // 60} min"
     )
     transcript = f"# {typeset(title)}\n\n{byline}\n"
     for part in transcript_parts(segments):
@@ -206,14 +207,15 @@ def require_metadata_values(titled: dict, source: str, edition: Edition) -> None
         raise CaptionError(msg)
 
 
-def _chapter_metadata(title: str, comment: str, chapters: list[_Chapter]) -> str:
-    """The FFmetadata of the film's tags and chapters, in milliseconds; the last ends the film."""
+def _chapter_metadata(title: str, comment: str, chapters: list[_Chapter], runtime: int) -> str:
+    """The FFmetadata of the film's tags and chapters, in milliseconds; the last ends with the
+    film's runtime."""
     metadata = (
         f";FFMETADATA1\ntitle={_metadata_value(typeset(title))}\nartist={_metadata_value(AUTHOR)}\n"
         f"author={_metadata_value(AUTHOR)}\ncomment={_metadata_value(typeset(comment))}\n"
     )
     for i, chapter in enumerate(chapters):
-        end = chapters[i + 1].entry["start"] if i + 1 < len(chapters) else DURATION
+        end = chapters[i + 1].entry["start"] if i + 1 < len(chapters) else runtime
         metadata += (
             "\n[CHAPTER]\nTIMEBASE=1/1000\n"
             f"START={round(chapter.entry['start'] * 1000)}\n"
@@ -226,16 +228,18 @@ def subtitle_files(timeline: dict, edition: Edition) -> None:
     """Write the edition's SRT and VTT captions, chapters, transcript and chapter metadata.
 
     Nothing is written for a film whose chapter metadata would hold a value the format cannot
-    keep (`require_metadata_values`); both callers write the timeline they pass to its file
-    first, so the refusal names that file.
+    keep (`require_metadata_values`), or whose timeline states no runtime
+    (`Edition.runtime_in`); both callers write the timeline they pass to its file first, so the
+    refusal names that file.
     """
     require_metadata_values(timeline, relative(edition.timeline), edition)
+    runtime = edition.runtime_in(timeline)
     srt, vtt = _cue_documents(timeline["captions"])
     edition.srt.write_text(srt)
     edition.vtt.write_text(vtt)
     chapters = _chapters(timeline["segments"])
     write(edition.chapters, {"chapters": [chapter.entry for chapter in chapters]})
-    transcript = _transcript(timeline["title"], timeline["segments"], edition.code)
+    transcript = _transcript(timeline["title"], timeline["segments"], edition.code, runtime)
     edition.transcript.write_text(transcript)
-    metadata = _chapter_metadata(timeline["title"], edition.comment, chapters)
+    metadata = _chapter_metadata(timeline["title"], edition.comment, chapters, runtime)
     edition.chapter_metadata.write_text(metadata)

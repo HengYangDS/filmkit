@@ -448,7 +448,7 @@ test("the captions control and a version switch must reach the other film from t
   const broken = {
     ...CAPTIONS[0],
     width: 1280,
-    seek_checks: [{ target: 2, error: 4, decoded_frames: 0 }],
+    seek_checks: [{ target: 2, error: 4, decoded_frames: 0 }, ...CAPTIONS[0].seek_checks.slice(1)],
   };
   assert.deepEqual(switchProblems(broken, 60), [
     "-1080p-uncaptioned.mp4 is 1280x1080, not 1920x1080",
@@ -526,7 +526,7 @@ test("a read that stops fails its page and keeps what it read, and the other pag
     problems: ["the read stopped: net::ERR_FILE_NOT_FOUND"],
   });
   // A player whose delivery holds no chapters is not judged beyond the stop.
-  const binding = { film: { slug: "sample-reel", duration: 60 }, members: [] };
+  const binding = { film: { slug: "sample-reel", runtimes: { zh: 1636, en: 1476 } }, members: [] };
   const read = await readPlayer(closed, "/nowhere", "zh", binding, "/nowhere/player-zh.png");
   assert.equal(read.verdict, "fail");
   assert.deepEqual(read.editions, []);

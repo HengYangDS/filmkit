@@ -61,6 +61,7 @@ def stage(tmp_path, monkeypatch, code, groups, words, captions=()):
     }
     timeline = {
         **script,
+        "duration": 9,
         "segments": [timed],
         "timing_state": "Assembled",
         "captions": list(captions),

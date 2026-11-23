@@ -63,7 +63,7 @@ from filmkit.picture.rendering import (
     PictureError,
     validate_picture,
 )
-from filmkit.specification import DURATION, FPS
+from filmkit.specification import FPS
 
 if TYPE_CHECKING:
     from filmkit.production import Edition
@@ -139,10 +139,10 @@ def composition_report(edition: Edition, work: Path) -> dict:
     return repository.read(report)
 
 
-def sampled_frames(timeline: dict) -> list[int]:
-    """The frames the encoded level compares: every STEP seconds and every caption's start,
-    middle and end frame, each once, in order."""
-    last = DURATION * FPS - 1
+def sampled_frames(timeline: dict, frames: int) -> list[int]:
+    """The frames the encoded level compares of a film of `frames` frames: every STEP seconds
+    and every caption's start, middle and end frame, each once, in order."""
+    last = frames - 1
     frames = set(range(0, last + 1, round(STEP * FPS)))
     for cue in timeline.get("captions", []):
         for t in (cue["start"], (cue["start"] + cue["end"]) / 2, cue["end"]):
@@ -489,8 +489,9 @@ def compare_pictures(edition: Edition) -> dict:
     if composition["differing_instants"] == 0:
         files = {r.name: r.file for r in (edition.rendered(True), edition.rendered(False))}
         rows = excluded_rows(composition["band"], PICTURE_SIZE[1])
-        sampled = sampled_frames(timeline)
-        encoded = encoded_comparison(files, PICTURE_SIZE, DURATION * FPS, sampled, rows, work)
+        frames = edition.runtime_in(timeline) * FPS
+        sampled = sampled_frames(timeline, frames)
+        encoded = encoded_comparison(files, PICTURE_SIZE, frames, sampled, rows, work)
     if current_bindings(edition) != bound:
         msg = "A picture, the composition or the timeline changed while they were compared"
         raise PictureError(msg)

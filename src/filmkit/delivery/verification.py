@@ -55,9 +55,8 @@ class VerificationError(ValueError):
 # How many films' media are verified at the same time: each is one complete decode, which uses a
 # few of the host's cores.
 MEDIA_POOL = 4
-CREDITS_DURATION, DURATION, FPS, RATE = (
+CREDITS_DURATION, FPS, RATE = (
     specification.CREDITS_DURATION,
-    specification.DURATION,
     specification.FPS,
     specification.RATE,
 )
@@ -79,12 +78,14 @@ def verify_sources() -> dict:
 
 
 def verify_captions(timeline: dict, code: str) -> int:
-    """Captions stay single-line, typeset, within their limit and before the credits."""
+    """Captions stay single-line, typeset, within their limit and before the credits, which end
+    the runtime the timeline states."""
     limit, prior_end = specification.CAPTION_LIMITS[code], 0.0
+    credits = production.Edition(code).runtime_in(timeline) - CREDITS_DURATION
     for cue in timeline["captions"]:
         display = cue.get("display_text", cue["text"])
         if not (
-            0 <= cue["start"] < cue["end"] <= DURATION - CREDITS_DURATION
+            0 <= cue["start"] < cue["end"] <= credits
             and cue["start"] >= prior_end - 0.15
             and all("\n" not in v and len(v) <= limit for v in (cue["text"], display))
             and all(captions_timing.typeset(v) == v for v in (cue["text"], display))
@@ -119,8 +120,8 @@ def verify_narration(edition: production.Edition) -> dict:
         raise VerificationError(msg)
     with wave.open(str(soundtrack)) as audio:
         shape = (audio.getnframes(), audio.getframerate(), audio.getnchannels())
-    if shape != (DURATION * RATE, RATE, 2):
-        msg = "Soundtrack must be exact 48 kHz stereo for the duration"
+    if shape != (edition.runtime_in(timeline) * RATE, RATE, 2):
+        msg = "Soundtrack must be exact 48 kHz stereo for the runtime"
         raise VerificationError(msg)
     level, policy = assembly.get("program_level", {}), specification.PROGRAM_LEVEL
     after = level.get("after", {})
@@ -161,16 +162,16 @@ def verify_narration(edition: production.Edition) -> dict:
 def require_covering_geometry(edition: production.Edition) -> dict:
     """The geometry record, refused unless it passed on the whole current staged film."""
     geometry = repository.read(edition.picture_geometry)
-    step = geometry.get("step_frames")
+    step, runtime = geometry.get("step_frames"), edition.runtime
     if not (
         geometry.get("format") == "picture-geometry"
         and geometry.get("passed") is True
         and geometry["findings"] == geometry["errors"] == []
         and geometry["index_sha256"] == repository.sha(edition.rendered().page)
         and (geometry["width"], geometry["height"]) == picture_rendering.PICTURE_SIZE
-        and (geometry["duration"], geometry["fps"]) == (DURATION, FPS)
+        and (geometry["duration"], geometry["fps"]) == (runtime, FPS)
         and step in (1, 2)
-        and geometry["checked"] == -(-DURATION * FPS // step)
+        and geometry["checked"] == -(-runtime * FPS // step)
     ):
         msg = "Picture geometry does not cover the current staged film"
         raise VerificationError(msg)
@@ -279,12 +280,13 @@ def verify_package(edition: production.Edition) -> dict:
 
 
 def verify_media(edition: production.Edition, path: Path, rendition: production.Rendition) -> dict:
-    """Decode one complete delivered movie and check its rendition's declared contract."""
-    size = rendition.size
+    """Decode one complete delivered movie and check its rendition's declared contract, over
+    the edition's runtime."""
+    size, runtime = rendition.size, edition.runtime
     data = media.probe(path)
     try:
         video = media.require_video(
-            data, frames=DURATION * FPS, fps=FPS, size=size, duration=DURATION
+            data, frames=runtime * FPS, fps=FPS, size=size, duration=runtime
         )
     except media.MediaError as error:
         msg = f"Movie differs from the delivery contract: {path.name}: {error}"
@@ -303,7 +305,7 @@ def verify_media(edition: production.Edition, path: Path, rendition: production.
         )
         and video.get("level") == specification.H264_LEVELS[size[1]]
         and (int(audio["sample_rate"]), audio["channels"]) == (RATE, 2)
-        and abs(float(audio["duration"]) - DURATION) < tolerance
+        and abs(float(audio["duration"]) - runtime) < tolerance
         and any(s.get("disposition", {}).get("attached_pic") for s in data["streams"])
         and tags.get("artist") == specification.AUTHOR
         and tags.get("author", tags.get("com.apple.quicktime.author")) == specification.AUTHOR
@@ -320,14 +322,14 @@ def verify_media(edition: production.Edition, path: Path, rendition: production.
     ):
         msg = f"Movie differs from the delivery contract: {path.name}"
         raise VerificationError(msg)
-    cadence = media.video_cadence(path, DURATION * FPS, FPS)
-    if not packaging.keyed_as_declared(rendition, cadence.get("keyframes", [])):
+    cadence = media.video_cadence(path, runtime * FPS, FPS)
+    if not packaging.keyed_as_declared(rendition, cadence.get("keyframes", []), runtime):
         msg = f"Movie differs from the delivery contract: {path.name}: keyframes"
         raise VerificationError(msg)
-    frames = media.decoded_video_frames(path, DURATION * FPS, max(300, DURATION))
+    frames = media.decoded_video_frames(path, runtime * FPS, max(300, runtime))
     sample_frames = media.decoded_audio_frames(path)
     # AAC encoder padding is distinct from the declared sample domain.
-    if abs(sample_frames - DURATION * RATE) > 1024:
+    if abs(sample_frames - runtime * RATE) > 1024:
         msg = f"Decoded audio length differs: {path.name}"
         raise VerificationError(msg)
     return {
@@ -513,6 +515,7 @@ def qualify(
 # keeps its traceback.
 REFUSALS = (
     VerificationError,
+    production.UnassembledError,
     sources.SourceError,
     media.MediaError,
     picture_rendering.PictureError,

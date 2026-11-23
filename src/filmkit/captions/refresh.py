@@ -42,12 +42,13 @@ PRESENTATION_SCOPE = (
 
 
 def caption_source(timeline: dict) -> dict:
-    """Project the source copy from an assembled timeline for caption-only edits."""
+    """Project the source copy from an assembled timeline for caption-only edits: without what
+    the assembly and the captions write, among them the runtime, which no script states."""
     return {
         **{
             key: value
             for key, value in timeline.items()
-            if key not in {"segments", "captions", "timing_state", "caption_timing"}
+            if key not in {"segments", "captions", "timing_state", "caption_timing", "duration"}
         },
         "segments": [
             {

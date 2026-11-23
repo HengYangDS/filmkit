@@ -247,11 +247,11 @@ def test_a_timeline_replaced_while_the_film_is_scanned_is_refused_and_leaves_no_
 @pytest.mark.parametrize(
     ("stated", "said"),
     [
-        ("[]", "states no duration for the film's scan"),
-        ('{"segments": [], "duration": NaN}', "states no duration for the film's scan"),
-        ('{"segments": [], "duration": Infinity}', "states no duration for the film's scan"),
-        ('{"segments": [], "duration": 0}', "states no duration for the film's scan"),
-        ('{"segments": [], "duration": "6"}', "states no duration for the film's scan"),
+        ("[]", "states no runtime in whole seconds"),
+        ('{"segments": [], "duration": NaN}', "states no runtime in whole seconds"),
+        ('{"segments": [], "duration": Infinity}', "states no runtime in whole seconds"),
+        ('{"segments": [], "duration": 0}', "states no runtime in whole seconds"),
+        ('{"segments": [], "duration": "6"}', "states no runtime in whole seconds"),
         ('{"duration": 6}', "The timeline's aligned words stand in no form the scan reads"),
         (
             '{"duration": 6, "segments": [{"words": [{"start": 1}]}]}',
@@ -261,7 +261,7 @@ def test_a_timeline_replaced_while_the_film_is_scanned_is_refused_and_leaves_no_
             '{"duration": 6, "segments": [{"words": [{"start": 1, "end": "2"}]}]}',
             "The timeline states a word whose start or end is no time",
         ),
-        ('{"duration": 6, "segments": 3', "states no duration for the film's scan"),
+        ('{"duration": 6, "segments": 3', "states no runtime in whole seconds"),
     ],
 )
 def test_a_timeline_the_scan_cannot_read_is_refused_by_its_name(packaged, stated, said):

@@ -65,9 +65,9 @@ def pair(film_root, monkeypatch):
     picture_rendering.render_picture(edition, 60)
     monkeypatch.setattr(media, "probe", lambda path: {})
     monkeypatch.setattr(media, "require_video", lambda *arguments, **options: {})
-    grid = list(range(0, derivation.DURATION * derivation.FPS, 2 * derivation.FPS))
+    grid = list(range(0, edition.runtime * derivation.FPS, 2 * derivation.FPS))
     monkeypatch.setattr(media, "video_cadence", lambda *arguments: {"keyframes": grid})
-    monkeypatch.setattr(derivation, "require_derived_media", lambda path: None)
+    monkeypatch.setattr(derivation, "require_derived_media", lambda path, runtime: None)
     tools = Tools()
     monkeypatch.setattr(derivation.tools, "run", tools)
     encodes = []
@@ -78,7 +78,7 @@ def pair(film_root, monkeypatch):
             raise derivation.BandFault(tools.band_fault.format(code=code))
         target.write_text(f"derived from {repository.sha(source)}")
         check = {"frames": 99, "largest_departure": 1, "verdict": "pass"}
-        whole = derivation.DURATION * derivation.FPS
+        whole = edition.runtime * derivation.FPS
         edge = {"rows": list(edges), "frames": whole, "largest_departure": 0, "verdict": "pass"}
         scan = {"frames": whole, "changes": 0, "faults": [], "verdict": "pass"}
         made = {"ground": GROUND, "command": ["ffmpeg"], "elapsed_seconds": 1.5, "check": check}
@@ -109,7 +109,7 @@ def test_a_derivation_writes_the_picture_and_a_receipt_that_binds_its_source(pai
     assert derived["band_audit"]["verdict"] == derived["ground_check"]["verdict"] == "pass"
     # The captioned picture's band was scanned at every frame for a one-frame change.
     assert derived["band_scan"] == {
-        "frames": derivation.DURATION * derivation.FPS,
+        "frames": edition.runtime * derivation.FPS,
         "changes": 0,
         "faults": [],
         "verdict": "pass",
@@ -231,7 +231,7 @@ def test_a_captioned_picture_that_is_not_valid_refuses_before_anything_else(pair
 def test_a_derived_picture_whose_media_differ_is_removed(pair, monkeypatch):
     edition, _, _ = pair
 
-    def refuse(path):
+    def refuse(path, runtime):
         message = "keyframes leave the 2 s grid"
         raise PictureError(message)
 

@@ -32,7 +32,6 @@ import filmkit.repository as repository
 from filmkit.picture import renderer
 from filmkit.picture.rendering import PictureError
 from filmkit.production import STAGE_PAGE, VIEWING
-from filmkit.specification import DURATION
 
 if TYPE_CHECKING:
     from filmkit.production import Edition
@@ -53,7 +52,7 @@ def render_draft(edition: Edition, deadline: float = DEADLINE) -> dict:
         shutil.rmtree(stage)
     for earlier in (draft, edition.draft_stills, edition.draft_receipt):
         earlier.unlink(missing_ok=True)
-    rendering.stage_picture(edition, stage, DURATION, *DRAFT_SIZE)
+    rendering.stage_picture(edition, stage, edition.runtime, *DRAFT_SIZE)
     command = renderer.command(stage, draft, DRAFT_FPS, renderer.DRAFT_SPANS)
     # nice raises the niceness by its increment, so a caller nicer than NICENESS stays as it is.
     increment = max(0, NICENESS - os.getpriority(os.PRIO_PROCESS, 0))

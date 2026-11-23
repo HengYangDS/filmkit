@@ -14,10 +14,14 @@ import filmkit.specification as specification
 from filmkit.delivery.packaging import PackagingError
 from filmkit.picture.rendering import PictureError
 
+# The runtime the edition's timeline states: an odd number of seconds, which ends the 1080p
+# films' keyframe grid on half a group.
+RUNTIME = 1477
+
 
 def probe(
     *,
-    frames=specification.DURATION * specification.FPS,
+    frames=RUNTIME * specification.FPS,
     author=specification.AUTHOR,
     sound="audio",
     kind="uhd",
@@ -32,7 +36,7 @@ def probe(
     """
     edition = production.Edition("zh")
     rendition = production.RENDITIONS[kind]
-    duration = f"{specification.DURATION:.6f}"
+    duration = f"{RUNTIME:.6f}"
     tags = {**delivery_packaging.delivered_tags(edition, rendition)}
     tags["com.apple.quicktime.author"] = author
     for key, value in (changes or {}).items():
@@ -73,6 +77,7 @@ def packaging_root(tmp_path, monkeypatch):
         json.dumps({"title": script["title"], "release": script["release"]}, ensure_ascii=False)
     )
     edition.artifacts.mkdir(parents=True)
+    repository.write(edition.timeline, {"duration": RUNTIME, "fps": specification.FPS})
     for path, body in (
         (edition.picture, "picture"),
         (edition.rendered(captions=False).file, "uncaptioned picture"),
@@ -236,7 +241,7 @@ def test_the_commands_carry_the_release_metadata(packaging_root):
         "2",
     ]
     sound = ["-c:a", "aac", "-b:a", "256k", "-ar", "48000", "-ac", "2"]
-    sound += ["-t", str(specification.DURATION)]
+    sound += ["-t", "1477"]
     tags = [
         "title=示例影片 · 从源文件到成片",
         "artist=Yang HENG",
@@ -289,7 +294,7 @@ def test_the_commands_carry_the_release_metadata(packaging_root):
         "-Keys:CreationDate=" + created.removeprefix("creation_time="),
     ]
     expected = []
-    viewing = max(delivery_packaging.DEADLINE_FLOOR, 2 * specification.DURATION)
+    viewing = 2 * RUNTIME
     captioned, uncaptioned = (
         "sample-reel-final-picture.mp4",
         "sample-reel-final-picture-uncaptioned.mp4",
@@ -366,7 +371,7 @@ def test_a_failed_check_leaves_no_film_in_place_and_keeps_the_work(packaging_roo
 @pytest.mark.parametrize(
     "change",
     [
-        {"frames": specification.DURATION * specification.FPS - 1},
+        {"frames": RUNTIME * specification.FPS - 1},
         {"author": None},
         {"sound": "data"},
         {"changes": {"album": None}},
@@ -390,32 +395,37 @@ def test_a_failed_check_leaves_no_film_in_place_and_keeps_the_work(packaging_roo
         "version",
     ],
 )
-def test_a_finished_film_needs_every_frame_its_author_and_release(tmp_path, monkeypatch, change):
+def test_a_finished_film_needs_every_frame_its_author_and_release(
+    packaging_root, monkeypatch, change
+):
+    root, edition, _ = packaging_root
     monkeypatch.setattr(media, "probe", lambda _path: probe(**change))
     with pytest.raises(PackagingError, match="differs from the delivery contract"):
         delivery_packaging.check_delivered_film(
-            tmp_path / "film.mp4", production.Edition("zh"), production.RENDITIONS["uhd"]
+            root / "film.mp4", edition, production.RENDITIONS["uhd"]
         )
 
 
-def test_a_finished_film_may_carry_its_creation_date_beside_its_release_keys(tmp_path, monkeypatch):
+def test_a_finished_film_may_carry_its_creation_date_beside_its_release_keys(
+    packaging_root, monkeypatch
+):
+    root, edition, _ = packaging_root
     changes = {"com.apple.quicktime.creationdate": "2026-11-09T22:00:00+00:00"}
     monkeypatch.setattr(media, "probe", lambda _path: probe(changes=changes))
     delivery_packaging.check_delivered_film(
-        tmp_path / "film.mp4", production.Edition("zh"), production.RENDITIONS["uhd"]
+        root / "film.mp4", edition, production.RENDITIONS["uhd"]
     )
 
 
 @pytest.mark.parametrize(("every", "passes"), [(2 * specification.FPS, True), (12, False)])
-def test_a_1080p_film_holds_a_keyframe_every_2_seconds(tmp_path, monkeypatch, every, passes):
+def test_a_1080p_film_holds_a_keyframe_every_2_seconds(packaging_root, monkeypatch, every, passes):
+    root, edition, _ = packaging_root
     monkeypatch.setattr(media, "probe", lambda _path: probe(kind="1080p-captioned"))
     monkeypatch.setattr(media, "video_cadence", lambda _path, frames, _fps: keyed(frames, every))
 
     def check():
         delivery_packaging.check_delivered_film(
-            tmp_path / "film.mp4",
-            production.Edition("zh"),
-            production.RENDITIONS["1080p-captioned"],
+            root / "film.mp4", edition, production.RENDITIONS["1080p-captioned"]
         )
 
     if passes:

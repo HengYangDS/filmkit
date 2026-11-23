@@ -104,7 +104,11 @@ def delivered(tmp_path, monkeypatch):
             segment("02", "a", "Ay", 20.0, ["Four, and more."]),
             segment("03", "b", "Bee", 40.0, ["Five.", "Six."]),
         ]
-        repository.write(edition.timeline, {"segments": segments, "captions": CUES})
+        # The editions last 27:16 and 24:36, each its own runtime.
+        runtime = {"zh": 1636, "en": 1476}[code]
+        repository.write(
+            edition.timeline, {"duration": runtime, "segments": segments, "captions": CUES}
+        )
         vtt = "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\n汉 A\n"
         (edition.artifacts / f"{edition.prefix}.vtt").write_text(vtt, encoding="utf-8")
         srt = "1\n00:00:01,000 --> 00:00:02,000\n汉 A\n"
@@ -134,8 +138,7 @@ def test_the_player_shows_the_film_its_versions_and_chapters_over_a_hidden_track
     assert page.all("html")[0]["lang"] == "zh-CN"
     assert page.all("title")[0]["text"] == "A <Reel> & Co"
     # The line under the title names the film's version after the language.
-    runtime = f"{specification.DURATION // 60:02d}:{specification.DURATION % 60:02d}"
-    byline = f"{specification.AUTHOR} · 中文 · 版本号 1.3.0 · {runtime} · 60 fps"
+    byline = f"{specification.AUTHOR} · 中文 · 版本号 1.3.0 · 27:16 · 60 fps"
     assert page.all("header")[0]["text"] == f"A <Reel> & Co{byline}English选择语言"
     # The film's colours, and its summary under the film.
     assert all(colour in html for colour in FILM.player.model_dump().values())
@@ -292,8 +295,7 @@ def test_the_english_player_speaks_english_and_names_chinese_in_chinese(delivere
     html = delivery_player.player_page(production.Edition("en"), "2.0.0")
     page = Page(html)
     assert page.all("html")[0]["lang"] == "en"
-    runtime = f"{specification.DURATION // 60:02d}:{specification.DURATION % 60:02d}"
-    byline = f"{specification.AUTHOR} · English · Version 2.0.0 · {runtime} · 60 fps"
+    byline = f"{specification.AUTHOR} · English · Version 2.0.0 · 24:36 · 60 fps"
     assert page.all("header")[0]["text"] == f"A <Reel> & Co{byline}中文Choose a language"
     [track] = page.all("track")
     assert (track["kind"], track["srclang"], track["label"]) == (
@@ -374,10 +376,12 @@ def test_packaging_writes_the_engines_player_and_records_what_it_shows(tmp_path,
         start = 12.0 * index
         voice = {"voice_start": start + 2, "voice_end": start + 10, "gap_kind": "thought"}
         segments.append({**scene, "start": start, "end": start + 12, **voice})
-    duration, fps = specification.DURATION, specification.FPS
-    timeline = {"title": script["title"], "duration": duration, "fps": fps, "segments": segments}
+    fps = specification.FPS
+    timeline = {"title": script["title"], "duration": 60, "fps": fps, "segments": segments}
     timeline["captions"] = [{"start": 2.0, "end": 3.0, "text": "旁白。", "segment": "01"}]
     repository.write(edition.timeline, timeline)
+    # The entry page shows both editions' runtimes.
+    repository.write(production.Edition("en").timeline, {"duration": 60})
     captions_documents.subtitle_files(timeline, edition)
     (tmp_path / "VERSION").write_text("1.3.0\n")
     delivery_packaging.package_metadata(edition)

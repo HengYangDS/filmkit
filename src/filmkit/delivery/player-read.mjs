@@ -19,6 +19,7 @@ import {
   LANGUAGES,
   parseCues,
   playerProblems,
+  seekPoints,
   verdict,
   visibleCaptionControls,
 } from "./player-verdict.mjs";
@@ -44,9 +45,6 @@ export async function digestFile(path) {
   for await (const block of createReadStream(path)) hash.update(block);
   return hash.digest("hex");
 }
-
-/** Two seconds in, the middle, and four seconds before the end. */
-export const seekPoints = (duration) => [2, duration / 2, duration - 4];
 
 /* The page's video, its caption track and its captions control as the browser holds them. */
 const videoState = (page) =>
@@ -371,10 +369,11 @@ export async function readEntry(page, root, members) {
   return { ...verdict("index.html", [...entryProblems(read, members), ...stopped]), ...read };
 }
 
-/** What one edition's player holds by the delivery: its chapters, the size of each of its members, its WebVTT, the
- * cues of its SRT and its cover's samples, against which a switch's frames are judged. */
-async function delivered(root, code, binding) {
-  const { slug, duration } = binding.film,
+/** What one edition's player holds by the delivery: its runtime, its chapters, the size of each of its members, its
+ * WebVTT, the cues of its SRT and its cover's samples, against which a switch's frames are judged. */
+export async function delivered(root, code, binding) {
+  const { slug } = binding.film,
+    duration = binding.film.runtimes[code],
     members = binding.members.map((member) => member.path),
     sizes = new Map();
   for (const member of members.filter((m) => m.startsWith(`${code}/`)))
@@ -438,7 +437,8 @@ export async function readPlayer(page, root, code, binding, screenshot) {
     read.native_caption_controls = await nativeCaptionControls(page);
     read.saved = await saveDownloads(page, root, code, read.files);
     read.opened = await openFileLinks(page, read.files);
-    const { duration } = binding.film;
+    // Each edition's films play against its own runtime.
+    const { duration } = expected;
     for (const [file, , dimensions] of VERSIONS)
       read.editions.push(await switchVersion(page, file, dimensions, duration, expected.cover));
     read.captions = await switchCaptions(page, duration, expected.cover);

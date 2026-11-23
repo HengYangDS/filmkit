@@ -1,7 +1,7 @@
 /** Read the delivered players back in a real browser, and paint the cover from a staged document.
  *
- * players: a binding names the destination, the film's file prefix and duration, and the SHA-256 of each of the 25
- * delivery members (the delivery readback, or a review round's artifacts binding). The member bytes are checked before and after the browser read.
+ * players: a binding names the destination, the film's file prefix, each edition's runtime by its code, and the
+ * SHA-256 of each of the 25 delivery members (the delivery readback, or a review round's artifacts binding). The member bytes are checked before and after the browser read.
  * The read (player-read.mjs, judged by player-verdict.mjs) opens the language entry page and each language's player, and records each page with a
  * verdict of its own in the receipt's `pages`: every link leads to a member or a sibling page; the captioned viewing
  * edition plays first with its captions control pressed; the control turns the captions off and on, paused and
@@ -27,8 +27,8 @@ import { parseArgs } from "node:util";
 import { launchBrowser } from "../picture/headless-browser.mjs";
 import { frameContract, PAGE, StageError } from "../picture/stage-contract.mjs";
 import { decodePng } from "./player-frames.mjs";
-import { digestFile, readDelivery, seekPoints } from "./player-read.mjs";
-import { LANGUAGES } from "./player-verdict.mjs";
+import { digestFile, readDelivery } from "./player-read.mjs";
+import { LANGUAGES, seekPoints } from "./player-verdict.mjs";
 
 export { decodePng, digestFile, seekPoints };
 
@@ -71,8 +71,9 @@ export function deliveryMembers(slug) {
 }
 
 /** Why a binding does not name one delivery; none for a binding with an absolute destination, the film's file prefix
- * and positive duration, and exactly the film's delivery members, each once with a SHA-256. A delivery readback must
- * also have matched its sources with nothing beside them. */
+ * and each edition's runtime by its code, a positive whole number of seconds, and exactly the film's delivery members,
+ * each once with a SHA-256. A binding that names one duration for the film, as bindings did before the editions could
+ * differ in length, is refused. A delivery readback must also have matched its sources with nothing beside them. */
 export function bindingProblems(binding) {
   const problems = [];
   if (typeof binding?.destination !== "string" || !isAbsolute(binding.destination))
@@ -80,8 +81,16 @@ export function bindingProblems(binding) {
   const slug = binding?.film?.slug,
     named = typeof slug === "string" && SLUG.test(slug);
   if (!named) problems.push("film names no file prefix");
-  if (!(Number.isFinite(binding?.film?.duration) && binding.film.duration > 0))
-    problems.push("film names no duration");
+  const runtimes = binding?.film?.runtimes;
+  if (binding?.film && Object.hasOwn(binding.film, "duration"))
+    problems.push(
+      "film names one duration for both editions; a binding names each edition's runtime by its code",
+    );
+  for (const code of Object.keys(LANGUAGES))
+    if (!(Number.isInteger(runtimes?.[code]) && runtimes[code] > 0))
+      problems.push(`film names no runtime for ${code}`);
+  const other = Object.keys(runtimes ?? {}).filter((code) => !Object.hasOwn(LANGUAGES, code));
+  if (other.length) problems.push(`film names a runtime for no edition: ${other.join(", ")}`);
   if (binding?.all_match === false) problems.push("the readback does not match its sources");
   if (binding?.unexpected?.length)
     problems.push(`unexpected entries at the destination: ${binding.unexpected.join(", ")}`);

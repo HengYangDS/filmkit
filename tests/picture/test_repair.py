@@ -50,7 +50,6 @@ def pair(film_root, monkeypatch):
     """The Chinese edition with one caption and both pictures staged and checked, compared as
     pictures of 96x54 and two seconds."""
     monkeypatch.setattr(equivalence, "PICTURE_SIZE", SIZE)
-    monkeypatch.setattr(equivalence, "DURATION", SECONDS)
     # The pictures' media are not checked here; the comparison reads each receipt as it stands.
     monkeypatch.setattr(
         equivalence,
@@ -59,7 +58,7 @@ def pair(film_root, monkeypatch):
     )
     monkeypatch.setattr(equivalence.tools, "run", reporting(BAND))
     edition = Edition("zh")
-    film_root.timeline(edition, captions=CUES)
+    film_root.timeline(edition, captions=CUES, runtime=SECONDS)
     film_root.staged(edition)
     return edition
 

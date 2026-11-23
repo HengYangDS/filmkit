@@ -173,7 +173,7 @@ def timeline_of(code):
         segments.append(
             {"id": f"0{number}", "text": text, "utterance_groups": thoughts, "words": words}
         )
-    return {"segments": segments, "captions": []}
+    return {"duration": {"zh": 1636, "en": 1476}[code], "segments": segments, "captions": []}
 
 
 def prompted(root, put, monkeypatch, template):

@@ -60,14 +60,13 @@ from filmkit.picture.rendering import (
 )
 from filmkit.picture.repair import ATTEMPTS, repair_pictures
 from filmkit.preflight import PreflightError, admitted, preflight
-from filmkit.production import CODES, Edition
+from filmkit.production import CODES, Edition, UnassembledError
 from filmkit.review import ReviewError
 from filmkit.review.set_aside import require_set_aside
 from filmkit.soundtrack.assembly import assemble
 from filmkit.soundtrack.fit import REFUSALS as FIT_REFUSALS
 from filmkit.soundtrack.fit import VariantsError, fit, read_variants
 from filmkit.soundtrack.gates import check_sound
-from filmkit.specification import DURATION
 from filmkit.tools import ToolError
 
 if TYPE_CHECKING:
@@ -115,7 +114,7 @@ EDITION_ACTIONS: dict[str, Callable[[Edition, argparse.Namespace], object]] = {
     "stage-picture": lambda edition, options: stage_picture(
         edition,
         options.output,
-        options.duration,
+        edition.runtime if options.duration is None else options.duration,
         options.width,
         options.height,
         options.start,
@@ -159,13 +158,16 @@ REFUSALS = (
     PackagingError,
     PreflightError,
     ReviewError,
+    UnassembledError,
 )
 
 
 def arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("action", choices=[*EDITION_ACTIONS])
-    parser.add_argument("--duration", type=int, default=DURATION)
+    parser.add_argument(
+        "--duration", type=int, help="stage-picture: the seconds staged, by default the runtime"
+    )
     parser.add_argument("--start", type=float, default=0)
     parser.add_argument("--width", type=int, default=PICTURE_SIZE[0])
     parser.add_argument("--height", type=int, default=PICTURE_SIZE[1])

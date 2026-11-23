@@ -109,6 +109,10 @@ def test_an_edition_action_passes_its_options_to_its_owner(monkeypatch, tmp_path
         lambda edition, seconds, *, asked: owner(edition, seconds, captions=False, asked=asked),
     )
     output = tmp_path / "stage"
+    # Without --duration a stage spans the edition's runtime, as its timeline states it.
+    en = production.Edition("en")
+    en.timeline.parent.mkdir(parents=True)
+    en.timeline.write_text(json.dumps({"duration": 1477}))
     stage = ["--output", str(output), "--duration", "60", "--width", "1920", "--height", "1080"]
     produce.main(["stage-picture", "--language", "zh", *stage, "--start", "12.5"])
     produce.main(["render-picture", "--language", "en", "--deadline", "600"])
@@ -122,11 +126,21 @@ def test_an_edition_action_passes_its_options_to_its_owner(monkeypatch, tmp_path
     assert calls == [
         (zh, output, 60, 1920, 1080, 12.5, {"captions": True}),
         (en, 600, {"captions": True}),
-        (en, None, produce.DURATION, 3840, 2160, 0, {"captions": False}),
+        (en, None, 1477, 3840, 2160, 0, {"captions": False}),
         (zh, 600, {"captions": False, "asked": True}),
         (zh, {"captions": False}),
         (en, {}),
     ]
+
+
+def test_an_edition_without_a_timeline_is_staged_at_no_runtime():
+    with pytest.raises(SystemExit) as refused:
+        produce.main(["stage-picture", "--language", "zh"])
+    assert str(refused.value) == (
+        "stage-picture: The zh edition has no timeline at build/artifacts/film/zh/timeline.json, "
+        "so no runtime: run produce assemble --language zh"
+    )
+    assert not production.Edition("zh").picture_stage.exists()
 
 
 def test_each_owner_keeps_its_own_deadline_default(monkeypatch):

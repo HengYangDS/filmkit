@@ -145,7 +145,7 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
         "Put working files under ROOT/build/evidence/reviews/round-5/zh/.",
         # The delivery format is the specification's, at the soundtracks' program level.
         (
-            f"Each edition: exactly {specification.DURATION} s, 16:9 pure 2D, "
+            "This edition: exactly 1636 s, 16:9 pure 2D, "
             f"{specification.FPS} fps, UHD master and a 1080p viewing edition, each with its "
             "captions drawn in the picture and again without captions, "
             f"{specification.RATE // 1000} kHz stereo narration at -16.5 LUFS integrated, "
@@ -153,6 +153,10 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
         ),
     ):
         assert expected in zh
+    # Each edition's prompt states its own runtime.
+    assert "This edition: exactly 1476 s, 16:9 pure 2D, " in en
+    assert "1476" not in zh
+    assert "1636" not in en
     assert "(no findings). Verify" in en
     # An edition whose previous review holds no findings has none to dispose of.
     assert "everything independently.\n- Repairs: 07.6 names all seven checks.\n" in en
@@ -162,7 +166,7 @@ def test_prompts_cite_the_exact_media_previous_findings_and_round_inputs(
         assert not re.search(r"\{[a-z_]+\}", text)
         # No prompt cites a work folder; the root itself may lie anywhere.
         assert "runtime/work" not in text.replace(str(root), "ROOT")
-    monkeypatch.setattr(specification, "DURATION", 1260)
+    put(Edition("en").timeline, {"duration": 1260, "segments": []})
     monkeypatch.setattr(specification, "RATE", 44100)
     monkeypatch.setattr(
         review_prompts, "FILM", review_prompts.FILM.model_copy(update={"concepts": None})

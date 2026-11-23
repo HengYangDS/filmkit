@@ -14,7 +14,6 @@ import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
 from filmkit.production import STAGE_RECORD, Edition
-from filmkit.specification import DURATION
 
 # The real composition, found before a test rebinds the repository root.
 COMPOSITION = repository.ROOT / picture_rendering.COMPOSITION
@@ -45,10 +44,10 @@ def edition(tmp_path, monkeypatch):
             put(root / source, f"fixture {path}")
     put(root / "content/source-manifest.json", {"members": []})
     edition = Edition("zh")
-    script = {"duration": DURATION, "segments": [{"id": "01", "text": "先看数据。"}]}
+    script = {"segments": [{"id": "01", "text": "先看数据。"}]}
     put(root / edition.script, script)
     segment = {"id": "01", "text": "先看数据。", "words": []}
-    put(edition.timeline, {**script, "segments": [segment], "captions": CUES})
+    put(edition.timeline, {**script, "duration": 60, "segments": [segment], "captions": CUES})
     put(edition.soundtrack, "zh narration")
     assembly = {
         "script_sha256": repository.sha(edition.script),
@@ -81,8 +80,8 @@ def staged_film(stage):
 
 
 def test_the_uncaptioned_stage_inlines_the_timeline_without_its_captions(edition):
-    picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160)
-    picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160, captions=False)
+    picture_rendering.stage_picture(edition, None, edition.runtime, 3840, 2160)
+    picture_rendering.stage_picture(edition, None, edition.runtime, 3840, 2160, captions=False)
     captioned, uncaptioned = edition.rendered(True), edition.rendered(False)
     assert uncaptioned.stage.name == "final-delivery-zh-uhd-uncaptioned"
     assert staged_film(captioned.stage)["captions"] == CUES
@@ -104,7 +103,7 @@ def test_the_uncaptioned_stage_inlines_the_timeline_without_its_captions(edition
 
 
 def test_a_stage_record_that_names_no_picture_is_the_captioned_one(edition):
-    picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160)
+    picture_rendering.stage_picture(edition, None, edition.runtime, 3840, 2160)
     record = edition.picture_stage / STAGE_RECORD
     earlier = {key: value for key, value in json.loads(record.read_text()).items()}
     del earlier["picture"]
@@ -118,7 +117,7 @@ def test_a_stage_record_that_names_no_picture_is_the_captioned_one(edition):
 
 
 def test_the_uncaptioned_picture_renders_to_its_own_file_and_receipt(edition):
-    picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160, captions=False)
+    picture_rendering.stage_picture(edition, None, edition.runtime, 3840, 2160, captions=False)
     picture_rendering.render_picture(edition, 60, captions=False)
     rendered = edition.rendered(False)
     receipt = repository.read(rendered.receipt)
@@ -141,7 +140,7 @@ def test_the_uncaptioned_picture_renders_to_its_own_file_and_receipt(edition):
 
 
 def test_the_uncaptioned_render_waits_for_its_own_current_stage(edition):
-    picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160)
+    picture_rendering.stage_picture(edition, None, edition.runtime, 3840, 2160)
     with pytest.raises(PictureError, match="No staged picture document and record in .*-uncap"):
         picture_rendering.render_picture(edition, 60, captions=False)
     assert not edition.rendered(False).receipt.exists()

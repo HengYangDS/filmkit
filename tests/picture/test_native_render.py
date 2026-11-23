@@ -18,7 +18,6 @@ import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 from filmkit.production import STAGE_PAGE, Edition
-from filmkit.specification import DURATION
 
 # Every test here has the deadline of a test that starts real processes, and their end.
 pytestmark = [pytest.mark.ffmpeg, pytest.mark.usefixtures("processes")]
@@ -67,11 +66,12 @@ def stage(film_root, monkeypatch):
     for font in FONTS.iterdir():
         shutil.copyfile(font, film_root.path / "assets/fonts" / font.name)
     edition = Edition("zh")
-    film_root.timeline(edition, captions=[{"start": 0, "end": DURATION, "text": "先看数据。"}])
+    film_root.timeline(edition, captions=[{"start": 0, "end": 60, "text": "先看数据。"}])
 
     def staged(name, width, height, *, captions=True):
         folder = film_root.path / "build/runtime/work/native" / name
-        picture_rendering.stage_picture(edition, folder, DURATION, width, height, captions=captions)
+        runtime = edition.runtime
+        picture_rendering.stage_picture(edition, folder, runtime, width, height, captions=captions)
         return folder
 
     return staged
@@ -88,7 +88,7 @@ def drawn(folder, spans):
 def test_a_native_picture_meets_the_engines_contract_of_a_picture(
     stage, film_root, monkeypatch, tmp_path
 ):
-    folder, frames = stage("captioned", 1920, 1080), DURATION * FPS
+    folder, frames = stage("captioned", 1920, 1080), Edition("zh").runtime * FPS
     # No browser is supplied to this film, and one that is named would leave a mark if it ran.
     started = tmp_path / "browser-started"
     browser = tmp_path / "browser"
@@ -113,7 +113,7 @@ def test_a_native_picture_meets_the_engines_contract_of_a_picture(
     # The film joined from spans is the picture the engine validates: every frame on the grid,
     # no B-frame, and a keyframe at every two seconds and nowhere else.
     media.require_video(
-        media.probe(joined), frames=frames, fps=FPS, size=(1920, 1080), duration=DURATION
+        media.probe(joined), frames=frames, fps=FPS, size=(1920, 1080), duration=frames // FPS
     )
     group = 2 * FPS
     assert media.video_cadence(joined, frames, FPS)["keyframes"] == list(range(0, frames, group))
@@ -132,7 +132,7 @@ def test_the_uncaptioned_stage_draws_other_frames_than_the_captioned_one(stage):
         stage("bare", 1920, 1080, captions=False),
     )
     first, second = drawn(captioned, 1)[1], drawn(uncaptioned, 1)[1]
-    assert first["frames"] == second["frames"] == DURATION * FPS
+    assert first["frames"] == second["frames"] == Edition("zh").runtime * FPS
     assert first["drawn_sha256"] != second["drawn_sha256"]
 
 

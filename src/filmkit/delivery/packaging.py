@@ -50,10 +50,11 @@ from filmkit.delivery.player import (
     COVER_JPEG,
     COVER_PNG,
     PAGE,
+    RUNTIME_ANCHOR,
+    entry_runtimes,
     entry_version,
     player_binding,
     player_page,
-    runtime_label,
     version_label,
 )
 from filmkit.delivery.track_language import set_chapter_language
@@ -66,7 +67,6 @@ from filmkit.repository import read, run, sha, write
 from filmkit.specification import (
     AUTHOR,
     CHAPTERS,
-    DURATION,
     FPS,
     H264_LEVELS,
     ISO_LANGUAGES,
@@ -99,8 +99,6 @@ DEADLINE_FLOOR = 600
 # packaging writes beside the release's keys.
 QUICKTIME_PREFIX = "com.apple.quicktime."
 CREATION_KEY = QUICKTIME_PREFIX + "creationdate"
-# The film that a delivery binding names for the real-browser player check.
-BOUND_FILM = {"slug": FILM.slug, "duration": DURATION}
 # The film repository's version, below its root, and the form it must take: a Semantic Versioning
 # 2.0.0 version without build metadata, such as 1.3.0 or 2.0.0-rc.1.
 VERSION = Path("VERSION")
@@ -144,7 +142,9 @@ def viewing_members(edition: Edition) -> tuple[str, ...]:
 def package_language_index(version: str) -> dict:
     """Derive one neutral entry point for the sibling language deliveries.
 
-    It names the film's version under the film's title, in a line of its own just before the
+    Each language link shows its own edition's runtime (`entry_runtimes`), so the page needs
+    both editions' timelines; an anchor outside the links names no edition's and is refused. It
+    names the film's version under the film's title, in a line of its own just before the
     `<nav>` that holds the language links.
     """
     source = repository.ROOT / INDEX
@@ -158,7 +158,10 @@ def package_language_index(version: str) -> dict:
     if "<base " in template:
         msg = "Delivery entry must not select a language through base"
         raise PackagingError(msg)
-    page = template.replace("/*RUNTIME*/", runtime_label())
+    page = template[:start] + entry_runtimes(nav) + template[start + len(nav) :]
+    if RUNTIME_ANCHOR in page:
+        msg = f"{INDEX} holds {RUNTIME_ANCHOR} outside its language links, naming no edition"
+        raise PackagingError(msg)
     # Both editions' packages write this one page; each replaces it whole.
     page = page.replace("<nav", f"{entry_version(version)}\n<nav", 1)
     repository.write_text(LANGUAGE_INDEX, page)
@@ -201,7 +204,7 @@ def refresh_shot_plan(edition: Edition, timeline: dict) -> None:
         {
             "schema_version": 1,
             "language": edition.code,
-            "duration": DURATION,
+            "duration": edition.runtime_in(timeline),
             "fps": FPS,
             "script_sha256": sha(edition.script),
             "composition_sha256": sha(COMPOSITION_SCRIPT),
@@ -240,8 +243,11 @@ def package_metadata(edition: Edition) -> None:
     if not target_cover.exists() or sha(target_cover) != sha(source_cover):
         shutil.copy2(source_cover, target_cover)
     timeline = read(edition.timeline)
-    if (timeline["duration"], timeline["fps"]) != (DURATION, FPS):
-        msg = f"The timeline must last {DURATION} s at {FPS} fps"
+    # The timeline states the runtime; refused here, before anything is written, where it
+    # states none in whole seconds.
+    edition.runtime_in(timeline)
+    if timeline["fps"] != FPS:
+        msg = f"The timeline must be at {FPS} fps"
         raise PackagingError(msg)
     refresh_shot_plan(edition, timeline)
     chapters = read(edition.chapters)["chapters"]
@@ -399,12 +405,14 @@ def only_release_keys(tags: dict, expected: dict) -> bool:
     return keys <= {*expected, CREATION_KEY}
 
 
-def keyed_as_declared(rendition: Rendition, keyframes: list[int]) -> bool:
-    """Whether a film's keyframes stand at every interval its rendition declares, from the first
-    frame, and nowhere else; a rendition that declares none keeps the keyframes it copies."""
+def keyed_as_declared(rendition: Rendition, keyframes: list[int], runtime: int) -> bool:
+    """Whether the keyframes of a film of `runtime` seconds stand at every interval its
+    rendition declares, from the first frame, and nowhere else, the last interval cut short
+    where the runtime is no whole number of them; a rendition that declares none keeps the
+    keyframes it copies."""
     if rendition.keyframe_seconds is None:
         return True
-    return keyframes == list(range(0, DURATION * FPS, rendition.keyframe_seconds * FPS))
+    return keyframes == list(range(0, runtime * FPS, rendition.keyframe_seconds * FPS))
 
 
 def keyframe_options(rendition: Rendition) -> tuple[str, ...]:
@@ -462,7 +470,7 @@ def encode_command(
         "-ac",
         "2",
         "-t",
-        str(DURATION),
+        str(edition.runtime),
         *(argument for tag in tags for argument in ("-metadata", tag)),
         "-metadata:s:v:0",
         "language=" + language,
@@ -561,11 +569,12 @@ def check_delivered_film(path: Path, edition: Edition, rendition: Rendition) -> 
     sounds = [stream for stream in streams if stream["codec_type"] == "audio"]
     tags, expected = info["format"].get("tags", {}), delivered_tags(edition, rendition)
     names, language = track_names(edition), ISO_LANGUAGES[edition.code]
+    runtime = edition.runtime
     if not (
         sounds
-        and int(movie["nb_frames"]) == DURATION * FPS
+        and int(movie["nb_frames"]) == runtime * FPS
         and (movie["avg_frame_rate"], movie.get("has_b_frames")) == (f"{FPS}/1", 0)
-        and float(info["format"]["duration"]) == float(sounds[0]["duration"]) == DURATION
+        and float(info["format"]["duration"]) == float(sounds[0]["duration"]) == runtime
         and any(stream.get("disposition", {}).get("attached_pic") for stream in streams)
         and all(tags.get(key) == expected.get(key) for key in {*expected, "hd_video"})
         and only_release_keys(tags, expected)
@@ -583,11 +592,11 @@ def check_delivered_film(path: Path, edition: Edition, rendition: Rendition) -> 
         raise PackagingError(msg)
     if rendition.keyframe_seconds is not None:
         try:
-            keyframes = media.video_cadence(path, DURATION * FPS, FPS)["keyframes"]
+            keyframes = media.video_cadence(path, runtime * FPS, FPS)["keyframes"]
         except media.MediaError as error:
             msg = f"The finished film differs from the delivery contract: {path}: {error}"
             raise PackagingError(msg) from error
-        if not keyed_as_declared(rendition, keyframes):
+        if not keyed_as_declared(rendition, keyframes, runtime):
             msg = f"The finished film differs from the delivery contract: {path}: keyframes"
             raise PackagingError(msg)
 
@@ -612,7 +621,7 @@ def package_rendition(
     finished.parent.mkdir(parents=True, exist_ok=True)
     command = encode_command(edition, rendition, intermediate, created_at)
     write(edition.film_package, package)
-    deadline = max(DEADLINE_FLOOR, DURATION * rendition.deadline_ratio)
+    deadline = max(DEADLINE_FLOOR, edition.runtime * rendition.deadline_ratio)
     encode(edition, package, command, deadline, intermediate)
     commands = [command, *attach_cover_and_keys(edition, intermediate, finished, created_at)]
     set_chapter_language(finished, ISO_LANGUAGES[edition.code])

@@ -60,7 +60,6 @@ def pictures(tmp_path, monkeypatch):
     """The Chinese edition's two rendered pictures, valid, and their timeline and composition."""
     monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
     monkeypatch.setattr(equivalence, "PICTURE_SIZE", SIZE)
-    monkeypatch.setattr(equivalence, "DURATION", SECONDS)
     monkeypatch.setattr(equivalence, "validate_picture", lambda _edition, captions: {})
     edition = Edition("zh")
     repository.write(edition.timeline, {"duration": SECONDS, "captions": CUES})
@@ -85,13 +84,10 @@ def pictures(tmp_path, monkeypatch):
     return edition, run, reports
 
 
-def test_the_sampled_frames_are_every_half_second_and_each_cue_s_start_middle_and_end(
-    monkeypatch,
-):
-    monkeypatch.setattr(equivalence, "DURATION", SECONDS)
+def test_the_sampled_frames_are_every_half_second_and_each_cue_s_start_middle_and_end():
     timeline = {"captions": [{"start": 0.51, "end": 1.0}, {"start": 1.9, "end": 2.5}]}
     # A cue's instants fall on the frames that show them, and none past the last frame.
-    assert equivalence.sampled_frames(timeline) == [0, 30, 45, 60, 90, 114, 119]
+    assert equivalence.sampled_frames(timeline, SECONDS * 60) == [0, 30, 45, 60, 90, 114, 119]
 
 
 def test_the_caption_band_is_widened_and_aligned_to_the_encoder_s_blocks():

@@ -10,8 +10,11 @@ import filmkit.repository as repository
 import filmkit.specification as specification
 from filmkit.delivery.verification import VerificationError
 
-FRAMES = specification.DURATION * specification.FPS
-SAMPLE_FRAMES = specification.DURATION * specification.RATE
+# The runtime the edition's timeline states: an odd number of seconds, so the 1080p film's last
+# keyframe group is half a group.
+RUNTIME = 1477
+FRAMES = RUNTIME * specification.FPS
+SAMPLE_FRAMES = RUNTIME * specification.RATE
 
 
 def probe(changes: dict) -> dict:
@@ -19,7 +22,7 @@ def probe(changes: dict) -> dict:
 
     Each change names its field by keys and list indices joined by slashes; None removes it.
     """
-    seconds = f"{specification.DURATION:.6f}"
+    seconds = f"{RUNTIME:.6f}"
     language = specification.ISO_LANGUAGES["zh"]
     video = {
         "codec_type": "video",
@@ -81,6 +84,7 @@ def decoded(tmp_path, monkeypatch):
     film = production.Edition("zh").film("uhd")
     film.parent.mkdir(parents=True)
     film.write_text("film\n")
+    repository.write(production.Edition("zh").timeline, {"duration": RUNTIME})
     monkeypatch.setattr(media, "video_cadence", lambda *_: {})
     monkeypatch.setattr(media, "decoded_video_frames", lambda *_: FRAMES)
     monkeypatch.setattr(media, "decoded_audio_frames", lambda _path: SAMPLE_FRAMES)
@@ -169,6 +173,9 @@ def test_a_delivered_1080p_film_holds_a_keyframe_every_2_seconds(
     }
     monkeypatch.setattr(media, "probe", lambda _path: probe(viewing))
     keyframes = list(range(0, FRAMES, every))
+    if passes:
+        # 88,620 frames: the last keyframe stands 60 frames, half a group, before the end.
+        assert (FRAMES, keyframes[-1]) == (88620, 88560)
     monkeypatch.setattr(media, "video_cadence", lambda *_: {"keyframes": keyframes})
     edition, rendition = production.Edition("zh"), production.RENDITIONS["1080p-captioned"]
     if passes:

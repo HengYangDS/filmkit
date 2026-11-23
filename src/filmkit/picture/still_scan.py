@@ -65,7 +65,7 @@ import filmkit.repository as repository
 from filmkit.picture.errors import PictureError
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
 from filmkit.picture.still_record import NoAnswerError
-from filmkit.production import CODES, Edition
+from filmkit.production import CODES, Edition, UnassembledError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
@@ -427,16 +427,16 @@ def film_subjects(edition: Edition) -> dict[str, Path]:
 
 
 def film_frames(edition: Edition) -> list[int]:
-    """The frames each phase of a scan reads of the edition's whole film: the seconds its
-    timeline states, at the scan's rate."""
+    """The frames each phase of a scan reads of the edition's whole film: its runtime as its
+    timeline states it (`Edition.runtime`), at the scan's rate. A missing timeline is the
+    caller's to name, as every missing input is."""
     if not edition.timeline.is_file():
         raise FileNotFoundError(ENOENT, "No timeline", str(edition.timeline))
-    stated = repository.read_entry(edition.timeline, ("duration",))
-    seconds = stated["duration"] if stated else None
-    if not still_record.number(seconds) or seconds <= 0:
-        msg = f"{repository.relative(edition.timeline)} states no duration for the film's scan"
-        raise PictureError(msg)
-    return [round(seconds * FPS)] * len(PHASES)
+    try:
+        seconds = edition.runtime
+    except UnassembledError as error:
+        raise PictureError(str(error)) from error
+    return [seconds * FPS] * len(PHASES)
 
 
 def film_record(edition: Edition) -> dict:

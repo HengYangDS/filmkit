@@ -81,21 +81,21 @@ def stream(path) -> dict:
 @pytest.fixture(scope="module")
 def pair(tmp_path_factory):
     """A film root with one edition's packaging inputs, real: the captioned picture, the picture
-    derived from it with its receipt, the soundtrack, the chapters and the cover. The contract's
-    duration, frame and levels are the small ones while the module's tests run."""
+    derived from it with its receipt, the soundtrack, the chapters, the cover and the timeline,
+    which states the films' two seconds. The contract's frame and levels are the small ones while
+    the module's tests run."""
     root = tmp_path_factory.mktemp("real-films").resolve()
     edition = production.Edition("zh")
     script = repository.read(edition.script)
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(repository, "ROOT", root)
-        for module in (delivery_packaging, delivery_verification, derivation):
-            patch.setattr(module, "DURATION", SECONDS)
         patch.setattr(derivation, "PICTURE_SIZE", SIZE)
         patch.setattr(derivation, "ENCODER", ("-threads", "2", *derivation.ENCODER))
         for height, level in ((SIZE[1], 52), (VIEWING_SIZE[1], 42)):
             patch.setitem(specification.H264_LEVELS, height, level)
         release = {"title": script["title"], "release": script["release"]}
         repository.write(root / edition.script, release)
+        repository.write(edition.timeline, {"duration": SECONDS})
         (root / "VERSION").write_text("1.3.0\n")
         captioned, uncaptioned = edition.rendered(True), edition.rendered(False)
         picture(captioned.file, "-bf", "0")
@@ -182,16 +182,16 @@ def test_a_film_whose_picture_holds_b_frames_is_refused_by_both_checks(pair):
 
 def test_the_derived_picture_passes_its_own_media_check_and_others_are_refused(pair):
     derived = pair.rendered(False).file
-    derivation.require_derived_media(derived)
+    derivation.require_derived_media(derived, SECONDS)
     probed = stream(derived)
     assert (probed["nb_frames"], probed["has_b_frames"]) == (str(FRAMES), 0)
     # The same frames with a keyframe every second.
     other = derived.with_name("another-grid.mp4")
     ffmpeg("-i", derived, "-c:v", "libx264", "-g", "60", "-keyint_min", "60", "-bf", "0", other)
     with pytest.raises(PictureError, match="keyframes leave the 2 s grid: another-grid.mp4"):
-        derivation.require_derived_media(other)
+        derivation.require_derived_media(other, SECONDS)
     # The same frames on the grid, with x264's default B-frames.
     grid = ["-g", "120", "-keyint_min", "120", "-sc_threshold", "0"]
     ffmpeg("-i", derived, "-c:v", "libx264", *grid, other)
     with pytest.raises(MediaError, match="another-grid.mp4: B-frames"):
-        derivation.require_derived_media(other)
+        derivation.require_derived_media(other, SECONDS)

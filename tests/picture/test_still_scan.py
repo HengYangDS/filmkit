@@ -556,12 +556,13 @@ def test_a_film_that_does_not_decode_to_its_timeline_s_seconds_is_refused(packag
     assert not packaged.edition.film_stills.exists()
 
 
-def test_a_timeline_that_states_no_duration_is_named(packaged):
+def test_a_timeline_that_states_no_runtime_is_named(packaged):
     repository.write(packaged.edition.timeline, timeline((1.0, 5.0)))
     with pytest.raises(PictureError) as refused:
         still_scan.scan_film(packaged.edition)
     assert str(refused.value) == (
-        "build/artifacts/film/zh/timeline.json states no duration for the film's scan"
+        "build/artifacts/film/zh/timeline.json states no runtime in whole seconds: "
+        "run produce assemble --language zh"
     )
 
 

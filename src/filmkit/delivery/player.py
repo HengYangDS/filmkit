@@ -54,12 +54,12 @@ import filmkit.repository as repository
 from filmkit.captions.documents import clock, transcript_parts
 from filmkit.captions.timing import shown_text, typeset
 from filmkit.film import FILM
-from filmkit.production import CODES, RENDITIONS, UHD, VIEWING
-from filmkit.specification import AUTHOR, DURATION, FPS
+from filmkit.production import CODES, RENDITIONS, UHD, VIEWING, Edition
+from filmkit.specification import AUTHOR, FPS
 
 if TYPE_CHECKING:
     from filmkit.captions.documents import Part, Scene
-    from filmkit.production import Edition, Rendition
+    from filmkit.production import Rendition
 
 # What a thought's words and its cues' are compared without: all but letters and digits.
 UNSPOKEN = re.compile(r"[\W_]+")
@@ -72,6 +72,9 @@ PAGE = "index.html"
 # poster. `COVER` is the PNG's name after the film's, which a release publishes under the edition's
 # prefix (`filmkit.delivery.reproduction.members`).
 COVER = "cover.png"
+# The anchor in each language link of the entry page that packaging fills with the runtime of
+# the link's edition.
+RUNTIME_ANCHOR = "/*RUNTIME*/"
 COVER_PNG = f"{FILM.slug}-{COVER}"
 COVER_JPEG = f"{FILM.slug}-cover.jpg"
 
@@ -217,10 +220,25 @@ STYLE = Template(
 SCRIPT = Path(__file__).with_name("player-page.js").read_text(encoding="utf-8")
 
 
-def runtime_label() -> str:
-    """The films' running time as the player and the entry page show it, minutes:seconds."""
-    minutes, seconds = divmod(DURATION, 60)
+def runtime_label(runtime: int) -> str:
+    """An edition's runtime as its player and the entry page show it, minutes:seconds."""
+    minutes, seconds = divmod(runtime, 60)
     return f"{minutes:02d}:{seconds:02d}"
+
+
+def entry_runtimes(links: str) -> str:
+    """The entry page's `<nav>`, `links`, with the runtime anchor in each language link filled
+    with the runtime of the link's edition, which refuses while that edition has no timeline
+    (`Edition.runtime`): each link shows its own edition's length."""
+    for code in CODES:
+        start = links.find(f'href="{code}/{PAGE}"')
+        close = links.find("</a>", start)
+        close = len(links) if close < 0 else close
+        link = links[start:close]
+        if RUNTIME_ANCHOR in link:
+            link = link.replace(RUNTIME_ANCHOR, runtime_label(Edition(code).runtime))
+        links = links[:start] + link + links[close:]
+    return links
 
 
 def version_label(code: str, version: str) -> str:
@@ -432,6 +450,7 @@ def player_page(edition: Edition, version: str) -> str:
     other = WORDS[other_code]
     title = escape(typeset(repository.read(edition.script)["title"]))
     timeline = repository.read(edition.timeline)
+    runtime = runtime_label(edition.runtime_in(timeline))
     parts = transcript_parts(timeline["segments"])
     track = embedded(edition, edition.vtt.name, "text/vtt")
     files = "".join(file_link(edition, name, label) for name, label in listed_files(edition))
@@ -446,7 +465,7 @@ def player_page(edition: Edition, version: str) -> str:
         f'<a class="language" href="../{PAGE}">{words["entry"]}</a></nav>'
     )
     shown = escape(version_label(code, version))
-    byline = f"{escape(AUTHOR)} · {words['language']} · {shown} · {runtime_label()} · {FPS} fps"
+    byline = f"{escape(AUTHOR)} · {words['language']} · {shown} · {runtime} · {FPS} fps"
     return f"""<!doctype html>
 <html lang="{words["lang"]}">
 <head>

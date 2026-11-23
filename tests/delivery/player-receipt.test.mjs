@@ -18,7 +18,7 @@ import {
 import { readDelivery } from "../../src/filmkit/delivery/player-read.mjs";
 
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const FILM = { slug: "sample-reel", duration: 60 };
+const FILM = { slug: "sample-reel", runtimes: { zh: 1636, en: 1476 } };
 /* A PNG of one pixel, which an edition's read decodes as the delivery's cover. */
 const COVER = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhf" +
@@ -30,7 +30,7 @@ test("a delivery's read names each screenshot before its player is read, also wh
   const closed = { goto: async () => Promise.reject(Error("net::ERR_FILE_NOT_FOUND")) };
   const binding = {
     destination: "/nowhere",
-    film: { slug: "sample-reel", duration: 60 },
+    film: FILM,
     members: [],
   };
   const named = [];

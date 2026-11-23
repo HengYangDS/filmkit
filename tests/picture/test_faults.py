@@ -96,7 +96,6 @@ def prepared(tmp_path, monkeypatch):
     report that finds no paint apart from the captions."""
     monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
     monkeypatch.setattr(equivalence, "PICTURE_SIZE", SIZE)
-    monkeypatch.setattr(equivalence, "DURATION", SECONDS)
     monkeypatch.setattr(equivalence, "validate_picture", lambda _edition, captions: {})
     monkeypatch.setattr(equivalence.tools, "run", reporting(BAND))
     edition = Edition("zh")

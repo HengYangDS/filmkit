@@ -20,7 +20,6 @@ import filmkit.preflight as preflight
 import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
-from filmkit.specification import DURATION
 
 # What the engine's renderer names itself as in a draft's receipt and record.
 DREW = {
@@ -61,7 +60,7 @@ def scanning(monkeypatch, moving, still):
     def read(_movie, _phase):
         shown = frames(moving, still)
         yield from shown
-        for k in range(DURATION * picture_draft.DRAFT_FPS - len(shown)):
+        for k in range(Edition("zh").runtime * picture_draft.DRAFT_FPS - len(shown)):
             yield np.roll(shown[0], 7 * (k + 1), axis=1)
 
     monkeypatch.setattr(still_scan, "frame_rate", lambda _movie: picture_draft.DRAFT_FPS)
@@ -84,7 +83,7 @@ def test_a_draft_is_staged_afresh_and_drawn_in_one_process(film_root, monkeypatc
     picture_draft.render_draft(Edition("zh"), 60)
     assert not retired.exists()
     record = repository.read(stage / "stage.json")
-    assert (record["width"], record["height"], record["duration"]) == (1920, 1080, DURATION)
+    assert (record["width"], record["height"], record["duration"]) == (1920, 1080, 60)
     assert (record["start"], record["picture"]) == (0, "captioned")
     members = sorted(str(path.relative_to(stage)) for path in stage.rglob("*") if path.is_file())
     declared = [path for path, _ in picture_rendering.staged_members()]
@@ -116,7 +115,7 @@ def test_the_draft_scan_lands_where_preflight_reads_it(film_root, tmp_path):
     film_root.timeline(edition, words=[{"text": "先看", "start": 1.0, "end": 2.0}])
     # The stand-in draft holds the film's seconds, as the timeline it is scanned against states
     # them: its square moves for four seconds and then stands, under no speech.
-    whole = DURATION * picture_draft.DRAFT_FPS
+    whole = edition.runtime * picture_draft.DRAFT_FPS
     movie = tmp_path / "moving.mp4"
     grey = f"{still_scan.WIDTH}x{still_scan.HEIGHT}"
     encode = ["ffmpeg", "-v", "error", "-nostdin", "-f", "rawvideo", "-pix_fmt", "gray"]

@@ -1,7 +1,12 @@
-"""Where each edition's generated plans, pictures and records live, and the films it delivers."""
+"""Where each edition's generated plans, pictures and records live, the films it delivers, and
+its runtime as its timeline states it."""
+
+import json
+
+import pytest
 
 import filmkit.repository as repository
-from filmkit.production import CODES, RENDITIONS, Edition
+from filmkit.production import CODES, RENDITIONS, Edition, UnassembledError
 
 
 def test_generated_plans_and_records_live_under_build():
@@ -50,4 +55,52 @@ def test_each_edition_delivers_both_sizes_with_and_without_captions():
     assert (renditions[1].decoding, renditions[1].video) == (
         renditions[3].decoding,
         renditions[3].video,
+    )
+
+
+def test_an_edition_s_runtime_is_the_whole_seconds_its_timeline_states(tmp_path, monkeypatch):
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    edition = Edition("en")
+    edition.timeline.parent.mkdir(parents=True)
+    edition.timeline.write_text(json.dumps({"duration": 1477, "segments": []}))
+    assert edition.runtime == 1477
+    assert edition.runtime_in({"duration": 1636}) == 1636
+
+
+def test_an_edition_without_a_timeline_has_no_runtime(tmp_path, monkeypatch):
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    with pytest.raises(UnassembledError) as refused:
+        _ = Edition("zh").runtime
+    assert str(refused.value) == (
+        "The zh edition has no timeline at build/artifacts/film/zh/timeline.json, so no runtime: "
+        "run produce assemble --language zh"
+    )
+
+
+@pytest.mark.parametrize(
+    "stated",
+    [
+        "[]",
+        "{}",
+        '{"duration": 1476.5}',
+        '{"duration": 1476.0}',
+        '{"duration": 0}',
+        '{"duration": true}',
+        '{"duration": "1476"}',
+        '{"duration": NaN}',
+        '{"duration": 14',
+    ],
+)
+def test_a_timeline_that_states_no_whole_number_of_seconds_is_refused(
+    tmp_path, monkeypatch, stated
+):
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    edition = Edition("zh")
+    edition.timeline.parent.mkdir(parents=True)
+    edition.timeline.write_text(stated)
+    with pytest.raises(UnassembledError) as refused:
+        _ = edition.runtime
+    assert str(refused.value) == (
+        "build/artifacts/film/zh/timeline.json states no runtime in whole seconds: "
+        "run produce assemble --language zh"
     )

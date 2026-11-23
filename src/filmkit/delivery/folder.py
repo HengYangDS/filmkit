@@ -19,7 +19,7 @@ differ and removes every other entry except Finder's .DS_Store files and the app
 build/artifacts/delivery/predecessors/<time>/, outside the destination, as the rollback copy.
 shasum then checks every member against its source's SHA-256 from
 build/evidence/delivery/SHA256SUMS, and the readback, which the player check reads, records
-each member with the film's file prefix and duration in
+each member with the film's file prefix and each edition's runtime by its code in
 build/evidence/delivery/delivery-readback.json.
 
 Before rsync changes anything, the player check (`filmkit.tools player-check players`) reads
@@ -65,10 +65,10 @@ from pathlib import Path
 import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
 import filmkit.tools as tools
-from filmkit.delivery.packaging import BOUND_FILM, LANGUAGE_INDEX, viewing_members
+from filmkit.delivery.packaging import LANGUAGE_INDEX, viewing_members
 from filmkit.film import FILM
 from filmkit.picture.rendering import PictureError
-from filmkit.production import CODES, Edition
+from filmkit.production import CODES, Edition, UnassembledError
 
 # The variable by which a host names the folder below which its films' delivery folders lie.
 ROOT_VARIABLE = "FILMKIT_DELIVERY_ROOT"
@@ -317,6 +317,12 @@ def entries(destination: Path, paths: list[str]) -> list[str]:
     return sorted(path for path in found if path not in allowed)
 
 
+def bound_film() -> dict:
+    """The film that a delivery binding names for the real-browser player check: its file prefix
+    and each edition's runtime by its code, which the two editions need not share."""
+    return {"slug": FILM.slug, "runtimes": {code: Edition(code).runtime for code in CODES}}
+
+
 def readback(root: Path, destination: Path) -> dict:
     """Check every member at the destination against its source, and nothing beside them."""
     paths = [path for _, path in plan(root)]
@@ -336,7 +342,7 @@ def readback(root: Path, destination: Path) -> dict:
         rows.append({"path": path, "sha256": repository.sha(target), "bytes": size})
     return {
         "destination": str(destination),
-        "film": dict(BOUND_FILM),
+        "film": bound_film(),
         "delivered_at": datetime.now(UTC).isoformat(),
         "members": rows,
         "all_match": True,
@@ -351,12 +357,13 @@ def check_players(binding: Path, receipt: Path) -> int:
 
 def bind_players(root: Path, members: list[tuple[Path, str]], binding: Path | None = None) -> Path:
     """Write the members as the player check reads them from their sources, and return the
-    binding: the folder that holds them, the film's file prefix and duration, and each member's
+    binding: the folder that holds them, the film's file prefix and each edition's runtime by
+    its code, and each member's
     path and SHA-256. It lies in the delivery's work folder unless another place is named."""
     binding = binding or root / PLAYERS_BINDING
     bound = {
         "destination": str(root / SOURCE),
-        "film": dict(BOUND_FILM),
+        "film": bound_film(),
         "members": [{"path": path, "sha256": repository.sha(source)} for source, path in members],
     }
     repository.write(binding, bound)
@@ -486,7 +493,7 @@ def main(argv: list[str] | None = None) -> None:
     try:
         folder, rule = delivery_destination(options.destination)
         report = deliver(repository.ROOT, folder, dry_run=options.dry_run, rule=rule)
-    except DeliveryRefusedError as error:
+    except (DeliveryRefusedError, UnassembledError) as error:
         raise SystemExit(str(error)) from None
     if options.dry_run:
         print(json.dumps(report, ensure_ascii=False))

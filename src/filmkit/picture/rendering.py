@@ -33,7 +33,7 @@ from filmkit.picture import encoding, faces, renderer, template
 from filmkit.picture.errors import PictureError
 from filmkit.production import RENDITIONS, STAGE_PAGE, STAGE_RECORD
 from filmkit.repository import content_sha, read, sha, write
-from filmkit.specification import DURATION, FPS
+from filmkit.specification import FPS
 
 if TYPE_CHECKING:
     from filmkit.production import Edition, Rendered
@@ -224,13 +224,19 @@ def stage_picture(
     captions: bool = True,
 ) -> None:
     """Materialize the authored picture, or with `captions` False the uncaptioned one, in one
-    ignored native render workspace: its own stage unless `output` names another. The record
-    names the faces the renderer registers, each family with its font's place in the stage, and
-    the language the picture is drawn in."""
+    ignored native render workspace: its own stage unless `output` names another. The stage
+    spans `duration` seconds from `start`, within the edition's runtime (`Edition.runtime`). The
+    record names the faces the renderer registers, each family with its font's place in the
+    stage, and the language the picture is drawn in."""
     renderer.require_renderer()
+    if not edition.timeline.is_file():
+        raise edition.unassembled()
+    # The runtime is the bound timeline's, so the stage spans the very timeline it inlines.
+    inputs, timeline = candidate_picture_inputs(edition)
+    runtime = edition.runtime_in(timeline)
     if (
-        not 1 <= duration <= DURATION
-        or not 0 <= start <= DURATION - duration
+        not 1 <= duration <= runtime
+        or not 0 <= start <= runtime - duration
         or (width, height) not in STAGE_SIZES
     ):
         msg = "Picture must use the admitted frame and duration contract"
@@ -240,7 +246,6 @@ def stage_picture(
     if not target.is_relative_to(repository.ROOT / "build"):
         msg = "Derived renderer inputs belong to this repository's build owner"
         raise PictureError(msg)
-    inputs, timeline = candidate_picture_inputs(edition)
     drawn_with = staged_faces()
     document = picture_html(
         edition, duration, width, height, start, timeline=timeline, captions=captions
@@ -295,7 +300,8 @@ def require_current_stage(edition: Edition, stage: Path, *, captions: bool = Tru
     """The stage's record, refused unless the stage holds the complete current UHD picture.
 
     The record must bind the current inputs, template, edition and picture, captioned or with
-    `captions` False uncaptioned, over the whole duration at the UHD frame; the staged document
+    `captions` False uncaptioned, over the runtime its bound timeline states at the UHD frame;
+    the staged document
     and data must be the ones those sources derive now, and every copied member must match its
     record and its source.
     """
@@ -305,8 +311,9 @@ def require_current_stage(edition: Edition, stage: Path, *, captions: bool = Tru
         raise PictureError(msg)
     binding = read(record)
     inputs, timeline = candidate_picture_inputs(edition)
+    runtime = edition.runtime_in(timeline)
     expected = {
-        "duration": DURATION,
+        "duration": runtime,
         "start": 0,
         "fps": FPS,
         "width": PICTURE_SIZE[0],
@@ -325,9 +332,7 @@ def require_current_stage(edition: Edition, stage: Path, *, captions: bool = Tru
     if differing:
         msg = f"The stage is not the complete current UHD picture: {', '.join(differing)} differ"
         raise PictureError(msg)
-    derived = picture_html(
-        edition, DURATION, *PICTURE_SIZE, 0, timeline=timeline, captions=captions
-    )
+    derived = picture_html(edition, runtime, *PICTURE_SIZE, 0, timeline=timeline, captions=captions)
     if document.read_bytes() != derived.encode("utf-8"):
         msg = "The staged document differs from the one the current sources derive"
         raise PictureError(msg)
@@ -479,15 +484,17 @@ def validate_picture(edition: Edition, *, captions: bool = True) -> dict:
 
         return derivation.validate(edition, receipt)
     validate_picture_binding(edition, receipt, captions=captions)
-    require_picture_media(rendered.file, "rendered")
+    require_picture_media(rendered.file, "rendered", edition.runtime)
     return receipt
 
 
 def require_picture_media(
-    path: Path, made: str, duration: int = DURATION, size: tuple[int, int] = PICTURE_SIZE
+    path: Path, made: str, duration: int, size: tuple[int, int] = PICTURE_SIZE
 ) -> None:
-    """Refuse a picture, `made` rendered or derived, that is not the whole film at the pictures'
-    frame, rate and size with a keyframe at every `encoding.KEYFRAME_SECONDS` and nowhere else."""
+    """Refuse a picture, `made` rendered or derived, that is not the whole film of `duration`
+    seconds, the edition's runtime, at the pictures' frame, rate and size with a keyframe at
+    every `encoding.KEYFRAME_SECONDS` and nowhere else; a runtime that is no whole number of
+    groups ends on a shorter last group."""
     frames = duration * FPS
     media.require_video(media.probe(path), frames=frames, fps=FPS, size=size, duration=duration)
     keyframes = media.video_cadence(path, frames, FPS)["keyframes"]

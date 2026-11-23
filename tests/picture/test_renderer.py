@@ -19,7 +19,7 @@ import filmkit.repository as repository
 from filmkit.film import FILM
 from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
-from filmkit.specification import DURATION, FPS
+from filmkit.specification import FPS
 
 
 def spans_of(command):
@@ -306,19 +306,20 @@ def test_the_rendered_picture_meets_the_shared_video_contract(film_root, monkeyp
     edition = Edition("zh")
     film_root.staged(edition)
     picture_rendering.render_picture(edition, 60)
+    runtime = edition.runtime
     cover = {"codec_type": "video", "disposition": {"attached_pic": 1}, "width": 640}
     video = {
         "codec_type": "video",
         "disposition": {"attached_pic": 0},
-        "nb_frames": str(DURATION * FPS),
+        "nb_frames": str(runtime * FPS),
         "avg_frame_rate": "60/1",
         "has_b_frames": 0,
         "width": 3840,
         "height": 2160,
-        "duration": f"{DURATION + 1e-7}",
+        "duration": f"{runtime + 1e-7}",
     }
-    probed = {"streams": [cover, video], "format": {"duration": f"{DURATION:.6f}"}}
-    cadence, keyframes = [], list(range(0, DURATION * FPS, 2 * FPS))
+    probed = {"streams": [cover, video], "format": {"duration": f"{runtime:.6f}"}}
+    cadence, keyframes = [], list(range(0, runtime * FPS, 2 * FPS))
 
     def video_cadence(*arguments):
         cadence.append(arguments)
@@ -328,14 +329,14 @@ def test_the_rendered_picture_meets_the_shared_video_contract(film_root, monkeyp
     monkeypatch.setattr(media, "video_cadence", video_cadence)
     # The video stream is found by type behind a cover, and durations agree within 1e-6 s.
     assert picture_rendering.validate_picture(edition)["exit"] == 0
-    assert cadence == [(edition.picture, DURATION * FPS, FPS)]
+    assert cadence == [(edition.picture, runtime * FPS, FPS)]
     # A keyframe off the two-second grid, or one missing from it, is refused by the grid's name.
     for off in ([*keyframes, 7], keyframes[:-1]):
         keyframes = sorted(off)
         with pytest.raises(PictureError, match="rendered picture's keyframes leave the 2 s grid"):
             picture_rendering.validate_picture(edition)
-    keyframes = list(range(0, DURATION * FPS, 2 * FPS))
-    frames = str(DURATION * FPS - 1)
+    keyframes = list(range(0, runtime * FPS, 2 * FPS))
+    frames = str(runtime * FPS - 1)
     for change in ({"nb_frames": frames}, {"avg_frame_rate": "30/1"}, {"has_b_frames": 2}):
         probed["streams"] = [cover, {**video, **change}]
         with pytest.raises(media.MediaError, match="Video differs"):

@@ -75,7 +75,7 @@ from filmkit.picture.rendering import (
     require_receipt_picture,
     validate_picture,
 )
-from filmkit.specification import DURATION, FPS
+from filmkit.specification import FPS
 
 if TYPE_CHECKING:
     from filmkit.production import Edition, Rendition
@@ -322,10 +322,10 @@ def derive(
     return made if edge is None else {**made, "edge_check": {"rows": list(edges), **edge}}
 
 
-def require_derived_media(path: Path) -> None:
-    """Refuse a derived picture that is not the whole film on the pictures' keyframe grid
-    (`filmkit.picture.rendering.require_picture_media`)."""
-    rendering.require_picture_media(path, "derived", DURATION, PICTURE_SIZE)
+def require_derived_media(path: Path, runtime: int) -> None:
+    """Refuse a derived picture that is not the whole film of `runtime` seconds, its edition's,
+    on the pictures' keyframe grid (`filmkit.picture.rendering.require_picture_media`)."""
+    rendering.require_picture_media(path, "derived", runtime, PICTURE_SIZE)
 
 
 def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
@@ -392,8 +392,8 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
         raise PictureError(msg) from error
     try:
         with durations.phase("media"):
-            require_derived_media(rendered.file)
-        if made["edge_check"]["frames"] != DURATION * FPS:
+            require_derived_media(rendered.file, edition.runtime)
+        if made["edge_check"]["frames"] != edition.runtime * FPS:
             msg = f"The edge rows were measured at {made['edge_check']['frames']} frames"
             raise PictureError(msg)
         if source_bindings(edition) != bound:
@@ -505,7 +505,7 @@ def validate_binding(edition: Edition, receipt: dict) -> None:
 def validate(edition: Edition, receipt: dict) -> dict:
     """Bind the derived uncaptioned picture to its receipt and check its media; the receipt."""
     validate_binding(edition, receipt)
-    require_derived_media(edition.rendered(False).file)
+    require_derived_media(edition.rendered(False).file, edition.runtime)
     return receipt
 
 

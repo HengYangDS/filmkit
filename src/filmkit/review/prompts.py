@@ -293,7 +293,8 @@ def prompt_context(out_dir: Path, previous: Path | None, changes: Path | None) -
     """The template fields both editions' prompts share.
 
     They name the canonical source, the film's concept contract and the readings' occurrence
-    plans, the round's places, the delivery format and the pause, level and clarity policies the
+    plans, the round's places, the delivery format but the runtime, which each edition's own
+    fields state, and the pause, level and clarity policies the
     current scripts, assemblies and declaration hold; the previous round's directory only when
     there is one.
     """
@@ -313,7 +314,6 @@ def prompt_context(out_dir: Path, previous: Path | None, changes: Path | None) -
         "out": cited(out_dir),
         **({} if previous is None else {"previous": cited(previous)}),
         "changes": changes_text(changes),
-        "duration": specification.DURATION,
         "fps": specification.FPS,
         "rate": f"{specification.RATE / 1000:g}",
         "program": f"{levels.pop():g}",
@@ -535,6 +535,8 @@ def read_round(
             "dispositions": stated[code],
             "language": Edition(code).language,
             "code": code,
+            # Each edition's own runtime: the two editions need not last alike.
+            "duration": Edition(code).runtime,
             "other": other,
             "other_language": Edition(other).language,
         }

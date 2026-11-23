@@ -35,11 +35,12 @@ import filmkit.sources as sources
 import filmkit.specification as specification
 from filmkit.film import FILM
 
-# The verified films last two seconds, the last of them credits.
-DURATION, CREDITS = 2, 1
-# The seconds the edition's timeline states, which is what the still scan reads a film's length
-# from: long enough to hold the still run of the film the scan's requirement was written for.
-SCANNED = 900
+# The runtime each edition's timeline states, which every check reads a film's length from, the
+# last second of it credits: long enough to hold a still run of more than the scan's limit, and
+# short enough for a soundtrack written whole.
+RUNTIME, CREDITS = 8, 1
+# The runtimes of a delivered film whose editions differ in length: 27:16 and 24:36.
+EDITION_RUNTIMES = {"zh": 1636, "en": 1476}
 # The film's version, which the bound root's VERSION holds.
 VERSION = "1.3.0"
 
@@ -90,7 +91,8 @@ def passing_scans(monkeypatch) -> None:
 
 @pytest.fixture
 def film(tmp_path, monkeypatch, passing_scans) -> Folder:
-    """A root whose current members are small texts, and an absent destination.
+    """A root whose current members are small texts, beside each edition's timeline, and an
+    absent destination.
 
     The players' real-browser readback passes every page, as its own tests read real pages, and
     each edition's film passes its still scan (`passing_scans`).
@@ -100,6 +102,8 @@ def film(tmp_path, monkeypatch, passing_scans) -> Folder:
     monkeypatch.setattr(repository, "ROOT", folder.root)
     for source, path in delivery_folder.plan(folder.root):
         write_input(source, f"current {path}\n")
+    for code, runtime in EDITION_RUNTIMES.items():
+        write_input(production.Edition(code).timeline, {"duration": runtime})
     monkeypatch.setattr(delivery_folder, "check_players", passing_players)
     return folder
 
@@ -133,8 +137,6 @@ class Inputs:
     root: Path
     edition: production.Edition
     checked: list = field(default_factory=list)
-    duration: int = DURATION
-    credits: int = CREDITS
 
     @staticmethod
     def put(path: Path, body: str | bytes | dict) -> Path:
@@ -189,7 +191,7 @@ class Inputs:
         longest = max((run["speech"] for run in runs), default=0)
         report = {
             "fps": picture_still_scan.FPS,
-            "frames": SCANNED * picture_still_scan.FPS,
+            "frames": RUNTIME * picture_still_scan.FPS,
             "fine": {"rule": picture_still_scan.FINE_RULE, "runs": list(runs)},
             "coarse": {"rule": picture_still_scan.COARSE_RULE, "runs": []},
             "longest_fine_speech": longest,
@@ -202,16 +204,15 @@ class Inputs:
 
 
 def shorten(monkeypatch) -> None:
-    """Verify films of DURATION seconds whose last CREDITS seconds are credits."""
-    monkeypatch.setattr(delivery_verification, "DURATION", DURATION)
+    """Verify films whose last CREDITS seconds are credits."""
     monkeypatch.setattr(delivery_verification, "CREDITS_DURATION", CREDITS)
 
 
 @pytest.fixture
-def short_films(monkeypatch) -> tuple[int, int]:
-    """Verify films of DURATION seconds whose last CREDITS seconds are credits."""
+def short_films(monkeypatch) -> int:
+    """Verify films whose last CREDITS seconds are credits."""
     shorten(monkeypatch)
-    return DURATION, CREDITS
+    return CREDITS
 
 
 def narration(inputs: Inputs, texts: dict[str, str]) -> None:
@@ -237,7 +238,7 @@ def narration(inputs: Inputs, texts: dict[str, str]) -> None:
         edition.narration_selected,
         {"script_sha256": sha(script), "cast_sha256": sha(cast), "records": records},
     )
-    write_soundtrack(edition.soundtrack, DURATION * specification.RATE)
+    write_soundtrack(edition.soundtrack, RUNTIME * specification.RATE)
     level = {
         "policy": specification.PROGRAM_LEVEL,
         "after": {"integrated_lufs": -16.6, "true_peak_dbtp": -1.2},
@@ -255,7 +256,7 @@ def narration(inputs: Inputs, texts: dict[str, str]) -> None:
         {"start": 0.1, "end": 0.5, "text": "数据先行。"},
         {"start": 0.6, "end": 0.9, "text": "交付在后。"},
     ]
-    timeline = {"segments": segments, "captions": captions, "duration": SCANNED}
+    timeline = {"segments": segments, "captions": captions, "duration": RUNTIME}
     write_input(edition.timeline, timeline)
 
 
@@ -291,10 +292,10 @@ def picture(inputs: Inputs, *, derived: bool = False) -> None:
             "index_sha256": sha(edition.rendered().page),
             "width": 3840,
             "height": 2160,
-            "duration": DURATION,
+            "duration": RUNTIME,
             "fps": specification.FPS,
             "step_frames": 2,
-            "checked": DURATION * specification.FPS // 2,
+            "checked": RUNTIME * specification.FPS // 2,
             "browser": "Chromium",
         },
     )

@@ -14,7 +14,7 @@ import filmkit.repository as repository
 from filmkit.film import FILM
 from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
-from filmkit.specification import DURATION, FPS
+from filmkit.specification import FPS
 
 
 def declaring(monkeypatch, capture: str) -> None:
@@ -31,7 +31,7 @@ def edition(film_root, monkeypatch):
     film_root.staged(edition)
     monkeypatch.setattr(media, "probe", lambda path: {})
     monkeypatch.setattr(media, "require_video", lambda *arguments, **options: {})
-    grid = list(range(0, DURATION * FPS, 2 * FPS))
+    grid = list(range(0, edition.runtime * FPS, 2 * FPS))
     monkeypatch.setattr(media, "video_cadence", lambda *arguments: {"keyframes": grid})
     derived = []
     monkeypatch.setattr(

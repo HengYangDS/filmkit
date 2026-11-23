@@ -17,7 +17,7 @@ import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.film import FILM
 from filmkit.production import Edition
-from filmkit.specification import DURATION, FPS
+from filmkit.specification import FPS
 
 # The sample film's composition, found before a test rebinds the repository root.
 COMPOSITION = repository.ROOT / picture_rendering.COMPOSITION
@@ -66,19 +66,20 @@ def edition(tmp_path, monkeypatch):
     put(root / FILM.entry, "<title>Sample</title>\n")
     put(root / "VERSION", "1.3.0\n")
     edition = Edition("zh")
-    script = {"duration": DURATION, "segments": [{"id": "01", "text": "先看数据。"}]}
+    script = {"segments": [{"id": "01", "text": "先看数据。"}]}
     put(root / edition.script, script)
     put(root / edition.cast, {"voice": "narrator"})
     segment = {"id": "01", "text": "先看数据。", "words": []}
-    put(edition.timeline, {**script, "segments": [segment], "captions": []})
+    # The timeline states the runtime, a minute, as the assembly writes it.
+    put(edition.timeline, {**script, "duration": 60, "segments": [segment], "captions": []})
     put(edition.soundtrack, "zh narration")
     assembly = {
         "script_sha256": repository.sha(edition.script),
         "soundtrack_sha256": repository.sha(edition.soundtrack),
     }
     put(edition.audio_assembly, assembly)
-    picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160)
-    picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160, captions=False)
+    picture_rendering.stage_picture(edition, None, edition.runtime, 3840, 2160)
+    picture_rendering.stage_picture(edition, None, edition.runtime, 3840, 2160, captions=False)
     composition = repository.sha(root / picture_rendering.COMPOSITION_SCRIPT)
     put(
         edition.picture_gates,
@@ -111,10 +112,10 @@ def edition(tmp_path, monkeypatch):
             "index_sha256": repository.sha(edition.rendered().page),
             "width": 3840,
             "height": 2160,
-            "duration": DURATION,
+            "duration": edition.runtime,
             "fps": FPS,
             "step_frames": 2,
-            "checked": -(-DURATION * FPS // 2),
+            "checked": -(-edition.runtime * FPS // 2),
         },
     )
     monkeypatch.setattr(preflight.concepts, "check", lambda: {"status": "not_declared"})

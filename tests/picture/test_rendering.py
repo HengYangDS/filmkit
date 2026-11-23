@@ -21,11 +21,13 @@ import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.film import FILM
 from filmkit.picture.rendering import PictureError
-from filmkit.production import STAGE_RECORD, Edition
-from filmkit.specification import DURATION, FPS
+from filmkit.production import STAGE_RECORD, Edition, UnassembledError
+from filmkit.specification import FPS
 
 # The real composition, found before a test rebinds the repository root.
 COMPOSITION = repository.ROOT / picture_rendering.COMPOSITION
+# The runtime the fixture's timelines state: an odd number of seconds, unlike the sample's 60.
+RUNTIME = 1477
 # The template patterns that the renderer document replaces.
 PLACEHOLDERS = (
     "/* FILM_DATA */",
@@ -80,10 +82,11 @@ def root(tmp_path, monkeypatch):
     put(root / "content/source-manifest.json", {"members": []})
     for code, text in (("zh", "先看数据。"), ("en", "Read the data.")):
         edition = Edition(code)
-        script = {"duration": DURATION, "segments": [{"id": "01", "text": text}]}
+        script = {"segments": [{"id": "01", "text": text}]}
         put(root / edition.script, script)
         segment = {"id": "01", "text": text, "words": []}
-        put(edition.timeline, {**script, "segments": [segment], "captions": []})
+        timeline = {**script, "duration": RUNTIME, "segments": [segment], "captions": []}
+        put(edition.timeline, timeline)
         put(edition.soundtrack, f"{code} narration")
         assembly = {
             "script_sha256": repository.sha(edition.script),
@@ -111,7 +114,7 @@ def passing_gates(edition, **changes):
 def staged():
     """The Chinese edition, staged complete at the UHD frame, its picture checked."""
     edition = Edition("zh")
-    picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160)
+    picture_rendering.stage_picture(edition, None, RUNTIME, 3840, 2160)
     passing_gates(edition)
     return edition
 
@@ -188,7 +191,7 @@ def test_staging_twice_writes_the_same_complete_document(code):
     stage = edition.picture_stage
     written = []
     for _ in range(2):
-        picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160)
+        picture_rendering.stage_picture(edition, None, RUNTIME, 3840, 2160)
         written.append(((stage / "index.html").read_bytes(), (stage / "stage.json").read_bytes()))
     assert written[0] == written[1]
     document = written[0][0].decode()
@@ -197,7 +200,7 @@ def test_staging_twice_writes_the_same_complete_document(code):
         assert placeholder in template
         assert placeholder not in document
     assert f'<html lang="{"en" if code == "en" else "zh-CN"}">' in document
-    assert f'data-duration="{DURATION}"' in document
+    assert 'data-duration="1477"' in document
     assert '<div style="width:3840px;height:2160px" id="film"' in document
     assert "<script>" + (COMPOSITION / "film.js").read_text() + "</script>" in document
     assert "<style>" + (COMPOSITION / "film.css").read_text() + "</style>" in document
@@ -236,7 +239,7 @@ def test_staging_reads_each_bound_input_once(root, monkeypatch):
         return path_open(self, *args, **kwargs)
 
     monkeypatch.setattr(Path, "open", counted)
-    picture_rendering.stage_picture(edition, None, DURATION, 3840, 2160)
+    picture_rendering.stage_picture(edition, None, RUNTIME, 3840, 2160)
     for path in (root / edition.script, edition.timeline, edition.audio_assembly):
         assert opened.count(path) == 1
 
@@ -244,7 +247,8 @@ def test_staging_reads_each_bound_input_once(root, monkeypatch):
 def test_candidate_inputs_refuse_a_timeline_or_soundtrack_of_other_sources():
     edition = Edition("zh")
     timeline = json.loads(edition.timeline.read_text())
-    put(edition.timeline, {**timeline, "duration": DURATION - 1})
+    segment = {**timeline["segments"][0], "text": "另一句。"}
+    put(edition.timeline, {**timeline, "segments": [segment]})
     with pytest.raises(PictureError, match="timeline differs from its authored script"):
         picture_rendering.candidate_picture_inputs(edition)
     put(edition.timeline, timeline)
@@ -255,11 +259,11 @@ def test_candidate_inputs_refuse_a_timeline_or_soundtrack_of_other_sources():
 
 def test_staging_refuses_other_frames_durations_and_places(root):
     edition = Edition("zh")
-    for duration, size, start in ((DURATION + 1, (3840, 2160), 0), (DURATION, (1280, 720), 0)):
+    for duration, size, start in ((RUNTIME + 1, (3840, 2160), 0), (RUNTIME, (1280, 720), 0)):
         with pytest.raises(PictureError, match="admitted frame and duration"):
             picture_rendering.stage_picture(edition, None, duration, *size, start)
     with pytest.raises(PictureError, match="build owner"):
-        picture_rendering.stage_picture(edition, root / "elsewhere", DURATION, 3840, 2160)
+        picture_rendering.stage_picture(edition, root / "elsewhere", RUNTIME, 3840, 2160)
     assert not edition.picture_stage.exists()
 
 
@@ -274,7 +278,7 @@ def test_the_document_refuses_a_template_pattern_it_does_not_find_exactly(root):
     ):
         template.write_text(changed)
         with pytest.raises(PictureError, match=re.escape(repr(pattern))):
-            picture_rendering.picture_html(edition, DURATION, 3840, 2160, 0)
+            picture_rendering.picture_html(edition, RUNTIME, 3840, 2160, 0)
 
 
 def test_a_completed_render_binds_only_the_current_stage(staged):
@@ -304,6 +308,29 @@ def test_a_completed_render_binds_only_the_current_stage(staged):
         picture_rendering.validate_picture_binding(edition, edited)
     document.write_text(original)
     picture_rendering.validate_picture_binding(edition, receipt)
+
+
+def test_a_stage_spans_the_runtime_its_edition_s_timeline_states(staged):
+    edition = staged
+    record = json.loads((edition.picture_stage / STAGE_RECORD).read_text())
+    assert (record["duration"], record["start"]) == (1477, 0)
+    assert picture_rendering.require_current_stage(edition, edition.picture_stage) == record
+    # A stage of the sample's 60 s is no stage of this edition's whole runtime.
+    picture_rendering.stage_picture(edition, None, 60, 3840, 2160)
+    with pytest.raises(PictureError, match="duration differ"):
+        picture_rendering.require_current_stage(edition, edition.picture_stage)
+
+
+def test_an_edition_without_a_timeline_is_refused_before_a_stage_is_written():
+    edition = Edition("en")
+    edition.timeline.unlink()
+    with pytest.raises(UnassembledError) as refused:
+        picture_rendering.stage_picture(edition, None, RUNTIME, 3840, 2160)
+    assert str(refused.value) == (
+        "The en edition has no timeline at build/artifacts/film/en/timeline.json, so no runtime: "
+        "run produce assemble --language en"
+    )
+    assert not edition.picture_stage.exists()
 
 
 def test_a_changed_template_or_copied_member_refuses_the_stage(staged, root):
@@ -452,7 +479,7 @@ def test_another_renderer_version_refuses_staging_and_rendering(
     pinned = re.escape(picture_renderer.RENDERER_VERSION)
     versions = rf"installs @napi-rs/canvas 0\.0\.1; the engine draws with @napi-rs/canvas {pinned}"
     with pytest.raises(PictureError, match=versions):
-        picture_rendering.stage_picture(staged, None, DURATION, 3840, 2160)
+        picture_rendering.stage_picture(staged, None, RUNTIME, 3840, 2160)
     fake = renderer(tmp_path, "open(__file__ + '.ran', 'w').close()")
     with pytest.raises(PictureError, match=versions):
         render(monkeypatch, staged, fake, 60)

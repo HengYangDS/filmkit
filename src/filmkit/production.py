@@ -5,6 +5,7 @@ Every action takes the edition it produces as an argument; nothing holds a curre
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
@@ -139,6 +140,11 @@ class Rendered:
         return self.stage / STAGE_PAGE
 
 
+class UnassembledError(ValueError):
+    """An edition whose runtime no assembled timeline states: it has no timeline, or its timeline
+    states no whole number of seconds. The refusal names the assembly, which states it."""
+
+
 def review_report(record: Path) -> Path:
     """The report of a review record: beside it and under its name, as Markdown. A round writes
     the copy there, the verifier reads it there and a release publishes it from there, wherever
@@ -219,6 +225,42 @@ class Edition:
     def timeline(self) -> Path:
         """The assembled timeline: segment times, thought pauses, words and captions."""
         return self.artifacts / "timeline.json"
+
+    @property
+    def runtime(self) -> int:
+        """The edition's runtime in whole seconds, as its assembled timeline states it: the one
+        reading every step takes, refused for an edition that has no timeline (`runtime_in`)."""
+        try:
+            text = self.timeline.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            raise self.unassembled() from None
+        try:
+            timeline = json.loads(text)
+        except (ValueError, RecursionError):
+            timeline = None
+        return self.runtime_in(timeline)
+
+    def unassembled(self) -> UnassembledError:
+        """The refusal of a step that needs the edition's runtime while it has no timeline."""
+        place = repository.relative(self.timeline)
+        message = (
+            f"The {self.code} edition has no timeline at {place}, so no runtime: "
+            f"run produce assemble --language {self.code}"
+        )
+        return UnassembledError(message)
+
+    def runtime_in(self, timeline: object) -> int:
+        """The runtime that a timeline of this edition states as its `duration`, for a step that
+        holds the timeline it bound: a whole number of seconds from 1, refused otherwise with
+        the timeline's place, since only the assembly writes it."""
+        stated = timeline.get("duration") if isinstance(timeline, dict) else None
+        if type(stated) is not int or stated < 1:
+            message = (
+                f"{repository.relative(self.timeline)} states no runtime in whole seconds: "
+                f"run produce assemble --language {self.code}"
+            )
+            raise UnassembledError(message)
+        return stated
 
     @property
     def soundtrack(self) -> Path:

@@ -22,7 +22,8 @@ def test_the_current_picture_passes(inputs, monkeypatch):
         "picture_sha256": repository.sha(edition.picture),
         "uncaptioned_picture_sha256": repository.sha(edition.rendered(captions=False).file),
         "caption_equivalence": {"composition_instants": 5, "encoded_frames": 4},
-        "geometry_frames": 60,
+        # Every second frame of the 8 s runtime.
+        "geometry_frames": 240,
         "browser": "Chromium",
     }
     # Each receipt is bound to its own picture.

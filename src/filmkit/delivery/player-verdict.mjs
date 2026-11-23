@@ -173,13 +173,22 @@ export function entryProblems(read, members) {
   return problems;
 }
 
-/** Why a film, as the player shows it, does not play as delivered: its duration, its size, a media error, or nothing
- * decoded at a seek point. */
+/** Where a film of `duration` seconds is played from: two seconds in, the middle, and four seconds before the end. */
+export const seekPoints = (duration) => [2, duration / 2, duration - 4];
+
+/** Why a film, as the player shows it, does not play as delivered: its duration, its size, a media error, seek points
+ * other than those of its edition's runtime, `duration`, or nothing decoded at a seek point. */
 export function playbackProblems(state, duration) {
   const { file } = state,
     problems = [],
     expect = (ok, problem) => ok || problems.push(problem);
   expect(state.duration === duration, `${file} lasts ${state.duration} s, not ${duration} s`);
+  const sought = state.seek_checks.map((check) => check.target),
+    points = seekPoints(duration);
+  expect(
+    isDeepStrictEqual(sought, points),
+    `${file} was sought at ${sought.join(", ")} s, not at ${points.join(", ")} s, the points of its ${duration} s`,
+  );
   expect(
     isDeepStrictEqual([state.width, state.height], state.dimensions),
     `${file} is ${state.width}x${state.height}, not ${state.dimensions.join("x")}`,

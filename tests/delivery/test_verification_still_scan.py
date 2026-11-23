@@ -33,12 +33,12 @@ def test_an_edition_whose_film_passed_its_scan_is_verified(inputs, verify):
 
 
 def test_a_film_that_holds_a_still_run_is_refused_with_its_seconds_and_its_speech(inputs, verify):
-    held = {"start": 842.7, "end": 847.4, "speech": 3.86}
-    inputs.scan_film({"start": 12.0, "end": 14.5, "speech": 2.1}, held)
+    held = {"start": 2.7, "end": 7.4, "speech": 3.86}
+    inputs.scan_film({"start": 0.2, "end": 2.5, "speech": 2.1}, held)
     with pytest.raises(PictureError) as refused:
         verify()
     assert str(refused.value) == (
-        "The zh film holds a still picture with 3.5 s of speech or more: 842.70-847.40 s with "
+        "The zh film holds a still picture with 3.5 s of speech or more: 2.70-7.40 s with "
         "3.86 s of speech; see build/evidence/editions/zh/film-stills.json"
     )
 
@@ -70,7 +70,7 @@ def test_a_record_cut_short_is_refused_with_the_action_that_writes_it(inputs, ve
 def test_a_record_whose_runs_a_hand_emptied_is_not_trusted(inputs, verify):
     # The record of a film that stands still, its list of runs emptied: its own list of the
     # runs at the limit and its longest speech still state the run.
-    inputs.scan_film({"start": 842.7, "end": 847.4, "speech": 3.86})
+    inputs.scan_film({"start": 2.7, "end": 7.4, "speech": 3.86})
     inputs.change(inputs.edition.film_stills, "fine", "runs", value=[])
     with pytest.raises(PictureError) as refused:
         verify()
