@@ -409,7 +409,7 @@ Where an edition's latest whole narration started within the run of a convergenc
 
 #### Scenario: A convergence that did not complete
 
-- **WHEN** a convergence of 343 s ran a narration of 41 s and ended with its edition missing the runtime, and a render of 200 s followed
+- **WHEN** a convergence of 343 s ran a narration of 41 s and ended with its edition refused by the assembly, and a render of 200 s followed
 - **THEN** the convergence is listed as not completed and left out, and the build's sum holds 241 s: the narration and the render
 
 #### Scenario: A narration after an earlier convergence
