@@ -63,7 +63,7 @@ Shown by `tests/test_languages.py`, `tests/narration/test_cmudict.py`, `tests/te
       fixture dictionary, refuses "I" for a declared "AI", a Chinese bench that reads no dictionary, the record's
       fields, and every scenario of the requirement "A judgment reads only the pinned dictionary", with a stub of the
       model loader that a refusal never calls; and passes.
-- [ ] 2.6 Add the host tool `cmudict` to `tests/conftest.py`, present where the supplied file holds the pinned SHA-256,
+- [x] 2.6 Add the host tool `cmudict` to `tests/conftest.py`, present where the supplied file holds the pinned SHA-256,
       and in `tests/narration/test_cmudict.py` the function that lists, for given text words and a dictionary, the
       other spellings the rule takes for each, with two tests: one over a fixture of CMUdict lines (for "labelled",
       "tiers", "their", "catalogue", "AI" declared by letter names, and "to"), and one marked `cmudict` over the pinned

@@ -1,11 +1,18 @@
 """The pinned CMUdict: read in its file's order, secondary stress as none, and refused where the
 supply step has not placed its bytes."""
 
+import json
+from pathlib import Path
+
 import pronounced
 import pytest
 
 import filmkit.narration.cmudict as cmudict
+import filmkit.narration.recognition as recognition
 import filmkit.repository as repository
+
+ENGINE = Path(__file__).resolve().parents[2]
+SAMPLE = ENGINE / "examples/sample-film/content/en/film-script.json"
 
 FIXTURE = (
     b";;; # comment lines and comments after a pronunciation are dropped\n"
@@ -63,3 +70,73 @@ def test_the_pin_is_the_commit_the_films_cite():
         3_618_488,
         "build/runtime/tool-cache/cmudict/cmudict.dict",
     )
+
+
+def test_the_spellings_the_rule_takes_for_a_text_word_over_the_fixture():
+    heard = recognition.Heard(cmudict.parse(pronounced.RAW), {"ai": ()})
+    words = ["labelled", "tiers", "their", "catalogue", "AI", "to"]
+    assert recognition.let_through(words, heard) == {
+        "labelled": ["labeled"],
+        # tears is first the verb tear: no spelling has tiers' sound first.
+        "tiers": [],
+        "their": ["there", "they're"],
+        "catalogue": ["catalog"],
+        # Declared by its letter names, AI has no pronunciation.
+        "AI": [],
+        "to": ["thuy", "too", "tu", "tue", "two"],
+    }
+
+
+# The spellings the rule takes for each English word of the sample film and of the Change's
+# scenarios over the pinned file, from the design's appendix (probe-6 and probe-7) and the
+# scenarios; a word not listed takes none.
+PINNED = {
+    "build": ["bild", "billed"],
+    "check": ["chek", "cheque", "czech"],
+    "draws": ["draus"],
+    "file": ["pfeil", "phyle"],
+    "first": ["furst"],
+    "frame": ["fraim"],
+    "from": ["frum"],
+    "how": ["hao", "hau", "howe"],
+    "joins": ["joines", "joynes"],
+    "made": ["maid", "mayde"],
+    "match": ["mache", "matsch"],
+    "matches": ["matsch's"],
+    "none": ["nuhn", "nun", "nunn"],
+    "one": ["won"],
+    "part": ["parte"],
+    "same": ["sejm"],
+    "seed": ["cede"],
+    "short": ["shortt"],
+    "so": ["sew"],
+    "steps": ["steppes"],
+    "these": ["thee's"],
+    "to": ["thuy", "too", "tu", "tue", "two"],
+    "was": ["waas", "wah's"],
+    "when": ["wen"],
+    "labelled": ["labeled"],
+    "their": ["there", "they're"],
+    "catalogue": ["catalog"],
+    "tiers": [],
+    "an": ["ahn", "ann", "anne"],
+    "or": ["oar", "ohr", "ore", "orr"],
+    "delivery's": [],
+}
+
+
+@pytest.mark.cmudict
+def test_the_spellings_the_rule_takes_over_the_pinned_file():
+    script = json.loads(SAMPLE.read_text(encoding="utf-8"))
+    sample = {
+        unit
+        for segment in script["segments"]
+        for unit in recognition.recognition_units(segment.get("spoken_text") or segment["text"])
+    }
+    words = sorted(sample | set(PINNED))
+    place = ENGINE / cmudict.PLACE
+    heard = recognition.Heard(cmudict.parse(place.read_bytes()), {})
+    found = recognition.let_through(words, heard)
+    assert {word: others for word, others in found.items() if others} == {
+        word: others for word, others in PINNED.items() if others
+    }

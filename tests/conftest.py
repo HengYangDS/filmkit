@@ -29,6 +29,7 @@ os.environ["FILMKIT_NARRATION_PROCESSES"] = "1"
 import filmkit.child_processes as child_processes
 import filmkit.delivery.folder as delivery_folder
 import filmkit.languages as languages
+import filmkit.narration.cmudict as narration_cmudict
 from filmkit.narration.thought_groups import join_quiet
 from filmkit.narration.voice_model import MODEL, NATIVE_DECODER, REVISION
 
@@ -103,12 +104,22 @@ def rsync_3() -> bool:
     )
 
 
+def cmudict_supplied() -> bool:
+    """Whether the supply step placed the pinned CMUdict below the engine's root, its SHA-256 the
+    pin's (`filmkit.narration.cmudict`)."""
+    place = Path(__file__).resolve().parents[1] / narration_cmudict.PLACE
+    return place.is_file() and (
+        hashlib.sha256(place.read_bytes()).hexdigest() == narration_cmudict.SHA256
+    )
+
+
 # Production runs host tools that Homebrew installs and the locked toolchain does not supply:
 # FFmpeg with libx264, ExifTool for the films' QuickTime keys, and rsync 3 for delivery, since
 # macOS's own rsync is openrsync. Tests
 # marked with a tool's marker run it and are skipped where it is not on PATH; the header and the
 # summary of every run name the tests it skips. A test that evaluates on the host's Metal device
-# is marked and skipped the same way where the device evaluates nothing.
+# is marked and skipped the same way where the device evaluates nothing, and one that reads the
+# pinned CMUdict where the supply step has not placed it below the engine's root.
 HOST_TOOLS = {
     "ffmpeg": HostTool(
         "host FFmpeg",
@@ -122,6 +133,13 @@ HOST_TOOLS = {
         "an evaluation on the host's Metal device",
         metal_evaluates(),
         "fails",
+    ),
+    "cmudict": HostTool(
+        "supplied CMUdict",
+        "a read of the pinned CMUdict that the supply step places below the engine's root",
+        cmudict_supplied(),
+        f"is not at {narration_cmudict.PLACE} with its pinned SHA-256; run "
+        f"{narration_cmudict.SUPPLY}",
     ),
 }
 host_skipped: dict[str, list[str]] = {marker: [] for marker in HOST_TOOLS}
