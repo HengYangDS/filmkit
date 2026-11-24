@@ -49,11 +49,11 @@ reviewers' prompt SHALL take the rules from that document alone.
 
 ### Requirement: A film's words hold no form its register refuses
 
-Before a film narrates and before it renders, the engine SHALL check the edition's words a viewer meets (titles,
-thoughts, caption terms, release prose, the player summary and the entry page) against its register style, and SHALL
-refuse while an error-level form stands that the film does not excuse, naming each place and form at once. Every
-occurrence of a form the document lists SHALL be refused unless the film excuses it at its place or it stands inside
-a fixed idiom that the style states.
+Before a film narrates and before it renders, the engine SHALL check the words a viewer meets (titles, thoughts,
+caption terms, release prose, the player summary and the entry page) by the rules their language takes, and SHALL
+refuse while an error-level form stands unexcused, naming each place and form at once. Every occurrence of a
+listed form SHALL be refused where its rule's language applies, unless the film excuses it at its place or it
+stands inside a fixed idiom that the style states.
 
 #### Scenario: An address of the audience
 
@@ -217,3 +217,22 @@ occurrence of the form, and the engine SHALL hold no other list of words that ex
 
 - **WHEN** a zero-width space stands inside 名副其实
 - **THEN** the register check reads the idiom as if the character were not there and refuses nothing for it
+
+### Requirement: Each place is checked by the rules of the languages its words are in
+
+The register check SHALL check each place by the rules of every language whose words it holds, as the language registry reads them in its edition: the edition's language, and the language its edition reads each other script in. A place every edition shares, as the entry page, SHALL be checked by the rules of every declared language. No rule SHALL apply to a place because of its script alone.
+
+#### Scenario: A rule one language does not take
+
+- **WHEN** the engine's tests declare `xb` with English's rules but without the rule for contractions, and an `xb` thought says "don't"
+- **THEN** the check refuses nothing for the contraction, while an English thought that says "don't" is refused
+
+#### Scenario: English words in a Chinese thought
+
+- **WHEN** a Chinese thought holds the English word "don't"
+- **THEN** the check refuses the contraction, since the Chinese declaration reads Latin script as English
+
+#### Scenario: A place every edition shares
+
+- **WHEN** the entry page holds 你们 and "you"
+- **THEN** the check refuses both, naming the entry page

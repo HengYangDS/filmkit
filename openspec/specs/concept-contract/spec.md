@@ -8,11 +8,11 @@ Keep every concept a film names faithful to its canonical source: one approved r
 
 ### Requirement: A film may declare a concept contract
 
-A film MAY name a concept contract in its declaration. The engine SHALL refuse a contract that is malformed, that repeats a concept id, or whose concept cites a document the source manifest does not pin, naming each failing entry. Each concept SHALL carry its source term, its essence, its source passage, and for each edition one approved rendering, the forms the narration may use and the counterexamples to refuse.
+A film MAY name a concept contract in its declaration. Each concept SHALL carry its source term, its essence, its source passage, and for each declared edition one approved rendering, the forms the narration may use and the counterexamples to refuse. The engine SHALL refuse a contract that is malformed, repeats a concept id, gives a concept no rendering for a declared edition or one for an undeclared edition, or cites a document the source manifest does not pin, naming each failing entry.
 
 #### Scenario: A malformed contract is refused
 
-- **WHEN** a concept lacks a rendering for an edition, or two concepts share an id
+- **WHEN** a concept lacks a rendering for a declared edition, holds one for an edition the film does not declare, or two concepts share an id
 - **THEN** the check refuses and names each failing entry
 
 #### Scenario: A concept cites an unpinned document
@@ -41,7 +41,7 @@ When a local clone of the source repository is named, each concept's quotation S
 
 ### Requirement: Segments name their concepts by the approved renderings
 
-A script segment MAY declare the concepts it states. Each declared concept SHALL exist in the contract; the same segment SHALL declare the same concepts in both editions; and each declared concept SHALL appear in that segment's narration by its edition's rendering or one of its forms, as a substring in Chinese and as a whole-word phrase, ignoring case, in English.
+A script segment MAY declare the concepts it states. Each declared concept SHALL exist in the contract; the same segment SHALL declare the same concepts in every edition; and each declared concept SHALL appear in that segment's narration by its edition's rendering or one of its forms: as a substring in a language whose words spaces do not delimit, as Chinese, and as a whole-word phrase, ignoring case, in a language whose words spaces delimit, as English.
 
 #### Scenario: An undeclared or unknown concept
 
@@ -50,8 +50,8 @@ A script segment MAY declare the concepts it states. Each declared concept SHALL
 
 #### Scenario: Editions that declare different concepts
 
-- **WHEN** one segment declares different concepts in its two editions
-- **THEN** the check refuses and names the segment and the concepts that differ
+- **WHEN** one segment declares different concepts in two of its editions
+- **THEN** the check refuses and names the segment, those editions and the concepts that differ
 
 #### Scenario: A declared concept said in other words
 
@@ -122,7 +122,7 @@ The reviewer prompt context SHALL name the film's concept contract and the readi
 
 ### Requirement: A Latin-script term's number is carried in Chinese
 
-A Latin-script word keeps its base form in Chinese. Where the English counterpart of a Chinese thought uses such a word only in its plural, the Chinese clause holding it SHALL hold a number word, or the concept check SHALL refuse before narration, naming the edition, thought, word, plural and clause. A film MAY declare more number words, and exceptions with a reason.
+A Latin-script word keeps its base form in a language that marks no grammatical number, as Chinese. Where the counterpart of such a thought, in an edition whose language marks number, uses that word only in its plural, the clause holding it SHALL hold one of its language's number words, or the concept check SHALL refuse before narration, naming the edition, thought, word, plural and clause. A film MAY declare more number words, and exceptions with a reason.
 
 #### Scenario: A plural heard as one
 

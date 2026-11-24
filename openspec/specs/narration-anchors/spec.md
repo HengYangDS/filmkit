@@ -154,7 +154,7 @@ A replacement SHALL find its phrase in the thought's text without marks. An anch
 
 ### Requirement: A rewrite moves each anchor to the words it still says
 
-A rewrite, which replaces a segment's thoughts whole, SHALL move each anchor whose words, compared by their units, occur in the new thoughts exactly once, or as many times as in the old thoughts, to that occurrence or to the occurrence of the same rank; in English an occurrence SHALL begin and end at word boundaries. It SHALL be refused for every other anchor, naming each with its words, unless the new thoughts restate its marks, and for new thoughts that do not each say a spoken unit.
+A rewrite, which replaces a segment's thoughts whole, SHALL move each anchor whose words, by their units, occur in the new thoughts exactly once, or as often as in the old ones, to that occurrence or to the one of the same rank; where spaces delimit the language's words, an occurrence SHALL begin and end at word boundaries. It SHALL be refused for every other anchor, naming each with its words, unless the new thoughts restate its marks, and for new thoughts that do not each say a spoken unit.
 
 #### Scenario: A segment rewritten whole
 
@@ -202,7 +202,7 @@ An `anchor` edit SHALL name a thought, a span of units of the thought's text, th
 
 ### Requirement: The anchors of both editions are reported
 
-`python -m filmkit.narration.anchors` SHALL print, for each edition, each segment's anchors with their thought, words and units and, where the edition's timeline holds them, their times, and with `--json` the same as one JSON document; it SHALL name as stale, and not give, times of other marks than the script's; and it SHALL name each id that one edition marks in a segment and the other does not, refusing nothing for it.
+`python -m filmkit.narration.anchors` SHALL print, for each edition, each segment's anchors with their thought, words and units and, where the edition's timeline holds them, their times, and with `--json` the same as one JSON document; it SHALL name as stale, and not give, times of other marks than the script's; and it SHALL name each id that one edition marks in a segment and some other edition does not, refusing nothing for it.
 
 #### Scenario: An anchor in one edition only
 
