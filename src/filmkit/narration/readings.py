@@ -442,9 +442,10 @@ def check(code: str) -> dict:
         words, failures = declared_words(contract)
         rows, gaps = resolve(thoughts, words)
         failures += gaps
-    # A language that writes no Latin script says every Latin word as a name its contract lists;
-    # one that writes it, each word written with two or more capitals as one of its targets.
-    embeds = "latin" not in edition.declaration.scripts
+    # A language that reads Latin script as another says every Latin word as a name its
+    # pronunciation lists; any other, each word written with two or more capitals as one of its
+    # targets.
+    embeds = languages.names_embedded(code)
     names = (
         set(contract.get("embedded_english_targets", []))
         if embeds

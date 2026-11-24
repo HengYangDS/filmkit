@@ -81,11 +81,12 @@ class Read(NamedTuple):
 
 class Names(NamedTuple):
     """What an edition's Latin units are read by beside their letters: the terms the film
-    declares (`filmkit.narration.terms`) and, in the Chinese edition (`chinese`), the other
-    Latin units its script says, by their letters and digits (`others`)."""
+    declares (`filmkit.narration.terms`) and, in an edition whose language reads Latin script as
+    another (`embedded`, `filmkit.languages.names_embedded`), the other Latin units its script
+    says, by their letters and digits (`others`)."""
 
     terms: tuple[NarrationTerm, ...] = ()
-    chinese: bool = False
+    embedded: bool = False
     others: frozenset[str] = frozenset()
 
 
@@ -213,13 +214,13 @@ def _joined(units: Sequence[Read], end: int, other: Read) -> list[int]:
 
 
 def edition_names(
-    declared: Sequence[NarrationTerm], texts: Sequence[str], *, chinese: bool
+    declared: Sequence[NarrationTerm], texts: Sequence[str], *, embedded: bool
 ) -> Names:
-    """An edition's names: its declared terms and, in Chinese, the Latin units its spoken texts
-    say that say no term, by their letters and digits. They are recognition units, so a word
+    """An edition's names: its declared terms and, where `embedded`, the Latin units its spoken
+    texts say that say no term, by their letters and digits. They are recognition units, so a word
     such as `Node.js` gives two."""
     declared = tuple(declared)
-    if not chinese:
+    if not embedded:
         return Names(declared)
     others = {
         unit.reading
@@ -231,14 +232,15 @@ def edition_names(
 
 
 def stands_for(expected: Read, observed: Read, names: Names) -> bool:
-    """Whether, in Chinese speech, a transcript's unit may stand for the text's declared term:
-    a Latin unit that holds a letter, says no term and is no other Latin unit of the edition.
+    """Whether, in speech of a language that reads Latin script as another, a transcript's unit
+    may stand for the text's declared term: a Latin unit that holds a letter, says no term and is
+    no other Latin unit of the edition.
 
     A recognizer has no steady spelling for a foreign name in Chinese speech; how the term was
     said there is the term line's to judge (`filmkit.narration.terms`).
     """
     return (
-        names.chinese
+        names.embedded
         and expected.term is not None
         and not observed.han
         and observed.term is None

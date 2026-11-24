@@ -224,7 +224,8 @@ export function leadWords(whole, rules = WRAPPING) {
  * and a Chinese line opening on closing punctuation. */
 export function labelBreaks({ whole, lines }, rules = WRAPPING) {
   const lead = new Set(leadWords(whole, rules).map(bare)),
-    chinese = HAN.test(whole),
+    // A label that holds a Han character breaks between characters, by CJK line breaking.
+    ideographic = HAN.test(whole),
     found = [];
   for (const block of blocksOf(lines)) {
     if (block.length < 2) continue;
@@ -242,7 +243,7 @@ export function labelBreaks({ whole, lines }, rules = WRAPPING) {
         found.push(
           `line ${line.number}, the last of its size, spans ${share} of the widest, under ${rules.last_share}`,
         );
-      if (chinese) return;
+      if (ideographic) return;
       if (!last && ending && lead.has(bare(ending)))
         found.push(`line ${line.number} ends on the lead word "${word(ending)}"`);
       if (last && words >= 3 && wordsOf(line.text).length === 1)
@@ -251,7 +252,7 @@ export function labelBreaks({ whole, lines }, rules = WRAPPING) {
         );
     });
   }
-  if (chinese)
+  if (ideographic)
     lines.forEach((line, k) => {
       const mark = k ? CLOSES.exec(line.text)?.[0] : null;
       if (mark) found.push(`line ${k + 1} opens on "${mark}"`);

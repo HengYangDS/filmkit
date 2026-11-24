@@ -154,14 +154,14 @@ def test_units_with_the_same_letters_stay_alike_beside_a_declared_term():
     # A straight apostrophe keeps one unit; a curly one or a space parts it, and the parts join.
     for heard in ("Their name's are here.", "Their name’s are here.", "Their name s are here."):
         assert (by_reading(text, heard), by_reading(text, heard, names)) == (0, 0), heard
-    chinese = narration_recognition.Names((NAME,), chinese=True, others=OTHERS)
+    chinese = narration_recognition.Names((NAME,), embedded=True, others=OTHERS)
     assert by_reading("那些 names 在这里。", "那些name's在这里。", chinese) == 0
 
 
 def test_a_term_inside_a_compound_is_compared_by_its_letters():
     # The term line measures no occurrence inside a compound, so nothing would hold its sound:
     # there the comparison reads the letters, as for any other word, and fails closed.
-    chinese = narration_recognition.Names((NAME,), chinese=True, others=OTHERS)
+    chinese = narration_recognition.Names((NAME,), embedded=True, others=OTHERS)
     assert by_reading("一种 Naim-based 的做法。", "一种Nime-based的做法。", chinese) == 1
     english = narration_recognition.Names((NAME,))
     assert by_reading("A Naim-based plan.", "A Name-based plan.", english) == 1
@@ -171,7 +171,7 @@ def test_a_term_inside_a_compound_is_compared_by_its_letters():
 
 
 def test_a_term_in_chinese_speech_is_alike_one_latin_unit_that_is_no_other_unit_of_the_edition():
-    names = narration_recognition.Names((NAME,), chinese=True, others=OTHERS)
+    names = narration_recognition.Names((NAME,), embedded=True, others=OTHERS)
     text = "Naim 走的是另一条路。"
     for heard in ("Name走的是另一条路。", "Nime走的是另一条路。"):
         assert (by_reading(text, heard), by_reading(text, heard, names)) == (1, 0), heard
@@ -204,7 +204,7 @@ def test_an_english_edition_gives_a_term_no_other_letters():
     # Built for the English edition, the comparison has no rule of other letters: in English
     # every word is Latin letters, and any word would pass in the name's place.
     texts = ["Naim is built for it.", "An Agent reads it."]
-    names = narration_recognition.edition_names((NAME,), texts, chinese=False)
+    names = narration_recognition.edition_names((NAME,), texts, embedded=False)
     assert names == narration_recognition.Names((NAME,))
     assert by_reading("Naim is built for it.", "Nime is built for it.", names) == 1
     assert by_reading("Naim 走的是另一条路。", "Nime走的是另一条路。", names) == 1

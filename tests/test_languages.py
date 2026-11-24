@@ -216,3 +216,14 @@ def test_every_python_site_counts_a_character_of_extension_a_as_han():
     assert re.fullmatch(spotlight.HAN, character)
     assert register._CHINESE.match(character)
     assert label_matches.words(f"{character}a") == [character, "a"]
+
+
+def test_a_latin_word_is_an_embedded_name_where_the_language_reads_latin_as_another(
+    monkeypatch,
+):
+    # Chinese reads Latin script as English; English writes it; a language derived from
+    # Chinese's declaration that reads Latin as no other language says no Latin word as a name.
+    xd = languages.parse("xd", {**derived_languages.declaration("zh"), "embedded": {}})
+    monkeypatch.setitem(languages.LANGUAGES, "xd", xd)
+    assert [languages.names_embedded(code) for code in ("zh", "en", "xd")] == [True, False, False]
+    assert languages.written_in("API", "xd") is None

@@ -300,7 +300,7 @@ def test_a_chinese_bench_reads_the_editions_other_latin_units_from_its_script(
     )
     # The script's Latin units by their letters, less the term's: `Node.js` is two units.
     zh = narration_judgment.bench("zh", [], asr=None, aligner={}, film=declared)
-    assert zh.names == Names((NAME,), chinese=True, others=frozenset({"agent", "node", "js"}))
+    assert zh.names == Names((NAME,), embedded=True, others=frozenset({"agent", "node", "js"}))
     # The English bench has no rule of other letters, under which any word would pass.
     en = narration_judgment.bench("en", [], asr=None, aligner={}, film=declared)
     assert en.names == Names((NAME,))
@@ -314,7 +314,7 @@ def test_a_take_records_the_unit_that_stood_for_a_term_in_other_letters(narrated
     record = narrated([voiced(), voiced()])
     bench, _held = narration_judgment.studio("en", [record])
     chinese = dataclasses.replace(
-        bench, code="zh", language="Chinese", names=Names((NAME,), chinese=True)
+        bench, code="zh", language="Chinese", names=Names((NAME,), embedded=True)
     )
     path = repository.ROOT / record["utterance_groups"]["records"][0]["path"]
     said = "Naim 走的是另一条路。"
@@ -497,4 +497,4 @@ def test_a_test_languages_bench_takes_its_sources_reading_check(monkeypatch, tmp
     }
     assert (benches["xa"].words, benches["xa"].names) == (benches["zh"].words, benches["zh"].names)
     assert (benches["xb"].words, benches["xb"].names) == (benches["en"].words, benches["en"].names)
-    assert benches["xa"].names.chinese and not benches["xb"].names.chinese
+    assert benches["xa"].names.embedded and not benches["xb"].names.embedded

@@ -300,6 +300,13 @@ def checks(code: str, kind: str) -> bool:
     return kind in language(code).readings
 
 
+def names_embedded(code: str) -> bool:
+    """Whether a language reads Latin script as another language (its `embedded`), so that every
+    Latin word its narration says is a name: one its pronunciation lists among its embedded
+    targets, and one recognition reads as a name and not by a reading of its own."""
+    return "latin" in language(code).embedded
+
+
 def named(english_name: str) -> Language:
     """The declared language that the speech models take by this name, as a contract keys its
     part, refused when no declaration takes it."""
