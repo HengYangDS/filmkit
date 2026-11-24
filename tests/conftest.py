@@ -105,9 +105,9 @@ def rsync_3() -> bool:
 
 
 def cmudict_supplied() -> bool:
-    """Whether the supply step placed the pinned CMUdict below the engine's root, its SHA-256 the
-    pin's (`filmkit.narration.cmudict`)."""
-    place = Path(__file__).resolve().parents[1] / narration_cmudict.PLACE
+    """Whether the supply step placed the pinned CMUdict below the sample film's root, where
+    `mise run sample:supply` places it, its SHA-256 the pin's (`filmkit.narration.cmudict`)."""
+    place = Path(os.environ["FILMKIT_ROOT"]) / narration_cmudict.PLACE
     return place.is_file() and (
         hashlib.sha256(place.read_bytes()).hexdigest() == narration_cmudict.SHA256
     )
@@ -119,7 +119,7 @@ def cmudict_supplied() -> bool:
 # marked with a tool's marker run it and are skipped where it is not on PATH; the header and the
 # summary of every run name the tests it skips. A test that evaluates on the host's Metal device
 # is marked and skipped the same way where the device evaluates nothing, and one that reads the
-# pinned CMUdict where the supply step has not placed it below the engine's root.
+# pinned CMUdict where the supply step has not placed it below the sample film's root.
 HOST_TOOLS = {
     "ffmpeg": HostTool(
         "host FFmpeg",
@@ -136,7 +136,7 @@ HOST_TOOLS = {
     ),
     "cmudict": HostTool(
         "supplied CMUdict",
-        "a read of the pinned CMUdict that the supply step places below the engine's root",
+        "a read of the pinned CMUdict that the supply step places below the sample film's root",
         cmudict_supplied(),
         f"is not at {narration_cmudict.PLACE} with its pinned SHA-256; run "
         f"{narration_cmudict.SUPPLY}",

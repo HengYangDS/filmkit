@@ -46,7 +46,7 @@ run = [
 # mirror where the hub is unreachable. sample:build runs every stage in order, and
 # sample:durations prints what each command took.
 [tasks."sample:supply"]
-description = "Install the pinned browser build and speech models below the sample film's tool cache"
+description = "Install the pinned browser build, CMUdict and speech models below the sample film's tool cache"
 dir = "{{config_root}}/examples/sample-film"
 run = "uv run --python 3.12 --frozen --offline python -m filmkit.supply"
 

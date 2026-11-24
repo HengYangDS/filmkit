@@ -134,7 +134,8 @@ def test_the_spellings_the_rule_takes_over_the_pinned_file():
         for unit in recognition.recognition_units(segment.get("spoken_text") or segment["text"])
     }
     words = sorted(sample | set(PINNED))
-    place = ENGINE / cmudict.PLACE
+    # The supply step places the file below the film's root: the sample's, which the tests build.
+    place = repository.ROOT / cmudict.PLACE
     heard = recognition.Heard(cmudict.parse(place.read_bytes()), {})
     found = recognition.let_through(words, heard)
     assert {word: others for word, others in found.items() if others} == {
