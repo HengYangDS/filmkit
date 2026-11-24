@@ -161,7 +161,7 @@ and 6.6 run models and each waits for its own GPU ticket under the host's rules.
       for each film's root. Done when `trial.md` names each recording whose count moves, with its pairs, shows none
       that moves from fewer differing units to more, and states the films' let-through list again from the supplied
       file, equal to the appendix's list.
-- [ ] 6.5 In scratch copies of `ch1-5` and `ch6-11`, declare the owner's records for 02.10, 14.4, 21.3 and 09.1
+- [x] 6.5 In scratch copies of `ch1-5` and `ch6-11`, declare the owner's records for 02.10, 14.4, 21.3 and 09.1
       (D-44), each with `lines = ["units"]` and its take's audio SHA-256 from its copy's judgment, and run
       `python -m filmkit.narration.judge --language <code>` for both editions of each copy, as the child of one GPU
       ticket. Done when `trial.md` shows the four takes passing their units line with the owner named, 28.4 refused by
@@ -169,7 +169,7 @@ and 6.6 run models and each waits for its own GPU ticket under the host's rules.
       (Chinese 03.5, 04.1, 04.4, 07.7, 12.4 and 15.4; English 14.1) named for the ear with their takes' paths and
       SHA-256 and refused by nothing else, every other verdict as recorded, each judgment bound to the receipt SHA-256
       recorded before, and no recording written.
-- [ ] 6.6 In the scratch copy of `ch1-5`, run
+- [x] 6.6 In the scratch copy of `ch1-5`, run
       `python -m filmkit.narration.audition audition --language zh --targets <file naming 03.5> --takes 3` as the child
       of one GPU ticket, then `python -m filmkit.narration.audition apply --language zh --proposals <its file> --dry-run`.
       Done when `trial.md` shows the proposal ordered with takes above the line first, a take under it named for the
