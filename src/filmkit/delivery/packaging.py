@@ -228,8 +228,8 @@ def package_metadata(edition: Edition) -> None:
     source_cover = repository.ROOT / edition.cover
     if not source_cover.is_file():
         msg = (
-            f"The declaration names an unpainted cover, editions.{edition.code}.cover: "
-            f"{edition.cover}; paint it from the staged picture with the cover check"
+            f"The {edition.code} edition's cover {edition.cover} is not painted; paint it from "
+            "the staged picture with the cover check"
         )
         raise PackagingError(msg)
     version = film_version()

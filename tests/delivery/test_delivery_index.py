@@ -40,10 +40,10 @@ def test_the_runtime_and_viewing_members_follow_the_edition():
     )
 
 
-def test_an_edition_whose_cover_is_not_painted_refuses_naming_its_field(tmp_path, monkeypatch):
+def test_an_edition_whose_cover_is_not_painted_refuses_naming_its_place(tmp_path, monkeypatch):
     monkeypatch.setattr(repository, "ROOT", tmp_path)
     edition = production.Edition("zh")
-    with pytest.raises(PackagingError, match=rf"editions\.zh\.cover: {re.escape(edition.cover)}"):
+    with pytest.raises(PackagingError, match=rf"zh edition's cover {re.escape(edition.cover)} is"):
         delivery_packaging.package_metadata(edition)
     assert not (tmp_path / "build").exists()
 

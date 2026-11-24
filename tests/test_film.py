@@ -41,7 +41,7 @@ def test_a_complete_declaration_loads(declared):
 
 def test_a_missing_script_refuses_naming_its_edition(declared):
     (declared / Edition("en").script).unlink()
-    with pytest.raises(FilmError, match=r"editions\.en\.sources: content/en/film-script\.json"):
+    with pytest.raises(FilmError, match=r"editions\.en: content/en/film-script\.json"):
         film.load(declared)
 
 
@@ -60,9 +60,9 @@ def test_a_missing_concept_contract_refuses_naming_its_field(declared):
         film.load(declared)
 
 
-def test_a_declaration_names_covers_before_they_are_painted(declared):
+def test_a_film_loads_before_its_covers_are_painted(declared):
     for code in CODES:
-        cover = declared / film.FILM.editions[code].cover
+        cover = declared / Edition(code).cover
         cover.unlink(missing_ok=True)
         assert not cover.exists()
     assert film.load(declared) == film.FILM
@@ -117,14 +117,14 @@ def test_a_declaration_is_refused_with_every_problem_it_holds(declared):
 
 
 def test_missing_files_and_a_player_page_are_named_together(declared):
-    (declared / film.FILM.editions["en"].sources / "film-script.json").unlink()
-    (declared / film.FILM.editions["zh"].sources / "player.html").write_text("<html></html>")
+    (declared / Edition("en").script).unlink()
+    (declared / Edition("zh").sources / "player.html").write_text("<html></html>")
     missing, copied = film.problems(declared)
-    assert "editions.en.sources" in missing
+    assert "editions.en: content/en/film-script.json" in missing
     assert "player.html" in copied
     with pytest.raises(FilmError) as refusal:
         film.load(declared)
-    assert "editions.en.sources" in str(refusal.value) and "player.html" in str(refusal.value)
+    assert "editions.en: " in str(refusal.value) and "player.html" in str(refusal.value)
 
 
 def test_a_declaration_that_is_no_text_is_refused_as_no_declaration(declared):
@@ -404,7 +404,7 @@ def test_each_edition_declares_the_words_and_colours_of_its_player():
     for code in CODES:
         summary = film.FILM.editions[code].summary
         assert summary and summary == summary.strip()
-        assert not (repository.ROOT / film.FILM.editions[code].sources / "player.html").exists()
+        assert not (repository.ROOT / Edition(code).sources / "player.html").exists()
     assert CHINESE.search(film.FILM.editions["en"].summary) is None
 
 
@@ -433,7 +433,7 @@ def test_a_film_not_yet_migrated_from_its_player_refuses_naming_the_declarations
     path.write_text(
         "".join(line for line in lines if not line.startswith("summary = ")), encoding="utf-8"
     )
-    (declared / film.FILM.editions["zh"].sources / "player.html").write_text("<html></html>")
+    (declared / Edition("zh").sources / "player.html").write_text("<html></html>")
     with pytest.raises(FilmError) as refusal:
         film.load(declared)
     for field in ("editions.zh.summary", "editions.en.summary", "player\n"):
@@ -441,7 +441,7 @@ def test_a_film_not_yet_migrated_from_its_player_refuses_naming_the_declarations
 
 
 def test_a_player_template_left_in_the_sources_refuses_naming_the_declarations(declared):
-    (declared / film.FILM.editions["en"].sources / "player.html").write_text("<html></html>")
+    (declared / Edition("en").sources / "player.html").write_text("<html></html>")
     with pytest.raises(FilmError) as refusal:
         film.load(declared)
     assert "content/en/player.html" in str(refusal.value)

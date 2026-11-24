@@ -5,6 +5,8 @@ import hashlib
 import json
 from pathlib import Path
 
+import derived_languages
+
 import filmkit.production as production
 import filmkit.repository as repository
 
@@ -22,8 +24,10 @@ def write_json(path, value) -> None:
 
 
 def stage(tmp_path, monkeypatch, code, groups, words, captions=()):
-    """Stage an assembled edition: script, cast, timeline, waveform, receipt and selection."""
-    release = json.loads((SAMPLE / production.Edition(code).script).read_text())["release"]
+    """Stage an assembled edition: script, cast, timeline, waveform, receipt and selection. A
+    test language's edition takes the release of the sample's edition it derives from."""
+    source = derived_languages.DERIVED.get(code, (code,))[0]
+    release = json.loads((SAMPLE / production.Edition(source).script).read_text())["release"]
     monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
     edition = production.Edition(code)
     text = "".join(groups)

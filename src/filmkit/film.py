@@ -101,6 +101,17 @@ WITHDRAWN = (
         "runtime_fit",
         "remove it: nothing reads it, since an edition lasts as long as its narration",
     ),
+    Withdrawn(
+        "edition",
+        "sources",
+        "remove it and move the edition's files to content/<code>/, the folder its code derives",
+    ),
+    Withdrawn(
+        "edition",
+        "cover",
+        "remove it and move the cover to assets/cover/<slug>-cover-<code>.png, the place the "
+        "file prefix and the edition's code derive",
+    ),
 )
 
 
@@ -135,12 +146,9 @@ class Declared(BaseModel):
 
 
 class EditionDeclaration(Declared):
-    """One edition's folder of script and cast, its cover, the summary its player shows under the
-    film, and its caption terms. A declaration that names no folder holds the edition's files at
-    the folder its code derives (`places`)."""
+    """One edition: the summary its player shows under the film, and its caption terms. Its files
+    stand at the places its code derives (`places`)."""
 
-    sources: str | None = None
-    cover: str
     summary: Stated
     caption_terms: tuple[str, ...] = ()
 
@@ -708,22 +716,17 @@ class Film(Declared):
         return self
 
 
-def folder_of(film: Film, code: str) -> str:
-    """An edition's folder of script and cast: the one its declaration still names, until the
-    release withdraws that key, else the one its code derives (`places`)."""
-    return film.editions[code].sources or places(code, film.slug).folder
-
-
 def named_files(film: Film) -> list[tuple[str, str]]:
-    """Each file the declaration names except the covers, with the field that names it."""
+    """Each file the declaration names or its editions derive, except the covers, with the field
+    that names it or the edition's table."""
     named = [
         ("entry", film.entry),
         ("source_manifest", film.source_manifest),
         ("review.prompt", film.review.prompt),
     ]
     for code in film.editions:
-        field = f"editions.{code}.sources"
-        named += [(field, f"{folder_of(film, code)}/{name}") for name in EDITION_FILES]
+        edition = places(code, film.slug)
+        named += [(f"editions.{code}", path) for path in (edition.script, edition.cast)]
     named += [("picture.fonts", font) for font in film.picture.fonts]
     if film.review.readings is not None:
         named.append(("review.readings", film.review.readings))
@@ -735,10 +738,11 @@ def named_files(film: Film) -> list[tuple[str, str]]:
 def copied_players(root: Path, film: Film) -> str | None:
     """Why a film's sources may not hold player pages of their own, naming each one and the
     declarations that replace it, or None when they hold none."""
+    folders = [places(code, film.slug).folder for code in film.editions]
     pages = [
-        f"{folder_of(film, code)}/{PLAYER_TEMPLATE}"
-        for code in film.editions
-        if (root / folder_of(film, code) / PLAYER_TEMPLATE).is_file()
+        f"{folder}/{PLAYER_TEMPLATE}"
+        for folder in folders
+        if (root / folder / PLAYER_TEMPLATE).is_file()
     ]
     if not pages:
         return None
@@ -754,11 +758,13 @@ def read(root: Path) -> tuple[Film | None, list[str]]:
     load.
 
     A key renamed since 0.22.3 is a problem, and the fields are then judged as if it carried its
-    new name, so the rename hides no other field. A declaration that states no `credits_duration`
-    is refused in one line that says to declare it there; its other fields are judged as if it
-    stated one, so that absence hides no other field, and the film is not loaded: the credits
-    are never defaulted. The files the declaration names and a player page left in its sources
-    are judged only once the fields load.
+    new name, so the rename hides no other field; a withdrawn key of the declaration or of an
+    edition's table is a problem, and the fields are judged as if it were absent. A declaration
+    that states no `credits_duration` is refused in one line that says to declare it there; its
+    other fields are judged as if it stated one, so that absence hides no other field, and the
+    film is not loaded: the credits are never defaulted. The files the declaration names or its
+    editions derive, and a player page left in an edition's folder, are judged only once the
+    fields load.
     """
     try:
         declared = tomllib.loads((root / DECLARATION).read_text(encoding="utf-8"))
@@ -783,7 +789,7 @@ def read(root: Path) -> tuple[Film | None, list[str]]:
     for code in unknown:
         found.append(f"{DECLARATION} declares editions.{code}: {languages.unknown(code)}")
         editions.pop(code)
-    found += declared_sources.withdrawn_problems(root, declared)
+    found += declared_sources.withdrawn_problems(root, declared, withdraw=True)
     found += declared_sources.prompt_problems(root, declared)
     found += declared_sources.entry_problems(root, declared)
     undeclared = CREDITS not in declared

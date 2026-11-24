@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import filmkit.languages as languages
 import filmkit.repository as repository
-from filmkit.film import CAST, FILM, SCRIPT, folder_of
+from filmkit.film import FILM, Places, places
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -188,17 +188,22 @@ class Edition:
         return self.declaration.english_name
 
     @property
+    def places(self) -> Places:
+        """Where the edition's files stand, each derived from its code (`filmkit.film.places`)."""
+        return places(self.code, FILM.slug)
+
+    @property
     def sources(self) -> str:
-        """The folder of the edition's script, cast and narration mirror."""
-        return folder_of(FILM, self.code)
+        """The folder of the edition's script, cast and narration mirror, `content/<code>`."""
+        return self.places.folder
 
     @property
     def script(self) -> str:
-        return f"{self.sources}/{SCRIPT}"
+        return self.places.script
 
     @property
     def cast(self) -> str:
-        return f"{self.sources}/{CAST}"
+        return self.places.cast
 
     @property
     def shot_plan(self) -> Path:
@@ -212,7 +217,7 @@ class Edition:
 
     @property
     def cover(self) -> str:
-        return FILM.editions[self.code].cover
+        return self.places.cover
 
     @property
     def artifacts(self) -> Path:

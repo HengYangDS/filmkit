@@ -120,13 +120,15 @@ def _held(where: str, value: object, kind: str) -> list[str]:
     ]
 
 
-def withdrawn_problems(root: Path, declared: dict) -> list[str]:
+def withdrawn_problems(root: Path, declared: dict, withdraw: bool = False) -> list[str]:
     """Each key of the one table of withdrawn keys (`filmkit.film.WITHDRAWN`) that the declaration,
     an edition's table, script, segments, cast or pronunciation part declares, each in one line
     with what to do instead. An edition's files are read in the folder its declaration still
     names, and in the folder its code derives where it names none (`filmkit.film.places`), so a
-    film that has not moved them and one that has are read alike."""
-    from filmkit.film import CAST, DECLARATION, SCRIPT, places
+    film that has not moved them and one that has are read alike. With `withdraw`, the
+    declaration's and the edition tables' withdrawn keys are then set aside, so that they hide
+    none of its other fields' problems."""
+    from filmkit.film import CAST, DECLARATION, SCRIPT, places, withdrawn
 
     found = _held(DECLARATION, declared, "declaration")
     editions = declared.get("editions")
@@ -144,4 +146,9 @@ def withdrawn_problems(root: Path, declared: dict) -> list[str]:
         found += _held(f"{folder}/{CAST}", _json(root / folder / CAST), "cast")
         part = PurePosixPath(derived.pronunciation).name
         found += _held(f"{folder}/{part}", _json(root / folder / part), "part")
+    if withdraw:
+        tables = editions.values() if isinstance(editions, dict) else ()
+        for value, kind in ((declared, "declaration"), *((table, "edition") for table in tables)):
+            for key in withdrawn(kind) if isinstance(value, dict) else ():
+                value.pop(key, None)
     return found

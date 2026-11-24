@@ -5,8 +5,24 @@ import json
 
 import pytest
 
+import filmkit.film as film
 import filmkit.repository as repository
 from filmkit.production import CODES, RENDITIONS, Edition, UnassembledError
+
+
+def test_every_place_of_an_edition_is_derived_from_its_code():
+    for code in CODES:
+        edition = Edition(code)
+        assert edition.places == film.places(code, film.FILM.slug)
+        assert (edition.sources, edition.script, edition.cast, edition.cover) == (
+            f"content/{code}",
+            f"content/{code}/film-script.json",
+            f"content/{code}/voice-reference.json",
+            f"assets/cover/sample-reel-cover-{code}.png",
+        )
+        assert edition.places.reference == f"assets/audio/{code}/narration-reference.wav"
+        assert edition.places.pronunciation == f"content/{code}/pronunciation.json"
+        assert edition.places.readings == f"content/{code}/readings.json"
 
 
 def test_generated_plans_and_records_live_under_build():

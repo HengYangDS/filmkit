@@ -181,23 +181,41 @@ def test_a_withdrawn_key_is_refused_where_the_declaration_still_names_the_files(
     # A film that has not moved its Chinese files keeps them where its declaration names them.
     for name in film.EDITION_FILES:
         (declared / "content/zh" / name).rename(declared / "content" / name)
-    rewrite(declared, 'sources = "content/zh"', 'sources = "content"')
+    rewrite(declared, "[editions.zh]\n", '[editions.zh]\nsources = "content"\n')
     declare(declared / "content" / film.SCRIPT, duration=1500)
     rewrite(declared, 'slug = "sample-reel"', 'slug = "Two Words"')
     with pytest.raises(FilmError) as refusal:
         film.load(declared)
-    first, other = str(refusal.value).split("\n", 1)
-    assert first == f"content/film-script.json {DURATION}"
+    sources, script, other = str(refusal.value).split("\n", 2)
+    assert sources == f"content/film.toml editions.zh declares sources; {WITHDRAWN['sources']}"
+    assert script == f"content/film-script.json {DURATION}"
     assert "\nslug\n" in other
 
 
-def test_a_withdrawn_key_is_refused_at_the_derived_place_under_no_sources(declared):
-    rewrite(declared, 'sources = "content/zh"\n', "")
+def test_a_withdrawn_key_is_refused_at_the_place_its_code_derives(declared):
     declare(declared / "content/zh" / film.SCRIPT, duration=1500)
     rewrite(declared, 'slug = "sample-reel"', 'slug = "Two Words"')
     first, other = film.problems(declared)
     assert first == f"content/zh/film-script.json {DURATION}"
     assert "\nslug\n" in other
+    rewrite(declared, 'slug = "Two Words"', 'slug = "sample-reel"')
+    assert film.problems(declared) == [first]
+
+
+# What the loader says of each key an edition's table may no longer declare.
+WITHDRAWN = film.withdrawn("edition")
+
+
+@pytest.mark.parametrize(("key", "value"), [("sources", '"content/en"'), ("cover", '"c.png"')])
+def test_an_edition_s_folder_or_cover_is_refused_in_one_line_beside_other_problems(
+    declared, key, value
+):
+    rewrite(declared, "[editions.en]\n", f"[editions.en]\n{key} = {value}\n")
+    rewrite(declared, 'slug = "sample-reel"', 'slug = "Two Words"')
+    first, other = film.problems(declared)
+    assert first == f"content/film.toml editions.en declares {key}; {WITHDRAWN[key]}"
+    # The key is set aside: pydantic names the file prefix alone, and not the withdrawn key.
+    assert "\nslug\n" in other and f"editions.en.{key}" not in other
     rewrite(declared, 'slug = "Two Words"', 'slug = "sample-reel"')
     assert film.problems(declared) == [first]
 

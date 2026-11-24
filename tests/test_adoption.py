@@ -218,6 +218,16 @@ def test_the_template_is_asked_for_every_anchor_at_once(project):
     assert "FILM_DATA" in text and "0 times" in text
 
 
+def test_an_edition_s_withdrawn_folder_is_named_by_the_declaration_question_alone(project):
+    rewrite(
+        project / film.DECLARATION, "[editions.zh]\n", '[editions.zh]\nsources = "content/zh"\n'
+    )
+    findings = found(project)
+    instead = film.withdrawn("edition")["sources"]
+    assert findings["declaration"] == [f"content/film.toml editions.zh declares sources; {instead}"]
+    assert [name for name in adoption.QUESTIONS if findings[name]] == ["declaration"]
+
+
 def test_a_template_whose_root_names_one_language_is_named_with_the_anchor_to_write(project):
     # A film's template written before this release opens with its Chinese edition's tag.
     rewrite(project / "picture/index.html", '<html lang="und">', '<html lang="zh-CN">')
