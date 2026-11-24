@@ -13,18 +13,31 @@ import filmkit.narration.recognition as recognition
 import filmkit.repository as repository
 from filmkit.narration.readings import Thought, Word
 
+# Each edition's pronunciation, by the English name of its language, as a test edits it.
+PARTS = {"Chinese": "content/zh/pronunciation.json", "English": "content/en/pronunciation.json"}
+
 
 @pytest.fixture
 def film(tmp_path, monkeypatch):
-    """A copy of the sample film's sources below a new root, and its pronunciation contract."""
+    """A copy of the sample film's sources below a new root, and an edit of its pronunciations:
+    `edit(change)` hands `change` each edition's pronunciation by its language's English name, as
+    `languages`, beside the declaration's schema version, and writes back each to its place."""
     shutil.copytree(repository.ROOT / "content", tmp_path / "content")
     monkeypatch.setattr(repository, "ROOT", tmp_path)
-    path = tmp_path / "content/voice-performance.json"
 
     def edit(change) -> None:
-        performance = json.loads(path.read_text(encoding="utf-8"))
-        change(performance["pronunciation"])
-        path.write_text(json.dumps(performance, ensure_ascii=False, indent=2) + "\n")
+        shared = readings.FILM.pronunciation
+        view = {
+            "schema_version": shared.schema_version,
+            "languages": {name: repository.read(path) for name, path in PARTS.items()},
+        }
+        change(view)
+        for name, path in PARTS.items():
+            repository.write(path, view["languages"][name])
+        if view["schema_version"] != shared.schema_version:
+            changed = shared.model_copy(update={"schema_version": view["schema_version"]})
+            declared = readings.FILM.model_copy(update={"pronunciation": changed})
+            monkeypatch.setattr(readings, "FILM", declared)
 
     return tmp_path, edit
 
@@ -206,9 +219,9 @@ def test_a_homophone_rule_gives_its_display_word_the_reading_of_its_spoken_form(
     assert distance(text, "先，再核对。", words) == 2
 
 
-def test_the_cli_proposes_without_changing_the_contract(film, capsys):
+def test_the_cli_proposes_without_changing_the_pronunciation(film, capsys):
     root, edit = film
-    path = root / "content/voice-performance.json"
+    path = root / PARTS["Chinese"]
 
     def drop_a_word(pronunciation):
         pronunciation["languages"]["Chinese"]["targets"] = [
@@ -272,7 +285,7 @@ def test_the_chinese_contract_lists_its_names_as_terms(film):
     assert readings.check("zh")["occurrences"] == 38
 
 
-def test_a_version_1_contract_is_not_checked(film):
+def test_a_film_of_schema_version_1_is_not_checked(film):
     root, edit = film
 
     def first_version(pronunciation):
@@ -344,15 +357,15 @@ def test_a_declared_term_is_spelled_alike_and_its_reference_is_in_the_text(film,
     with pytest.raises(readings.ReadingError) as refusal:
         readings.check("en")
     assert str(refusal.value).splitlines() == [
-        f"content/voice-performance.json: the {language} normalization gives HyperFrames no "
-        "spoken form; the film declares HyperFrames in [[narration.terms]]"
-        for language in ("Chinese", "English")
+        f"{path}: its normalization gives HyperFrames no spoken form; the film declares "
+        "HyperFrames in [[narration.terms]]"
+        for path in PARTS.values()
     ]
     spell("HyperFrames", "HyperFrames")
     assert readings.check("zh")["occurrences"] == 38
     assert readings.check("en")["occurrences"] == 0
     spell("HyperFrames", "Hyperframes")
-    other = "the English normalization gives HyperFrames the spoken form Hyperframes"
+    other = "content/en/pronunciation.json: its normalization gives HyperFrames the spoken form"
     with pytest.raises(readings.ReadingError, match=other):
         readings.check("zh")
     # The contract's schema version does not spare a term its spelling.
@@ -464,3 +477,21 @@ def test_each_reading_check_is_chosen_by_the_kinds_its_language_declares():
     assert not languages.checks("xa", languages.CMUDICT_STRESS)
     assert languages.checks("xb", languages.CMUDICT_STRESS)
     assert readings.proposals_path("xa") == "build/evidence/readings/xa-proposals.json"
+
+
+def test_a_target_whose_source_no_list_holds_is_refused_before_narration(film, monkeypatch):
+    _root, edit = film
+
+    def cite(contract) -> None:
+        target = {"term": "record", "kind": "lexical", "source": "cmudict"}
+        contract["languages"]["English"]["targets"] = [target]
+
+    edit(cite)
+    with pytest.raises(readings.ReadingError, match="the target record cites the source 'cmudict'"):
+        readings.check("en")
+    # A source that several editions cite stands once in the declaration's [pronunciation].
+    listed = (film_declaration.PronunciationSource(id="cmudict"),)
+    shared = film_declaration.FILM.pronunciation.model_copy(update={"sources": listed})
+    declared = film_declaration.FILM.model_copy(update={"pronunciation": shared})
+    monkeypatch.setattr(film_declaration, "FILM", declared)
+    assert readings.check("en")["contract"] == "content/en/pronunciation.json"

@@ -326,10 +326,9 @@ class ClarityException(Declared):
 
 
 class Review(Declared):
-    """The reviewer prompt, the verifier's floors, the scored dimensions and the plan readings.
+    """The reviewer prompt, the verifier's floors and the scored dimensions.
 
-    The dimensions keep their record order. The readings file holds the listening plan's
-    analyst readings; without one the plan adds none. The clarity floors, one for each edition,
+    The dimensions keep their record order. The clarity floors, one for each edition,
     are what the review's measurement records each voice's clarity against (`review.clarity`).
     The floor holds for a soundtrack and its segments. A single thought varies about its segment,
     so a film may keep a thought under the floor by a `clarity_exceptions` entry, and with
@@ -349,7 +348,6 @@ class Review(Declared):
     overall_minimum: Floor
     dimension_minimum: Floor
     dimensions: dict[str, str] = Field(min_length=1)
-    readings: str | None = None
     clarity_minimum_db: ClarityFloors | None = None
     clarity_thought_margin_db: Annotated[float, Field(ge=0, le=6)] | None = None
     clarity_exceptions: tuple[ClarityException, ...] = ()
@@ -611,6 +609,31 @@ class Register(Declared):
         return exceptions
 
 
+class PronunciationSource(Declared):
+    """A source that pronunciation targets cite: its id, and what the film records of it."""
+
+    id: Stated
+    provider: str | None = None
+    families: tuple[str, ...] = ()
+    qualification: str | None = None
+    url: str | None = None
+    bytes: int | None = None
+    sha256: str | None = None
+
+
+class Pronunciation(Declared):
+    """What every edition's pronunciation shares, which binds no recording: the schema version
+    the readings check holds the film to, the boundary of what its targets control, the criteria
+    a listening accepts a reading by, and the sources that more than one edition's targets cite.
+    Each edition's normalization, targets, own sources and status stand in its folder
+    (`filmkit.narration.pronunciation`)."""
+
+    schema_version: int
+    control_boundary: Stated
+    acceptance: tuple[Stated, ...] = Field(min_length=1)
+    sources: tuple[PronunciationSource, ...] = ()
+
+
 class Film(Declared):
     """A film: its file prefix, delivery folder, entry page, sources, the length of its credits,
     its editions, fonts, player colours and review.
@@ -634,6 +657,7 @@ class Film(Declared):
     picture: Picture
     player: Player
     review: Review
+    pronunciation: Pronunciation | None = None
     narration: Narration = Field(default_factory=Narration)
     captions: Captions = Field(default_factory=Captions)
     # Declared as [register]: `register` would shadow the model class's own (ABCMeta's).
@@ -684,8 +708,6 @@ def named_files(film: Film) -> list[tuple[str, str]]:
         edition = places(code, film.slug)
         named += [(f"editions.{code}", path) for path in (edition.script, edition.cast)]
     named += [("picture.fonts", font) for font in film.picture.fonts]
-    if film.review.readings is not None:
-        named.append(("review.readings", film.review.readings))
     if film.concepts is not None:
         named.append(("concepts", film.concepts))
     return named

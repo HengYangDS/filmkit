@@ -67,7 +67,7 @@ from filmkit.film import FILM
 from filmkit.narration.alignment import verify_aligner
 from filmkit.narration.group_generation import too_short
 from filmkit.narration.narrate import ALIGNER
-from filmkit.narration.pronunciation import pronunciation_contract
+from filmkit.narration.pronunciation import pronunciation
 from filmkit.narration.recognition import (
     NO_NAMES,
     Names,
@@ -176,12 +176,11 @@ def bench(code: str, references: list, *, asr, aligner: dict, film=None) -> Benc
     script = repository.read(edition.script)
     # An edition that reads its Han characters by their pinyin compares its words' readings; one
     # whose language writes no Latin script hears each Latin unit its texts say as a name.
-    contracted = bool(script.get("pronunciation_contract"))
-    pinyin = contracted and languages.checks(code, languages.PINYIN_READINGS)
-    embeds = contracted and "latin" not in edition.declaration.scripts
+    pinyin = languages.checks(code, languages.PINYIN_READINGS)
+    embeds = "latin" not in edition.declaration.scripts
     words, texts = (), []
     if pinyin or embeds:
-        contract, _ = pronunciation_contract(script, edition.language)
+        contract, _ = pronunciation(code)
         texts = [thought.text for thought in readings.edition_thoughts(script, contract)]
         words = readings.compared_words(contract) if pinyin else ()
     measured_standards = standards(code, references, aligner, edition.language)
@@ -204,21 +203,17 @@ def held(code: str, script: dict, film=None) -> Held:
     return Held(releases, *clarity.thought_lines(code, film=film or FILM))
 
 
-def require_terms(code: str, script: dict, records: list[dict], film=None) -> None:
+def require_terms(code: str, records: list[dict], film=None) -> None:
     """Refuse, in one line each, a name that a receipt's thoughts say, that the edition's
     normalization respells in other letters and that the film declares no term for
     (`terms.respelling_failures`). It is asked before any model loads: a complete receipt
     narrates nothing, so no readings check runs before a judgment or an audition."""
-    path = script.get("pronunciation_contract")
-    if not path:
-        return
-    languages = repository.read(path)["pronunciation"]["languages"]
-    language = languages[Edition(code).language]
+    contract, _ = pronunciation(code)
     said = [
         (f"{record['id']}.{child['index']}", child["spoken_text"])
         for record, child in thoughts(records)
     ]
-    failures = terms.respelling_failures((film or FILM).narration.terms, language, said, code)
+    failures = terms.respelling_failures((film or FILM).narration.terms, contract, said, code)
     if failures:
         raise SystemExit("\n".join(failures))
 
@@ -235,7 +230,7 @@ def studio(
     film = film or FILM
     references = terms.receipt_references(code, film.narration.terms, records)
     script = repository.read(Edition(code).script)
-    require_terms(code, script, records, film)
+    require_terms(code, records, film)
     lines = held(code, script, film)
     asr, aligner = models or (load_asr(), load_aligner())
     return bench(code, references, asr=asr, aligner=aligner, film=film), lines

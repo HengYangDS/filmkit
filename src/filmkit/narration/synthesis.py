@@ -39,7 +39,7 @@ from filmkit.narration import processes
 from filmkit.narration.group_generation import generate_native_groups, load_voice_model
 from filmkit.narration.pronunciation import (
     native_utterance_plan,
-    pronunciation_contract,
+    pronunciation,
     pronunciation_text,
     validate_language_reference,
 )
@@ -177,13 +177,13 @@ def load_request(argv: list[str] | None = None) -> Request:
     _check_cast(cast, reference)
     segments = _chosen(script["segments"], options.ids)
     language = validate_language_reference({**script, "segments": segments}, cast, options.language)
-    contract, contract_sha256 = pronunciation_contract(script, language)
+    contract, contract_sha256 = pronunciation(options.language)
     return Request(
         cast=cast,
         reference=reference,
         language=language,
         contract=contract,
-        contract_path=script["pronunciation_contract"],
+        contract_path=places(options.language, FILM.slug).pronunciation,
         contract_sha256=contract_sha256,
         segments=[
             {**segment, "spoken_text": pronunciation_text(segment, contract)}

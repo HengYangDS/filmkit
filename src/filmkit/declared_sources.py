@@ -122,15 +122,16 @@ def _held(where: str, value: object, kind: str) -> list[str]:
 
 def withdrawn_problems(root: Path, declared: dict, withdraw: bool = False) -> list[str]:
     """Each key of the one table of withdrawn keys (`filmkit.withdrawn`) that the declaration,
-    an edition's table, script, segments, cast or pronunciation part declares, each in one line
-    with what to do instead. An edition's files are read in the folder its declaration still
-    names, and in the folder its code derives where it names none (`filmkit.film.places`), so a
-    film that has not moved them and one that has are read alike. With `withdraw`, the
-    declaration's and the edition tables' withdrawn keys are then set aside, so that they hide
-    none of its other fields' problems."""
+    its review table, an edition's table, script, segments, cast or pronunciation part declares,
+    each in one line with what to do instead. An edition's files are read in the folder its
+    declaration still names, and in the folder its code derives where it names none
+    (`filmkit.film.places`), so a film that has not moved them and one that has are read alike.
+    With `withdraw`, the declaration's, its review table's and the edition tables' withdrawn keys
+    are then set aside, so that they hide none of its other fields' problems."""
     from filmkit.film import CAST, DECLARATION, SCRIPT, places
 
     found = _held(DECLARATION, declared, "declaration")
+    found += _held(f"{DECLARATION} review", declared.get("review"), "review")
     editions = declared.get("editions")
     for code, table in (editions if isinstance(editions, dict) else {}).items():
         found += _held(f"{DECLARATION} editions.{code}", table, "edition")
@@ -147,8 +148,10 @@ def withdrawn_problems(root: Path, declared: dict, withdraw: bool = False) -> li
         part = PurePosixPath(derived.pronunciation).name
         found += _held(f"{folder}/{part}", _json(root / folder / part), "part")
     if withdraw:
-        tables = editions.values() if isinstance(editions, dict) else ()
-        for value, kind in ((declared, "declaration"), *((table, "edition") for table in tables)):
+        tables = [(declared, "declaration"), (declared.get("review"), "review")]
+        if isinstance(editions, dict):
+            tables += [(table, "edition") for table in editions.values()]
+        for value, kind in tables:
             for key in withdrawn.keys(kind) if isinstance(value, dict) else ():
                 value.pop(key, None)
     return found

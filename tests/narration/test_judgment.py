@@ -16,6 +16,7 @@ import filmkit.narration.terms as narration_terms
 import filmkit.preflight as preflight
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as soundtrack_assembly
+from filmkit.narration.pronunciation import PronunciationError
 from filmkit.narration.recognition import Names
 from filmkit.production import Edition
 
@@ -225,37 +226,21 @@ def ending_of(child: dict) -> dict:
 
 
 def test_a_chinese_take_is_compared_by_the_readings_the_film_declares(monkeypatch, tmp_path):
-    # The bench of a Chinese edition holds the words whose readings the film's contract declares,
+    # The bench of a Chinese edition holds the words whose readings its pronunciation declares,
     # and each word a homophone rule respells, read as its spoken form reads.
     monkeypatch.setattr(repository, "ROOT", tmp_path)
-    contract = {
-        "schema_version": 2,
-        "pronunciation": {
-            "languages": {
-                "Chinese": {
-                    "normalization": [{"display": "去重", "spoken": "去虫", "kind": "homophone"}],
-                    "targets": [
-                        {
-                            "kind": "contextual-mandarin-word",
-                            "term": "重来",
-                            "target_reading": "chóng lái",
-                        }
-                    ],
-                }
-            }
-        },
+    part = {
+        "normalization": [{"display": "去重", "spoken": "去虫", "kind": "homophone"}],
+        "targets": [
+            {"kind": "contextual-mandarin-word", "term": "重来", "target_reading": "chóng lái"}
+        ],
     }
-    repository.write("contract.json", contract)
-    repository.write(
-        Edition("zh").script,
-        {"pronunciation_contract": "contract.json", "segments": []},
-    )
+    repository.write(Edition("zh").places.pronunciation, part)
+    repository.write(Edition("zh").script, {"segments": []})
     monkeypatch.setattr(narration_judgment, "standards", lambda *_: [])
     bench = narration_judgment.bench("zh", [], asr=None, aligner={})
     assert [word.term for word in bench.words] == ["重来", "去重"]
-    assert bench.words == narration_readings.compared_words(
-        contract["pronunciation"]["languages"]["Chinese"]
-    )
+    assert bench.words == narration_readings.compared_words(part)
 
 
 NAME = film.NarrationTerm(
@@ -266,15 +251,14 @@ CLOSE = narration_terms.Vowel(250.0, 2750.0, 6)
 
 
 def says_name(narrated, voiced, monkeypatch, *, term: bool = True) -> dict:
-    """An English edition whose first thought says NAME as its contract respells it, Naim.
+    """An English edition whose first thought says NAME as its pronunciation respells it, Naim.
 
     With `term`, the film declares NAME with its reference in that thought. The receipt's
     texts are its spoken texts, as the retained records hold them.
     """
     record = narrated([voiced(), voiced()], [{"text": t, "spoken_text": t} for t in SAYS_NAME])
     rule = {"display": "NAME", "spoken": "Naim", "kind": "english-name"}
-    languages = {"English": {"normalization": [rule]}}
-    repository.write("content/voice-performance.json", {"pronunciation": {"languages": languages}})
+    repository.write(Edition("en").places.pronunciation, {"normalization": [rule]})
     narrated.recognizer.thoughts[:2] = SAYS_NAME
     if term:
         update = {"narration": film.Narration(terms=(NAME,))}
@@ -303,15 +287,13 @@ def test_a_chinese_bench_reads_the_editions_other_latin_units_from_its_script(
 ):
     monkeypatch.setattr(repository, "ROOT", tmp_path)
     rule = {"display": "NAME", "spoken": "Naim", "kind": "english-name"}
-    languages = {language: {"normalization": [rule]} for language in ("Chinese", "English")}
-    repository.write("contract.json", {"pronunciation": {"languages": languages}})
     groups = ["NAME 和 Agent 一起。", "再用 Node.js 跑。"]
     text = "".join(groups)
     spoken = text.replace("NAME", "Naim")
     segment = {"id": "01", "text": text, "spoken_text": spoken, "utterance_groups": groups}
     for code in ("zh", "en"):
-        script = {"pronunciation_contract": "contract.json", "segments": [segment]}
-        repository.write(Edition(code).script, script)
+        repository.write(Edition(code).places.pronunciation, {"normalization": [rule]})
+        repository.write(Edition(code).script, {"segments": [segment]})
     monkeypatch.setattr(narration_judgment, "standards", lambda *_: [])
     declared = narration_judgment.FILM.model_copy(
         update={"narration": film.Narration(terms=(NAME,))}
@@ -322,10 +304,10 @@ def test_a_chinese_bench_reads_the_editions_other_latin_units_from_its_script(
     # The English bench has no rule of other letters, under which any word would pass.
     en = narration_judgment.bench("en", [], asr=None, aligner={}, film=declared)
     assert en.names == Names((NAME,))
-    # Nor has a Chinese bench whose script names no contract: no script units are known.
-    repository.write(Edition("zh").script, {"segments": [segment]})
-    bare = narration_judgment.bench("zh", [], asr=None, aligner={}, film=declared)
-    assert (bare.words, bare.names) == ((), Names((NAME,)))
+    # A Chinese edition without its pronunciation has no bench: its units are unknown.
+    (tmp_path / Edition("zh").places.pronunciation).unlink()
+    with pytest.raises(PronunciationError, match="content/zh/pronunciation.json does not exist"):
+        narration_judgment.bench("zh", [], asr=None, aligner={}, film=declared)
 
 
 def test_a_take_records_the_unit_that_stood_for_a_term_in_other_letters(narrated, voiced):
@@ -498,15 +480,13 @@ def test_the_judgment_reads_the_receipt_where_the_narration_writes_it(narrated, 
 def test_a_test_languages_bench_takes_its_sources_reading_check(monkeypatch, tmp_path):
     monkeypatch.setattr(repository, "ROOT", tmp_path)
     rule = {"display": "NAME", "spoken": "Naim", "kind": "english-name"}
-    parts = {name: {"normalization": [rule]} for name in ("Chinese", "English", "Xa", "Xb")}
-    repository.write("contract.json", {"pronunciation": {"languages": parts}})
     groups = ["NAME 和 Agent 一起。", "再用 Node.js 跑。"]
     text = "".join(groups)
     segment = {"id": "01", "text": text, "spoken_text": text.replace("NAME", "Naim")}
     segment["utterance_groups"] = groups
     for code in ("zh", "xa", "en", "xb"):
-        script = {"pronunciation_contract": "contract.json", "segments": [segment]}
-        repository.write(Edition(code).script, script)
+        repository.write(Edition(code).places.pronunciation, {"normalization": [rule]})
+        repository.write(Edition(code).script, {"segments": [segment]})
     monkeypatch.setattr(narration_judgment, "standards", lambda *_: [])
     declared = narration_judgment.FILM.model_copy(
         update={"narration": film.Narration(terms=(NAME,))}

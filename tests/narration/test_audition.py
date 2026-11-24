@@ -151,6 +151,7 @@ def auditioned(retained_group_record, declared, monkeypatch):
         "utterance_groups": [plan["text"] for plan in plans],
     }
     repository.write(edition.script, {"segments": [section]})
+    repository.write(edition.places.pronunciation, {"normalization": []})
     cast = {
         "reference_sha256": settings["reference_sha256"],
         "reference_text": settings["reference_text"],
@@ -391,13 +392,9 @@ def declare_term(monkeypatch, thought: str) -> None:
 
 
 def test_an_audition_asks_for_the_term_before_it_loads_a_model(auditioned):
-    # The contract respells the name the second thought says; the film declares no term for it.
-    contract = "content/voice-performance.json"
+    # The pronunciation respells the name the second thought says; the film declares no term.
     rule = {"display": "Sekond", "spoken": "Second", "kind": "english-name"}
-    languages = {"English": {"normalization": [rule]}}
-    repository.write(contract, {"pronunciation": {"languages": languages}})
-    script = repository.read(Edition("en").script)
-    repository.write(Edition("en").script, {**script, "pronunciation_contract": contract})
+    repository.write(Edition("en").places.pronunciation, {"normalization": [rule]})
     with pytest.raises(SystemExit) as refused:
         narration_audition.audition("en", "targets.json")
     assert str(refused.value) == (

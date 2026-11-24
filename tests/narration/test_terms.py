@@ -285,20 +285,21 @@ def test_every_language_gives_a_term_its_declared_spoken_form():
     def rule(display, spoken):
         return {"display": display, "spoken": spoken, "kind": "english-name"}
 
-    languages = {
-        "Chinese": {"normalization": [rule("ETHER", "Eether")]},
-        "English": {"normalization": [rule("ETHER", "Ether")]},
+    zh, en = "content/zh/pronunciation.json", "content/en/pronunciation.json"
+    parts = {
+        zh: {"normalization": [rule("ETHER", "Eether")]},
+        en: {"normalization": [rule("ETHER", "Ether")]},
     }
-    assert terms.parity_failures((TERM,), languages, "contract.json") == [
-        "contract.json: the English normalization gives ETHER the spoken form Ether; the film "
-        "declares Eether in [[narration.terms]]"
+    assert terms.parity_failures((TERM,), parts) == [
+        f"{en}: its normalization gives ETHER the spoken form Ether; the film declares Eether in "
+        "[[narration.terms]]"
     ]
-    languages["English"]["normalization"] = [rule("ether", "Eether")]
-    assert terms.parity_failures((TERM,), languages, "contract.json") == []
-    languages["Chinese"]["normalization"] = []
-    assert terms.parity_failures((TERM,), languages, "contract.json") == [
-        "contract.json: the Chinese normalization gives ETHER no spoken form; the film declares "
-        "Eether in [[narration.terms]]"
+    parts[en]["normalization"] = [rule("ether", "Eether")]
+    assert terms.parity_failures((TERM,), parts) == []
+    parts[zh]["normalization"] = []
+    assert terms.parity_failures((TERM,), parts) == [
+        f"{zh}: its normalization gives ETHER no spoken form; the film declares Eether in "
+        "[[narration.terms]]"
     ]
 
 

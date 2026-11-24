@@ -22,7 +22,7 @@ from mlx_audio.audio_io import write
 import filmkit.narration.group_generation as group_generation
 import filmkit.narration.judgment as judgment
 import filmkit.repository as repository
-from filmkit.narration.pronunciation import pronunciation_contract
+from filmkit.narration.pronunciation import pronunciation
 from filmkit.narration.retakes import bind_proposals
 from filmkit.narration.transcription import LIBRARIES
 from filmkit.narration.voice_model import request_fingerprint
@@ -94,7 +94,7 @@ def bind(code: str, rows: list[dict], *, dry_run: bool = False) -> tuple[list[st
     """
     edition = Edition(code)
     script, cast = repository.read(edition.script), repository.read(edition.cast)
-    contract, _ = pronunciation_contract(script, edition.language)
+    contract, _ = pronunciation(code)
     cast, bound, skipped = bind_proposals(script, cast, rows, contract)
     if not dry_run:
         repository.write(edition.cast, cast)

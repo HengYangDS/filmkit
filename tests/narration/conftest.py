@@ -20,30 +20,20 @@ import filmkit.narration.anchors as anchors
 import filmkit.repository as repository
 from filmkit.production import Edition
 
-CONTRACT = "content/voice-performance.json"
-
 
 @pytest.fixture
 def write_edition(tmp_path, monkeypatch):
     """Write tiny editions under a temporary root.
 
-    Each edition gets a script of authored thoughts bound to a shared pronunciation
-    contract and a cast holding only its retakes. A segment whose
-    thoughts are written with anchors holds them as its anchored thoughts.
+    Each edition gets a script of authored thoughts, its own pronunciation and a cast holding
+    only its retakes. A segment whose thoughts are written with anchors holds them as its
+    anchored thoughts.
     """
     monkeypatch.setattr(repository, "ROOT", tmp_path)
 
     def write(code: str, thoughts: dict, retakes: dict, normalization: tuple = ()) -> dict:
         edition = Edition(code)
-        contract = (
-            repository.read(CONTRACT)
-            if (tmp_path / CONTRACT).exists()
-            else {"pronunciation": {"languages": {}}}
-        )
-        contract["pronunciation"]["languages"][edition.language] = {
-            "normalization": list(normalization)
-        }
-        repository.write(CONTRACT, contract)
+        repository.write(edition.places.pronunciation, {"normalization": list(normalization)})
         segments = []
         for sid, groups in thoughts.items():
             # Thoughts written with marks are a segment's anchored ones, its plain ones filled.
@@ -52,7 +42,7 @@ def write_edition(tmp_path, monkeypatch):
             segments.append({**segment, "utterance_groups": plain})
             if plain != groups:
                 segments[-1]["anchored_groups"] = list(groups)
-        repository.write(edition.script, {"pronunciation_contract": CONTRACT, "segments": segments})
+        repository.write(edition.script, {"segments": segments})
         repository.write(edition.cast, {"retakes": retakes})
         return {"script": tmp_path / edition.script, "cast": tmp_path / edition.cast}
 
@@ -162,8 +152,7 @@ def narrated(retained_records, declared, stand_ins, tmp_path, monkeypatch):
     monkeypatch.setattr(repository, "ROOT", tmp_path)
     declared(clarity_minimum_db=None)
     edition = Edition("en")
-    contract = "content/voice-performance.json"
-    repository.write(contract, {"pronunciation": {"languages": {"English": {"normalization": []}}}})
+    repository.write(edition.places.pronunciation, {"normalization": []})
 
     def narrate(pcms, plans=None) -> dict:
         plans = plans or [{"text": text, "spoken_text": text} for text in THOUGHTS]
@@ -175,9 +164,7 @@ def narrated(retained_records, declared, stand_ins, tmp_path, monkeypatch):
             "spoken_text": record["spoken_text"],
             "utterance_groups": [plan["text"] for plan in plans],
         }
-        repository.write(
-            edition.script, {"pronunciation_contract": contract, "segments": [section]}
-        )
+        repository.write(edition.script, {"segments": [section]})
         if not (tmp_path / edition.cast).exists():
             cast = {
                 "reference_sha256": settings["reference_sha256"],
@@ -299,14 +286,13 @@ def engine(stand_ins, declared, voiced, monkeypatch, tmp_path):
     reference = tmp_path / edition.places.reference
     reference.parent.mkdir(parents=True, exist_ok=True)
     reference.write_bytes(b"approved synthetic reference")
-    contract = "content/voice-performance.json"
-    repository.write(contract, {"pronunciation": {"languages": {"English": {"normalization": []}}}})
+    repository.write(edition.places.pronunciation, {"normalization": []})
     section = {
         "id": "26",
         "text": "".join(converging.THOUGHTS),
         "utterance_groups": list(converging.THOUGHTS),
     }
-    repository.write(edition.script, {"pronunciation_contract": contract, "segments": [section]})
+    repository.write(edition.script, {"segments": [section]})
     cast = {
         "reference_sha256": repository.sha(reference),
         "reference_text": "A reference.",

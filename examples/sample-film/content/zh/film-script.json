@@ -95,7 +95,6 @@
     "tail_seconds": 0.25,
     "short_cue_lead_seconds": 0.1
   },
-  "pronunciation_contract": "content/voice-performance.json",
   "timing_state": "Unrecorded ear-first script; timing is derived after narration.",
   "segments": [
     {

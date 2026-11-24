@@ -16,7 +16,7 @@ import filmkit.narration.flow as flow
 import filmkit.narration.terms as terms
 import filmkit.repository as repository
 from filmkit.film import FILM
-from filmkit.narration.pronunciation import pronunciation_contract, pronunciation_text
+from filmkit.narration.pronunciation import pronunciation, pronunciation_text
 from filmkit.narration.thought_groups import validate_group_inputs
 from filmkit.repository import read, sha, write
 
@@ -83,7 +83,7 @@ def select(edition: Edition) -> None:
         msg = f"{performance['receipt']}: the edition has no narration receipt; narrate it first"
         raise SelectionError(msg)
     candidates = {record["id"]: record for record in read(performance["receipt"])["records"]}
-    contract, _ = pronunciation_contract(script, edition.language)
+    contract, _ = pronunciation(edition.code)
     records = []
     for segment in script["segments"]:
         record = dict(candidates[segment["id"]])

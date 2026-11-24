@@ -45,13 +45,11 @@ def test_a_missing_script_refuses_naming_its_edition(declared):
         film.load(declared)
 
 
-def test_a_missing_font_or_readings_file_refuses_naming_its_field(declared):
+def test_a_missing_font_refuses_naming_its_field(declared):
     (declared / film.FILM.picture.fonts[-1]).unlink()
-    (declared / film.FILM.review.readings).unlink()
     with pytest.raises(FilmError) as refusal:
         film.load(declared)
     assert f"picture.fonts: {film.FILM.picture.fonts[-1]}" in str(refusal.value)
-    assert f"review.readings: {film.FILM.review.readings}" in str(refusal.value)
 
 
 def test_a_missing_concept_contract_refuses_naming_its_field(declared):

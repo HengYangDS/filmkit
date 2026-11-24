@@ -1,7 +1,7 @@
 {
   "zh": {
     "language": "Chinese",
-    "pronunciation_contract": "content/voice-performance.json",
+    "pronunciation_contract": "content/zh/pronunciation.json",
     "pronunciation_contract_sha256": "c5e44c36a60216996a12c4f3be1416ddc0452162f1aaeed213d93ef332424eee",
     "normalization": [],
     "cast": {
@@ -161,7 +161,7 @@
   },
   "en": {
     "language": "English",
-    "pronunciation_contract": "content/voice-performance.json",
+    "pronunciation_contract": "content/en/pronunciation.json",
     "pronunciation_contract_sha256": "c5e44c36a60216996a12c4f3be1416ddc0452162f1aaeed213d93ef332424eee",
     "normalization": [],
     "cast": {

@@ -1,10 +1,10 @@
 {
-  "written_by": "filmkit 0.30.0 with treat-languages-as-equals through task 4.2 (a1c28da), synthesis.load_request --dry-run on each sample edition",
+  "written_by": "filmkit 0.30.0 with treat-languages-as-equals through task 7.4, synthesis.load_request --dry-run on each sample edition; against task 4.2 (a1c28da) only each pronunciation digest and so each fingerprint changed",
   "editions": {
     "zh": [
       {
         "segment": "01",
-        "fingerprint": "35e0435b04a98fa8124b5e569545438f4312f3eead7fc63ac91e416e3192f6f3",
+        "fingerprint": "63757a2d8c00f83bf8f5391a98df5690e53ae59f480fc90ba62e2f21c93d9859",
         "speech": {
           "reference_audio": "assets/audio/zh/narration-reference.wav",
           "reference_sha256": "7ff6347ed4231943944ef27bfc708cfcf796619b3988b2b99bc21be71ae338da",
@@ -18,13 +18,13 @@
           "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
           "decoder": "official native chunked_decode",
           "stream": false,
-          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27",
+          "pronunciation_contract_sha256": "fb70177cbf8eaa137bef0ccf4049018698e4643bfa00c3761bdd37cd1225dc62",
           "icl_repetition_penalty": 1.05
         }
       },
       {
         "segment": "02",
-        "fingerprint": "8435d38801fcac91b5affb679f2a5b2eb1db57c06fe6856a2b757f711db8e57e",
+        "fingerprint": "0d9e177b70223e08d0e9f6148a61567e96657719f955bd6820f3aa58e1bcc4e3",
         "speech": {
           "reference_audio": "assets/audio/zh/narration-reference.wav",
           "reference_sha256": "7ff6347ed4231943944ef27bfc708cfcf796619b3988b2b99bc21be71ae338da",
@@ -38,13 +38,13 @@
           "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
           "decoder": "official native chunked_decode",
           "stream": false,
-          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27",
+          "pronunciation_contract_sha256": "fb70177cbf8eaa137bef0ccf4049018698e4643bfa00c3761bdd37cd1225dc62",
           "icl_repetition_penalty": 1.05
         }
       },
       {
         "segment": "03",
-        "fingerprint": "3656e6de59f2135d53819428def2657bda89f2738a0598af4493930308dbe069",
+        "fingerprint": "ff2387742d5f45f273c0b4b4c81329ace21b4026b5dde21cd7b927bc520f77fb",
         "speech": {
           "reference_audio": "assets/audio/zh/narration-reference.wav",
           "reference_sha256": "7ff6347ed4231943944ef27bfc708cfcf796619b3988b2b99bc21be71ae338da",
@@ -58,13 +58,13 @@
           "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
           "decoder": "official native chunked_decode",
           "stream": false,
-          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27",
+          "pronunciation_contract_sha256": "fb70177cbf8eaa137bef0ccf4049018698e4643bfa00c3761bdd37cd1225dc62",
           "icl_repetition_penalty": 1.05
         }
       },
       {
         "segment": "04",
-        "fingerprint": "ead18dc191c949e7cd6bef166bc2a06b75c7e94873289be7df642e175aaf637e",
+        "fingerprint": "9ea6a3498e7eeef5928d25c860ad89358ba0cf9092358c61e0d6056959a25887",
         "speech": {
           "reference_audio": "assets/audio/zh/narration-reference.wav",
           "reference_sha256": "7ff6347ed4231943944ef27bfc708cfcf796619b3988b2b99bc21be71ae338da",
@@ -78,7 +78,7 @@
           "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
           "decoder": "official native chunked_decode",
           "stream": false,
-          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27",
+          "pronunciation_contract_sha256": "fb70177cbf8eaa137bef0ccf4049018698e4643bfa00c3761bdd37cd1225dc62",
           "icl_repetition_penalty": 1.05
         }
       }
@@ -86,7 +86,7 @@
     "en": [
       {
         "segment": "01",
-        "fingerprint": "0a9446f7442da8321c358bf445e5ac02e7a9c1966bcc8dc1b7dcb4391e58b035",
+        "fingerprint": "ab6f5e1786729107703258270a5d659782de3273b252b77caafe47b82225ce4c",
         "speech": {
           "reference_audio": "assets/audio/en/narration-reference.wav",
           "reference_sha256": "a763e48e15c5dc8abeda9b47da53c47db628b9ea602c79e657ab04653d318786",
@@ -100,12 +100,12 @@
           "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
           "decoder": "official native chunked_decode",
           "stream": false,
-          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27"
+          "pronunciation_contract_sha256": "41d228db1c910e3c28fc28d9b6c01c2e5c6dd1a371e6344cd43d4ee8b2f0cd8d"
         }
       },
       {
         "segment": "02",
-        "fingerprint": "d538c00a3a73d3a01e694c75eafdd0373e7e7a6bf68f4f266fc5c7c787f569ad",
+        "fingerprint": "c8082939ea3603a47d5a38e2f5cafd1650ce8578f781b1568bdb0cb609f0b181",
         "speech": {
           "reference_audio": "assets/audio/en/narration-reference.wav",
           "reference_sha256": "a763e48e15c5dc8abeda9b47da53c47db628b9ea602c79e657ab04653d318786",
@@ -119,12 +119,12 @@
           "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
           "decoder": "official native chunked_decode",
           "stream": false,
-          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27"
+          "pronunciation_contract_sha256": "41d228db1c910e3c28fc28d9b6c01c2e5c6dd1a371e6344cd43d4ee8b2f0cd8d"
         }
       },
       {
         "segment": "03",
-        "fingerprint": "01e17a3f23fb492e4d74457ded707c3cb527baad66aa841e9f62ceacf9adac4a",
+        "fingerprint": "cbc4091b477d0d58ca2724e19d87bbc5467badf92f0f2b3b40eedf170fd94c39",
         "speech": {
           "reference_audio": "assets/audio/en/narration-reference.wav",
           "reference_sha256": "a763e48e15c5dc8abeda9b47da53c47db628b9ea602c79e657ab04653d318786",
@@ -138,12 +138,12 @@
           "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
           "decoder": "official native chunked_decode",
           "stream": false,
-          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27"
+          "pronunciation_contract_sha256": "41d228db1c910e3c28fc28d9b6c01c2e5c6dd1a371e6344cd43d4ee8b2f0cd8d"
         }
       },
       {
         "segment": "04",
-        "fingerprint": "ece79ea4e48f8b3f72eaa333668b0a859f169154cf7b195739eb29eebd4ec03d",
+        "fingerprint": "a76a2c3f59f81d47f1d8ff1365faae18b4e0efa7f7dc9404dc615515dca5c070",
         "speech": {
           "reference_audio": "assets/audio/en/narration-reference.wav",
           "reference_sha256": "a763e48e15c5dc8abeda9b47da53c47db628b9ea602c79e657ab04653d318786",
@@ -157,7 +157,7 @@
           "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
           "decoder": "official native chunked_decode",
           "stream": false,
-          "pronunciation_contract_sha256": "46e278ae040b48b2473302bd184847ca3dc5750e28bda5610ffdd0c2c10add27"
+          "pronunciation_contract_sha256": "41d228db1c910e3c28fc28d9b6c01c2e5c6dd1a371e6344cd43d4ee8b2f0cd8d"
         }
       }
     ]

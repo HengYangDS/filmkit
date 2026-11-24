@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import shutil
 import wave
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,6 +11,7 @@ import mlx.core as mx
 import numpy as np
 import pytest
 
+import filmkit.film as film
 import filmkit.narration.group_generation as narration_group_generation
 import filmkit.narration.synthesis as narration_synthesis
 import filmkit.narration.thought_groups as narration_thought_groups
@@ -32,18 +34,13 @@ def sha256(data: bytes | str) -> str:
 
 
 def write_sources(root, segments, code="zh", **cast_changes) -> dict:
-    """Write a script of grouped segments, its contract, the reference of the edition `code` at
-    its place and its cast."""
+    """Write a script of grouped segments, the pronunciation and the reference of the edition
+    `code` at their places, and its cast."""
     reference = root / Edition(code).places.reference
     reference.parent.mkdir(parents=True, exist_ok=True)
     reference.write_bytes(b"approved synthetic reference")
-    contract = {"normalization": []}
-    repository.write(
-        root / "contract.json",
-        {"pronunciation": {"languages": {"Chinese": contract, "English": contract}}},
-    )
+    repository.write(root / Edition(code).places.pronunciation, {"normalization": []})
     script = {
-        "pronunciation_contract": "contract.json",
         "segments": [
             {"id": sid, "text": "".join(groups), "utterance_groups": groups}
             for sid, groups in segments.items()
@@ -466,21 +463,51 @@ def test_the_speech_plan_reproduces_the_retained_requests(code):
     ]
 
 
-# Each sample edition's requests as the engine planned them before its language came from the
-# edition's declaration: each segment's fingerprint and speech settings.
+# Each sample edition's requests as the engine plans them: each segment's fingerprint and speech
+# settings. They were captured before the language came from the edition's declaration, and again
+# when each edition's pronunciation came to stand in its folder, which changed each request's
+# pronunciation digest, and so its fingerprint, and nothing else.
 SAMPLE_REQUESTS = json.loads((Path(__file__).parent / "golden/sample-requests.json").read_text())
+
+
+def planned(code: str) -> list[dict]:
+    """Each segment's fingerprint and speech settings, as the edition's dry run plans them."""
+    edition = Edition(code)
+    argv = ["--language", code, "--script", edition.script, "--cast", edition.cast]
+    argv += ["--folder", "build/requests", "--receipt", "build/requests/receipt.json", "--dry-run"]
+    return [
+        {"segment": job.segment["id"], "fingerprint": job.fingerprint, "speech": job.speech}
+        for job in narration_synthesis.speech_plan(narration_synthesis.load_request(argv))
+    ]
 
 
 @pytest.mark.parametrize("code", CODES)
 def test_every_request_of_the_sample_keeps_its_speech_settings_and_fingerprint(code):
-    edition = Edition(code)
-    argv = ["--language", code, "--script", edition.script, "--cast", edition.cast]
-    argv += ["--folder", "build/requests", "--receipt", "build/requests/receipt.json", "--dry-run"]
-    planned = [
-        {"segment": job.segment["id"], "fingerprint": job.fingerprint, "speech": job.speech}
-        for job in narration_synthesis.speech_plan(narration_synthesis.load_request(argv))
+    assert planned(code) == SAMPLE_REQUESTS["editions"][code]
+    digest = repository.sha(Edition(code).places.pronunciation)
+    speech = [request["speech"] for request in planned(code)]
+    assert {settings["pronunciation_contract_sha256"] for settings in speech} == {digest}
+
+
+def test_an_english_pronunciation_edit_leaves_every_chinese_request_unchanged(
+    tmp_path, monkeypatch
+):
+    for folder in ("content", "assets/audio"):
+        shutil.copytree(repository.ROOT / folder, tmp_path / folder)
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    before = {code: planned(code) for code in CODES}
+    part = Edition("en").places.pronunciation
+    target = {"term": "record", "kind": "contextual-homograph", "lexical_stress": {}}
+    repository.write(part, {**repository.read(part), "targets": [target]})
+    after = planned("en")
+    assert planned("zh") == before["zh"]
+    assert [request["fingerprint"] for request in after] != [
+        request["fingerprint"] for request in before["en"]
     ]
-    assert planned == SAMPLE_REQUESTS["editions"][code]
+    # What every edition shares binds no request.
+    shared = film.FILM.pronunciation.model_copy(update={"acceptance": ("Listen to each.",)})
+    monkeypatch.setattr(film, "FILM", film.FILM.model_copy(update={"pronunciation": shared}))
+    assert (planned("zh"), planned("en")) == (before["zh"], after)
 
 
 def test_a_narration_names_its_edition():

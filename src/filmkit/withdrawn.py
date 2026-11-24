@@ -16,8 +16,8 @@ from filmkit.repository import DECLARATION
 
 class Withdrawn(NamedTuple):
     """A key a film may no longer declare: the kind of place that held it (`declaration`, an
-    `edition`'s table there, its `script`, a `segment` of it, its `cast` or its pronunciation
-    `part`), the key, and what to do instead."""
+    `edition`'s table there or its `review` table, its `script`, a `segment` of it, its `cast` or
+    its pronunciation `part`), the key, and what to do instead."""
 
     kind: str
     key: str
@@ -67,6 +67,26 @@ WITHDRAWN = (
         "remove it: the engine takes the SHA-256 of the cast's reference_text",
     ),
     Withdrawn("cast", "provider", "remove it: the engine narrates with its one provider, MLX"),
+    Withdrawn(
+        "script",
+        "pronunciation_contract",
+        "remove it and split the contract by edition: each edition's normalization, targets, own "
+        "sources and status into content/<code>/pronunciation.json, the place its code derives, "
+        f"and the schema version, control boundary, acceptance and shared sources into "
+        f"[pronunciation] in {DECLARATION}",
+    ),
+    Withdrawn("part", "language", "remove it: the folder's code states the edition's language"),
+    Withdrawn(
+        "part",
+        "occurrence_plan",
+        "remove it: the readings check derives the occurrence plan under build/",
+    ),
+    Withdrawn(
+        "review",
+        "readings",
+        "remove it and move each edition's analyst readings to content/<code>/readings.json, the "
+        "place its code derives",
+    ),
     Withdrawn(
         "edition",
         "sources",

@@ -4,12 +4,13 @@ Each edition runs the reading checks its language declares (`filmkit.languages`)
 `pinyin-readings` reads its Han characters by pypinyin's Mandarin readings, as Chinese declares,
 and the kind `cmudict-stress` holds its stress targets to CMUdict's ARPAbet, as English declares.
 
-A pronunciation contract of schema version 2 declares how the narration is read wherever a
-narrator could read it more than one way. The engine's watch list names the Mandarin characters
-whose readings a narrator confuses, in two classes: an occurrence of a word character must lie
-in a declared word of two or more characters, and one of the other class may also lie in a
-declared single character. Each watched occurrence in the Chinese narration takes its reading
-from the longest declared word that covers it.
+An edition's pronunciation, of the schema version 2 that the declaration's `[pronunciation]`
+table states, declares how its narration is read wherever a narrator could read it more than one
+way; a target that cites a source neither its pronunciation nor that table lists is refused. The
+engine's watch list names the Mandarin characters whose readings a narrator confuses, in two
+classes: an occurrence of a word character must lie in a declared word of two or more characters,
+and one of the other class may also lie in a declared single character. Each watched occurrence in
+the Chinese narration takes its reading from the longest declared word that covers it.
 
 pypinyin checks the declarations. A declared word's reading must divide into one dictionary
 reading per character, or after a word's first character that reading in the neutral tone,
@@ -20,10 +21,10 @@ declaring word, which must then have two or more characters, records the reason 
 needs, are refused as stale.
 
 Every Latin word in the narration of a language that does not write Latin script, as Chinese, must
-be one of the names its contract lists in `embedded_english_targets`, and every word written with
-two or more capitals in the narration of one that writes it, as English, one of its targets.
+be one of the names its pronunciation lists in `embedded_english_targets`, and every word written
+with two or more capitals in the narration of one that writes it, as English, one of its targets.
 Every language's normalization must give each Latin-script term the film declares in
-`[[narration.terms]]` the term's declared spoken form, whatever the contract's schema version,
+`[[narration.terms]]` the term's declared spoken form, whatever the schema version,
 and the text of each edition that says the term must hold its declared reference occurrence
 (`narration.terms`, which also measures how the recordings say it). A name that an
 edition says and that its normalization respells in other letters must be such a term, whatever
@@ -60,10 +61,15 @@ import filmkit.languages as languages
 import filmkit.narration.terms as terms
 import filmkit.repository as repository
 from filmkit.film import FILM
-from filmkit.narration.pronunciation import HAN, native_utterance_plan
+from filmkit.narration.pronunciation import (
+    HAN,
+    PronunciationError,
+    native_utterance_plan,
+    pronunciation,
+)
 from filmkit.production import CODES, Edition
 
-# The schema version whose contracts the check applies to.
+# The schema version of the pronunciations the check applies to.
 SCHEMA = 2
 WATCH_LIST = Path(__file__).with_name("watched-characters.toml")
 LATIN_WORD = re.compile(r"[A-Za-z][A-Za-z0-9]*(?:['’.-][A-Za-z0-9]+)*")
@@ -372,14 +378,13 @@ def propose() -> list[dict]:
     for code in (code for code in CODES if languages.checks(code, languages.PINYIN_READINGS)):
         edition = Edition(code)
         script = repository.read(edition.script)
-        path = script["pronunciation_contract"]
-        contract = repository.read(path)["pronunciation"]["languages"][edition.language]
+        contract, digest = pronunciation(code)
         words, _failures = declared_words(contract)
         rows = proposals(edition_thoughts(script, contract), words)
         report = {
             "edition": code,
-            "contract": path,
-            "contract_sha256": repository.sha(path),
+            "contract": edition.places.pronunciation,
+            "contract_sha256": digest,
             "proposals": len(rows),
             "occurrences": sum(row["occurrences"] for row in rows),
             "path": proposals_path(code),
@@ -389,19 +394,19 @@ def propose() -> list[dict]:
     return reports
 
 
-def term_failures(
-    code: str, thoughts: list[Thought], performance: dict, contract: str
-) -> list[str]:
-    """What the contract and an edition's text leave wrong in the film's declared terms, and each
-    name the edition says that its normalization respells in other letters and no term declares.
-    """
-    declared, languages = FILM.narration.terms, performance["languages"]
+def term_failures(code: str, thoughts: list[Thought], contract: dict) -> list[str]:
+    """What the editions' pronunciations and an edition's text leave wrong in the film's declared
+    terms, and each name the edition says that its normalization respells in other letters and
+    no term declares. Every edition's normalization must give a term its spoken form, so each
+    edition's pronunciation is read."""
+    declared = FILM.narration.terms
     said = [tuple(thought) for thought in thoughts]
-    owed = terms.respelling_failures(declared, languages[Edition(code).language], said, code)
+    owed = terms.respelling_failures(declared, contract, said, code)
     if not declared:
         return owed
+    parts = {Edition(other).places.pronunciation: pronunciation(other)[0] for other in CODES}
     return (
-        terms.parity_failures(declared, languages, contract)
+        terms.parity_failures(declared, parts)
         + terms.declaration_failures(declared, said, code)
         + owed
     )
@@ -411,15 +416,18 @@ def check(code: str) -> dict:
     """Check one edition's readings and names, write its occurrence plan, refuse every gap.
 
     Returns:
-        The report: the contract, its schema version and the occurrences resolved.
+        The report: the edition's pronunciation, the schema version and the occurrences resolved.
     """
     edition = Edition(code)
     script = repository.read(edition.script)
-    path = script["pronunciation_contract"]
-    performance = repository.read(path)["pronunciation"]
-    thoughts = edition_thoughts(script, performance["languages"][edition.language])
-    declared = term_failures(code, thoughts, performance, path)
-    version = performance.get("schema_version")
+    path = edition.places.pronunciation
+    try:
+        contract, digest = pronunciation(code)
+    except PronunciationError as error:
+        raise ReadingError(str(error)) from None
+    thoughts = edition_thoughts(script, contract)
+    declared = term_failures(code, thoughts, contract)
+    version = FILM.pronunciation.schema_version if FILM.pronunciation else None
     if version != SCHEMA and declared:
         raise ReadingError("\n".join(declared))
     if version != SCHEMA:
@@ -429,7 +437,6 @@ def check(code: str) -> dict:
             "schema_version": version,
             "status": "not_applicable",
         }
-    contract = performance["languages"][edition.language]
     rows, failures = [], []
     if languages.checks(code, languages.PINYIN_READINGS):
         words, failures = declared_words(contract)
@@ -450,7 +457,7 @@ def check(code: str) -> dict:
     report = {
         "edition": code,
         "contract": path,
-        "contract_sha256": repository.sha(path),
+        "contract_sha256": digest,
         "schema_version": version,
         "occurrences": len(rows),
         "plan": plan_path(code),

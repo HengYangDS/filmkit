@@ -1,7 +1,7 @@
 # The sample film that this repository's tests load and its local acceptance builds. The engine
 # takes every film-specific value from this declaration and the files it names; each edition's
-# script declares its title, author, language, frame rate and chapters, and each edition lasts as
-# long as its narration. Paths are below this folder.
+# script declares its title, author, frame rate and chapters, and each edition lasts as long as its
+# narration. Paths are below this folder.
 
 # The prefix of every delivered file.
 slug = "sample-reel"
@@ -17,8 +17,9 @@ credits_duration = 3
 # What each concept the film names means in that document, and each edition's words for it.
 concepts = "content/concepts.toml"
 
-# Each edition's summary, which its player shows under the film. Its script and cast stand in
-# content/<code>/ and its 16:9 cover at assets/cover/<slug>-cover-<code>.png.
+# Each edition's summary, which its player shows under the film. Its script, cast, pronunciation
+# and any analyst readings stand in content/<code>/ and its 16:9 cover at
+# assets/cover/<slug>-cover-<code>.png.
 [editions.zh]
 summary = "这部一分钟的短片演示一部影片怎样从源文件重建出来。片中的步骤依据 ddwg-film 的 README。"
 
@@ -54,12 +55,25 @@ muted = "#9BA8B1"
 line = "#34424E"
 accent = "#7DB7D8"
 
+# What every edition's pronunciation shares, which binds no recording: the schema version the
+# readings check holds the film to, the boundary of what the targets control and the criteria a
+# listening accepts a reading by. Each edition's normalization, targets, status and the sources
+# it alone cites stand in content/<code>/pronunciation.json; a source that two editions cite would
+# stand here as [[pronunciation.sources]], and the sample has none.
+[pronunciation]
+schema_version = 2
+control_boundary = "Dictionary and occurrence targets are acceptance criteria. Native Qwen Base does not consume IPA or SSML. No normalization is proposed without an actually heard error."
+acceptance = [
+  "Listen to every listed occurrence in its complete clause and a short waveform window, including the connected lead-in and natural phrase tail.",
+  "Bind actual script and spoken-text hashes, selected reference, generated WAV hash, exact time window, target, observation, listener/modality and decision.",
+  "ASR spelling, alignment, F0, dictionary targets and model praise alone cannot certify pronunciation or natural flow.",
+  "Qualify raw complete paragraphs, assembled within-chapter joins and chapter boundaries separately. No isolated-word splice or forced overall speed.",
+  "Full-film bilingual listening remains required after a pilot; targets are not a claim that all words were heard.",
+]
+
 [review]
 # The reviewer prompt: a str.format template that each round fills for each edition.
 prompt = "content/review/prompt.md"
-# The listening plan's analyst readings: the part of speech of each English heteronym occurrence,
-# keyed by segment and offset in the script.
-readings = "content/review/readings.json"
 # The verifier's floor: the overall score and every dimension at least this.
 overall_minimum = 95
 dimension_minimum = 95

@@ -235,22 +235,24 @@ def test_a_cast_that_declares_runtime_fit_is_refused_whatever_it_holds(declared,
 
 
 def test_every_kind_of_place_is_read_for_its_withdrawn_keys(declared, monkeypatch):
-    # The table names no key of a declaration, an edition's table, a segment or a part yet;
-    # each later withdrawal adds its row, and the loader reads every kind of place for it.
+    # The table names no key of a declaration or a segment yet; each later withdrawal adds its
+    # row, and the loader reads every kind of place for it.
     rows = [
         withdrawn.Withdrawn(kind, "held", "remove it")
-        for kind in ("declaration", "edition", "segment", "part")
+        for kind in ("declaration", "review", "edition", "segment", "part")
     ]
     monkeypatch.setattr(withdrawn, "WITHDRAWN", (*withdrawn.WITHDRAWN, *rows))
     rewrite(declared, "credits_duration = 3", "credits_duration = 3\nheld = 1")
+    rewrite(declared, "[review]\n", "[review]\nheld = 1\n")
     rewrite(declared, "[editions.en]\n", "[editions.en]\nheld = 1\n")
     script = json.loads((declared / "content/zh" / film.SCRIPT).read_text())
     script["segments"][0]["held"] = 1
     (declared / "content/zh" / film.SCRIPT).write_text(json.dumps(script, ensure_ascii=False))
     (declared / "content/en/pronunciation.json").write_text('{"held": 1}')
     segment = script["segments"][0]["id"]
-    assert film.problems(declared)[:4] == [
+    assert film.problems(declared)[:5] == [
         "content/film.toml declares held; remove it",
+        "content/film.toml review declares held; remove it",
         f"content/zh/film-script.json segment {segment} declares held; remove it",
         "content/film.toml editions.en declares held; remove it",
         "content/en/pronunciation.json declares held; remove it",
@@ -280,3 +282,32 @@ def test_a_cast_that_declares_a_withdrawn_key_is_refused_at_load(declared, key):
     assert film.problems(declared) == [
         f"content/en/voice-reference.json declares {key}; {withdrawn.keys('cast')[key]}"
     ]
+
+
+@pytest.mark.parametrize(
+    ("kind", "file", "key", "value"),
+    [
+        ("script", f"content/zh/{film.SCRIPT}", "pronunciation_contract", "content/v.json"),
+        ("part", "content/zh/pronunciation.json", "language", "Chinese"),
+        ("part", "content/en/pronunciation.json", "occurrence_plan", {"count": 0, "entries": []}),
+    ],
+)
+def test_a_pronunciation_not_split_by_edition_is_refused_at_load(declared, kind, file, key, value):
+    # Each edition's pronunciation stands in its folder, which states its language; the readings
+    # check derives the occurrence plan, and no script names a contract.
+    path = declared / file
+    if not path.exists():
+        path.write_text("{}")
+    declare(path, **{key: value})
+    assert film.problems(declared) == [f"{file} declares {key}; {withdrawn.keys(kind)[key]}"]
+
+
+def test_the_review_tables_readings_are_refused_beside_other_problems(declared):
+    rewrite(declared, "[review]\n", '[review]\nreadings = "content/review/readings.json"\n')
+    rewrite(declared, 'slug = "sample-reel"', 'slug = "Two Words"')
+    first, other = film.problems(declared)
+    assert first == (
+        f"content/film.toml review declares readings; {withdrawn.keys('review')['readings']}"
+    )
+    # The key is set aside: pydantic names the file prefix alone, and not the withdrawn key.
+    assert "\nslug\n" in other and "review.readings" not in other

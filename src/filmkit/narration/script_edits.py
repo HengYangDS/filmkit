@@ -23,7 +23,7 @@ refused by name, with its words and their new occurrences, unless the new though
 Marks that an edit places stand immediately before their first unit and after their last.
 
 Each segment whose thoughts changed has its text rebuilt from its plain thoughts and its spoken
-text derived through the script's pronunciation contract, and each bound retake follows its
+text derived through the edition's pronunciation, and each bound retake follows its
 exact text to its new index; a retake whose text no longer occurs exactly once is released. An
 edit of marks alone is written and keeps the text, the speech and every retake. Nothing is
 written unless every edit of every edition applies, and a script that breaks an anchor's rule
@@ -48,7 +48,7 @@ import filmkit.languages as languages
 import filmkit.repository as repository
 from filmkit.narration import anchors
 from filmkit.narration.anchors import Mark, Thought
-from filmkit.narration.pronunciation import pronunciation_contract, pronunciation_text
+from filmkit.narration.pronunciation import pronunciation, pronunciation_text
 from filmkit.narration.retakes import rebind
 from filmkit.narration.spoken_units import units
 from filmkit.production import CODES, Edition
@@ -81,7 +81,7 @@ def edit(
         cast: The edition's cast, whose thought retakes follow their text.
         replace: The [thought, old, new] replacements.
         split: The [thought, seam] splits.
-        contract: The edition's pronunciation contract, which derives each spoken text.
+        contract: The edition's pronunciation, which derives each spoken text.
         code: The edition's code, which names it in a refusal.
         rewrite: The [segment, thoughts] rewrites.
         anchor: The [thought, [first, after], id, words] marks.
@@ -393,7 +393,7 @@ def main(argv: list[str] | None = None) -> None:
             edition = Edition(code)
             script = repository.read(edition.script)
             anchors.require(script, code)
-            contract, _ = pronunciation_contract(script, edition.language)
+            contract, _ = pronunciation(code)
             cast = repository.read(edition.cast)
             edited[code] = edit(script, cast, contract=contract, code=code, **asked)
     if not options.dry_run:

@@ -115,7 +115,7 @@ def audition(
         if run_on
     }
     references = terms.receipt_references(code, FILM.narration.terms, records)
-    judgment.require_terms(code, script, records, FILM)
+    judgment.require_terms(code, records, FILM)
     model = group_generation.load_voice_model()
     asr = load_asr()
     aligner = load_aligner()

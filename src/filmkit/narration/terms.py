@@ -130,15 +130,12 @@ def times_said(text: str, forms: frozenset[str]) -> int:
     return sum(says(match.group(), forms) for match in LATIN_WORD.finditer(text))
 
 
-def parity_failures(terms: tuple[NarrationTerm, ...], languages: dict, contract: str) -> list[str]:
-    """Each language whose normalization gives a declared term another spoken form, or none.
-
-    `languages` holds the pronunciation contract's languages by name, and `contract` names its
-    file.
-    """
+def parity_failures(terms: tuple[NarrationTerm, ...], parts: dict[str, dict]) -> list[str]:
+    """Each edition's pronunciation whose normalization gives a declared term another spoken
+    form, or none; `parts` holds every edition's pronunciation by its file."""
     failures = []
     for term in terms:
-        for language, declared in languages.items():
+        for path, declared in parts.items():
             forms = sorted(
                 {
                     rule["spoken"]
@@ -150,8 +147,8 @@ def parity_failures(terms: tuple[NarrationTerm, ...], languages: dict, contract:
                 continue
             given = f"the spoken form {', '.join(forms)}" if forms else "no spoken form"
             failures.append(
-                f"{contract}: the {language} normalization gives {term.term} {given}; the film "
-                f"declares {term.spoken} in [[narration.terms]]"
+                f"{path}: its normalization gives {term.term} {given}; the film declares "
+                f"{term.spoken} in [[narration.terms]]"
             )
     return failures
 

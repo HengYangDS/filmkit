@@ -32,14 +32,8 @@ def edition(retained_group_record, monkeypatch):
         "spoken_text": record["spoken_text"],
         "utterance_groups": [plan["text"] for plan in plans],
     }
-    repository.write(
-        "content/voice-performance.json",
-        {"pronunciation": {"languages": {"English": {"normalization": []}}}},
-    )
-    script = {
-        "pronunciation_contract": "content/voice-performance.json",
-        "segments": [section],
-    }
+    repository.write(Edition("en").places.pronunciation, {"normalization": []})
+    script = {"segments": [section]}
     cast = {
         "reference_sha256": settings["reference_sha256"],
         "reference_text": settings["reference_text"],
@@ -97,6 +91,19 @@ def test_selection_binds_each_current_recording_and_its_alignment(edition, capsy
 
 def receipt_record(values: dict) -> dict:
     return values["receipt"]["records"][0]
+
+
+def test_a_take_recorded_under_the_whole_former_contract_is_selected_after_the_split(edition):
+    # Each thought binds the digest of the one contract both editions shared before each
+    # edition's pronunciation stood in its folder: the selection compares its spoken text with
+    # the edition's pronunciation, and that digest with nothing.
+    part = Edition("en").places.pronunciation
+    thoughts = receipt_record(edition)["utterance_groups"]["records"]
+    assert {thought["pronunciation_contract_sha256"] for thought in thoughts} == {"c" * 64}
+    assert repository.sha(part) != "c" * 64
+    narration_selection.select(Edition("en"))
+    selected = repository.read(Edition("en").narration_selected)
+    assert selected["records"] == edition["receipt"]["records"]
 
 
 @pytest.mark.parametrize(

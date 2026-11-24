@@ -26,7 +26,7 @@ def reading(arpabet: list[str], primary: int, secondary: list[int], weak: list[i
 
 
 # English targets of each kind, as CMU dictionary readings: a word, two contextual
-# homographs with their senses, and a letter name; and a planned occurrence of two of them.
+# homographs with their senses, and a letter name.
 TARGETS = [
     {
         "term": "acquisition",
@@ -56,52 +56,30 @@ TARGETS = [
     },
     {"term": "AI", "kind": "letter-name", "lexical_stress": {}},
 ]
-ENTRIES = [
-    {
-        "locale": "en",
-        "display_word": "AI",
-        "target_owner_term": "AI",
-        "grammar": "letter-name",
-        "target_stress": {},
-    },
-    {
-        "locale": "en",
-        "display_word": "use",
-        "target_owner_term": "use",
-        "grammar": "noun",
-        "target_stress": reading(["Y", "UW1", "S"], 1, [], []),
-    },
-]
+# Where the English edition's pronunciation stands.
+PART = "content/en/pronunciation.json"
 
 
 @pytest.fixture
 def performance() -> dict:
-    """A contract that holds the English targets and their planned occurrences."""
-    return {
-        "pronunciation": {
-            "languages": {"English": {"targets": copy.deepcopy(TARGETS)}},
-            "occurrence_plan": {"count": len(ENTRIES), "entries": copy.deepcopy(ENTRIES)},
-        }
-    }
+    """The English edition's pronunciation, holding the English targets."""
+    return {"targets": copy.deepcopy(TARGETS)}
 
 
 def target(performance: dict, term: str) -> dict:
-    targets = performance["pronunciation"]["languages"]["English"]["targets"]
-    return next(item for item in targets if item["term"] == term)
-
-
-def entry(performance: dict, term: str) -> dict:
-    entries = performance["pronunciation"]["occurrence_plan"]["entries"]
-    return next(item for item in entries if item["target_owner_term"] == term)
+    return next(item for item in performance["targets"] if item["term"] == term)
 
 
 def stress(term, **changes):
     return lambda performance: target(performance, term)["lexical_stress"].update(changes)
 
 
-def test_the_reviewed_contract_passes_its_target_checks():
-    reviewed = repository.read("content/voice-performance.json")
-    narration_pronunciation.validate_pronunciation_targets(reviewed)
+@pytest.mark.parametrize("code", CODES)
+def test_each_edition_s_reviewed_pronunciation_passes_its_target_checks(code):
+    part, digest = narration_pronunciation.pronunciation(code)
+    path = Edition(code).places.pronunciation
+    assert part == repository.read(path)
+    assert digest == hashlib.sha256((repository.ROOT / path).read_bytes()).hexdigest()
 
 
 @pytest.mark.parametrize(
@@ -126,37 +104,35 @@ def test_the_reviewed_contract_passes_its_target_checks():
             ),
             "Invalid lexical stress target for record",
         ),
-        (
-            lambda performance: performance["pronunciation"]["occurrence_plan"].update(count=1),
-            "Pronunciation occurrence count differs from its entries",
-        ),
-        (
-            lambda performance: entry(performance, "AI").update(display_word="Ai"),
-            "Letter-name target requires an authored label",
-        ),
-        (
-            lambda performance: entry(performance, "AI").update(grammar="noun"),
-            "Letter-name target requires an authored label",
-        ),
-        (
-            lambda performance: entry(performance, "use")["target_stress"].update(syllable_count=0),
-            "Invalid lexical stress target for use",
-        ),
     ],
 )
 def test_a_contradictory_target_is_refused(performance, tamper, message):
-    narration_pronunciation.validate_pronunciation_targets(performance)
+    narration_pronunciation.validate_part("en", performance, PART)
     changed = copy.deepcopy(performance)
     tamper(changed)
     with pytest.raises(ValueError, match=message):
-        narration_pronunciation.validate_pronunciation_targets(changed)
+        narration_pronunciation.validate_part("en", changed, PART)
+    # Chinese holds no stress to CMUdict, so its pronunciation's stress is not checked.
+    narration_pronunciation.validate_part("zh", changed, "content/zh/pronunciation.json")
+
+
+def test_a_target_s_source_is_found_in_its_pronunciation_and_then_in_the_shared_table():
+    cited = {"targets": [{"term": "record", "source": "cmudict"}]}
+    narration_pronunciation.validate_part("en", {**cited, "sources": [{"id": "cmudict"}]}, PART)
+    narration_pronunciation.validate_part("en", cited, PART, {"cmudict"})
+    with pytest.raises(ValueError) as refusal:
+        narration_pronunciation.validate_part("en", cited, PART, {"pypinyin"})
+    assert str(refusal.value) == (
+        f"{PART}: the target record cites the source 'cmudict', which neither {PART} nor the "
+        "declaration's [pronunciation] sources list; list it in one of them"
+    )
 
 
 @pytest.mark.parametrize("code", CODES)
 def test_the_reviewed_contract_derives_every_spoken_text_of_the_script(code):
     edition = Edition(code)
     script = repository.read(edition.script)
-    contract, _ = narration_pronunciation.pronunciation_contract(script, edition.language)
+    contract, _ = narration_pronunciation.pronunciation(code)
     for segment in script["segments"]:
         assert (
             narration_pronunciation.pronunciation_text(segment, contract) == segment["spoken_text"]
@@ -202,28 +178,24 @@ def test_stale_spoken_copy_is_refused():
         narration_pronunciation.pronunciation_text(section, {"normalization": [OPEN_SPEC]})
 
 
-def test_a_script_declares_its_pronunciation_contract(tmp_path, monkeypatch):
+def test_each_edition_reads_its_own_pronunciation(tmp_path, monkeypatch):
     monkeypatch.setattr(repository, "ROOT", tmp_path)
-    contract = {"pronunciation": {"languages": {"English": {"normalization": [OPEN_SPEC]}}}}
-    repository.write("contract.json", contract)
-    script = {"pronunciation_contract": "contract.json"}
-    assert narration_pronunciation.pronunciation_contract(script, "English") == (
+    repository.write(PART, {"normalization": [OPEN_SPEC]})
+    assert narration_pronunciation.pronunciation("en") == (
         {"normalization": [OPEN_SPEC]},
-        hashlib.sha256((tmp_path / "contract.json").read_bytes()).hexdigest(),
+        hashlib.sha256((tmp_path / PART).read_bytes()).hexdigest(),
     )
-    with pytest.raises(ValueError, match="must declare its pronunciation contract"):
-        narration_pronunciation.pronunciation_contract({}, "English")
+    with pytest.raises(ValueError, match=r"^zh: content/zh/pronunciation\.json does not exist"):
+        narration_pronunciation.pronunciation("zh")
 
 
-def test_a_contract_with_a_contradictory_target_is_not_read(tmp_path, monkeypatch):
+def test_a_pronunciation_with_a_contradictory_target_is_not_read(tmp_path, monkeypatch):
     monkeypatch.setattr(repository, "ROOT", tmp_path)
     targets = [{"term": "data", "lexical_stress": {"syllable_count": 0}}]
-    contract = {"pronunciation": {"languages": {"English": {"targets": targets}}}}
-    (tmp_path / "contract.json").write_text(json.dumps(contract))
+    (tmp_path / "content/en").mkdir(parents=True)
+    (tmp_path / PART).write_text(json.dumps({"targets": targets}))
     with pytest.raises(ValueError, match="Invalid lexical stress target for data"):
-        narration_pronunciation.pronunciation_contract(
-            {"pronunciation_contract": "contract.json"}, "English"
-        )
+        narration_pronunciation.pronunciation("en")
 
 
 @pytest.mark.parametrize("code", CODES)

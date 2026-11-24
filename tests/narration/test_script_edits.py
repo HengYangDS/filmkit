@@ -73,10 +73,11 @@ def test_edit_script_replaces_and_splits_thoughts_and_rebinds_retakes(
         ("首句。第二句。", "首句。第二句。"),
         ("甲句。乙句。丙句。", "甲句。乙句。丙句。"),
     ]
-    # The edit writes the script and the cast alone: the edition's folder holds no copy of its
-    # narration.
+    # The edit writes the script and the cast alone: the edition's folder holds its pronunciation,
+    # which the fixture wrote, and no copy of its narration.
     assert sorted(path.name for path in paths["script"].parent.iterdir()) == [
         "film-script.json",
+        "pronunciation.json",
         "voice-reference.json",
     ]
     assert repository.read(paths["cast"])["retakes"] == {

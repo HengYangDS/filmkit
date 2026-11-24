@@ -1,10 +1,10 @@
-"""Derive the pronunciation listening plan of both editions.
+"""Derive the pronunciation listening plan of every edition.
 
-The plan lists every dictionary target occurrence of the scripts' pronunciation contract
-and every English heteronym of the film's readings with the part of speech its clause gives
-it, so a reviewer and the later human listening check each one in context. A heteronym
-occurrence takes the part of speech the film's readings record for it, or the derivation
-refuses, so an edit that moves or adds one is re-read before the next review. A refusal
+The plan lists every target occurrence of each edition's pronunciation and every English
+heteronym of its readings with the part of speech its clause gives it, so a reviewer and the
+later human listening check each one in context. A heteronym occurrence takes the part of speech
+the edition's readings, `content/<code>/readings.json`, record for it, or the derivation refuses,
+so an edit that moves or adds one is re-read before the next review. A refusal
 raises `ReviewError`, which the command reports.
 
 For each assembled edition the plan also names the moments of its soundtrack a person should
@@ -31,7 +31,8 @@ import filmkit.narration.flow as narration_flow
 import filmkit.narration.terms as narration_terms
 import filmkit.repository as repository
 import filmkit.sources as sources
-from filmkit.film import FILM, Declared
+from filmkit.film import DECLARATION, FILM, Declared
+from filmkit.narration.pronunciation import PronunciationError, pronunciation
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
 
@@ -47,12 +48,12 @@ MANDARIN_BASIS = (
 )
 READING = "See target dictionary reading and admissible lexical-stress variants"
 PLAN_AUTHORITY = (
-    "Derived review aid; the contract and the recordings remain the owners. Listening decides."
+    "Derived review aid; the pronunciations and recordings remain the owners. Listening decides."
 )
 
 
 def arpabet(phones: str, primary: int, secondary=(), weak=()) -> dict:
-    """An analyst-stated reading in the contract's lexical-stress shape."""
+    """An analyst-stated reading in a pronunciation's lexical-stress shape."""
     values = phones.split()
     return {
         "arpabet": values,
@@ -73,19 +74,19 @@ class Reading(Declared):
     weak: tuple[int, ...] = ()
 
     def stress(self) -> dict:
-        """The reading in the contract's lexical-stress shape."""
+        """The reading in a pronunciation's lexical-stress shape."""
         return arpabet(self.phones, self.primary, self.secondary, self.weak)
 
 
 class Readings(Declared):
-    """The film's analyst readings for its listening plan.
+    """An edition's analyst readings for its listening plan.
 
-    `mandarin` holds Chinese words whose reading depends on context and that the contract's
+    `mandarin` holds Chinese words whose reading depends on context and that its pronunciation's
     targets do not cover, each with the reading its sentence gives it; `heteronyms` holds
     the English heteronyms with a reading for each part of speech or tense; `variants` holds
     the variants that the dictionary-sourced homograph targets lack; `grammar` holds the
     part of speech of each heteronym occurrence, keyed by "<segment>:<offset>" in the
-    English segment text. A script edit that moves or adds an occurrence makes the plan
+    edition's segment text. A script edit that moves or adds an occurrence makes the plan
     refuse until its entry is recorded again.
     """
 
@@ -95,11 +96,12 @@ class Readings(Declared):
     grammar: dict[str, dict[str, str]] = {}
 
 
-def film_readings() -> Readings:
-    """The analyst readings the film declares, or none when it declares no readings file."""
-    if FILM.review.readings is None:
+def edition_readings(code: str) -> Readings:
+    """The analyst readings an edition records in its folder, or none where it records none."""
+    path = repository.ROOT / Edition(code).places.readings
+    if not path.is_file():
         return Readings()
-    return Readings.model_validate_json((repository.ROOT / FILM.review.readings).read_bytes())
+    return Readings.model_validate_json(path.read_bytes())
 
 
 def occurrences(term: str, text: str, code: str) -> Iterator[tuple[int, int]]:
@@ -116,23 +118,23 @@ def occurrences(term: str, text: str, code: str) -> Iterator[tuple[int, int]]:
         yield match.start(), match.end()
 
 
-def analyst_contract(contract: dict, readings: Readings) -> dict:
-    """The pronunciation contract with the film's analyst-stated readings and variants: the
-    Mandarin readings in the part of each edition whose language reads Han characters by their
-    pinyin, the heteronyms and variants in that of each whose language holds stress to CMUdict."""
-    for code in CODES:
-        part = contract["languages"].get(Edition(code).language)
-        if part is not None and languages.checks(code, languages.PINYIN_READINGS):
-            _add_mandarin(contract, part, readings)
-        if part is not None and languages.checks(code, languages.CMUDICT_STRESS):
-            _add_heteronyms(contract, part, readings)
-    return contract
+def analyst_part(code: str, part: dict, readings: Readings) -> dict:
+    """An edition's pronunciation with its analyst-stated readings and variants: the Mandarin
+    readings where its language reads Han characters by their pinyin, the heteronyms and variants
+    where it holds stress to CMUdict, each analyst source added to its own sources once."""
+    part.setdefault("sources", [])
+    part.setdefault("targets", [])
+    if languages.checks(code, languages.PINYIN_READINGS):
+        _add_mandarin(part, readings)
+    if languages.checks(code, languages.CMUDICT_STRESS):
+        _add_heteronyms(part, readings)
+    return part
 
 
-def _add_mandarin(contract: dict, part: dict, readings: Readings) -> None:
+def _add_mandarin(part: dict, readings: Readings) -> None:
     """Add each analyst-stated Mandarin reading a part does not declare, and its source once."""
-    if not any(source["id"] == "analyst-mandarin" for source in contract["sources"]):
-        contract["sources"].append({"id": "analyst-mandarin", "qualification": MANDARIN_BASIS})
+    if not any(source["id"] == "analyst-mandarin" for source in part["sources"]):
+        part["sources"].append({"id": "analyst-mandarin", "qualification": MANDARIN_BASIS})
     known = {target["term"] for target in part["targets"]}
     for term, reading in readings.mandarin.items():
         if term not in known:
@@ -147,12 +149,12 @@ def _add_mandarin(contract: dict, part: dict, readings: Readings) -> None:
             )
 
 
-def _add_heteronyms(contract: dict, english: dict, readings: Readings) -> None:
+def _add_heteronyms(english: dict, readings: Readings) -> None:
     """Add each analyst-stated heteronym a part does not declare and each variant of its targets,
     and their source once."""
     known = {target["term"] for target in english["targets"]}
-    if not any(source["id"] == "analyst-inference" for source in contract["sources"]):
-        contract["sources"].append({"id": "analyst-inference", "qualification": BASIS})
+    if not any(source["id"] == "analyst-inference" for source in english["sources"]):
+        english["sources"].append({"id": "analyst-inference", "qualification": BASIS})
     for term, variants in readings.heteronyms.items():
         if term not in known:
             english["targets"].append(
@@ -249,35 +251,35 @@ def heard_moments(edition: Edition) -> dict:
 
 
 def listening_plan(out: Path) -> dict:
-    """Derive the pronunciation listening plan from the contract and current scripts.
+    """Derive the pronunciation listening plan from each edition's pronunciation and script.
 
-    Both editions' scripts name one pronunciation contract, which stays unchanged: its
-    hash is part of every recording's fingerprint, and the narrator consumes only its
-    normalization. The derived, planned-not-listened plan for the human listener lists
-    every dictionary-sourced target, the context-dependent Chinese readings the targets
-    do not cover, the film's English heteronyms with analyst-stated CMU-convention
-    readings, and each occurrence in the current spoken text with its clause and, for a
-    heteronym, the part of speech the film's readings record for that clause, bound to
-    the current script, cast and reference hashes. An occurrence without a recorded part
-    of speech, or a recorded one that names no current occurrence, is refused, so a script
-    edit cannot silently inherit a stale reading.
+    Each edition's pronunciation stays unchanged: its hash is part of every recording of that
+    edition, and the narrator consumes only its normalization. The derived, planned-not-listened
+    plan for the human listener lists every target of each edition's pronunciation, the
+    context-dependent Chinese readings and the English heteronyms with analyst-stated
+    CMU-convention readings that the edition's readings record, and each occurrence in the
+    current spoken text with its clause and, for a heteronym, the part of speech its readings
+    record for that clause, bound to the current script, cast and reference hashes. An occurrence
+    without a recorded part of speech, or a recorded one that names no current occurrence, is
+    refused, so a script edit cannot silently inherit a stale reading.
     """
-    scripts = {code: repository.read(Edition(code).script) for code in CODES}
-    named = {script.get("pronunciation_contract") for script in scripts.values()}
-    if len(named) != 1 or None in named:
-        names = sorted(map(str, named))
-        msg = f"the editions' scripts name different pronunciation contracts: {names}"
+    shared = FILM.pronunciation
+    if shared is None:
+        msg = f"{DECLARATION} declares no [pronunciation] table, which the plan cites"
         raise ReviewError(msg)
-    contract_file = named.pop()
-    contract_path = repository.ROOT / contract_file
     manifest = repository.ROOT / sources.MANIFEST
-    readings = film_readings()
-    contract = analyst_contract(repository.read(contract_path)["pronunciation"], readings)
-    entries, bindings = [], []
+    entries, bindings, derived, parts = [], [], [], {}
     for code in CODES:
         edition = Edition(code)
-        language, script_path, cast_path = edition.language, edition.script, edition.cast
-        script, cast = scripts[code], repository.read(cast_path)
+        try:
+            part, digest = pronunciation(code)
+        except PronunciationError as error:
+            raise ReviewError(str(error)) from None
+        script_path, cast_path = edition.script, edition.cast
+        script, cast = repository.read(script_path), repository.read(cast_path)
+        readings = edition_readings(code)
+        parts[edition.language] = analyst_part(code, part, readings)
+        derived.append({"path": edition.places.pronunciation, "sha256": digest})
         bindings.append(
             {
                 "locale": code,
@@ -289,38 +291,30 @@ def listening_plan(out: Path) -> dict:
                 },
                 "cast": {"path": cast_path, "sha256": repository.sha(cast_path)},
                 "selected_reference": {
-                    "path": Edition(code).places.reference,
+                    "path": edition.places.reference,
                     "sha256": cast["reference_sha256"],
                     "transcript_sha256": repository.content_sha(cast["reference_text"]),
                 },
                 "status": "planned-not-listened",
             }
         )
-        for target in contract["languages"][language]["targets"]:
-            entries += target_entries(code, target, script["segments"], readings.grammar)
-    current = {
-        (entry["target_owner_term"], f"{entry['section']}:{entry['display_span'][0]}")
-        for entry in entries
-        if languages.checks(entry["locale"], languages.CMUDICT_STRESS)
-    }
-    stale = {
-        term: sorted(key for key in keys if (term, key) not in current)
-        for term, keys in readings.grammar.items()
-    }
-    stale = {term: keys for term, keys in stale.items() if keys}
-    if stale:
-        msg = f"recorded parts of speech name no current occurrence: {stale}"
-        raise ReviewError(msg)
+        found = [
+            entry
+            for target in part["targets"]
+            for entry in target_entries(code, target, script["segments"], readings.grammar)
+        ]
+        entries += found
+        _refuse_stale(code, found, readings)
     repository.write(
         out,
         {
             "status": "planned-not-listened",
-            "derived_from": {"path": contract_file, "sha256": repository.sha(contract_path)},
+            "derived_from": derived,
             "authority": PLAN_AUTHORITY,
-            "sources": contract["sources"],
-            "control_boundary": contract["control_boundary"],
-            "acceptance": contract["acceptance"],
-            "languages": contract["languages"],
+            "sources": [source.model_dump(exclude_defaults=True) for source in shared.sources],
+            "control_boundary": shared.control_boundary,
+            "acceptance": list(shared.acceptance),
+            "languages": parts,
             "script_bindings": bindings,
             "occurrence_plan": {"count": len(entries), "entries": entries},
             "heard_moments": {code: heard_moments(Edition(code)) for code in CODES},
@@ -330,11 +324,28 @@ def listening_plan(out: Path) -> dict:
         "output": repository.relative(out),
         "occurrences": {code: sum(entry["locale"] == code for entry in entries) for code in CODES},
         "stress_targets": sum(
-            len(contract["languages"][Edition(code).language]["targets"])
+            len(parts[Edition(code).language]["targets"])
             for code in CODES
             if languages.checks(code, languages.CMUDICT_STRESS)
         ),
     }
+
+
+def _refuse_stale(code: str, entries: list[dict], readings: Readings) -> None:
+    """Refuse an edition's recorded part of speech that names no current heteronym occurrence."""
+    current = {
+        (entry["target_owner_term"], f"{entry['section']}:{entry['display_span'][0]}")
+        for entry in entries
+        if languages.checks(code, languages.CMUDICT_STRESS)
+    }
+    stale = {
+        term: sorted(key for key in keys if (term, key) not in current)
+        for term, keys in readings.grammar.items()
+    }
+    stale = {term: keys for term, keys in stale.items() if keys}
+    if stale:
+        msg = f"{code}: recorded parts of speech name no current occurrence: {stale}"
+        raise ReviewError(msg)
 
 
 def main(argv: list[str] | None = None) -> None:

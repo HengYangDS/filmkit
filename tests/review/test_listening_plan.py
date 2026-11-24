@@ -9,12 +9,9 @@ import pytest
 
 import filmkit.repository as repository
 import filmkit.review.listening_plan as review_listening_plan
-from filmkit.film import FILM
-from filmkit.production import Edition
+from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
 from filmkit.review.listening_plan import Readings
-
-CONTRACT = "content/voice-performance.json"
 
 
 def test_the_listening_plan_derives_for_the_current_scripts(tmp_path):
@@ -24,8 +21,8 @@ def test_the_listening_plan_derives_for_the_current_scripts(tmp_path):
     assert plan["occurrences"]["zh"] > 0
     assert plan["occurrences"]["en"] > 0
     written = json.loads((tmp_path / "plan.json").read_text())
-    contract = repository.read(Edition("zh").script)["pronunciation_contract"]
-    assert written["derived_from"] == {"path": contract, "sha256": repository.sha(contract)}
+    parts = [Edition(code).places.pronunciation for code in CODES]
+    assert written["derived_from"] == [{"path": p, "sha256": repository.sha(p)} for p in parts]
     assert set(written["heard_moments"]) == {"zh", "en"}
 
 
@@ -47,13 +44,9 @@ def test_listening_plan_binds_each_occurrence_and_refuses_unrecorded_readings(ro
         },
     ]
     chinese = [{"term": "调度", "kind": "contextual-mandarin-word", "target_reading": "diàodù"}]
-    contract = {
-        "sources": [{"id": "cmudict"}],
-        "control_boundary": "Targets are acceptance criteria.",
-        "acceptance": ["Listen to each occurrence in its clause."],
-        "languages": {"Chinese": {"targets": chinese}, "English": {"targets": english}},
-    }
-    put(root / CONTRACT, {"pronunciation": contract})
+    parts = {"zh": {"targets": chinese}, "en": {"sources": [{"id": "cmudict"}], "targets": english}}
+    for code, part in parts.items():
+        put(root / Edition(code).places.pronunciation, part)
     scripts = {
         "zh": ["先看调度。", "再改调度表，重新跑。"],
         "en": ["We use data. ", "Data takes the lead."],
@@ -61,19 +54,22 @@ def test_listening_plan_binds_each_occurrence_and_refuses_unrecorded_readings(ro
     for code, groups in scripts.items():
         script, cast = Edition(code).script, Edition(code).cast
         segment = {"id": "01", "text": "".join(groups), "utterance_groups": groups}
-        put(root / script, {"pronunciation_contract": CONTRACT, "segments": [segment]})
+        put(root / script, {"segments": [segment]})
         put(
             root / cast,
             {"reference_sha256": "a" * 64, "reference_text": f"{code} reference"},
         )
     put(root / "content/source-manifest.json", {"members": []})
     lead = {"noun": review_listening_plan.arpabet("L IY1 D", 1)}
+    # Each edition's analyst readings stand in its folder: the Chinese words' readings, and the
+    # English heteronyms with the part of speech of each occurrence.
+    put(root / Edition("zh").places.readings, {"mandarin": {"重新": "chóngxīn"}})
     readings = {
-        "mandarin": {"重新": "chóngxīn"},
         "heteronyms": {"lead": {"noun": {"phones": "L IY1 D", "primary": 1}}},
         "grammar": {"use": {"01:3": "verb"}, "lead": {"01:28": "noun"}},
     }
-    put(root / FILM.review.readings, readings)
+    english = root / Edition("en").places.readings
+    put(english, readings)
     out = root / "plan.json"
     assert review_listening_plan.listening_plan(out) == {
         "output": "plan.json",
@@ -96,37 +92,37 @@ def test_listening_plan_binds_each_occurrence_and_refuses_unrecorded_readings(ro
     assert entries[6]["target_stress"] == lead["noun"]
     assert {e["status"] for e in entries} == {"planned-not-listened"}
     assert plan["languages"]["English"]["targets"][-1]["source"] == "analyst-inference"
-    assert {"id": "analyst-inference", "qualification": review_listening_plan.BASIS} in plan[
-        "sources"
-    ]
+    analyst = {"id": "analyst-inference", "qualification": review_listening_plan.BASIS}
+    assert analyst in plan["languages"]["English"]["sources"]
     assert plan["languages"]["Chinese"]["targets"][-1]["source"] == "analyst-mandarin"
     assert [binding["sha256"] for binding in plan["script_bindings"]] == [
         repository.sha(root / "content/zh/film-script.json"),
         repository.sha(root / "content/en/film-script.json"),
     ]
-    assert plan["derived_from"] == {"path": CONTRACT, "sha256": repository.sha(root / CONTRACT)}
+    assert plan["derived_from"] == [
+        {"path": path, "sha256": repository.sha(root / path)}
+        for path in (Edition(code).places.pronunciation for code in CODES)
+    ]
 
-    put(root / FILM.review.readings, {**readings, "grammar": {"lead": {"01:28": "noun"}}})
+    put(english, {**readings, "grammar": {"lead": {"01:28": "noun"}}})
     with pytest.raises(ReviewError, match="use at 01:3: record its part of speech"):
         review_listening_plan.listening_plan(out)
     grammar = {"use": {"01:3": "verb"}, "lead": {"01:28": "noun", "01:40": "verb"}}
-    put(root / FILM.review.readings, {**readings, "grammar": grammar})
+    put(english, {**readings, "grammar": grammar})
     stale = re.escape("no current occurrence: {'lead': ['01:40']}")
     with pytest.raises(ReviewError, match=stale):
         review_listening_plan.listening_plan(out)
     # The command reports its refusals, and lets any other fault show in full.
-    with pytest.raises(SystemExit, match=f"listening plan: recorded parts of speech name {stale}"):
+    refused = f"listening plan: en: recorded parts of speech name {stale}"
+    with pytest.raises(SystemExit, match=refused):
         review_listening_plan.main(["--out", str(out)])
-    put(root / CONTRACT, "{")
+    put(root / Edition("en").places.pronunciation, "{")
     with pytest.raises(json.JSONDecodeError):
         review_listening_plan.main(["--out", str(out)])
 
 
-def test_scripts_that_name_different_contracts_refuse_the_plan(root, put):
-    for code in ("zh", "en"):
-        script = {"pronunciation_contract": f"content/{code}-contract.json", "segments": []}
-        put(root / Edition(code).script, script)
-    with pytest.raises(ReviewError, match="different pronunciation contracts"):
+def test_an_edition_without_its_pronunciation_refuses_the_plan(root):
+    with pytest.raises(ReviewError, match=r"^zh: content/zh/pronunciation\.json does not exist"):
         review_listening_plan.listening_plan(root / "plan.json")
 
 
@@ -146,13 +142,8 @@ def test_an_extra_variant_is_labelled_only_where_it_is_added():
             "lexical_stress": {"noun": noun, "verb": dictionary},
         },
     ]
-    contract = {
-        "sources": [],
-        "languages": {"Chinese": {"targets": []}, "English": {"targets": targets}},
-    }
-    extended, kept = review_listening_plan.analyst_contract(contract, readings)["languages"][
-        "English"
-    ]["targets"]
+    part = review_listening_plan.analyst_part("en", {"targets": targets}, readings)
+    extended, kept = part["targets"]
     assert extended["lexical_stress"] == {"noun": noun, "verb": added}
     assert extended["variant_sources"] == {"verb": "analyst-inference"}
     assert kept["lexical_stress"] == {"noun": noun, "verb": dictionary}

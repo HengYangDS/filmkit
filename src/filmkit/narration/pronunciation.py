@@ -1,8 +1,11 @@
 """Spoken text, pronunciation targets, narration language and the thoughts each segment speaks.
 
-One reviewed performance contract per script owns how display text is spoken: its
-normalization rules derive every spoken text, and its English lexical stress targets must agree
-with their ARPAbet phones before any speech provider loads.
+Each edition's pronunciation, `content/<code>/pronunciation.json` (`filmkit.film.places`), owns
+how its display text is spoken: its normalization rules derive every spoken text. Before any
+speech provider loads, its lexical stress targets must agree with their ARPAbet phones, in a
+language that holds its stress to CMUdict, and every source its targets cite must stand in it or
+among the sources every edition shares, in the declaration's `[pronunciation]` table. A
+recording's request binds the SHA-256 of its own edition's pronunciation and of no other.
 """
 
 from __future__ import annotations
@@ -18,33 +21,59 @@ from filmkit.narration.thought_groups import authored_groups
 HAN = f"[{languages.pattern('han')}]"
 
 
-def pronunciation_contract(script: dict, language: str) -> tuple[dict, str]:
-    """The script's pronunciation contract for one language and the contract file's SHA-256.
+class PronunciationError(ValueError):
+    """An edition's pronunciation is missing, contradicts its own stress or cites an unlisted
+    source."""
 
-    The contract's lexical stress targets are checked before it is used.
+
+def pronunciation(code: str) -> tuple[dict, str]:
+    """An edition's pronunciation and its file's SHA-256, checked before it is used.
+
+    Raises:
+        PronunciationError: the file does not exist, a stress target contradicts itself, or a target
+            cites a source that neither the file nor the declaration lists.
     """
-    path = script.get("pronunciation_contract")
-    if not path:
-        msg = "A script must declare its pronunciation contract"
-        raise ValueError(msg)
-    raw = (repository.ROOT / path).read_bytes()
-    performance = json.loads(raw)
-    validate_pronunciation_targets(performance)
-    return performance["pronunciation"]["languages"][language], repository.content_sha(raw)
+    # The film is read here, when a pronunciation is, and not as the module loads: a command
+    # that stands in for the narration imports it with no film below its root.
+    from filmkit.film import FILM, places
+
+    path = places(code, FILM.slug).pronunciation
+    try:
+        raw = (repository.ROOT / path).read_bytes()
+    except FileNotFoundError:
+        msg = f"{code}: {path} does not exist; write the edition's pronunciation there"
+        raise PronunciationError(msg) from None
+    part = json.loads(raw)
+    shared = FILM.pronunciation.sources if FILM.pronunciation else ()
+    validate_part(code, part, path, {source.id for source in shared})
+    return part, repository.content_sha(raw)
 
 
-def validate_pronunciation_targets(performance: dict) -> None:
-    """Reject contradictory lexical stress before loading a speech provider, in the part of each
-    language that holds its stress to CMUdict (`filmkit.languages`)."""
-    targets = [
-        target
-        for name, part in performance["pronunciation"]["languages"].items()
-        if languages.CMUDICT_STRESS in languages.named(name).readings
-        for target in part.get("targets", [])
+def validate_part(code: str, part: dict, path: str, shared: set[str] = frozenset()) -> None:
+    """Reject an edition's contradictory lexical stress, where its language holds its stress to
+    CMUdict (`filmkit.languages`), and every source its targets cite that neither its own
+    sources nor the shared ones (`shared`, their ids) list, naming each target and source."""
+    targets = part.get("targets", [])
+    if languages.checks(code, languages.CMUDICT_STRESS):
+        for target in targets:
+            _check_stress(target.get("lexical_stress", {}), target["term"])
+    listed = {source.get("id") for source in part.get("sources", [])} | shared
+    unlisted = [
+        f"{path}: the target {target['term']} cites the source {source!r}, which neither {path} "
+        "nor the declaration's [pronunciation] sources list; list it in one of them"
+        for target in targets
+        for source in _cited(target.get("source"))
+        if source not in listed
     ]
-    for target in targets:
-        _check_stress(target.get("lexical_stress", {}), target["term"])
-    _check_occurrence_plan(performance["pronunciation"].get("occurrence_plan"), targets)
+    if unlisted:
+        raise PronunciationError("\n".join(unlisted))
+
+
+def _cited(source: object) -> list:
+    """The sources a target cites: none, one or a list."""
+    if source is None:
+        return []
+    return source if isinstance(source, list) else [source]
 
 
 def _check_stress(value: object, term: str) -> None:
@@ -83,7 +112,7 @@ def _check_syllables(value: dict, term: str) -> None:
         or primary in secondary
     ):
         msg = f"Invalid lexical stress target for {term}"
-        raise ValueError(msg)
+        raise PronunciationError(msg)
 
 
 def _check_arpabet(value: dict, term: str) -> None:
@@ -98,34 +127,11 @@ def _check_arpabet(value: dict, term: str) -> None:
         or secondary != value.get("secondary_syllables", [])
     ):
         msg = f"Contradictory lexical stress phones for {term}"
-        raise ValueError(msg)
-
-
-def _check_occurrence_plan(occurrence_plan: dict | None, targets: list[dict]) -> None:
-    """Check the planned occurrences: their count, letter-name labels and English stress."""
-    if occurrence_plan is None:
-        return
-    entries = occurrence_plan["entries"]
-    if occurrence_plan["count"] != len(entries):
-        msg = "Pronunciation occurrence count differs from its entries"
-        raise ValueError(msg)
-    target_by_term = {target["term"]: target for target in targets}
-    for entry in entries:
-        term = entry["target_owner_term"]
-        target = target_by_term.get(term)
-        if (
-            target
-            and target.get("kind") == "letter-name"
-            and (entry["display_word"] != term or entry.get("grammar") != "letter-name")
-        ):
-            msg = "Letter-name target requires an authored label"
-            raise ValueError(msg)
-        if languages.checks(entry["locale"], languages.CMUDICT_STRESS):
-            _check_stress(entry["target_stress"], term)
+        raise PronunciationError(msg)
 
 
 def pronunciation_text(section: dict, contract: dict) -> str:
-    """Derive speech copy from the single reviewed performance contract."""
+    """Derive speech copy from an edition's pronunciation."""
     derived = section["text"]
     for rule in contract["normalization"]:
         derived = _normalized(derived, rule)
