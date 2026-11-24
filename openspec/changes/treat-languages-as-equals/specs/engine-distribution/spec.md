@@ -25,8 +25,13 @@ Until the release that retires the command, the question `editions` SHALL name e
 
 #### Scenario: The old paths it knows
 
-- **WHEN** the declaration's `sources` and a cast's `reference_audio` are still stated, and a line names `content/narration.md`
-- **THEN** the question takes as old paths those the withdrawn keys still state and the fixed names this release retires, and names the line
+- **WHEN** the declaration's `sources` and a cast's `reference_audio` are still stated, the Chinese cast's derivation cites `assets/audio/narration-reference.wav`, a line names `content/narration.md` and the NOTICE names the cited recording
+- **THEN** the question takes as old paths those the withdrawn keys still state, the fixed names this release retires and each recording a cast's derivation cites, whose new path is `assets/audio/narrator-identity.wav`, and names both lines
+
+#### Scenario: A copy that Git does not hold
+
+- **WHEN** a copy of the film's tracked files stands in a folder that another repository ignores, or below which it tracks nothing
+- **THEN** the question reads every file of the copy but its built output, packages and Git's records, and names each line it would name were the files tracked
 
 #### Scenario: An old path that another finding owns
 
