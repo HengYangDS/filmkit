@@ -8,11 +8,12 @@ permission audit refuses nothing. Each entry is one JSON line: the node whose ru
 (`FILMKIT_NODE`, which a node's run sets and every child inherits), the process, the kind and the
 path. Python records, below the film's root, each `open` with whether it writes, an open for
 reading of a path that does not stand as a `probe`, each `os.rename` (which `os.replace` raises)
-with its source marked, each hard link, each removal, and each `subprocess.Popen` with the paths
-in its arguments and environment that exist; a read made while the engine starts, as an engine
-module loads or the film loader (`filmkit.film.read`) runs, is a `load`. What the recorder and
-the seam read themselves, such as the node table's places, they read with the hook quiet
-(`quiet`). Node records each file access outside its allowances on the channel
+with its source marked, each hard link, each removal (a tree that `shutil.rmtree` removes as
+one, since it names the members through a folder's descriptor), and each `subprocess.Popen` with
+the paths in its arguments and environment that exist; a read made while the engine starts, as
+an engine module loads or the film loader (`filmkit.film.read`) runs, is a `load`. What the
+recorder and the seam read themselves, such as the node table's places, they read with the hook
+quiet (`quiet`). Node records each file access outside its allowances on the channel
 `node:permission-model:fs` (`opens.cjs`): reads of the node's inputs and outputs,
 `build/runtime/`, the engine's package and the film's packages, writes of its outputs and
 `build/runtime/`, so every other access below the root is in the log. Network use and paths
@@ -32,6 +33,7 @@ import contextlib
 import fnmatch
 import json
 import os
+import shutil
 import sys
 import threading
 from dataclasses import dataclass, field
@@ -114,10 +116,26 @@ def _starting() -> bool:
     return False
 
 
+def _removing_tree() -> bool:
+    """Whether `shutil.rmtree` runs on this thread: it names each member through a folder's
+    descriptor, relative to no working directory, and its own event names the tree."""
+    frame = sys._getframe(1)
+    while frame is not None:
+        if frame.f_code is shutil.rmtree.__code__:
+            return True
+        frame = frame.f_back
+    return False
+
+
 def _note(event: str, args: tuple, write) -> None:
     """Turn one audit event into entries: an open, a probe, a rename, a link, a removal or a
-    child; a read or probe made while the engine starts is a load."""
-    if event == "open" and isinstance(args[0], (str, bytes, os.PathLike)):
+    child; a read or probe made while the engine starts is a load. A tree that `shutil.rmtree`
+    removes is one removal, of the tree."""
+    if event == "shutil.rmtree":
+        write("remove", absolute(args[0]))
+    elif _removing_tree():
+        return
+    elif event == "open" and isinstance(args[0], (str, bytes, os.PathLike)):
         flags, path = (args[2] if isinstance(args[2], int) else 0), absolute(args[0])
         if flags & WRITING:
             write("write", path)
@@ -129,7 +147,7 @@ def _note(event: str, args: tuple, write) -> None:
     elif event == "os.link":
         write("read", absolute(args[0]))
         write("link", absolute(args[1]))
-    elif event in ("os.remove", "shutil.rmtree"):
+    elif event == "os.remove":
         write("remove", absolute(args[0]))
     elif event == "subprocess.Popen":
         _, command, cwd, environment = args
@@ -363,7 +381,8 @@ def exemption(path: Path, kind: str, judged: _Judged, log: Path) -> str:
 def check(log: Path, table=None) -> Report:
     """A log compared with the table, the engine's by default: each read outside a node's inputs
     of the way its record states, or of its default way, and outputs, and each write outside its
-    outputs; a `.partial` sibling renamed over its target is no write, the target is."""
+    outputs; a `.partial` sibling renamed over its target is no write, the target is, and a
+    rename's source that the same process did not write is a removal from its place."""
     import filmkit.repository as repository
     from filmkit.graph import chain
 
@@ -371,6 +390,7 @@ def check(log: Path, table=None) -> Report:
     report, judged = Report(), {}
     found = accesses(log)
     renamed = {(a.pid, a.path) for a in found if a.kind == "source"}
+    wrote = {(a.pid, a.path) for a in found if a.kind == "write"}
     for access in found:
         if access.node not in table.edges:
             if access.node:
@@ -382,20 +402,20 @@ def check(log: Path, table=None) -> Report:
         report.seen.add(access.node)
         if judging.node.tools:
             report.unseen[access.node] = judging.node.tools
-        if access.kind == "source" or (
-            access.kind == "write" and (access.pid, access.path) in renamed
-        ):
+        kind, named = access.kind, (access.pid, access.path)
+        if kind == "source" and named in wrote or kind == "write" and named in renamed:
             continue
-        path, writes = Path(os.path.realpath(access.path)), access.kind in WRITES
+        kind = "remove" if kind == "source" else kind
+        path, writes = Path(os.path.realpath(access.path)), kind in WRITES
         if covered(path, judging.writes if writes else judging.reads):
             continue
-        if access.kind == "probe" and covered(path, judging.probes):
+        if kind == "probe" and covered(path, judging.probes):
             continue
         if not writes and covered(path, judging.aside):
             reason = f"aside: {chain.ASIDE[judging.node.name][0]}"
             report.exempted.setdefault(reason, set()).add(access.node)
             continue
-        reason = "start-up" if access.kind == "load" else exemption(path, access.kind, judging, log)
+        reason = "start-up" if kind == "load" else exemption(path, kind, judging, log)
         if reason == "outside":
             continue
         if reason:
@@ -403,7 +423,7 @@ def check(log: Path, table=None) -> Report:
             continue
         report.findings.append(
             f"{access.node}: {access.process} (pid {access.pid}) "
-            f"{DID.get(access.kind, 'read')} {repository.relative(access.path)}, which "
+            f"{DID.get(kind, 'read')} {repository.relative(access.path)}, which "
             f"{'its outputs do' if writes else 'its declaration does'} not name"
         )
     return report

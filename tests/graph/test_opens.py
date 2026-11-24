@@ -293,3 +293,19 @@ def test_a_virtual_environment_named_whole_is_an_environment(film):
     report = opens.check(log, table)
     assert report.ok, report.findings
     assert report.exempted == {f"environment: {opens.EXEMPT['environment']}": {"stand:zh"}}
+
+
+def test_a_tree_removed_is_one_removal_and_a_rename_s_source_is_judged(film):
+    root, log, table = film
+    (root / "tree/sub").mkdir(parents=True)
+    (root / "tree/sub/a.log").write_text("a")
+    # shutil.rmtree names each member through a folder's descriptor; the tree is what it removes.
+    python_child(root, log, "import shutil\nshutil.rmtree(repository.ROOT / 'tree')\n")
+    (finding,) = opens.check(log, table).findings
+    assert "removed tree, which its outputs do not name" in finding
+    # A rename that moves a file another process wrote takes it from its place: a removal there.
+    log.unlink()
+    code = "import os\nos.replace(repository.ROOT / 'in.txt', repository.ROOT / 'out.json')\n"
+    python_child(root, log, code)
+    (finding,) = opens.check(log, table).findings
+    assert "removed in.txt, which its outputs do not name" in finding
