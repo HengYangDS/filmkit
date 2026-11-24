@@ -522,27 +522,25 @@ def test_a_reference_recording_the_cast_no_longer_names_is_named_missing_at_its_
     ]
 
 
-def test_a_cast_names_the_identity_recording_at_its_place(declared):
-    declare(
-        declared / "content/zh" / film.CAST,
-        derivation={"from": "assets/audio/narration-reference.wav"},
+def test_each_cast_names_the_identity_recording_in_the_run_that_moves_it(declared):
+    # The identity recording stands at its old place, which the Chinese cast's derivation cites,
+    # and the English cast names none: the one run that names the move names the English cast.
+    old, identity = "assets/audio/narration-reference.wav", "assets/audio/narrator-identity.wav"
+    no_derivation = (
+        f"content/en/voice-reference.json has no derivation that names {identity}, the recording "
+        "every reference derives from; record there how the reference was made from it"
     )
+    (declared / old).write_bytes(b"identity")
+    declare(declared / "content/zh" / film.CAST, derivation={"from": old})
     assert film.problems(declared) == [
-        "content/zh/voice-reference.json derivation cites assets/audio/narration-reference.wav; "
-        "move the recording every reference derives from to assets/audio/narrator-identity.wav and "
-        "cite it there"
+        f"content/zh/voice-reference.json derivation cites {old}; move the recording every "
+        f"reference derives from to {identity} and cite it there",
+        no_derivation,
     ]
-    # Where the film holds the identity recording, each cast's derivation names it.
-    (declared / "assets/audio/narrator-identity.wav").write_bytes(b"identity")
-    declare(
-        declared / "content/zh" / film.CAST,
-        derivation={"from": "assets/audio/narrator-identity.wav"},
-    )
-    assert film.problems(declared) == [
-        "content/en/voice-reference.json has no derivation that names "
-        "assets/audio/narrator-identity.wav, the recording every reference derives from; record "
-        "there how the reference was made from it"
-    ]
+    # Moved and cited at its place, it leaves the English cast named alone.
+    (declared / old).rename(declared / identity)
+    declare(declared / "content/zh" / film.CAST, derivation={"from": identity})
+    assert film.problems(declared) == [no_derivation]
 
 
 def test_a_script_at_its_old_place_is_named_with_its_destination_and_not_as_missing(declared):

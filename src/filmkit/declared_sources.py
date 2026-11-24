@@ -218,7 +218,8 @@ def placement_problems(root: Path, declared: dict) -> list[str]:
     `content/` above the editions' folders, and its reference recording and cover where the
     cast's withdrawn `reference_audio` and the edition's withdrawn `cover` still name them, are
     named with their destinations and not as missing. A cast's derivation names the recording
-    every reference derives from at `IDENTITY`, wherever the film holds one. It reads the
+    every reference derives from at `IDENTITY`, wherever the film holds one: at that place, or
+    where a cast's derivation cites it, which the same run asks to move there. It reads the
     declaration as declared, so a field's problem hides none of these.
     """
     from filmkit.film import CAST, DECLARATION, SCRIPT, edition_files, places
@@ -228,6 +229,8 @@ def placement_problems(root: Path, declared: dict) -> list[str]:
     slug = str(declared.get("slug"))
     references = {places(code, slug).reference for code in editions}
     found, claimed, folders = [], set(), {"content"}
+    # Each cast's place, with the recordings its derivation cites outside the references.
+    identities: dict[str, set[str]] = {}
     for code, table in editions.items():
         table = table if isinstance(table, dict) else {}
         derived = places(code, slug)
@@ -268,17 +271,22 @@ def placement_problems(root: Path, declared: dict) -> list[str]:
             for path in (*edition_files(code, slug)[:3], derived.readings, *moved.values())
             if path.endswith(".json") and (problem := _unreadable(root, path))
         ]
-        cited = cited_recordings(cast)
+        identities[cast_path] = cited_recordings(cast) - references
         found += [
             f"{cast_path} derivation cites {path}; move the recording every reference derives "
             f"from to {IDENTITY} and cite it there"
-            for path in sorted(cited - references - {IDENTITY})
+            for path in sorted(identities[cast_path] - {IDENTITY})
         ]
-        if (root / IDENTITY).is_file() and IDENTITY not in cited:
-            found.append(
-                f"{cast_path} has no derivation that names {IDENTITY}, the recording every "
-                "reference derives from; record there how the reference was made from it"
-            )
+    # The film holds the identity recording where it stands at its place or where any cast's
+    # derivation cites it, wherever it stands now, so that the run that names its move also names
+    # each cast whose derivation names none.
+    if (root / IDENTITY).is_file() or any(identities.values()):
+        found += [
+            f"{cast_path} has no derivation that names {IDENTITY}, the recording every reference "
+            "derives from; record there how the reference was made from it"
+            for cast_path, cited in identities.items()
+            if not cited
+        ]
     found += [
         f"{path}: this release removes it; {instead}"
         for path, instead in REMOVED.items()

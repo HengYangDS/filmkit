@@ -189,8 +189,9 @@ The loader SHALL refuse each recording that a cast's derivation cites outside `a
 
 #### Scenario: The identity recording at its old place
 
-- **WHEN** the Chinese cast's derivation cites `assets/audio/narration-reference.wav` as the recording every reference derives from
+- **WHEN** the Chinese cast's derivation cites `assets/audio/narration-reference.wav` as the recording every reference derives from, and the English cast's derivation names none
 - **THEN** the refusal names it with its destination `assets/audio/narrator-identity.wav`
+- **AND** the same refusal names the English cast as without a derivation that names it
 
 ### Requirement: The loader refuses a prompt's former fields and an entry page that breaks its rule
 
