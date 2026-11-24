@@ -102,7 +102,7 @@ def test_a_language_that_hears_its_latin_words_by_their_letters_reads_no_diction
     monkeypatch.setattr(narration_cmudict, "supplied", pytest.fail)
     assert narration_judgment.pronunciations("zh") is None
     bench = narration_judgment.bench("zh", [], asr=None, aligner={})
-    assert (bench.names.heard, bench.pronounced) == (None, None)
+    assert (bench.names.pronounced, bench.pronounced) == (None, None)
 
 
 def test_the_pronunciation_declares_the_readings_the_bench_hears_by(tmp_path, monkeypatch):
@@ -123,13 +123,13 @@ def test_the_pronunciation_declares_the_readings_the_bench_hears_by(tmp_path, mo
     }
     part = {"normalization": [], "targets": [LETTER_NAMES, read, catalogue]}
     repository.write(Edition("en").places.pronunciation, part)
-    heard = narration_judgment.pronunciations("en").heard
-    assert heard.declared == {
+    found = narration_judgment.pronunciations("en").pronunciations
+    assert found.declared == {
         "ai": (),
         "read": (("R", "IY1", "D"), ("R", "EH1", "D")),
         "catalogue": (("K", "AE1", "T", "AH0", "L", "AO0", "G"),),
     }
-    assert heard.said == narration_cmudict.parse(pronounced.RAW)
+    assert found.said == narration_cmudict.parse(pronounced.RAW)
 
 
 SHA = "b" * 64

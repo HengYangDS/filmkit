@@ -241,7 +241,6 @@ def test_a_chinese_take_is_compared_by_the_readings_the_film_declares(monkeypatc
     repository.write(Edition("zh").places.pronunciation, part)
     repository.write(Edition("zh").script, {"segments": []})
     monkeypatch.setattr(narration_judgment, "standards", lambda *_: [])
-    pronounced.supplied(monkeypatch)
     bench = narration_judgment.bench("zh", [], asr=None, aligner={})
     assert [word.term for word in bench.words] == ["重来", "去重"]
     assert bench.words == narration_readings.compared_words(part)
@@ -309,7 +308,8 @@ def test_a_chinese_bench_reads_the_editions_other_latin_units_from_its_script(
     # The English bench has no rule of other letters, under which any word would pass; it hears
     # its Latin units by their pronunciations, as English declares.
     en = narration_judgment.bench("en", [], asr=None, aligner={}, film=declared)
-    assert en.names == Names((NAME,), heard=en.names.heard) and en.names.heard is not None
+    assert en.names == Names((NAME,), pronounced=en.names.pronounced)
+    assert en.names.pronounced is not None
     # A Chinese edition without its pronunciation has no bench: its units are unknown.
     (tmp_path / Edition("zh").places.pronunciation).unlink()
     with pytest.raises(PronunciationError, match="content/zh/pronunciation.json does not exist"):

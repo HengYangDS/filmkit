@@ -220,7 +220,9 @@ def heard(**readings) -> narration_recognition.Names:
     """An English edition's names: no term, its Latin units heard by the fixture's pronunciations
     and the readings its pronunciation declares by word, () for a word said by its letter names."""
     declared = {word: tuple(tuple(p.split()) for p in said) for word, said in readings.items()}
-    return narration_recognition.Names(heard=narration_recognition.Heard(SAID, declared))
+    return narration_recognition.Names(
+        pronounced=narration_recognition.Pronunciations(SAID, declared)
+    )
 
 
 @pytest.mark.parametrize(
@@ -284,7 +286,7 @@ def test_a_declared_term_is_held_to_its_form_and_not_to_its_pronunciation():
     git = NarrationTerm(term="Git", spoken="Git", ipa="ɡɪt")
     names = heard()._replace(terms=(git,))
     assert narration_recognition.reading_distance("Git runs.", "Get runs.", (), names) == 1
-    (unit, _) = narration_recognition.read_units("Git runs.", (), names.terms, names.heard)
+    (unit, _) = narration_recognition.read_units("Git runs.", (), names.terms, names.pronounced)
     assert (unit.term, unit.first, unit.readings) == ("Git", None, ())
 
 
@@ -302,10 +304,10 @@ def test_how_a_language_hears_a_transcripts_latin_words_is_its_declaration():
         asked.append(True)
         return SAID
 
-    english = narration_recognition.hearing("xb", supplied, {})
-    assert english == narration_recognition.Heard(SAID, {}) and asked == [True]
-    names = narration_recognition.Names(heard=english)
+    english = narration_recognition.pronunciations_of("xb", supplied, {})
+    assert english == narration_recognition.Pronunciations(SAID, {}) and asked == [True]
+    names = narration_recognition.Names(pronounced=english)
     assert narration_recognition.reading_distance("Labelled.", "Labeled.", (), names) == 0
-    assert narration_recognition.hearing("xa", supplied, {}) is None and asked == [True]
-    chinese = narration_recognition.Names(heard=None)
+    assert narration_recognition.pronunciations_of("xa", supplied, {}) is None and asked == [True]
+    chinese = narration_recognition.Names(pronounced=None)
     assert narration_recognition.reading_distance("Labelled.", "Labeled.", (), chinese) == 1

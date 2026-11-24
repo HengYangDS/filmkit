@@ -464,15 +464,6 @@ def said(code: str, record: dict) -> str:
     return "\n".join(lines)
 
 
-def waiting(code: str, record: dict) -> str | None:
-    """What an edition waits for: each thought for the owner's ear, with its take, or None."""
-    ear = record["for_the_ear"]
-    if not ear:
-        return None
-    lines = [f"{code}: {len(ear)} thoughts wait for the owner's ear"]
-    return "\n".join([*lines, *judgment.waiting_lines(ear)])
-
-
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Narrate an edition until its takes are accepted.")
     parser.add_argument("--language", choices=CODES, required=True)
@@ -492,7 +483,10 @@ def main(argv: list[str] | None = None) -> None:
             record = converge(code, former, rounds=options.rounds, takes=options.takes)
             unsettled = record["unsettled"]
             refused = said(code, record) if unsettled else fitting.said(code, record["fit"])
-            refused = "\n".join(filter(None, [refused, waiting(code, record)]))
+            # The thoughts the last judgment judged, which it records beside the receipt.
+            judged = len(repository.read(Edition(code).ear_first / judge.RECORD)["thoughts"])
+            ear = judgment.waiting(code, record["for_the_ear"], judged)
+            refused = "\n".join(filter(None, [refused, *ear]))
             if refused:
                 run.fail()
     if refused:

@@ -76,11 +76,11 @@ from filmkit.narration.narrate import ALIGNER
 from filmkit.narration.pronunciation import declared_readings, pronunciation
 from filmkit.narration.recognition import (
     NO_NAMES,
-    Heard,
     Names,
+    Pronunciations,
     compared,
     edition_names,
-    hearing,
+    pronunciations_of,
     recognition_units,
     unit_distance,
 )
@@ -139,10 +139,11 @@ NO_THOUGHT_LINE = clarity.NO_THOUGHT_LINE
 
 @dataclasses.dataclass(frozen=True)
 class Pronounced:
-    """What an edition hears its Latin units by (`recognition.Heard`), and what its judgment's
-    record names of it: the dictionary's URL and SHA-256 and the pronunciation's SHA-256."""
+    """What an edition hears its Latin units by (`recognition.Pronunciations`), and what its
+    judgment's record names of it: the dictionary's URL and SHA-256 and the pronunciation's
+    SHA-256."""
 
-    heard: Heard
+    pronunciations: Pronunciations
     record: dict
 
 
@@ -152,8 +153,9 @@ class Bench:
 
     The recognizer, the pinned aligner with its identity, each declared term's reference vowel,
     the Chinese words a transcript is compared by (`readings.compared_words`), the film's flow
-    limits, the names a transcript's Latin units are read by (`recognition.Names`), and the
-    pronunciations they are heard by, or None (`pronunciations`).
+    limits, the names a transcript's Latin units are read by (`recognition.Names`, with the
+    pronunciations they are heard by), and what the record names of those pronunciations, or
+    None (`pronunciations`).
     """
 
     code: str
@@ -164,7 +166,7 @@ class Bench:
     words: tuple = ()
     flow: object = None
     names: Names = NO_NAMES
-    pronounced: Pronounced | None = None
+    pronounced: dict | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -200,13 +202,13 @@ def pronunciations(code: str) -> Pronounced | None:
     that names the supply step; a caller asks this before any model loads."""
     contract, digest = pronunciation(code)
     try:
-        heard = hearing(code, cmudict.supplied, declared_readings(contract))
+        found = pronunciations_of(code, cmudict.supplied, declared_readings(contract))
     except cmudict.DictionaryError as error:
         raise SystemExit(f"{code}: {error}") from None
-    if heard is None:
+    if found is None:
         return None
     named = {"dictionary": cmudict.URL, "dictionary_sha256": cmudict.SHA256}
-    return Pronounced(heard, {**named, "pronunciation_sha256": digest})
+    return Pronounced(found, {**named, "pronunciation_sha256": digest})
 
 
 def bench(code: str, references: list, *, asr, aligner: dict, film=None, pronounced=None) -> Bench:
@@ -226,11 +228,11 @@ def bench(code: str, references: list, *, asr, aligner: dict, film=None, pronoun
         texts = [thought.text for thought in readings.edition_thoughts(script, contract)]
         words = readings.compared_words(contract) if pinyin else ()
     measured_standards = standards(code, references, aligner, edition.language)
-    heard = pronounced.heard if pronounced else None
-    names = edition_names(film.narration.terms, texts, embedded=embeds, heard=heard)
+    found, named = (pronounced.pronunciations, pronounced.record) if pronounced else (None, None)
+    names = edition_names(film.narration.terms, texts, embedded=embeds, pronounced=found)
     flows = film.narration.flow
     return Bench(
-        code, edition.language, asr, aligner, measured_standards, words, flows, names, pronounced
+        code, edition.language, asr, aligner, measured_standards, words, flows, names, named
     )
 
 
@@ -536,14 +538,14 @@ def ear(rows: list[dict]) -> dict[str, dict]:
     }
 
 
-def waiting(rows: list[dict]) -> list[str]:
-    """One line for each thought for the ear among judged rows (`waiting_lines`)."""
-    return waiting_lines(ear(rows))
-
-
-def waiting_lines(ear: dict[str, dict]) -> list[str]:
-    """One line for each thought for the ear, naming its take's path and audio SHA-256."""
-    return [
+def waiting(code: str, ear: dict[str, dict], thoughts: int) -> list[str]:
+    """What an edition waits for, as `judge` and `converge` say it: a heading of the thoughts for
+    the owner's ear among the edition's `thoughts`, and one line for each, naming its take's path
+    and audio SHA-256; nothing where none waits."""
+    if not ear:
+        return []
+    lines = [f"{code}: {len(ear)} of {thoughts} thoughts wait for the owner's ear"]
+    return lines + [
         f"  {name}: {take['path']} ({take['wav_sha256']}) reads {take['cpp_db']} dB, under its "
         f"line of {take['line_db']} dB"
         for name, take in ear.items()

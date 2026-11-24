@@ -420,7 +420,7 @@ def test_a_thought_under_its_line_heard_by_no_one_gets_no_candidate_and_waits(
         }
     }
     assert str(waiting.value).splitlines() == [
-        "en: 1 thoughts wait for the owner's ear",
+        "en: 1 of 2 thoughts wait for the owner's ear",
         f"  26.2: {second['path']} ({second['wav_sha256']}) reads 17.4 dB, under its line of "
         "18.0 dB",
     ]

@@ -50,7 +50,7 @@ read(2) R IY1 D
 red R EH1 D
 tears T EH1 R Z
 tears(2) T IH1 R Z
-tew T Y UW1
+tew CH UW1
 tew(2) T UW1
 their DH EH1 R
 there DH EH1 R

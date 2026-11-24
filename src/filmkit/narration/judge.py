@@ -97,7 +97,7 @@ def judged(code: str, records: list[dict], bench, held) -> dict:
             "kept": sorted(held.kept),
         },
         "unit_limit": judgment.UNIT_LIMIT,
-        **({"pronunciations": bench.pronounced.record} if bench.pronounced else {}),
+        **({"pronunciations": bench.pronounced} if bench.pronounced else {}),
         "gates": "asked" if gate is not None else judgment.GATE_NOT_ASKED,
         "thoughts": rows,
         "refused": {row["thought"]: row["failed"] for row in rows if row["failed"]},
@@ -127,10 +127,7 @@ def main(argv: list[str] | None = None) -> None:
     if record["refused"]:
         said += [f"{code}: {len(record['refused'])} of {len(rows)} thoughts are refused"]
         said += judgment.refusal(rows)
-    if record["for_the_ear"]:
-        waiting = len(record["for_the_ear"])
-        said += [f"{code}: {waiting} of {len(rows)} thoughts wait for the owner's ear"]
-        said += judgment.waiting(rows)
+    said += judgment.waiting(code, record["for_the_ear"], len(rows))
     if said:
         raise SystemExit("\n".join(said))
 

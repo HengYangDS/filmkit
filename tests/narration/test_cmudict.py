@@ -72,33 +72,33 @@ def test_the_pin_is_the_commit_the_films_cite():
     )
 
 
-def let_through(words: list[str], heard: recognition.Heard) -> dict[str, list[str]]:
+def let_through(words: list[str], found: recognition.Pronunciations) -> dict[str, list[str]]:
     """For each text word, the other spellings a transcript may hold that the engine's own
     comparison passes for it (`recognition.reading_distance`): every headword in other letters
     that a recognition unit can spell, asked of the rule itself, not of a copy of it. The
     candidates are the headwords whose first pronunciation is one of the word's readings."""
-    names = recognition.Names(heard=heard)
+    names = recognition.Names(pronounced=found)
     by_first: dict[tuple[str, ...], list[str]] = {}
-    for headword, said in heard.said.items():
+    for headword, said in found.said.items():
         if recognition.recognition_units(headword) == [headword]:
             by_first.setdefault(said[0], []).append(headword)
-    found = {}
+    listed = {}
     for word in words:
-        own, _ = heard.of(word.lower())
+        own, _ = found.of(word.lower())
         candidates = {other for said in own for other in by_first.get(said, ())}
-        found[word] = sorted(
+        listed[word] = sorted(
             other
             for other in candidates
             if other.replace("'", "") != word.lower().replace("'", "")
             and recognition.reading_distance(word, other, (), names) == 0
         )
-    return found
+    return listed
 
 
 def test_the_spellings_the_rule_takes_for_a_text_word_over_the_fixture():
-    heard = recognition.Heard(cmudict.parse(pronounced.RAW), {"ai": ()})
+    said = recognition.Pronunciations(cmudict.parse(pronounced.RAW), {"ai": ()})
     words = ["labelled", "tiers", "their", "catalogue", "AI", "to", "eye"]
-    assert let_through(words, heard) == {
+    assert let_through(words, said) == {
         "labelled": ["labeled"],
         # tears is first the verb tear: no spelling has tiers' sound first.
         "tiers": [],
@@ -161,8 +161,8 @@ def test_the_spellings_the_rule_takes_over_the_pinned_file():
     words = sorted(sample | set(PINNED))
     # The supply step places the file below the film's root: the sample's, which the tests build.
     place = repository.ROOT / cmudict.PLACE
-    heard = recognition.Heard(cmudict.parse(place.read_bytes()), {})
-    found = let_through(words, heard)
+    said = recognition.Pronunciations(cmudict.parse(place.read_bytes()), {})
+    found = let_through(words, said)
     assert {word: others for word, others in found.items() if others} == {
         word: others for word, others in PINNED.items() if others
     }
