@@ -27,8 +27,10 @@ with `PreflightError` while any remains:
   judged against (`review.clarity_thought_margin_db`): none under that line, which with a
   margin of zero is the floor, and each between the line and the floor declared by its name
   (`review.clarity_exceptions`), but a thought whose selected take the owner heard clear
-  (`narration.heard`, its lines naming `clarity`); each it refuses is named for the owner's
-  ear with its selected take's audio SHA-256, where the selection bound one;
+  (`narration.heard`, its lines naming `clarity`) and the assembled soundtrack holds (the
+  assembly record's `source_sha256` of its segment is the selected recording's, else "run
+  assemble"); each it refuses is named for the owner's ear with its selected take's audio
+  SHA-256, where the selection bound one;
 - the caption cues above the edition's reading rate, each declared by its text
   (`captions.rate_exceptions`);
 - the geometry: the record that the delivery's verification requires, passed on the whole
@@ -57,6 +59,7 @@ from typing import TYPE_CHECKING
 import filmkit.concepts as concepts
 import filmkit.delivery.packaging as packaging
 import filmkit.delivery.verification as verification
+import filmkit.narration.hearings as hearings
 import filmkit.picture.renderer as renderer
 import filmkit.picture.rendering as rendering
 import filmkit.picture.still_scan as still_scan
@@ -232,19 +235,26 @@ def clarity(edition: Edition) -> str | None:
     lines = review_clarity.thought_lines(edition.code, floor=measured["floor_db"], film=FILM)
     line, declared = lines.line, lines.kept
     below = {row["id"]: row["cpp_db"] for row in measured["thoughts"] if row["below_floor"]}
-    takes = selected_takes(edition)
-    clear = {
-        record.thought
-        for record in FILM.narration.heard
-        if record.edition == edition.code
-        and "clarity" in record.lines
-        and takes.get(record.thought) == record.take
-    }
-    refused = {
+    takes, assembled = selected_takes(edition)
+    heard = [record for record in FILM.narration.heard if record.edition == edition.code]
+    under = {
         name: value
         for name, value in below.items()
-        if review_clarity.under_its_line(value, name, lines) and name not in clear
+        if review_clarity.under_its_line(value, name, lines)
     }
+    clear = {
+        name
+        for name in under
+        if name in takes and hearings.settling(heard, name, takes[name]).get("clarity")
+    }
+    # A take the owner heard counts only where the soundtrack the gate measured holds it.
+    unassembled = [
+        f"thought {name} reads {under[name]} dB: the owner heard its selected take, but the "
+        f"soundtrack was assembled from another selection of segment {name.rsplit('.', 1)[0]};"
+        " run assemble"
+        for name in sorted(clear - assembled)
+    ]
+    refused = {name: value for name, value in under.items() if name not in clear}
     held = f"the thought line of {line} dB"
     if not margin:
         held = f"the floor of {line} dB, to which the film holds every thought"
@@ -267,20 +277,25 @@ def clarity(edition: Edition) -> str | None:
         f"the declared thought {name} is stale: it does not read under the floor"
         for name in sorted(declared - set(below))
     ]
-    return "; ".join(found) or None
+    return "; ".join(unassembled + found) or None
 
 
-def selected_takes(edition: Edition) -> dict[str, str]:
-    """Each thought's selected take by its audio SHA-256, as the selection bound it; none where
-    the edition has no selected narration."""
+def selected_takes(edition: Edition) -> tuple[dict[str, str], set[str]]:
+    """Each thought's selected take by its audio SHA-256, as the selection bound it, and the
+    thoughts whose segment's selected recording is the one the assembly record names as its
+    source (`source_sha256`): those the assembled soundtrack holds. None where the edition has
+    no selected narration; no thought is assembled where it has no assembly record."""
     path = repository.ROOT / edition.narration_selected
     if not path.is_file():
-        return {}
-    return {
-        f"{record['id']}.{child['index']}": child["wav_sha256"]
-        for record in repository.read(path)["records"]
-        for child in record.get("utterance_groups", {}).get("records", [])
-    }
+        return {}, set()
+    records = repository.read(path)["records"]
+    assembly = edition.audio_assembly
+    sources = {}
+    if assembly.is_file():
+        sources = {r["id"]: r.get("source_sha256") for r in repository.read(assembly)["records"]}
+    takes = hearings.selected_takes(records)
+    held = {r["id"] for r in records if sources.get(r["id"]) == r.get("wav_sha256")}
+    return takes, {name for name in takes if name.rsplit(".", 1)[0] in held}
 
 
 def caption_rate(edition: Edition) -> str | None:

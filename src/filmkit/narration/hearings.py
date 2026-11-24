@@ -11,7 +11,8 @@ take's request, so a record narrates nothing again.
 A record is refused when the declaration loads where it names an edition the film does not
 declare, a take that is no SHA-256, no line or another, a line twice, a listener other than the
 film's author, or a take that another record names; the selection refuses one whose take is not
-its thought's selected take (`stale`).
+its thought's selected take (`stale`). Preflight counts a thought's selected take as heard only
+where the soundtrack was assembled from that selection (`filmkit.preflight.clarity`).
 """
 
 from __future__ import annotations
@@ -72,15 +73,21 @@ def settled(line: dict, record: Heard | None) -> dict:
     return {**line, "passes": True, "heard": {"listener": record.listener, "date": record.date}}
 
 
-def stale(heard: Sequence[Heard], records: Sequence[dict]) -> list[str]:
-    """Each record of an edition whose take is not its thought's selected take, among the
-    selected segments' `records`, in one line each: a record of another take, and one of a
-    thought the script does not hold."""
-    selected = {
+def selected_takes(records: Sequence[dict]) -> dict[str, str]:
+    """Each thought's selected take by its audio SHA-256, among the selected segments'
+    `records` (`narration-selected.json`)."""
+    return {
         f"{record['id']}.{child['index']}": child["wav_sha256"]
         for record in records
         for child in record.get("utterance_groups", {}).get("records", [])
     }
+
+
+def stale(heard: Sequence[Heard], records: Sequence[dict]) -> list[str]:
+    """Each record of an edition whose take is not its thought's selected take, among the
+    selected segments' `records`, in one line each: a record of another take, and one of a
+    thought the script does not hold."""
+    selected = selected_takes(records)
     found = []
     for record in heard:
         take = selected.get(record.thought)

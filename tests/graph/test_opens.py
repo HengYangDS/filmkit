@@ -286,14 +286,18 @@ def test_preflight_declares_the_selection_its_clarity_reads(tmp_path, monkeypatc
     monkeypatch.setattr(repository, "ROOT", root)
     log = tmp_path / "opens.jsonl"
     # Preflight reads each thought's selected take from the selection, to know whether the owner
-    # heard it (`preflight.selected_takes`).
-    selected = root / "build/evidence/editions/zh/narration-selected.json"
-    selected.parent.mkdir(parents=True)
+    # heard it, and the assembly record, to know whether the soundtrack holds it
+    # (`preflight.selected_takes`).
+    evidence = root / "build/evidence/editions/zh"
+    evidence.mkdir(parents=True)
     take = {"index": 1, "wav_sha256": "a" * 64}
     record = {"id": "01", "wav_sha256": "b" * 64, "utterance_groups": {"records": [take]}}
-    selected.write_text(json.dumps({"records": [record]}))
+    (evidence / "narration-selected.json").write_text(json.dumps({"records": [record]}))
+    assembled = {"records": [{"id": "01", "source_sha256": "b" * 64}]}
+    (evidence / "audio-assembly.json").write_text(json.dumps(assembled))
     code = "import filmkit.preflight as preflight\nfrom filmkit.production import Edition\n"
-    code += "assert preflight.selected_takes(Edition('zh')) == {'01.1': 'a' * 64}\n"
+    code += "takes = ({'01.1': 'a' * 64}, {'01.1'})\n"
+    code += "assert preflight.selected_takes(Edition('zh')) == takes\n"
     python_child(root, log, code, node="preflight:zh")
     assert opens.check(log).findings == []
 

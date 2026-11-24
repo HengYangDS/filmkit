@@ -52,7 +52,8 @@ read 17.4 to 17.7 dB [S7].
   settles, is named for the ear instead of refused: `judge`, `converge` and `audition` name it with its take's path,
   audio SHA-256, clarity and line; the convergence generates no candidate for it and exits 1 while it waits; audition
   proposes a take above its line before one for the ear. `produce preflight` passes a thought whose selected take the
-  owner heard clear and names the others for the ear. `check-sound` still refuses a soundtrack or a segment under the
+  owner heard clear where the soundtrack was assembled from that selection, says to run assemble where it was
+  not, and names the others for the ear. `check-sound` still refuses a soundtrack or a segment under the
   floor, whatever was heard.
 - **No take's request changes.** Neither the dictionary nor a record enters a request; the sample's golden requests
   stay byte for byte, and a new test plans them with both present.

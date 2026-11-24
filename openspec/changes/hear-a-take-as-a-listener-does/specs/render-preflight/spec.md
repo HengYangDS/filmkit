@@ -2,7 +2,7 @@
 
 ### Requirement: Preflight takes the owner's hearing of the selected take
 
-`produce preflight` SHALL refuse nothing for the clarity of a thought whose selected take, the take the selection bound for it, the owner's hearing settles for its clarity. It SHALL name each thought it refuses for its clarity for the ear, with its reading, its line and its selected take's audio SHA-256.
+`produce preflight` SHALL refuse nothing for the clarity of a thought whose selected take, the take the selection bound for it, the owner's hearing settles for its clarity, where the soundtrack was assembled from that selection; where the thought's segment was assembled from another selection, or no assembly record stands, it SHALL refuse and say to run assemble. It SHALL name each thought it refuses for its clarity for the ear, with its reading, its line and its selected take's audio SHA-256.
 
 #### Scenario: A thought heard clear on its selected take
 
@@ -14,11 +14,16 @@
 - **WHEN** the film's record of hearing names another take of that thought than the selected one
 - **THEN** the check refuses, naming the thought for the ear with its reading, the line and its selected take's audio SHA-256
 
+#### Scenario: A heard take selected after the assembly
+
+- **WHEN** the owner heard the thought's selected take clear and the soundtrack was assembled from another selection of its segment
+- **THEN** the check refuses, naming the thought and its segment and saying to run assemble
+
 ## MODIFIED Requirements
 
 ### Requirement: A film declares the line a single thought's clarity is judged against
 
-A film MAY declare a margin of zero or more under its clarity floor. `produce preflight` SHALL then refuse a thought the sound gate reads under the floor less that margin, and one between that line and the floor the film does not declare by name with a reason, unless the owner heard its selected take clear; and it SHALL refuse a declared thought reading at or over the floor. With a margin of zero no thought MAY be declared. Without a margin it SHALL report that single thoughts are not judged.
+A film MAY declare a margin of zero or more under its clarity floor. `produce preflight` SHALL then refuse a thought the sound gate reads under the floor less that margin, and one between that line and the floor not declared by name with a reason, unless the owner heard its selected and assembled take clear; and it SHALL refuse a declared thought reading at or over the floor. With a margin of zero no thought MAY be declared. Without a margin it SHALL report that single thoughts are not judged.
 
 #### Scenario: A thought under the thought line
 
