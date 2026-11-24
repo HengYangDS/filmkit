@@ -207,3 +207,17 @@ def test_a_node_of_one_edition_is_asked_of_that_edition_alone(stand_in_table, mo
     assert {entry.state for entry in found.values()} == {"fresh"}
     lines = verify.verify(table).listed
     assert not any("qualify:en" in line for line in lines), lines
+
+
+def test_a_rewriter_run_twice_keeps_its_earlier_writers_fresh(stand_in_table, monkeypatch):
+    write = stand_ins.WRITES["refresh-captions"]
+    monkeypatch.setitem(
+        stand_ins.WRITES,
+        "refresh-captions",
+        lambda root, code: {**write(root, code), "timeline": write(root, code)["timeline"] + "+"},
+    )
+    chain()
+    ran("refresh-captions")
+    _, found = judged(stand_in_table, "check-sound:zh")
+    assert found["assemble:zh"].state == found["refresh-captions:zh"].state == "fresh"
+    assert texts(found["check-sound:zh"]) == ["input timeline changed: zh/timeline.json"]

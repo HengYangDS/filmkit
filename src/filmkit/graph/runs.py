@@ -66,6 +66,31 @@ def stated(places: nodes.Places, known: dict[str, records.State]) -> dict[str, r
     return found
 
 
+def carried(
+    node: nodes.Node,
+    edition: Edition,
+    way: object,
+    inputs: dict[str, records.State],
+    before: records.RunRecord | None,
+) -> dict[str, str]:
+    """Each path the node rewrites that its run read as its own previous run wrote it, with the
+    digest its chain of runs first read from another writer: carried from that run where it
+    carried one, else that run's own input. Bytes the previous run did not write carry nothing,
+    so a hand edit between two runs stays its own."""
+    if before is None:
+        return {}
+    writes = {nodes.place(path): name for name, path in node.outputs(edition).items()}
+    found = {}
+    for name, path in node.inputs(edition, way).items():
+        output = writes.get(nodes.place(path))
+        if output is None or name not in inputs or name not in before.inputs:
+            continue
+        wrote = before.outputs.get(output)
+        if wrote is not None and wrote.sha256 == inputs[name].sha256:
+            found[name] = before.carried.get(name, before.inputs[name].sha256)
+    return found
+
+
 def outcome(
     completed: bool, ended: BaseException | None, refusals: tuple[type[BaseException], ...] = ()
 ) -> tuple[records.Outcome, str | None]:
@@ -97,6 +122,7 @@ class NodeRun:
             known = self.before.inputs if self.before else {}
             chosen = run.settings.get("way")
             self.inputs = stated(node.inputs(edition, chosen), known) if whole else {}
+            self.carried = carried(node, edition, chosen, self.inputs, self.before)
         self.label, self.outer = nodes.key(node.name, code), os.environ.get(opens.NODE)
         os.environ[opens.NODE] = self.label
         self.meter = host.start()
@@ -143,7 +169,7 @@ class NodeRun:
             **{key: duration[key] for key in records.FROM_DURATION},
         }
         if self.whole:
-            records.write(records.RunRecord(**common, inputs=self.inputs))
+            records.write(records.RunRecord(**common, inputs=self.inputs, carried=self.carried))
         else:
             records.write(records.PartialRecord(**common))
 

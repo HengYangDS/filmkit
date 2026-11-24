@@ -102,7 +102,8 @@ class Standing:
 class Binding:
     """A standing record that states a path several runs write: the node, the side and name it
     states the path under, the state, when its run ended, the writer's kind and the nodes a
-    rewriter follows, and for a rewriter the path as it read it."""
+    rewriter follows, and for a rewriter the input's name, the digest it read and the digest its
+    chain of runs first read (`records.RunRecord.carried`), the same where it carried none."""
 
     key: str
     node: str
@@ -112,7 +113,7 @@ class Binding:
     end: datetime
     kind: str
     after: tuple[str, ...] = ()
-    read: tuple[str, records.State] | None = None
+    read: tuple[str, str, str] | None = None
 
 
 @dataclass
@@ -198,7 +199,8 @@ def bound(table: nodes.Table, stand: dict[str, Standing]) -> dict[Path, list[Bin
                 writer = writer if partial else kind_of(table, s.node.name, name)
                 taken = None if partial else reads.get(path)
                 was = record.inputs.get(taken) if taken else None
-                read = (taken, was) if was else None
+                origin = record.carried.get(taken, was.sha256) if was else None
+                read = (taken, was.sha256, origin) if was else None
                 state, end = record.outputs[name], ended(record)
                 paths[path].append(
                     Binding(key, s.node.name, "output", name, state, end, *writer[1:], read)
@@ -217,7 +219,7 @@ def carried(earlier: Binding, by: Binding) -> bool:
     if by.end <= earlier.end or by is earlier:
         return False
     if by.kind == nodes.REWRITES and earlier.node in by.after:
-        return by.read is not None and by.read[1].sha256 == earlier.state.sha256
+        return by.read is not None and earlier.state.sha256 in by.read[1:]
     return by.kind == earlier.kind == nodes.REPLACES and earlier.side == "output"
 
 
@@ -242,9 +244,9 @@ def unwritten(earlier: Binding, writers: list[Binding]) -> Binding | None:
     for by in writers:
         if by.end <= earlier.end or by.kind != nodes.REWRITES or earlier.node not in by.after:
             continue
-        if by.read is None or by.read[1].sha256 == earlier.state.sha256:
+        if by.read is None or earlier.state.sha256 in by.read[1:]:
             continue
-        read = by.read[1].sha256
+        read = by.read[1]
         if not any(earlier.end < c.end < by.end and c.state.sha256 == read for c in writers):
             return by
     return None

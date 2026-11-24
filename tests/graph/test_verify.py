@@ -2,14 +2,19 @@
 accounts for and for a change that kept a file's size and time, every other stale node listed,
 and nothing written (design decision 6 of record-every-run)."""
 
+import json
 import os
+import shutil
 
 import pytest
-from stand_ins import CODES, chain, ran, wrote
+import sample_sound
+import stand_ins
+from stand_ins import CODES, chain, ran, read, wrote
 
 import filmkit.durations as durations
 import filmkit.repository as repository
 from filmkit.graph import plan, verify
+from filmkit.production import Edition
 
 
 def verified(table, capsys):
@@ -114,3 +119,51 @@ def test_a_build_with_no_record_passes_and_verify_writes_nothing(stand_in_table,
     before = listing()
     verified(stand_in_table, capsys)
     assert listing() == before
+
+
+def refreshing(monkeypatch):
+    """Let the stand-in refresh-captions change the timeline at each run, as a refresh after a
+    caption edit does."""
+    write = stand_ins.WRITES["refresh-captions"]
+
+    def changed(root, code):
+        return {**write(root, code), "timeline": read(root, f"{code}/timeline.json") + " +"}
+
+    monkeypatch.setitem(stand_ins.WRITES, "refresh-captions", changed)
+
+
+def test_a_rewriter_run_again_on_its_own_output_passes(stand_in_table, capsys, monkeypatch):
+    refreshing(monkeypatch)
+    chain()
+    ran("refresh-captions")
+    ran("check-sound")
+    status, lines = verified(stand_in_table, capsys)
+    assert status == 0, lines
+
+
+def test_a_hand_edit_between_two_runs_of_a_rewriter_is_refused(stand_in_table, capsys, monkeypatch):
+    refreshing(monkeypatch)
+    chain()
+    (repository.ROOT / "zh/timeline.json").write_text("HAND-EDITED timeline")
+    ran("refresh-captions")
+    status, lines = verified(stand_in_table, capsys)
+    assert status == 1
+    assert any(line.startswith("refused: zh/timeline.json: its bytes") for line in lines), lines
+
+
+@pytest.mark.ffmpeg
+def test_two_caption_edits_each_refreshed_verify_on_the_sample(built, tmp_path, monkeypatch):
+    # The reviewer's case on the real engine: a copy of the built sample, its Chinese script
+    # edited twice for presentation only, refresh-captions and check-sound run after each.
+    root = (tmp_path / "film").resolve()
+    shutil.copytree(built[0], root, symlinks=True)
+    monkeypatch.setattr(repository, "ROOT", root)
+    script = root / Edition("zh").script
+    for tail in (0.2, 0.15):
+        value = json.loads(script.read_text())
+        value["caption_timing"]["tail_seconds"] = tail
+        script.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
+        for command in ("refresh-captions", "check-sound"):
+            sample_sound.run(root, command, "zh")
+    verified = verify.verify()
+    assert verified.refusals == (), verified.refusals

@@ -155,6 +155,11 @@ The latest standing record of a declared writer SHALL bind a path's current byte
 
 Bytes that a rewriter read after a run of a writer it follows, which no declared writer's run between the two wrote, SHALL be bytes that no declared writer accounts for, though the file equals the rewriter's record.
 
+#### Scenario: A rewriter run again on its own output verifies
+
+- **WHEN** the script is edited twice for its captions alone, and `refresh-captions` and `check-sound` run after each edit
+- **THEN** `filmkit verify` refuses nothing, since each run of `refresh-captions` read what its own previous run wrote
+
 #### Scenario: A hand edit that a rewriter carried forward fails closed
 
 - **WHEN** the timeline is edited by hand after `assemble` and before `refresh-captions` rewrites it

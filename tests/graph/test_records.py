@@ -65,7 +65,7 @@ def test_a_record_and_a_partial_record_are_read_back_equal(root):
     folder = stated["inputs"]["stage"]
     assert [m["path"] for m in folder["members"]] == ["fonts/a.woff2", "index.html"]
     partial = records.PartialRecord(
-        **record.model_dump(exclude={"inputs", "schema_", "partial"}),
+        **record.model_dump(exclude={"inputs", "carried", "schema_", "partial"}),
     )
     records.write(partial)
     partial_path = records.place("check-sound", "zh", partial=True)

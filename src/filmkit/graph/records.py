@@ -122,9 +122,12 @@ class Common(Stated):
 
 
 class RunRecord(Common):
-    """One whole run of a node."""
+    """One whole run of a node. `carried` names each input that a rewriter read as its own
+    previous run wrote it, with the digest that its chain of runs first read from another writer,
+    so that the earlier writer's binding holds through a rewriter run again (design decision 5)."""
 
     inputs: dict[str, State]
+    carried: dict[str, str] = Field(default_factory=dict)
 
 
 class PartialRecord(Common):
