@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import filmkit.repository as repository
-from filmkit.graph import host, nodes, opens, records
+from filmkit.graph import chain, host, nodes, opens, records
 from filmkit.production import Edition
 
 if TYPE_CHECKING:
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 def table() -> dict[str, nodes.Node]:
     """The chain's nodes by name."""
-    return {node.name: node for node in nodes.TABLE}
+    return {node.name: node for node in chain.TABLE}
 
 
 def pins(node: nodes.Node) -> dict[str, str]:

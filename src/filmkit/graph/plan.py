@@ -35,7 +35,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from filmkit.graph import nodes, records, runs
+from filmkit.graph import chain, nodes, records, runs
 from filmkit.production import Edition
 
 if TYPE_CHECKING:
@@ -353,7 +353,7 @@ def plan(
 ) -> Planned:
     """The entries of the nodes asked for and every node upstream, in the derived order; each
     file that several records state is hashed once (`records.once`)."""
-    table = table or nodes.chain()
+    table = table or chain.table()
     keys = wanted(table, targets)
     with records.once() as taken:
         entries = judge_all(table, keys, full)

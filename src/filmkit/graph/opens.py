@@ -169,10 +169,10 @@ def node_options() -> dict[str, str]:
 def declared(named: str) -> tuple[list[Path], list[Path]]:
     """The places a node may read, its inputs of every way and its outputs, and those it may
     write, its outputs; nothing for a label that names no node of the table."""
-    from filmkit.graph import nodes
+    from filmkit.graph import chain
 
     try:
-        node, edition = nodes.chain().node(named)
+        node, edition = chain.table().node(named)
     except (KeyError, ValueError):
         return [], []
     inputs = [place(path) for way in node.ways.values() for path in way(edition).values()]
@@ -254,7 +254,7 @@ class _Judged:
     what it reads aside, and every place any node of its edition declares."""
 
     def __init__(self, table, named: str) -> None:
-        from filmkit.graph import nodes, records
+        from filmkit.graph import chain, records
 
         self.node, self.edition = table.node(named)
         way = None
@@ -263,7 +263,7 @@ class _Judged:
         inputs = list(self.node.inputs(self.edition, way).values())
         outputs = list(self.node.outputs(self.edition).values())
         self.reads, self.writes = real([*inputs, *outputs]), real(outputs)
-        self.aside = real(nodes.aside(self.node.name, self.edition).values())
+        self.aside = real(chain.aside(self.node.name, self.edition).values())
         everything = [
             item
             for each in table.nodes.values()
@@ -312,9 +312,9 @@ def check(log: Path, table=None) -> Report:
     of the way its record states, or of its default way, and outputs, and each write outside its
     outputs; a `.partial` sibling renamed over its target is no write, the target is."""
     import filmkit.repository as repository
-    from filmkit.graph import nodes
+    from filmkit.graph import chain
 
-    table = table or nodes.chain()
+    table = table or chain.table()
     report, judged = Report(), {}
     found = accesses(log)
     renamed = {(a.pid, a.path) for a in found if a.kind == "source"}
@@ -337,7 +337,7 @@ def check(log: Path, table=None) -> Report:
         if covered(path, judging.writes if writes else judging.reads):
             continue
         if not writes and covered(path, judging.aside):
-            reason = f"aside: {nodes.ASIDE[judging.node.name][0]}"
+            reason = f"aside: {chain.ASIDE[judging.node.name][0]}"
             report.exempted.setdefault(reason, set()).add(access.node)
             continue
         reason = exemption(path, access.kind, judging, log)

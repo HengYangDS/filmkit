@@ -11,7 +11,7 @@ import sample_sound
 
 import filmkit.repository as repository
 import filmkit.tools as tools
-from filmkit.graph import nodes, opens
+from filmkit.graph import chain, nodes, opens
 
 # A Node child that reads a declared and an undeclared file, writes in the temporary folder,
 # opens a socket to a closed port and runs to its end.
@@ -181,9 +181,9 @@ def test_every_node_the_light_suite_runs_reads_and_writes_only_what_it_declares(
     # The nodes whose tools are seen only through their arguments are named with them.
     named = report.unseen
     for code in sample_sound.NARRATED:
-        assert named[nodes.key("assemble", code)] == nodes.MEDIA
-        assert named[nodes.key("check-sound", code)] == nodes.MEDIA
-    assert named[nodes.key("preflight", "zh")] == nodes.BROWSER
+        assert named[nodes.key("assemble", code)] == chain.MEDIA
+        assert named[nodes.key("check-sound", code)] == chain.MEDIA
+    assert named[nodes.key("preflight", "zh")] == chain.BROWSER
     # Each exemption is reported with the nodes it covered.
     records = f"records: {opens.EXEMPT['records']}"
     assert report.exempted[records] == report.seen

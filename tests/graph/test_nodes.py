@@ -7,7 +7,7 @@ import pytest
 import filmkit.produce as produce
 import filmkit.repository as repository
 import filmkit.tools as tools
-from filmkit.graph import nodes
+from filmkit.graph import chain, nodes
 from filmkit.graph.records import Folder
 from filmkit.narration import converge, readings
 from filmkit.production import Edition
@@ -15,12 +15,12 @@ from filmkit.production import Edition
 
 @pytest.fixture(scope="module")
 def table():
-    return nodes.chain()
+    return chain.table()
 
 
 def test_the_order_respects_every_derived_edge(table):
     position = {name: index for index, name in enumerate(table.order)}
-    assert set(position) == {nodes.key(n.name, c) for n in nodes.TABLE for c in table.codes}
+    assert set(position) == {nodes.key(n.name, c) for n in chain.TABLE for c in table.codes}
     for name, before in table.edges.items():
         assert all(position[earlier] < position[name] for earlier in before), name
 
@@ -124,9 +124,9 @@ def test_every_command_with_a_duration_record_is_a_node_or_named_with_its_reason
         "verify",
         "reproduce",
     }
-    unnamed = commands - set(table.nodes) - set(nodes.NOT_NODES)
+    unnamed = commands - set(table.nodes) - set(chain.NOT_NODES)
     assert unnamed == set()
-    assert set(table.nodes).isdisjoint(nodes.NOT_NODES)
+    assert set(table.nodes).isdisjoint(chain.NOT_NODES)
 
 
 def test_the_uncaptioned_picture_reads_the_inputs_of_its_way(table):
