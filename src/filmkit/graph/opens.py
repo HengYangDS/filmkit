@@ -336,6 +336,7 @@ class _Judged:
         everything = [
             item
             for each in table.nodes.values()
+            if self.edition.code in each.codes(table.codes)
             for way in each.ways.values()
             for item in [*way(self.edition).values(), *each.outputs(self.edition).values()]
         ]

@@ -21,14 +21,19 @@ def table():
 
 def test_the_order_respects_every_derived_edge(table):
     position = {name: index for index, name in enumerate(table.order)}
-    assert set(position) == {nodes.key(n.name, c) for n in chain.TABLE for c in table.codes}
+    keys = {nodes.key(n.name, c) for n in chain.TABLE for c in n.codes(table.codes)}
+    assert set(position) == keys
     for name, before in table.edges.items():
         assert all(position[earlier] < position[name] for earlier in before), name
 
 
 def test_each_node_follows_the_writers_of_what_it_reads(table):
     for code in table.codes:
-        up = {name: table.upstream(nodes.key(name, code)) for name in table.nodes}
+        up = {
+            name: table.upstream(nodes.key(name, code))
+            for name, node in table.nodes.items()
+            if code in node.codes(table.codes)
+        }
         assert nodes.key("assemble", code) in up["refresh-captions"]
         assert {nodes.key("assemble", code), nodes.key("refresh-captions", code)} <= up[
             "check-sound"
@@ -173,3 +178,12 @@ def test_the_table_loads_beside_a_receipt_that_cannot_be_read(tmp_path, monkeypa
     # A receipt that cannot be read is no derived picture's, as the way of the picture takes it.
     compared = chain.table().nodes["compare-pictures"].inputs(Edition("zh"))
     assert "uncaptioned_stage" in compared
+
+
+def test_the_renderer_is_qualified_once_a_build_for_the_first_edition(table):
+    # `picture/qualification.py`: every engine release qualifies the canvas build it pins, once.
+    first, *others = table.codes
+    assert nodes.key("qualify-renderer", first) in table.edges
+    assert not any(nodes.key("qualify-renderer", code) in table.edges for code in others)
+    # The sample declares drafts, so each edition renders its draft.
+    assert all(nodes.key("render-draft", code) in table.edges for code in table.codes)

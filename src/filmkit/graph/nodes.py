@@ -46,7 +46,8 @@ class Node:
     """One command of an edition's build chain: its ways, each with its inputs, its outputs,
     the host class it is expected to measure at, and whether it is model work. A node of several
     ways takes `default_way` where no run says which; `tools` names the tools it starts whose
-    reads are seen only through their arguments."""
+    reads are seen only through their arguments; `editions`, given the film's editions in their
+    declared order, names those the node applies to, every one by default."""
 
     name: str
     ways: dict[str, Callable[[Edition], Places]]
@@ -55,6 +56,11 @@ class Node:
     gpu: bool = False
     default_way: Callable[[Edition], str] | None = None
     tools: tuple[str, ...] = ()
+    editions: Callable[[tuple[str, ...]], tuple[str, ...]] | None = None
+
+    def codes(self, codes: tuple[str, ...]) -> tuple[str, ...]:
+        """The editions, of the film's, that the node applies to."""
+        return tuple(self.editions(codes)) if self.editions else tuple(codes)
 
     def way(self, edition: Edition, recorded: object = None) -> str:
         """The way a run took, or else the way the node takes by default."""
@@ -151,8 +157,8 @@ def written(nodes: dict[str, Node], codes: Iterable[str]) -> dict[Path, list[tup
     """Each output path of every node of every edition, with the keys and output names that
     write it."""
     found: dict[Path, list[tuple[str, str]]] = {}
-    for code in codes:
-        for node in nodes.values():
+    for node in nodes.values():
+        for code in node.codes(tuple(codes)):
             for name, path in node.outputs(Edition(code)).items():
                 found.setdefault(place(path), []).append((key(node.name, code), name))
     return found
@@ -183,9 +189,11 @@ def edges(nodes: dict[str, Node], shared: dict, codes: tuple[str, ...]) -> dict[
     the reader among those it follows, and for a rewriter the nodes it names; replacers of one
     path have no edge between them."""
     paths = written(nodes, codes)
-    before: dict[str, set[str]] = {key(n, c): set() for c in codes for n in nodes}
-    for code in codes:
-        for node in nodes.values():
+    before: dict[str, set[str]] = {
+        key(node.name, c): set() for node in nodes.values() for c in node.codes(codes)
+    }
+    for node in nodes.values():
+        for code in node.codes(codes):
             reader, edition = key(node.name, code), Edition(code)
             reads = {place(p) for way in node.ways.values() for p in way(edition).values()}
             for out, by in paths.items():
@@ -202,7 +210,7 @@ def edges(nodes: dict[str, Node], shared: dict, codes: tuple[str, ...]) -> dict[
             for writer in shared.get(output, ()):
                 if writer.node == name and writer.kind == REWRITES:
                     before[named].update(
-                        key(after, code) for after in writer.after if after in nodes
+                        k for after in writer.after if (k := key(after, code)) in before
                     )
     return before
 

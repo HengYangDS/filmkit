@@ -358,6 +358,8 @@ TABLE = (
         },
         "heavy",
         tools=MEDIA,
+        # Only a film that declares drafts renders them (`[picture] drafts`).
+        editions=lambda codes: codes if FILM.picture.drafts else (),
     ),
     Node(
         "preflight",
@@ -413,6 +415,9 @@ TABLE = (
         only("renderer_qualification", lambda e: e.renderer_qualification),
         "heavy",
         tools=MEDIA,
+        # Once a build: every engine release qualifies the canvas build it pins
+        # (`picture/qualification.py`), for the film's first declared edition.
+        editions=lambda codes: codes[:1],
     ),
     Node(
         "compare-pictures",

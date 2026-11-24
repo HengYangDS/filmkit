@@ -168,7 +168,7 @@ def followed(table: nodes.Table) -> set[tuple[str, Path]]:
         for writer in writers:
             if writer.kind != nodes.REWRITES:
                 continue
-            for code in table.codes:
+            for code in table.nodes[writer.node].codes(table.codes):
                 path = nodes.place(table.nodes[writer.node].outputs(Edition(code))[output])
                 pairs |= {(nodes.key(a, code), path) for a in writer.after if a not in names}
     return pairs
@@ -344,7 +344,9 @@ def wanted(table: nodes.Table, targets: Iterable[str]) -> set[str]:
     asked = set()
     for target in targets:
         name, _, code = target.rpartition(":")
-        keys = [nodes.key(name, c) for c in table.codes] if code == "all" else [target]
+        node = table.nodes.get(name)
+        every = node.codes(table.codes) if node else table.codes
+        keys = [nodes.key(name, c) for c in every] if code == "all" else [target]
         unknown = [k for k in keys if k not in table.edges]
         if unknown or not name:
             known = ", ".join(table.nodes)

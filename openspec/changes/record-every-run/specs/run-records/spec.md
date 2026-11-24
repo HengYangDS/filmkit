@@ -118,6 +118,15 @@ The engine SHALL derive each edge from the paths and order the nodes with `graph
 - **WHEN** a table holds two nodes that write one path with no declaration of how
 - **THEN** loading the table refuses, naming the path and both nodes
 
+### Requirement: A node applies to the editions it declares
+
+A node SHALL state the editions it applies to, every edition by default, and the plan and `filmkit verify` SHALL neither list nor wait on a node of an edition it does not apply to.
+
+#### Scenario: The renderer is qualified once a build
+
+- **WHEN** a film's chain qualifies the renderer for its first declared edition alone
+- **THEN** the table holds no `qualify-renderer` of any other edition, and a plan of that build states every node fresh
+
 ### Requirement: A file several runs write is bound by its latest declared writer, in order
 
 The latest standing record of a declared writer SHALL bind a path's current bytes. An earlier writer's binding, and the binding of a reader that a rewriter follows, SHALL hold only through a later run of a writer declared after it, which for a rewrite read the bytes so bound, or of a peer that replaces the file, where that later run's binding holds in turn. A run of a writer SHALL make every writer declared after it stale until it runs again, whatever the bytes.

@@ -2,12 +2,15 @@
 from its run records as decisions 5 and 6 of record-every-run say, and nothing written."""
 
 import os
+from dataclasses import replace
 
 import pytest
+import stand_ins
 from stand_ins import CODES, chain, ran, selecting
 
+import filmkit.durations as durations
 import filmkit.repository as repository
-from filmkit.graph import nodes, plan
+from filmkit.graph import nodes, plan, records, runs, verify
 
 
 def judged(table, *targets, full=False):
@@ -179,3 +182,28 @@ def test_the_plan_writes_nothing(stand_in_table):
     judged(stand_in_table)
     judged(stand_in_table, full=True)
     assert listing() == before
+
+
+def test_a_node_of_one_edition_is_asked_of_that_edition_alone(stand_in_table, monkeypatch):
+    # A node that the film runs once a build, for its first declared edition, as the renderer's
+    # qualification: neither the plan nor verify asks for it in the other edition.
+    qualify = replace(
+        stand_ins.stand_in("qualify", {"stage": "{code}/stage.txt"}, {"q": "{code}/q.json"}),
+        editions=lambda codes: codes[:1],
+    )
+    table = nodes.load((*stand_ins.TABLE, qualify), stand_ins.SHARED, CODES)
+    monkeypatch.setattr(runs, "table", lambda: {n.name: n for n in (*stand_ins.TABLE, qualify)})
+    assert nodes.key("qualify", "en") not in table.edges
+    for code in CODES:
+        ran("stage", code)
+    with durations.run("zh", "qualify"):
+        (repository.ROOT / "zh/q.json").write_text("qualified")
+    # A run of it for another edition writes its duration record and no run record.
+    with durations.run("en", "qualify"):
+        pass
+    assert not records.place("qualify", "en").exists()
+    _, found = judged(table, "qualify:all", "stage:all")
+    assert list(found) == ["stage:zh", "stage:en", "qualify:zh"]
+    assert {entry.state for entry in found.values()} == {"fresh"}
+    lines = verify.verify(table).listed
+    assert not any("qualify:en" in line for line in lines), lines

@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING
 
 import filmkit.repository as repository
 from filmkit.graph import chain, host, nodes, opens, records
-from filmkit.production import Edition
+from filmkit.production import CODES, Edition
 
 if TYPE_CHECKING:
     from filmkit.durations import Run
@@ -159,10 +159,11 @@ def unwritten(label: str, error: Exception) -> None:
 def open_node(
     code: str | None, command: str, run: Run, *, whole: bool = True, way: str | None = None
 ) -> NodeRun | None:
-    """The run of the node a command names, opened; None for a command that names none, and for
-    one whose opening failed, which is named (`unwritten`)."""
+    """The run of the node a command names, opened; None for a command that names none or an
+    edition the node does not apply to, which writes its duration record alone, and for one
+    whose opening failed, which is named (`unwritten`)."""
     node = table().get(command)
-    if code is None or node is None:
+    if code is None or node is None or code not in node.codes(CODES):
         return None
     try:
         return NodeRun(node, code, run, whole=whole, way=way)
