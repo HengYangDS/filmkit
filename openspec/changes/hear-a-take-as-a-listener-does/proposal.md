@@ -79,11 +79,16 @@ None.
 
 ## Impact
 
-- **Base:** release 0.31.0 (`v0.31.0`).
+- **Base:** release 0.32.0 (`v0.32.0`), onto which the series drafted and built on 0.31.0 was carried; of the files
+  the design cites, 0.32.0 changed only `preflight.py` and `film.py`.
 - **Engine:** `languages/__init__.py`, `languages/en.toml`, `languages/zh.toml`; `narration/recognition.py`,
-  `narration/judgment.py`, `narration/judge.py`, `narration/converge.py`, `narration/audition.py`,
-  `narration/selection.py`; a new `narration/cmudict.py`; `preflight.py`; `supply.py`; `film.py`; their tests, with
-  new `tests/narration/test_cmudict.py`, `tests/narration/test_units_line.py` and `tests/test_film_hearings.py`, and a
+  `narration/pronunciation.py`, `narration/judgment.py`, `narration/judge.py`, `narration/converge.py`,
+  `narration/fitting.py`, `narration/audition.py`, `narration/selection.py`; new `narration/cmudict.py` and
+  `narration/hearings.py`; `preflight.py`; `supply.py`; `film.py`; the node table, `graph/chain.py`, where
+  preflight's node declares the selection its run now reads; the sample's supply task in `.config/mise/config.toml`;
+  their tests, with new `tests/narration/test_cmudict.py`, `tests/narration/test_units_line.py`,
+  `tests/test_film_hearings.py` and `tests/test_preflight_hearings.py`, the fixture dictionary in `tests/pronounced.py`
+  (new) and the narration fixtures of `tests/narration/conftest.py`, a case in `tests/graph/test_opens.py`, and a
   host marker in `tests/conftest.py`; the README, `NOTICE` and the Changelog. No package is added, so `uv.lock`,
   `package-lock.json` and `released.json` keep their bytes.
 - **Supply:** one more download at the supply step, 3,618,488 bytes from `raw.githubusercontent.com`, under CMUdict's
@@ -97,8 +102,10 @@ None.
   decisions (D-46; the films session under his delegation); the English rule is his choice of option 1 (D-49).
 - **A film that adopts:** runs the supply step once more; changes no source; may add `[[narration.heard]]` records.
   Its takes, their requests and their fingerprints are unchanged, so nothing is narrated again for this Change.
-- **Release:** a minor release of its own, the next after 0.31.0, before the fused film narrates its next round; not
-  the derivation's R4, which waits for R2a and R2b (design decision 8).
+  On 0.32.0 each batch of records makes `check-picture`, `check-sound` and `preflight` run again before a render,
+  since the gate records bind the declaration whole (design decision 5).
+- **Release:** a minor release of its own, the next after 0.32.0, before the fused film narrates its next round; not
+  the derivation's R4, which waits for R2b (design decision 8).
 - **Drafts:** none of the open drafts is edited.
 
 Owner: the engine's maintainer.
@@ -109,5 +116,5 @@ Numbered as in the design.
 
 - **[S1]** `build/evidence/owner-words.md` in the engine's repository, items D-44, D-46 and D-49.
 - **[S2]** `build/evidence/engine-derivation/derivation-2026-11-23.md` in the engine's repository: §8 finding 1.
-- **[S3]** The engine at `v0.31.0`, the files and lines that the design cites.
+- **[S3]** The engine at `v0.31.0`, the files and lines that the design cites, read again at `v0.32.0`.
 - **[S7]** The fused film's trial: the judgments of the three trial copies, the retake plan and the owner's ear check.

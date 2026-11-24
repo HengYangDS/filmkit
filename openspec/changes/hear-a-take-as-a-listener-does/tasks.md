@@ -15,7 +15,8 @@ input that remains.
       helper that derives `xa` and `xb`; the golden request test; whether the sample's local acceptance judges any
       take; and the effective lines of each test file named below. Done when
       `build/evidence/hear-a-take-as-a-listener-does/research.md` names the base commit and each site, caller and
-      answer with its file and line, and the file each case goes to.
+      answer with its file and line, and the file each case goes to. Read again on `v0.32.0` when the series was
+      carried onto it (the design's Context).
 - [x] 1.2 Record the SHA-256 of `tests/narration/golden/sample-requests.json` and
       `tests/narration/golden/receipts.json` at the base. Done when `research.md` holds both.
 
@@ -75,8 +76,9 @@ Shown by `tests/test_languages.py`, `tests/narration/test_cmudict.py`, `tests/te
 ## 3. The owner's hearing, and the thoughts for the ear
 
 Shown by `tests/test_film_hearings.py`, `tests/narration/test_units_line.py`, `tests/narration/test_selection.py`,
-`tests/narration/test_converge.py`, `tests/narration/test_audition.py`, `tests/test_preflight.py` and
-`tests/soundtrack/test_sound_gates.py`. Tasks 3.4 to 3.7 carry design decision 6.
+`tests/narration/test_converge.py`, `tests/narration/test_audition.py`, `tests/test_preflight.py`,
+`tests/test_preflight_hearings.py`, `tests/graph/test_opens.py` and `tests/soundtrack/test_sound_gates.py`. Tasks 3.4
+to 3.7 carry design decision 6.
 
 - [x] 3.1 Add `Narration.heard` to `film.py`: records of `edition`, `thought`, `take`, `lines` (one or both of
       `units` and `clarity`), `listener`, `date` and `note`, refusing an edition the film does not declare, a take that
@@ -108,10 +110,13 @@ Shown by `tests/test_film_hearings.py`, `tests/narration/test_units_line.py`, `t
       qualifies a take by the judgment's lines" over stub takes, loading no model; and passes.
 - [x] 3.7 Let `preflight.clarity` refuse nothing for a thought whose selected take the owner's hearing settles for its
       clarity, and name each thought it refuses for its clarity for the ear with its selected take's audio SHA-256;
-      leave `check-sound` reading no record. Done when `tests/test_preflight.py` holds every scenario of the
-      requirements "Preflight takes the owner's hearing of the selected take" and "A film declares the line a single
-      thought's clarity is judged against", and `tests/soundtrack/test_sound_gates.py` holds every scenario of "The
-      sound gate refuses the lines reviewers hold"; and both pass.
+      leave `check-sound` reading no record; and let preflight's node in the table (`graph/chain.py`) declare the
+      selection its run reads. Done when `tests/test_preflight_hearings.py` holds every scenario of the requirement
+      "Preflight takes the owner's hearing of the selected take" and `tests/test_preflight.py` every scenario of "A
+      film declares the line a single thought's clarity is judged against", `tests/soundtrack/test_sound_gates.py`
+      holds every scenario of "The sound gate refuses the lines reviewers hold", and `tests/graph/test_opens.py` holds
+      a read of the selection and the assembly record by `preflight.selected_takes`, in a child of preflight's run,
+      clean under the check of what each run opens; and all pass.
 
 ## 4. No request changes
 

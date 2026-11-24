@@ -34,6 +34,17 @@ What the Change rests on in the engine at `v0.31.0` [S3]:
 - Every film declares `author` as the owner: the three released films' scripts and the fused trial's (read on 24
   November); from 0.31.0 the declaration states it once (`content/film.toml`).
 
+Carried onto 0.32.0 (`v0.32.0`, the derivation's R2a, `record-every-run`) [S3]: of the files cited above, 0.32.0
+changed only `preflight.py`, whose `clarity` now stands at lines 215-256, and `film.py`; the other lines cited hold
+the same code. 0.32.0 records each run of a node of an edition's build chain and states, in a node table
+(`graph/chain.py`), what each node's run reads and writes, held to the reads by a check of what each run opens
+(`graph/opens.py`). Of this Change's new reads by a node, one needed a declaration: preflight's of the selection
+(decision 5). `select` and preflight read the records of hearing in the declaration, which every node binds whole,
+and preflight reads the assembly record, which its node already declared. The dictionary is read only by `judge`,
+`converge` and `audition`, which are no nodes, from below `build/runtime/`, which the check lets through as work.
+0.32.0's picture and sound gate records also bind the declaration whole, so a record of hearing costs runs of the
+gates (decision 5).
+
 The trial [S7]: over three copies of the fused film's English edition eight takes failed the units line, three on a
 spelling of the same sound (13.2 "labeled"; 28.3 and 29.3 "tears"); the owner heard five refused takes correct (D-44)
 and chose the ear for a single thought under 18 dB (D-46) [S1].
@@ -156,8 +167,17 @@ Decision 1 weighs these; the counts are `probe-6.json` and `probe-7.json` [S6].
      Change may widen it if he asks. The selection refuses a record whose take is not its thought's selected take,
      which also refuses a record of a thought the script does not hold. A record that a line no longer needs is said
      so and refused by nothing.
-   - **Applies to:** `film.py`, `narration/judgment.py`, `narration/selection.py`, `preflight.py`.
-   - **Reopened when:** the owner names another listener, or R3 or R4 lands.
+   - **Applies to:** `film.py`, `narration/judgment.py`, `narration/selection.py`, `preflight.py`; and the node
+     table, `graph/chain.py`, where preflight's node declares the selection, beside the gate records it judges, since
+     its run now reads it to find each thought's selected take; the readiness receipt keeps its ten digests.
+   - **Cost on 0.32.0:** the picture and sound gate records bind the declaration whole (`bound_inputs` in
+     `picture/gates.py` and `soundtrack/gates.py`), so each batch of records makes `check-picture` (heavy),
+     `check-sound` and `preflight` run again before a render, where on 0.31.0 only `preflight` ran again;
+     `filmkit plan` also reports every node stale, as after any edit of the declaration, though no command of 0.32.0
+     refuses on that. The Change's owner accepts that cost for this release. R2b-1 (`build-a-film-by-its-verbs`,
+     drafted and reviewed) removes it by binding only the tables of the declaration that a node reads.
+   - **Reopened when:** the owner names another listener, or R3 or R4 lands; or, before R2b-1 lands, the gates' runs
+     for a batch of records cost more than the owner accepts.
 6. **A thought under its clarity line goes to the owner's ear; the soundtrack and segments stay hard lines.**
    - **Rests on:** D-46 [S1]; the trial, where the three candidates of English 13.5 stayed at 17.4 to 17.7 dB under
      its 18.0 dB line [S7].
@@ -182,12 +202,13 @@ Decision 1 weighs these; the counts are `probe-6.json` and `probe-7.json` [S6].
    - **Reopened when:** a request comes to bind the film's or a language's declaration.
 8. **A release of its own before the fused film narrates again; one Change for its three parts.**
    - **Rests on:** the derivation, which puts the finding in R4 or in a Change of its own before the fused film
-     narrates [S2, §8]; R4 waits for R2b and R2a [S2, §5.7]; the trial waits on these takes.
+     narrates [S2, §8]; R4 waits for R2b, R2a having been released as 0.32.0 [S2, §5.7]; the trial waits on these
+     takes.
    - **Considered:** R4; a Change for each part.
    - **Chosen because:** nothing here depends on the lock; the three parts meet in the take's judgment and in one
      record, and separate Changes would give the record one line now and another later. Groups 2 and 3 of the tasks
      do not depend on each other, so either part can be cut before it is built.
-   - **Applies to:** the release after 0.31.0.
+   - **Applies to:** the release after 0.32.0.
    - **Reopened when:** the owner withholds a part.
 
 ## Risks / Trade-offs
@@ -212,7 +233,9 @@ Decision 1 weighs these; the counts are `probe-6.json` and `probe-7.json` [S6].
    28.3 once he has heard it; 28.4 also fails its phrase line and goes to candidates, so its record is written only
    if no candidate is bound, for the take then bound, after he hears it.
 4. The owner hears the seven; each take he hears clear gets `lines = ["clarity"]`, each he rejects goes to `audition`.
-5. `ethos-film` adopts the release with its December edition; it needs no record.
+5. The hearings of a round are recorded together, then `check-picture`, `check-sound` and `preflight` run once
+   before the next render, since on 0.32.0 each edit of the declaration makes the gate records stale (decision 5).
+6. `ethos-film` adopts the release with its December edition; it needs no record.
 
 Rollback: a film that wrote no record is judged by the previous release as before; one that did removes its records,
 which the previous release refuses as an unknown key.
@@ -229,7 +252,8 @@ Read or measured on 24 November 2026, read only.
 - **[S1]** `build/evidence/owner-words.md` in the engine's repository: D-44 (12:37 CST), D-46 (13:03 CST) and D-49
   (14:44 CST).
 - **[S2]** `build/evidence/engine-derivation/derivation-2026-11-23.md` in the engine's repository: §8 finding 1, §5.7.
-- **[S3]** The engine at `v0.31.0`: the files and lines cited, and `openspec/specs/`.
+- **[S3]** The engine at `v0.31.0`: the files and lines cited, and `openspec/specs/`; read again at `v0.32.0`, whose
+  `openspec/specs/` leaves the four capabilities this Change modifies as they were.
 - **[S4]** CMUdict, https://github.com/cmusphinx/cmudict, its commits and `LICENSE` at
   `74790861f652b15e4ac49015a90074ad62a27690`; PyPI's JSON for `cmudict`, `pronouncing`, `g2p-en`, `nltk` and
   `breame`; `python-cmudict`'s submodule and `LICENSE` at its tag `v1.1.3`.
