@@ -19,6 +19,7 @@ from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 import filmkit.withdrawn as withdrawn
+from filmkit.repository import ARTIFACTS, EVIDENCE
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -28,11 +29,12 @@ WITHDRAWN_FIELDS = {"other": "{others}", "other_language": "{others}"}
 
 
 def _fields(line: str) -> set[str]:
-    """The fields a line of a str.format template cites; none for a line that is no template."""
-    try:
-        return {name for _, name, _, _ in string.Formatter().parse(line) if name}
-    except ValueError:
-        return set()
+    """The fields a line of a str.format template cites.
+
+    Raises:
+        ValueError: the line is no str.format template.
+    """
+    return {name for _, name, _, _ in string.Formatter().parse(line) if name}
 
 
 def prompt_problems(root: Path, declared: dict) -> list[str]:
@@ -50,26 +52,44 @@ def prompt_problems(root: Path, declared: dict) -> list[str]:
         text = (root / prompt).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return []
+    from filmkit.places import CAST, SCRIPT, places
+
     codes = "|".join(re.escape(code) for code in editions)
-    places = [f"build/artifacts/film/{code}/" for code in editions]
-    places += [f"build/evidence/editions/{code}/" for code in editions]
-    places += [f"content/{code}/" for code in editions]
-    places += [
-        f"{table['sources']}/{name}"
-        for table in editions.values()
-        if isinstance(table, dict) and isinstance(table.get("sources"), str)
-        for name in ("film-script.json", "voice-reference.json")
+    slug = str(declared.get("slug"))
+    folders = [places(code, slug).folder for code in editions]
+    # Each edition's folders, and where its files stood: the folder the withdrawn `sources`
+    # still names and the one above the editions' folders.
+    named = [f"{folder}/" for folder in folders]
+    named += [
+        f"{root_folder.as_posix()}/{code}/"
+        for root_folder in (ARTIFACTS, EVIDENCE)
+        for code in editions
+    ]
+    former = {table.get("sources") for table in editions.values() if isinstance(table, dict)}
+    former |= {PurePosixPath(folder).parent.as_posix() for folder in folders}
+    named += [
+        f"{folder}/{name}"
+        for folder in sorted(f for f in former if isinstance(f, str))
+        for name in (SCRIPT, CAST, NARRATION_COPY)
     ]
     grouped = re.compile(rf"\{{\{{?\s*(?:{codes})(?:\s*,\s*(?:{codes}))+\s*\}}\}}?")
     found = []
     for number, line in enumerate(text.splitlines(), 1):
         where = f"{prompt}:{number}"
+        try:
+            cited = _fields(line)
+        except ValueError as error:
+            found.append(
+                f"{where} is no str.format template ({error}); write each brace that is no field "
+                "twice"
+            )
+            continue
         found += [
             f"{where} cites {{{field}}}, which the engine no longer fills; name every other edition"
             f" by {WITHDRAWN_FIELDS[field]}"
-            for field in sorted(_fields(line) & set(WITHDRAWN_FIELDS))
+            for field in sorted(cited & set(WITHDRAWN_FIELDS))
         ]
-        if any(place in line for place in places):
+        if any(place in line for place in named):
             found.append(
                 f"{where} names an edition's files by their path; name every edition's files by "
                 "{editions}"

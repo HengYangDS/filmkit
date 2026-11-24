@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from filmkit.places import places
-from filmkit.repository import DECLARATION
+from filmkit.repository import DECLARATION, EVIDENCE
 
 
 class Withdrawn(NamedTuple):
@@ -82,7 +82,7 @@ WITHDRAWN = (
         "cast",
         "performance_recording",
         "remove it: the edition's narration receipt and alignment stand in "
-        "build/evidence/editions/<code>/ear-first/, where the narration writes them",
+        f"{EVIDENCE.as_posix()}/<code>/ear-first/, where the narration writes them",
     ),
     Withdrawn(
         "cast",

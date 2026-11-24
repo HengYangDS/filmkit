@@ -557,3 +557,20 @@ def test_an_unreadable_cast_is_named(declared):
     (declared / "content/en" / film.CAST).write_text("{")
     (problem,) = film.problems(declared)
     assert problem.startswith("content/en/voice-reference.json cannot be read: ")
+
+
+def test_a_prompt_that_names_a_former_place_or_is_no_template_is_refused(declared):
+    # Once a film removes `sources`, a line that names where the Chinese files stood is still
+    # named; a line that is no str.format template is named, not passed over.
+    prompt = declared / film.FILM.review.prompt
+    lines = prompt.read_text(encoding="utf-8").splitlines()
+    end = len(lines)
+    added = ["Read ROOT/content/film-script.json first.", "Compare {other} with { the rest."]
+    prompt.write_text("\n".join([*lines, *added]) + "\n", encoding="utf-8")
+    name = film.FILM.review.prompt
+    assert film.problems(declared) == [
+        f"{name}:{end + 1} names an edition's files by their path; name every edition's files by "
+        "{editions}",
+        f"{name}:{end + 2} is no str.format template (expected '}}' before end of string); "
+        "write each brace that is no field twice",
+    ]
