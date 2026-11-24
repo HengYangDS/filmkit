@@ -397,7 +397,8 @@ def check(log: Path, table=None) -> Report:
     from filmkit.graph import chain
 
     table = table or chain.table()
-    report, judged = Report(), {}
+    # The files the engine reads at start-up, read once a check, at its first start-up read.
+    report, judged, loaded = Report(), {}, None
     found = accesses(log)
     renamed = {(a.pid, a.path) for a in found if a.kind == "source"}
     wrote = {(a.pid, a.path) for a in found if a.kind == "write"}
@@ -425,7 +426,9 @@ def check(log: Path, table=None) -> Report:
             reason = f"aside: {chain.ASIDE[judging.node.name][0]}"
             report.exempted.setdefault(reason, set()).add(access.node)
             continue
-        started = kind == "load" and path in starting()
+        if kind == "load" and loaded is None:
+            loaded = starting()
+        started = kind == "load" and path in loaded
         reason = "start-up" if started else exemption(path, kind, judging, log)
         if reason == "outside":
             continue
