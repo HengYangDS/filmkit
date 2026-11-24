@@ -7,6 +7,7 @@ import derived_languages
 import pytest
 
 import filmkit.languages as languages
+import filmkit.picture.label_matches as label_matches
 import filmkit.picture.sync_audit as picture_sync_audit
 from filmkit.picture.rendering import PictureError
 
@@ -416,3 +417,12 @@ def test_a_label_is_stemmed_by_the_language_it_is_written_in(test_languages, mon
         assert judged == [] and [row["label"] for row in report["far_from_words"]] == [
             "Availability"
         ]
+
+
+def test_a_stemmer_kind_the_engine_does_not_hold_is_refused_not_passed_over(monkeypatch):
+    # A kind the declarations admit and the matcher does not hold matches no label exactly in
+    # silence: it is refused, naming the kind.
+    monkeypatch.setattr(label_matches, "STEMMERS", {})
+    with pytest.raises(ValueError, match="holds no stemmer snowball-english"):
+        label_matches.stemmer("records", "en")
+    assert label_matches.stemmer("记录", "zh") is None

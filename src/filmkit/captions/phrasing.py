@@ -53,6 +53,9 @@ def caption_terms(code: str) -> tuple[str, ...]:
 def segment_caption_phrases(segment: dict, code: str) -> list[str]:
     """Keep authored cue boundaries and preserve the complete spoken copy of an edition."""
     captions = languages.language(code).captions
+    if captions.phrasing not in PHRASINGS:
+        msg = f"The engine holds no caption phrasing {captions.phrasing}, which {code} declares"
+        raise CaptionError(msg)
     phrase, sentences = PHRASINGS[captions.phrasing]
     limit = captions.limit
     phrases = segment.get("caption_phrases") or phrase(segment["text"], limit, caption_terms(code))

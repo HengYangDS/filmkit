@@ -108,12 +108,21 @@ def thought_words(segment: dict) -> list[tuple[int, int]]:
 
 def stemmer(label: str, code: str):
     """The stemmer of the language a label of an edition is written in, or None where that
-    language declares none or the label is in no language the edition reads."""
+    language declares none or the label is in no language the edition reads.
+
+    Raises:
+        ValueError: the language declares a stemmer the matcher does not hold, which would
+            otherwise match its labels exactly and say nothing.
+    """
     if not any(ch.isalpha() for ch in label):
         return None
     language = languages.written_in(label, code)
-    kind = None if language is None else STEMMERS.get(language.stemmer)
-    return None if kind is None else snowballstemmer.stemmer(kind)
+    if language is None or language.stemmer == "none":
+        return None
+    if language.stemmer not in STEMMERS:
+        msg = f"The label matcher holds no stemmer {language.stemmer}, which {code} declares"
+        raise ValueError(msg)
+    return snowballstemmer.stemmer(STEMMERS[language.stemmer])
 
 
 def stems(text: str, stemming) -> list[str]:

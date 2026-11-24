@@ -9,6 +9,7 @@ import filmkit.captions.full_width_punctuation as full_width
 import filmkit.captions.phrasing as captions_phrasing
 import filmkit.languages as languages
 import filmkit.repository as repository
+from filmkit.captions import CaptionError
 
 # The fixed terms of the English script that the phrasing cases below come from, as that
 # film declares them for its English edition.
@@ -580,3 +581,9 @@ def test_a_test_language_is_phrased_by_its_declared_kind():
         captions_phrasing.segment_caption_phrases(english, "en")
     )
     assert captions_phrasing.caption_terms("xb") == ()
+
+
+def test_a_phrasing_kind_the_engine_does_not_hold_is_refused_by_name(monkeypatch):
+    monkeypatch.setattr(captions_phrasing, "PHRASINGS", {})
+    with pytest.raises(CaptionError, match="holds no caption phrasing english-grammar"):
+        captions_phrasing.segment_caption_phrases({"text": "One thought."}, "en")
