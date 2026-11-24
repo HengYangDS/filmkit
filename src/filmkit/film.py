@@ -400,8 +400,6 @@ class Review(Declared):
 
 # The longest heard pause a word boundary without a mark may hold, in seconds.
 PauseLimit = Annotated[float, Field(gt=0, le=2)]
-# A declared word or reason: text that holds more than whitespace.
-FlowText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 # A Latin-script word, which may hold an apostrophe, a period or a hyphen inside.
 LatinWord = Annotated[
     str, StringConstraints(pattern=r"^[A-Za-z][A-Za-z0-9]*(?:['’.-][A-Za-z0-9]+)*$")
@@ -417,9 +415,9 @@ class FlowException(Declared):
 
     edition: Code
     thought: ThoughtName
-    left: FlowText
-    right: FlowText
-    reason: FlowText
+    left: Stated
+    right: Stated
+    reason: Stated
 
 
 class Flow(Declared):
@@ -472,7 +470,7 @@ class NarrationTerm(Declared):
 
     term: LatinWord
     spoken: LatinWord
-    ipa: FlowText
+    ipa: Stated
     reference: dict[Code, TermReference] = Field(default_factory=dict)
 
 
