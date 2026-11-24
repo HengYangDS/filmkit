@@ -16,7 +16,7 @@ input that remains.
       take; and the effective lines of each test file named below. Done when
       `build/evidence/hear-a-take-as-a-listener-does/research.md` names the base commit and each site, caller and
       answer with its file and line, and the file each case goes to.
-- [ ] 1.2 Record the SHA-256 of `tests/narration/golden/sample-requests.json` and
+- [x] 1.2 Record the SHA-256 of `tests/narration/golden/sample-requests.json` and
       `tests/narration/golden/receipts.json` at the base. Done when `research.md` holds both.
 
 ## 2. English words heard by their pronunciation
