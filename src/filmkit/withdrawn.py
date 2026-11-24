@@ -16,8 +16,9 @@ from filmkit.repository import DECLARATION
 
 class Withdrawn(NamedTuple):
     """A key a film may no longer declare: the kind of place that held it (`declaration`, an
-    `edition`'s table there or its `review` table, its `script`, a `segment` of it, its `cast` or
-    its pronunciation `part`), the key, and what to do instead."""
+    `edition`'s table there or its `review` table, its `script`, a script's `performance` table
+    `voice_performance`, a `segment` of it, its `cast` or its pronunciation `part`), the key, and
+    what to do instead."""
 
     kind: str
     key: str
@@ -55,6 +56,16 @@ WITHDRAWN = (
         for key in ("chapter_index", "chapter_title")
     ),
     Withdrawn("segment", "language", BY_CODE),
+    *(
+        Withdrawn(
+            "performance",
+            key,
+            "remove it: no step reads it; move any words that record how the voice, its "
+            "reference or its takes were made or approved into the edition's cast derivation, "
+            "each under its own key",
+        )
+        for key in ("performance_intent", "energy_curve", "pacing_profile", "provider_notes")
+    ),
     Withdrawn(
         "cast",
         "runtime_fit",

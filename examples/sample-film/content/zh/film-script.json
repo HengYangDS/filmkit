@@ -38,10 +38,7 @@
     "purpose": "Show a first-time viewer, in spoken Chinese, how a narrated film is rebuilt from its tracked sources: complete thoughts, the stages in the order they run, and nothing the cited source does not state."
   },
   "voice_performance": {
-    "performance_intent": "The DDWG narrator's reference, as ddwg-film selected it; clear, lively connected explanation; firm sentence endings; no theatrical delivery.",
-    "energy_curve": "Curious opening, purposeful explanatory body, firmer decisions, settled coda.",
     "assembly_mode": "native-speech-designed-pauses",
-    "pacing_profile": "Ear-first copy spoken at the voice's native rate from the clear reference derived from the unmodified identity root. Speech is never time-stretched or pitch-shifted. No native pause inside a thought outlasts the declared inner cap, and each one lasts at least the floor of its punctuation, so a sentence end inside a thought is heard as a longer break than a clause mark and a clause mark as a longer one than a comma; a long run of speech takes a breath at the comma nearest its middle. Designed quiet separates complete thoughts and paragraphs, longer after longer ones, each thought boundary outlasts the longest pause inside its thought by at least a fifth, and the coda settles on its own longer pause after every thought; the fraction of a second that rounds the runtime up opens the picture between paragraphs and chapters within declared bounds, and the credits take what the gaps cannot.",
     "designed_pauses": {
       "thought": 0.7,
       "question": 0.8,
@@ -73,9 +70,6 @@
       "chapter": 4.0
     },
     "tail_guard_seconds": 0.3,
-    "provider_notes": {
-      "native": "Identity-root ICL reference and fixed seed; natural punctuation only; no instruction tokens, pitch or tempo transform, or music."
-    },
     "coda_thought_pause_seconds": 0.8,
     "inner_pause_cap_seconds": 0.33,
     "inner_pause_floors_seconds": {

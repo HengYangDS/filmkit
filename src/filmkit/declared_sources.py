@@ -122,7 +122,8 @@ def _held(where: str, value: object, kind: str) -> list[str]:
 
 def withdrawn_problems(root: Path, declared: dict, withdraw: bool = False) -> list[str]:
     """Each key of the one table of withdrawn keys (`filmkit.withdrawn`) that the declaration,
-    its review table, an edition's table, script, segments, cast or pronunciation part declares,
+    its review table, an edition's table, script, its voice performance, segments, cast or
+    pronunciation part declares,
     each in one line with what to do instead. An edition's files are read in the folder its
     declaration still names, and in the folder its code derives where it names none
     (`filmkit.film.places`), so a film that has not moved them and one that has are read alike.
@@ -140,6 +141,8 @@ def withdrawn_problems(root: Path, declared: dict, withdraw: bool = False) -> li
         folder = sources if isinstance(sources, str) else derived.folder
         script = _json(root / folder / SCRIPT)
         found += _held(f"{folder}/{SCRIPT}", script, "script")
+        performance = script.get("voice_performance") if isinstance(script, dict) else None
+        found += _held(f"{folder}/{SCRIPT} voice_performance", performance, "performance")
         segments = script.get("segments") if isinstance(script, dict) else None
         for segment in segments if isinstance(segments, list) else ():
             named = segment.get("id") if isinstance(segment, dict) else None

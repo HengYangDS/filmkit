@@ -404,3 +404,18 @@ def test_each_sample_cast_keeps_its_scope_in_its_derivation():
         cast = repository.read(production.Edition(code).cast)
         assert cast["derivation"]["scope"].startswith("The DDWG narrator's reference recording")
         assert not {"model", "revision", "reference_mode", "scope"} & set(cast)
+
+
+@pytest.mark.parametrize(
+    "key", ["performance_intent", "energy_curve", "pacing_profile", "provider_notes"]
+)
+def test_the_pause_policys_prose_is_refused_with_where_its_records_go(declared, key):
+    path = declared / "content/en" / film.SCRIPT
+    script = json.loads(path.read_text())
+    script["voice_performance"][key] = "Words."
+    path.write_text(json.dumps(script, ensure_ascii=False))
+    assert film.problems(declared) == [
+        f"content/en/film-script.json voice_performance declares {key}; remove it: no step reads "
+        "it; move any words that record how the voice, its reference or its takes were made or "
+        "approved into the edition's cast derivation, each under its own key"
+    ]
