@@ -4,6 +4,21 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- English words are heard by their pronunciation (OpenSpec Change `hear-a-take-as-a-listener-does`): a language declares `latin_heard`, English `cmudict-pronunciations` and Chinese `letters`; in an English edition a transcript's word in other letters passes the units line where its first pronunciation in the pinned CMUdict is one of the text word's readings (those the pronunciation declares, else CMUdict's first, secondary stress read as none), and a word declared by its letter names is compared by its letters.
+- The supply step downloads the pinned CMUdict (`cmudict.dict` at commit `74790861`, 3,618,488 bytes, its SHA-256 checked before it is moved to `build/runtime/tool-cache/cmudict/`); a judgment of an English edition reads only that file and names it in its record, with the pronunciation's SHA-256.
+- `[[narration.heard]]`: the owner's hearing of one take, by its audio's SHA-256, settles the lines it names (`units`, `clarity`) for that take alone; the listener must be the film's `author`.
+- A thought whose take reads under its clarity line, heard by no one, is for the owner's ear: `judge` and `converge` name it with its take's path and SHA-256 and exit 1 while it waits, it gets no candidate, `audition` proposes a take above its line first, and preflight passes a thought whose selected take the owner heard clear.
+
+### Changed
+
+- A film that adopts this release runs `python -m filmkit.supply` once more, which places the dictionary; a judgment, convergence or audition of an English edition refuses without it, in one line that names the supply step. It changes no source: every take's request and fingerprint stay as they were, so nothing is narrated again.
+- A film records the owner's hearings of the takes he settled as `[[narration.heard]]`, each bound to its take's audio SHA-256; a record whose take is not its thought's selected take is refused by `produce select`.
+- A single thought under its clarity line is no longer refused or retaken: the owner hears each thought named for the ear, and each take he hears clear gets a record with `lines = ["clarity"]`; one he rejects goes to `audition`. `check-sound` still refuses a soundtrack or a segment under the floor, whatever was heard.
+- The run record of `preflight` binds the edition's selected narration (`narration-selected.json`), whose takes the owner's hearings name, as its run reads it: the record's bytes change once, and a new selection leaves the pre-render check stale. The readiness receipt binds the ten inputs it bound before.
+- A record of hearing is an edit of `content/film.toml`, which the picture and sound gate records bind whole since 0.32.0: each batch of records makes `check-picture` (heavy), `check-sound` and `preflight` run again before a render, so a film records a round's hearings together. The drafted Change `build-a-film-by-its-verbs` (R2b-1) removes this by binding only the tables of the declaration that a node reads.
+
 ## [0.32.0] - 2026-11-24
 
 ### Added

@@ -45,6 +45,11 @@ own licenses, which the licenses above do not cover:
 - snowballstemmer 3.1.1, the Snowball stemmers in pure Python, which the sync audit loads,
   Copyright (c) 2001 Dr Martin Porter, (c) 2004, 2005 Richard Boulton, (c) 2013 Yoshiki
   Shibukawa and (c) 2006-2025 Olly Betts, under the BSD 3-Clause License;
+- CMUdict, the Carnegie Mellon University Pronouncing Dictionary, `cmudict.dict` at commit
+  74790861f652b15e4ac49015a90074ad62a27690 of https://github.com/cmusphinx/cmudict, which
+  the supply step downloads and a judgment of an English edition reads, Copyright (C)
+  1993-2015 Carnegie Mellon University, under its two-clause BSD license; the engine does
+  not redistribute it;
 - the speech models that the supply step downloads, each under the Apache License 2.0:
   mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16 at revision a6eb4f68,
   mlx-community/Qwen3-ASR-0.6B-bf16 at revision eae2b51f and

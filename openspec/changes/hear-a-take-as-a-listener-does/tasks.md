@@ -126,7 +126,7 @@ Shown by `tests/narration/test_synthesis.py`.
 
 ## 5. The documents
 
-- [ ] 5.1 Document in the README the supply step's download (file, source, size and licence); the units line's
+- [x] 5.1 Document in the README the supply step's download (file, source, size and licence); the units line's
       comparison by pronunciation, with what it lets through (design decision 1, in short), and `latin_heard`;
       `[[narration.heard]]`, with its fields, its listener, what it passes and what refuses it; and the thoughts for
       the ear in `judge`, `converge`, `audition` and preflight. Add to `NOTICE` CMUdict as the supply step downloads
