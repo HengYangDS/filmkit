@@ -173,7 +173,7 @@ Built in the engine on R1's head, released as 0.32.0. A film that adopts it chan
 
 ## Open Questions
 
-- Whether a node that encodes is stale when the host's FFmpeg or ExifTool version changes. They are Homebrew's, not pinned by the engine (AGENTS.md, Host Tools), and no record binds their versions today; R2a records none, and R2b's Change answers it.
+- Whether a node that encodes is stale when the host's FFmpeg or ExifTool version changes. They are Homebrew's, not pinned by the engine (AGENTS.md, Host Tools), and no record binds their versions today; R2a records none, and R2b's Change answers it. It is no longer hypothetical: Homebrew upgraded FFmpeg to 9.1 at 11:53 on 24 November 2026, between R1's acceptance build and R2a's, and the films' audio packets differed from a byte-equal soundtrack while every encoding node stayed fresh (the independent review of that day, fact 1, and finding S9). The release note says so.
 
 ## Sources
 
