@@ -145,14 +145,15 @@ def staged_picture(edition: Edition, captions: bool = True) -> Places:
 
 
 def derived_uncaptioned(edition: Edition) -> bool:
-    """Whether the edition's uncaptioned picture, as its receipt stands, was derived. A receipt
-    that is missing or cannot be read is no derived picture's, as `uncaptioned_way` takes one, so
-    that the table loads and the owner's own check refuses the receipt."""
+    """Whether the edition's uncaptioned picture, as its receipt stands, was derived, by the
+    owner's rule (`derivation.is_derived`). A receipt that is missing or cannot be read is no
+    derived picture's, as `uncaptioned_way` takes one, so that the table loads and the owner's
+    own check refuses the receipt (design decision 5)."""
     try:
         found = repository.read(edition.rendered(captions=False).receipt)
     except (OSError, ValueError):
         return False
-    return isinstance(found, dict) and isinstance(found.get("derived"), dict)
+    return isinstance(found, dict) and derivation.is_derived(found)
 
 
 def uncaptioned_way(edition: Edition) -> str:
