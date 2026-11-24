@@ -18,6 +18,9 @@ spaced = true
 unit = "words"
 # Its reading checks: each stressed word's stress against its CMUdict phones.
 readings = ["cmudict-stress"]
+# A transcript's word in other letters than its text's is heard by its pronunciation in the
+# engine's pinned CMUdict: its first is one of the text word's readings.
+latin_heard = "cmudict-pronunciations"
 # Snowball's English stemmer finds a label's words in other forms. A wrapped label's line other
 # than the last may not end on a word that leads the phrase after it: an article, preposition,
 # conjunction, determiner, possessive, wh-word or auxiliary.

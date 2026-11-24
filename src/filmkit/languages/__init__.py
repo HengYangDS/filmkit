@@ -5,10 +5,11 @@ engine admits an edition whose code has a declaration here, `<code>.toml`, and r
 in one line that names the languages it declares. Each declaration holds every value and choice
 specific to its language: its tags and names, the scripts it writes and the language it reads
 each other script in, whether spaces delimit its words, its unit of speech, how it marks number,
-its captions, reading checks, stemmer, lead words, register rules and player words. A behaviour
-that more than one language could share stays once in code, named by its basis, and a
-declaration chooses it by that name; a declaration that names a kind the engine does not hold,
-or that misses or adds a field, is refused when it loads, naming the language and the field.
+its captions, reading checks, how a transcript's Latin-script words are heard, stemmer, lead
+words, register rules and player words. A behaviour that more than one language could share stays
+once in code, named by its basis, and a declaration chooses it by that name; a declaration that
+names a kind the engine does not hold, or that misses or adds a field, is refused when it loads,
+naming the language and the field.
 
 The classes of characters the engine reads, its scripts and its marks, stand once in
 `scripts.json`, which this module and the Node audits (`scripts.mjs`) both read.
@@ -128,10 +129,10 @@ class Language(Declared):
     the name in a transcript, `{minutes}` standing for the runtime. `scripts` names the scripts
     it writes and `embedded` the language it reads each other script in, both by the scripts of
     `scripts.json`. `spaced` says whether spaces delimit its words; `unit` is what its speech is
-    counted in. `readings` names its reading checks, `stemmer` the stemmer that finds a label's
-    words in other forms, or `none`, and `lead_words` the words a wrapped line other than the
-    last may not end on. `rules`, declared as `register`, names the register's rules its words
-    meet.
+    counted in. `readings` names its reading checks, `latin_heard` how a transcript's Latin-script
+    words are heard, `stemmer` the stemmer that finds a label's words in other forms, or `none`,
+    and `lead_words` the words a wrapped line other than the last may not end on. `rules`,
+    declared as `register`, names the register's rules its words meet.
     """
 
     code: Code
@@ -147,6 +148,7 @@ class Language(Declared):
     number: Annotated[Counted | Suffixed, Field(discriminator="kind")]
     captions: Captions
     readings: tuple[Literal["pinyin-readings", "cmudict-stress"], ...]
+    latin_heard: Literal["letters", "cmudict-pronunciations"]
     stemmer: Literal["snowball-english", "none"]
     lead_words: tuple[Word, ...]
     # Declared as `register`, which would shadow the model class's own (ABCMeta's).

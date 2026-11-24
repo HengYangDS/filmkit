@@ -24,7 +24,7 @@ input that remains.
 Shown by `tests/test_languages.py`, `tests/narration/test_cmudict.py`, `tests/test_supply.py`,
 `tests/narration/test_recognition.py` and `tests/narration/test_units_line.py`.
 
-- [ ] 2.1 Add `latin_heard` to the language declaration, with the kinds `letters` and `cmudict-pronunciations`;
+- [x] 2.1 Add `latin_heard` to the language declaration, with the kinds `letters` and `cmudict-pronunciations`;
       declare `cmudict-pronunciations` in `en.toml` and `letters` in `zh.toml`, each with its comment. Done when
       `tests/test_languages.py` holds both values, `xb`'s equal to English's and `xa`'s to Chinese's, and a
       declaration that names another kind, or none, refused when it loads with the language and the field named; and

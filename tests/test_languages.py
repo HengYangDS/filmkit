@@ -41,6 +41,7 @@ def test_chinese_holds_the_values_of_its_table():
     assert (zh.captions.phrasing, zh.captions.limit) == ("full-width-punctuation", 33)
     assert (zh.captions.reading_rate, zh.captions.hold) == ("none", "none")
     assert (zh.readings, zh.stemmer, zh.lead_words) == (("pinyin-readings",), "none", ())
+    assert zh.latin_heard == "letters"
     assert "contractions" not in zh.rules and "colloquial" in zh.rules
 
 
@@ -59,6 +60,7 @@ def test_english_holds_the_values_of_its_table():
     assert (en.captions.phrasing, en.captions.limit) == ("english-grammar", 66)
     assert (en.captions.reading_rate, en.captions.hold) == (25, "full-interval")
     assert (en.readings, en.stemmer) == (("cmudict-stress",), "snowball-english")
+    assert en.latin_heard == "cmudict-pronunciations"
     assert "colloquial" not in en.rules and "contractions" in en.rules
 
 
@@ -87,6 +89,7 @@ def test_a_test_language_equals_its_source_but_for_its_code_tags_and_names(code,
     assert derived.model_dump(exclude=replaced) == held.model_dump(exclude=replaced)
     assert (derived.code, derived.iso639_2) == (code, {"xa": "qaa", "xb": "qab"}[code])
     assert derived.tag != held.tag and derived.english_name != held.english_name
+    assert derived.latin_heard == held.latin_heard
 
 
 def test_the_fixture_declares_the_test_languages_beside_the_engines(test_languages):
@@ -106,7 +109,7 @@ def declared(**changes) -> dict:
     data = derived_languages.declaration("zh")
     for key, value in changes.items():
         if value is None:
-            data.pop(key)
+            data.pop(key, None)
         else:
             data[key] = value
     return data
@@ -124,6 +127,11 @@ def declared(**changes) -> dict:
         ),
         (declared(readings=["ipa-readings"]), "readings.0: Input should be 'pinyin-readings'"),
         (declared(stemmer="snowball-german"), "stemmer: Input should be 'snowball-english'"),
+        (declared(latin_heard=None), "latin_heard: Field required"),
+        (
+            declared(latin_heard="ipa-pronunciations"),
+            "latin_heard: Input should be 'letters' or 'cmudict-pronunciations'",
+        ),
         (declared(number={"kind": "dual"}), "number: Input tag 'dual' found using 'kind'"),
         (declared(scripts=["cyrillic"]), "scripts names cyrillic: the scripts are han, latin"),
         (declared(embedded={"han": "zh"}), "embedded names han, which is no other script"),

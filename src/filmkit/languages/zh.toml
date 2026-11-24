@@ -19,6 +19,9 @@ spaced = false
 unit = "characters"
 # Its reading checks: each Han character's reading against its pinyin.
 readings = ["pinyin-readings"]
+# A transcript's Latin-script word in other letters than its text's is heard by its letters: the
+# Chinese edition says them as names, compared by the film's terms.
+latin_heard = "letters"
 # No stemmer finds a label's words in other forms, and no lead word ends a line badly.
 stemmer = "none"
 lead_words = []
