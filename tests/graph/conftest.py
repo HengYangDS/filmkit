@@ -2,8 +2,10 @@
 
 import pytest
 import sample_sound
+import stand_ins
 
 import filmkit.repository as repository
+from filmkit.graph import opens, runs
 
 
 @pytest.fixture(scope="session")
@@ -28,3 +30,13 @@ def sound_chain(built, monkeypatch):
     root, _ = built
     monkeypatch.setattr(repository, "ROOT", root)
     return root
+
+
+@pytest.fixture
+def stand_in_table(tmp_path, monkeypatch):
+    """A scratch film root whose node table is the stand-in one (`stand_ins`); the loaded table."""
+    root = tmp_path.resolve()
+    monkeypatch.setattr(repository, "ROOT", root)
+    monkeypatch.setattr(runs, "table", lambda: {node.name: node for node in stand_ins.TABLE})
+    monkeypatch.delenv(opens.NODE, raising=False)
+    return stand_ins.scratch(root)
