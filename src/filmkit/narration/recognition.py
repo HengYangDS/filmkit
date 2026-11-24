@@ -21,6 +21,16 @@ units are also compared by reading (`reading_distance`), as a listener hears the
 - two Latin units are alike when their letters and digits are, so an apostrophe is no
   difference (`check's` for `checks`), and adjacent Latin units are joined where the other side
   writes them as one (`back test` for `backtest`): spelling and spacing are the recognizer's;
+- in an edition whose language hears its Latin-script words by CMUdict's pronunciations
+  (`latin_heard`, `filmkit.languages`), a text's Latin unit is also alike a transcript's when the
+  transcript unit's first pronunciation in the pinned CMUdict (`filmkit.narration.cmudict`) is one
+  of the text unit's own readings: those the edition's pronunciation declares for the word
+  (`pronunciation.declared_readings`), else CMUdict's first. A recognizer writes "labeled" where
+  the text has "labelled", and "there" for "their": what a listener heard. "tears" for "tiers" is
+  refused, since CMUdict says "tears" first as the verb "tear", and "are" for "or" too, which
+  share only a weak form. A word the pronunciation declares by its letter names, such as "AI", is
+  compared by its letters only, on either side. A unit is looked up as written and then by its
+  letters; one CMUdict does not hold, and a declared term, have no pronunciation;
 - a Latin unit that says a term the film declares, its display form or its spoken form in any
   case, reads as that term, its possessive kept (`terms.said_form`): a respelling is how the
   narrator is told the name, and a recognizer writes the name in its own spelling;
@@ -46,9 +56,10 @@ import filmkit.narration.readings as readings
 import filmkit.narration.terms as terms
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from filmkit.film import NarrationTerm
+    from filmkit.narration.cmudict import Dictionary
 
 UNIT = re.compile(f"[{languages.pattern('han')}]|[a-z0-9']+")
 HAN_UNIT = languages.compiled("han")
@@ -66,28 +77,54 @@ class Read(NamedTuple):
     A Han character has its reading; a Latin unit has its letters and digits, or, where it says
     a declared term, `term` names the term and the reading is the letters of its spoken form,
     with an `s` for a possessive. `particle` says that the text says 的, 地 or 得 as a particle
-    at this place.
+    at this place. Where the edition hears its Latin units by their pronunciations (`Heard`), a
+    Latin unit that says no term has `readings`, its own as a text's unit, and `first`, CMUdict's
+    first pronunciation of it as a transcript's unit, or None.
     """
 
     unit: str
     reading: str
     particle: bool = False
     term: str | None = None
+    readings: tuple[tuple[str, ...], ...] = ()
+    first: tuple[str, ...] | None = None
 
     @property
     def han(self) -> bool:
         return HAN_UNIT.fullmatch(self.unit) is not None
 
 
+class Heard(NamedTuple):
+    """The pronunciations an edition hears its Latin units by: the pinned CMUdict (`said`), and the
+    readings its pronunciation declares by word (`declared`), () for a word it declares by its
+    letter names."""
+
+    said: Dictionary
+    declared: Mapping[str, tuple[tuple[str, ...], ...]]
+
+    def of(self, unit: str) -> tuple[tuple[tuple[str, ...], ...], tuple[str, ...] | None]:
+        """A Latin unit's readings as a text's unit and its first pronunciation as a
+        transcript's, each looked up as written and then by its letters."""
+        letters = unit.replace("'", "")
+        declared = self.declared.get(unit, self.declared.get(letters))
+        if declared == ():
+            return (), None
+        found = self.said.get(unit) or self.said.get(letters)
+        first = found[0] if found else None
+        return declared or ((first,) if first else ()), first
+
+
 class Names(NamedTuple):
     """What an edition's Latin units are read by beside their letters: the terms the film
-    declares (`filmkit.narration.terms`) and, in an edition whose language reads Latin script as
+    declares (`filmkit.narration.terms`); in an edition whose language reads Latin script as
     another (`embedded`, `filmkit.languages.names_embedded`), the other Latin units its script
-    says, by their letters and digits (`others`)."""
+    says, by their letters and digits (`others`); and, in one whose language hears its Latin
+    units by CMUdict's pronunciations, those pronunciations (`heard`)."""
 
     terms: tuple[NarrationTerm, ...] = ()
     embedded: bool = False
     others: frozenset[str] = frozenset()
+    heard: Heard | None = None
 
 
 NO_NAMES = Names()
@@ -133,24 +170,34 @@ def unit_distance(
     return row[-1]
 
 
-def _latin(unit: str, word: str, declared: Sequence[NarrationTerm]) -> Read:
+def _latin(
+    unit: str, word: str, declared: Sequence[NarrationTerm], heard: Heard | None = None
+) -> Read:
     """A Latin unit as it is heard: as the declared term it says where its whole `word` says it
-    too (`terms.unit_says`), its possessive kept, or by its letters and digits."""
+    too (`terms.unit_says`), its possessive kept, or by its letters and digits and, where the
+    edition hears its Latin units by their pronunciations, by those (`Heard.of`)."""
     for term in declared:
         said = terms.unit_says(unit, word, terms.spoken_forms(term))
         if said is not None:
             letters = "".join(recognition_units(term.spoken)).replace("'", "")
             return Read(unit, letters + ("s" if said[1] else ""), term=term.term)
-    return Read(unit, unit.replace("'", ""))
+    if heard is None:
+        return Read(unit, unit.replace("'", ""))
+    own, first = heard.of(unit)
+    return Read(unit, unit.replace("'", ""), readings=own, first=first)
 
 
 def read_units(
-    text: str, words: Sequence[readings.Word] = (), declared: Sequence[NarrationTerm] = ()
+    text: str,
+    words: Sequence[readings.Word] = (),
+    declared: Sequence[NarrationTerm] = (),
+    heard: Heard | None = None,
 ) -> list[Read]:
     """Each recognition unit of a text as it is heard.
 
     A Han character under a declared word takes that word's reading, and any other the
-    dictionary's reading in its context. A Latin unit that says a declared term reads as it.
+    dictionary's reading in its context. A Latin unit that says a declared term reads as it, and
+    any other also by its pronunciations where `heard` gives them.
     """
     text = text.lower()
     covered, dictionary = readings.coverage(text, list(words)), readings.contextual(text)
@@ -162,7 +209,7 @@ def read_units(
         if HAN_UNIT.fullmatch(unit) is None:
             letter = at + len(unit) - len(unit.lstrip("'"))
             word = next((w for start, end, w in latin_words if start <= letter < end), unit)
-            found.append(_latin(unit, word, declared))
+            found.append(_latin(unit, word, declared, heard))
             continue
         word, _start, offset = covered.get(at, (None, 0, 0))
         reading = dictionary.get(at, unit) if word is None else word.syllables[offset]
@@ -183,8 +230,13 @@ def alike(expected: Read, observed: Read) -> bool:
     if expected.han != observed.han:
         return False
     if not expected.han:
-        # Units of the same letters and digits are alike whatever term either says.
-        return _letters(expected) == _letters(observed) or expected.reading == observed.reading
+        # Units of the same letters and digits are alike whatever term either says; the
+        # transcript's first pronunciation is the text's only where it is one of its readings.
+        return (
+            _letters(expected) == _letters(observed)
+            or expected.reading == observed.reading
+            or (observed.first is not None and observed.first in expected.readings)
+        )
     return (
         expected.unit == observed.unit
         or expected.reading == observed.reading
@@ -213,22 +265,40 @@ def _joined(units: Sequence[Read], end: int, other: Read) -> list[int]:
     return found
 
 
+def hearing(
+    code: str,
+    supplied: Callable[[], Dictionary],
+    declared: Mapping[str, tuple[tuple[str, ...], ...]],
+) -> Heard | None:
+    """The pronunciations an edition hears its Latin units by, as its language declares
+    (`latin_heard`): the dictionary `supplied` reads and the readings its pronunciation declares,
+    or None for a language that hears them by their letters, which reads no dictionary."""
+    if languages.language(code).latin_heard != "cmudict-pronunciations":
+        return None
+    return Heard(supplied(), declared)
+
+
 def edition_names(
-    declared: Sequence[NarrationTerm], texts: Sequence[str], *, embedded: bool
+    declared: Sequence[NarrationTerm],
+    texts: Sequence[str],
+    *,
+    embedded: bool,
+    heard: Heard | None = None,
 ) -> Names:
-    """An edition's names: its declared terms and, where `embedded`, the Latin units its spoken
-    texts say that say no term, by their letters and digits. They are recognition units, so a word
-    such as `Node.js` gives two."""
+    """An edition's names: its declared terms, the pronunciations it hears its Latin units by
+    (`heard`), and, where `embedded`, the Latin units its spoken texts say that say no term, by
+    their letters and digits. They are recognition units, so a word such as `Node.js` gives
+    two."""
     declared = tuple(declared)
     if not embedded:
-        return Names(declared)
+        return Names(declared, heard=heard)
     others = {
         unit.reading
         for text in texts
         for unit in read_units(text, (), declared)
         if not unit.han and unit.term is None
     }
-    return Names(declared, True, frozenset(others))
+    return Names(declared, True, frozenset(others), heard)
 
 
 def stands_for(expected: Read, observed: Read, names: Names) -> bool:
@@ -266,8 +336,8 @@ def compared(
     expected: str, observed: str, words: Sequence[readings.Word] = (), names: Names = NO_NAMES
 ) -> Compared:
     """A text and a transcript compared unit by unit, by reading (`reading_distance`)."""
-    want = read_units(expected, words, names.terms)
-    got = read_units(observed, words, names.terms)
+    want = read_units(expected, words, names.terms, names.heard)
+    got = read_units(observed, words, names.terms, names.heard)
     cost = [[0] * (len(got) + 1) for _ in range(len(want) + 1)]
     for i in range(len(want) + 1):
         for j in range(len(got) + 1):

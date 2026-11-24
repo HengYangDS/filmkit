@@ -1,7 +1,9 @@
 """Recognition units and their comparison: how a transcript is checked against its text."""
 
+import pronounced
 import pytest
 
+import filmkit.narration.cmudict as narration_cmudict
 import filmkit.narration.readings as narration_readings
 import filmkit.narration.recognition as narration_recognition
 from filmkit.film import NarrationTerm
@@ -208,3 +210,96 @@ def test_an_english_edition_gives_a_term_no_other_letters():
     assert names == narration_recognition.Names((NAME,))
     assert by_reading("Naim is built for it.", "Nime is built for it.", names) == 1
     assert by_reading("Naim 走的是另一条路。", "Nime走的是另一条路。", names) == 1
+
+
+# The pronunciations of the fixture's lines (`pronounced`), as the pinned CMUdict states them.
+SAID = narration_cmudict.parse(pronounced.RAW)
+
+
+def heard(**readings) -> narration_recognition.Names:
+    """An English edition's names: no term, its Latin units heard by the fixture's pronunciations
+    and the readings its pronunciation declares by word, () for a word said by its letter names."""
+    declared = {word: tuple(tuple(p.split()) for p in said) for word, said in readings.items()}
+    return narration_recognition.Names(heard=narration_recognition.Heard(SAID, declared))
+
+
+@pytest.mark.parametrize(
+    ("text", "transcript", "by_unit", "by_reading"),
+    [
+        # Another spelling of the same word, and a homophone.
+        ("It is labelled.", "It is labeled.", 1, 0),
+        ("Their aim.", "There aim.", 1, 0),
+        # A spelling that has the text's sound only as a later pronunciation: tears is first
+        # the verb tear.
+        ("Half tiers.", "Half tears.", 1, 1),
+        # A word of another sound, and another word's weak form.
+        ("An aim.", "And aim.", 1, 1),
+        ("Or this.", "Are this.", 1, 1),
+        # Secondary stress against none is the same sound; primary stress is kept.
+        ("The catalogue.", "The catalog.", 1, 0),
+        ("A tier.", "Uh tier.", 1, 1),
+        # A word the dictionary does not hold is compared by its letters.
+        ("The delivery's end.", "The delivery end.", 1, 1),
+        # Each spelling whose first pronunciation is the text word's.
+        ("To go.", "Two go.", 1, 0),
+        ("Too late.", "To late.", 1, 0),
+    ],
+)
+def test_english_words_are_also_compared_by_their_pronunciation(
+    text, transcript, by_unit, by_reading
+):
+    units = narration_recognition.recognition_units
+    assert narration_recognition.unit_distance(units(text), units(transcript)) == by_unit
+    assert narration_recognition.reading_distance(text, transcript, (), heard()) == by_reading
+
+
+def test_a_declared_reading_is_the_text_words_own():
+    # CMUdict lists the past tense of read first; declared by its present tense alone, the word
+    # is no longer heard in "red".
+    assert narration_recognition.reading_distance("Read it.", "Red it.", (), heard()) == 0
+    present = heard(read=("R IY1 D",))
+    assert narration_recognition.reading_distance("Read it.", "Red it.", (), present) == 1
+    both = heard(read=("R IY1 D", "R EH1 D"))
+    assert narration_recognition.reading_distance("Read it.", "Red it.", (), both) == 0
+
+
+def test_a_word_declared_by_letter_names_is_compared_by_its_letters():
+    # CMUdict lists ai first as the word eye.
+    assert narration_recognition.reading_distance("AI helps.", "I helps.", (), heard()) == 0
+    letters = heard(ai=())
+    for transcript in ("I helps.", "Eye helps."):
+        assert narration_recognition.reading_distance("AI helps.", transcript, (), letters) == 1
+    assert narration_recognition.reading_distance("AI helps.", "A I helps.", (), letters) == 0
+    # Declared so, it gives no pronunciation on the transcript's side either.
+    assert narration_recognition.reading_distance("Eye helps.", "AI helps.", (), letters) == 1
+
+
+def test_a_declared_term_is_held_to_its_form_and_not_to_its_pronunciation():
+    git = NarrationTerm(term="Git", spoken="Git", ipa="ɡɪt")
+    names = heard()._replace(terms=(git,))
+    assert narration_recognition.reading_distance("Git runs.", "Get runs.", (), names) == 1
+    (unit, _) = narration_recognition.read_units("Git runs.", (), names.terms, names.heard)
+    assert (unit.term, unit.first, unit.readings) == ("Git", None, ())
+
+
+def test_a_language_that_hears_its_latin_words_by_their_letters_reads_no_dictionary():
+    assert narration_recognition.reading_distance("Their aim.", "There aim.") == 1
+    chinese = narration_recognition.Names(embedded=True, others=OTHERS)
+    assert by_reading("他们 their 目标。", "他们there目标。", chinese) == 1
+
+
+@pytest.mark.usefixtures("test_languages")
+def test_how_a_language_hears_a_transcripts_latin_words_is_its_declaration():
+    asked = []
+
+    def supplied():
+        asked.append(True)
+        return SAID
+
+    english = narration_recognition.hearing("xb", supplied, {})
+    assert english == narration_recognition.Heard(SAID, {}) and asked == [True]
+    names = narration_recognition.Names(heard=english)
+    assert narration_recognition.reading_distance("Labelled.", "Labeled.", (), names) == 0
+    assert narration_recognition.hearing("xa", supplied, {}) is None and asked == [True]
+    chinese = narration_recognition.Names(heard=None)
+    assert narration_recognition.reading_distance("Labelled.", "Labeled.", (), chinese) == 1

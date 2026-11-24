@@ -43,7 +43,7 @@ Shown by `tests/test_languages.py`, `tests/narration/test_cmudict.py`, `tests/te
       the file. Done when `tests/test_supply.py` holds, with the download stubbed, a checked file in its place, a
       download of other bytes refused with nothing left in the place, and a file in place kept without a download; and
       passes.
-- [ ] 2.4 Give `recognition.Names` the pronunciations by which its language hears Latin units and the edition's
+- [x] 2.4 Give `recognition.Names` the pronunciations by which its language hears Latin units and the edition's
       declared readings, none in `NO_NAMES`; give each Latin unit that says no declared term its pronunciations in
       `read_units`, looked up as written and then by its letters, a text unit read by the readings its edition's
       pronunciation declares or else by CMUdict's first, and one declared by letter names by its letters only; and let
