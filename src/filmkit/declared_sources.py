@@ -195,6 +195,11 @@ REMOVED = {
 NARRATION_COPY = "narration.md"
 
 
+def cited_recordings(cast: dict) -> set[str]:
+    """Each recording a cast's derivation cites, by its path below the film's root."""
+    return set(RECORDING.findall(json.dumps(cast.get("derivation", ""))))
+
+
 def _unreadable(root: Path, path: str) -> str | None:
     """Why a source that stands below a root cannot be read as JSON, or None."""
     try:
@@ -264,7 +269,7 @@ def placement_problems(root: Path, declared: dict) -> list[str]:
             for path in (*edition_files(code, slug)[:3], derived.readings, *moved.values())
             if path.endswith(".json") and (problem := _unreadable(root, path))
         ]
-        cited = set(RECORDING.findall(json.dumps(cast.get("derivation", ""))))
+        cited = cited_recordings(cast)
         found += [
             f"{cast_path} derivation cites {path}; move the recording every reference derives "
             f"from to {IDENTITY} and cite it there"

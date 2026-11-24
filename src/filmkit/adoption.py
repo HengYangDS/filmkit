@@ -43,7 +43,8 @@ of the film that cannot be read is a finding of the question that reads it.
   (the declaration, the review prompt, the entry page and each edition's files), that names a
   file this release moves or removes by its former path, with what to write instead: the paths
   that the declaration's withdrawn `sources` and `cover` and the casts' withdrawn
-  `reference_audio` still name, and the files the loader names as removed
+  `reference_audio` still name, each other recording a cast's derivation cites, whose place is
+  the identity recording's, and the files the loader names as removed
   (`filmkit.declared_sources`). It reads the declaration as TOML, so a declaration that does not
   load hides none of them; it lists the tracked files by Git, or every file but `NOT_SOURCES`
   where Git holds none of them (`tracked`), and a file that cannot be listed, or read as text
@@ -449,7 +450,7 @@ def vale(root: Path) -> list[str]:
 def former_paths(root: Path, declared: dict) -> tuple[dict[str, str], set[str]]:
     """Each former path of a file this release moves or removes, with what to write instead, and
     the sources the loader reads, whose findings are the `declaration` question's."""
-    from filmkit.declared_sources import NARRATION_COPY, REMOVED
+    from filmkit.declared_sources import IDENTITY, NARRATION_COPY, REMOVED, cited_recordings
 
     instead = {old: f"this release removes it; {text}" for old, text in REMOVED.items()}
     owned = {film.DECLARATION}
@@ -460,7 +461,9 @@ def former_paths(root: Path, declared: dict) -> tuple[dict[str, str], set[str]]:
         if isinstance(path, str)
     }
     slug = str(declared.get("slug"))
-    for code, edition in table(declared.get("editions"), f"{film.DECLARATION}: editions").items():
+    editions = table(declared.get("editions"), f"{film.DECLARATION}: editions")
+    references = {film.places(code, slug).reference for code in editions}
+    for code, edition in editions.items():
         edition = edition if isinstance(edition, dict) else {}
         derived = film.places(code, slug)
         sources = edition.get("sources")
@@ -480,6 +483,7 @@ def former_paths(root: Path, declared: dict) -> tuple[dict[str, str], set[str]]:
             except UnreadableError:
                 held = {}
             moves.append((held.get("reference_audio"), derived.reference))
+            moves += [(path, IDENTITY) for path in cited_recordings(held) - references]
         instead |= {
             old: f"write {new}" for old, new in moves if isinstance(old, str) and old != new
         }

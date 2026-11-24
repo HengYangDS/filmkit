@@ -103,3 +103,13 @@ def test_a_declaration_that_does_not_load_is_still_read(film):
 def test_an_unreadable_file_is_named(film):
     (film / "NOTICE").write_bytes(b"Scripts: \xff\n")
     assert "NOTICE cannot be read as text: " in "\n".join(asked(film))
+
+
+def test_the_recording_a_cast_s_derivation_cites_is_named_with_the_identity_s_place(film):
+    # Every film's NOTICE names the recording its Chinese cast's derivation cites.
+    cast = {"reference_audio": "assets/a.wav", "derivation": {"path": "assets/audio/voice.wav"}}
+    put(film, "content/voice-reference.json", json.dumps(cast))
+    put(film, "NOTICE", "Its identity recording, assets/audio/voice.wav, was generated.\n")
+    assert "NOTICE:1 names assets/audio/voice.wav; write assets/audio/narrator-identity.wav" in (
+        asked(film)
+    )
