@@ -91,12 +91,17 @@ Each node SHALL take its inputs from one function of paths, the owner's where th
 
 ### Requirement: The order of nodes is derived from their paths and declared writers
 
-The engine SHALL derive each edge from the paths and order the nodes with `graphlib.TopologicalSorter`. A path that several nodes write SHALL name each writer as one that rewrites it after named writers or one that replaces it whole. A cycle, and a path two nodes write without that declaration, SHALL refuse the table when it loads, naming the nodes or the path.
+The engine SHALL derive each edge from the paths and order the nodes with `graphlib.TopologicalSorter`. A path that several nodes write SHALL name each writer as one that rewrites it after named writers or one that replaces it whole. A node that reads such a path SHALL come after every writer of it but a rewriter that names the reader among the nodes it follows. A cycle, and a path two nodes write without that declaration, SHALL refuse the table when it loads, naming the nodes or the path.
 
 #### Scenario: A rewritten timeline has one producer for its reader
 
 - **WHEN** `refresh-captions` is declared to rewrite the timeline after `assemble`
 - **THEN** `refresh-captions` follows `assemble`, and `check-sound` follows both
+
+#### Scenario: A reader that a rewriter follows comes before it
+
+- **WHEN** `refresh-captions` is declared to rewrite the selected narration after `select` and `assemble`, and `assemble` reads it
+- **THEN** the table loads with `assemble` before `refresh-captions`, and `assemble`'s binding of the selected narration holds through the record of `refresh-captions`
 
 #### Scenario: An undeclared second writer is refused
 
@@ -105,7 +110,7 @@ The engine SHALL derive each edge from the paths and order the nodes with `graph
 
 ### Requirement: A file several runs write is bound by its latest declared writer, in order
 
-The latest standing record of a declared writer SHALL bind a path's current bytes. An earlier writer's binding SHALL hold only through a later run of a writer declared after it, which for a rewrite read its output, or of a peer that replaces the file. A run of a writer SHALL make every writer declared after it stale until it runs again, whatever the bytes.
+The latest standing record of a declared writer SHALL bind a path's current bytes. An earlier writer's binding, and the binding of a reader that a rewriter follows, SHALL hold only through a later run of a writer declared after it, which for a rewrite read the bytes so bound, or of a peer that replaces the file. A run of a writer SHALL make every writer declared after it stale until it runs again, whatever the bytes.
 
 #### Scenario: Both editions write the entry page
 

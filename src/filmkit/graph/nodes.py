@@ -404,9 +404,7 @@ TABLE = (
     Node(
         "narrate",
         {"default": lambda e: declared(e) | sources(e) | checked_words(e)},
-        lambda e: (
-            narration(e) | {"readings_plan": root(f"build/evidence/readings/{e.code}-plan.json")}
-        ),
+        narration,
         "gpu",
         gpu=True,
     ),

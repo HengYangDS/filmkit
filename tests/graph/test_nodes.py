@@ -9,7 +9,8 @@ import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.graph import nodes
 from filmkit.graph.records import Folder
-from filmkit.narration import converge
+from filmkit.narration import converge, readings
+from filmkit.production import Edition
 
 
 @pytest.fixture(scope="module")
@@ -117,3 +118,13 @@ def test_the_uncaptioned_picture_reads_the_inputs_of_its_way(table):
     assert "stage" not in derived
     assert native["stage"] == Folder(edition.rendered(captions=False).stage, "**/*")
     assert node.way(edition, "native") == "native"
+
+
+def test_the_occurrence_plan_is_no_output_of_any_node(table):
+    # The readings check writes it before a narration's run opens, a dry run's too (design
+    # decision 8), so no record binds it.
+    for code in table.codes:
+        plan = (repository.ROOT / readings.plan_path(code)).resolve()
+        for node in table.nodes.values():
+            outputs = {nodes.place(p) for p in node.outputs(Edition(code)).values()}
+            assert plan not in outputs, node.name
