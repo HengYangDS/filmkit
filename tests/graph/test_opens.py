@@ -279,3 +279,17 @@ def test_the_narration_s_caches_are_outputs_of_narrate(tmp_path, monkeypatch):
     code += "    repository.write(path, {})\n"
     python_child(root, log, code, node="narrate:zh")
     assert opens.check(log).findings == []
+
+
+def test_a_virtual_environment_named_whole_is_an_environment(film):
+    root, log, table = film
+    (root / ".venv").mkdir()
+    (root / ".venv/pyvenv.cfg").write_text("home = /usr/bin\n")
+    # `uv run` names the film's environment in VIRTUAL_ENV, which a child's environment carries.
+    code = "import os, subprocess, sys\n"
+    code += "environment = {**os.environ, 'VIRTUAL_ENV': str(repository.ROOT / '.venv')}\n"
+    code += "subprocess.run([sys.executable, '-c', 'pass'], env=environment, check=True)\n"
+    python_child(root, log, code)
+    report = opens.check(log, table)
+    assert report.ok, report.findings
+    assert report.exempted == {f"environment: {opens.EXEMPT['environment']}": {"stand:zh"}}
