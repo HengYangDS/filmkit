@@ -39,7 +39,7 @@ A run record SHALL state the engine's version, the SHA-256 of the engine's `rele
 
 ### Requirement: A run of part of a node writes a partial record
 
-A narration of chosen segments or of its checks alone, a stage written to another place or size than the node's, and a check whose arguments name other places SHALL write, in place of the node's record, a partial record of the outputs as they stand after it, its outcome and its time. A partial record SHALL never make its node fresh.
+A narration of chosen segments or of its checks alone, a stage written to another place or size than the node's, and a check whose arguments name other places SHALL write, in place of the node's record, a partial record of the node's outputs as they stand after it, its outcome and its time. A partial record SHALL never make its node fresh, and SHALL make it stale where the outputs it states differ from those the node's record states.
 
 #### Scenario: A retake is accounted for and leaves the narration stale
 
@@ -49,7 +49,7 @@ A narration of chosen segments or of its checks alone, a stage written to anothe
 #### Scenario: A stage written elsewhere
 
 - **WHEN** `produce stage-picture --language zh --output build/runtime/work/trial` ends
-- **THEN** the node's run record is not replaced, and a partial record names what the run wrote
+- **THEN** the node's run record is not replaced, a partial record states the node's outputs as they stand after it, and the plan leaves the node fresh, since the run changed none of them
 
 ### Requirement: A redo writes the records of the nodes it redoes
 

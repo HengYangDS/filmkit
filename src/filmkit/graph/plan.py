@@ -18,7 +18,8 @@ that no holding run carries is stale, replaced by an earlier writer's run. Bytes
 record does not state, and bytes that a rewriter read after an earlier writer's run that no
 declared writer's run between them wrote, are bytes that no declared writer accounts for, and
 every node whose record binds the path through the writers is stale for them. A node whose
-partial record ended after its record is stale, changed by a partial run (decision 8).
+partial record ended after its record, with other outputs than that record states, is stale,
+changed by a partial run (decision 8).
 
 Each reason has a kind. `unaccounted` (bytes no record of a declared writer accounts for) and
 `blind` (a file whose size and time held while its digest changed, which only `full` sees) are
@@ -320,9 +321,21 @@ def judged(
         kind = "unaccounted" if kind == "output" else kind
         text = f"{compared.side} {compared.name} {records.SAYS[compared.result]}: {compared.path}"
         reasons.append(Reason(kind, text, compared.path))
-    if s.partial is not None and (s.whole is None or ended(s.partial) > ended(s.whole)):
+    if s.partial is not None and changed_by_part(s.partial, s.whole):
         reasons.append(Reason("partial", "changed by a partial run"))
     return reasons + settled.reasons.get(key, [])
+
+
+def changed_by_part(partial: records.PartialRecord, whole: records.RunRecord | None) -> bool:
+    """Whether a partial run changed the node: it ended after the node's record, and the outputs
+    it left differ from the ones that record states. A stage written elsewhere, or made again
+    from the same sources, leaves the node as its record states it."""
+    if whole is None:
+        return True
+    if ended(partial) <= ended(whole):
+        return False
+    left = {name: state.sha256 for name, state in partial.outputs.items()}
+    return left != {name: state.sha256 for name, state in whole.outputs.items()}
 
 
 def wanted(table: nodes.Table, targets: Iterable[str]) -> set[str]:

@@ -72,6 +72,15 @@ def test_a_node_after_a_partial_run_is_stale_as_changed_by_a_partial_run(stand_i
     assert texts(found["stage:zh"]) == ["changed by a partial run"]
 
 
+def test_a_partial_run_that_left_the_node_s_outputs_as_recorded_leaves_it_fresh(stand_in_table):
+    # A stage written elsewhere, or made again from the same sources, changes none of the node's
+    # outputs: its partial record states them with the digests its record states.
+    ran("stage")
+    ran("stage", whole=False)
+    _, found = judged(stand_in_table, "stage:zh")
+    assert (found["stage:zh"].state, texts(found["stage:zh"])) == ("fresh", [])
+
+
 def test_two_replacing_writers_of_a_page_are_fresh_until_a_hand_edit(stand_in_table):
     chain(*CODES)
     ran("package-metadata", "zh")

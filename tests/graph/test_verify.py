@@ -55,9 +55,9 @@ def test_rewrites_replacements_repairs_and_retakes_pass(stand_in_table, capsys):
             (repository.ROOT / "zh/picture").write_text("the repaired picture")
         with durations.node("zh", "compare"):
             wrote("compare", "zh")
-    # A retake narrates part of the edition again.
-    (repository.ROOT / "zh/takes.txt").write_text("a retaken thought")
-    ran("narrate", whole=False)
+    # A retake narrates part of the edition again, changing its takes.
+    with durations.run("zh", "narrate", whole=False):
+        (repository.ROOT / "zh/takes.txt").write_text("a retaken thought")
     status, lines = verified(stand_in_table, capsys)
     assert status == 0, lines
     assert "narrate:zh: stale: changed by a partial run" in lines
