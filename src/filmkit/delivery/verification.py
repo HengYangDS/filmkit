@@ -110,10 +110,6 @@ def verify_narration(edition: production.Edition) -> dict:
     script_path, cast_path = repository.ROOT / edition.script, repository.ROOT / edition.cast
     script, cast = repository.read(script_path), repository.read(cast_path)
     script_sha256 = repository.sha(script_path)
-    mirror = (repository.ROOT / edition.mirror).read_text().strip()
-    if mirror != "\n\n".join(segment["text"] for segment in script["segments"]):
-        msg = "Narration mirror differs from the current script"
-        raise VerificationError(msg)
     selected = repository.read(edition.narration_selected)
     assembly = repository.read(edition.audio_assembly)
     soundtrack = edition.soundtrack

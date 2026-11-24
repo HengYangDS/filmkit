@@ -74,6 +74,8 @@ def test_captions_end_by_the_credits_of_the_runtime_their_timeline_states():
 
 def test_current_narration_passes_and_validates_every_selected_recording(inputs):
     edition = inputs.edition
+    # The script is the narration's one copy: the edition's folder holds no narration text.
+    assert not (inputs.root / edition.sources / "narration.md").exists()
     assert delivery_verification.verify_narration(edition) == {
         "segments": 2,
         "captions": 2,
@@ -89,10 +91,6 @@ def test_current_narration_passes_and_validates_every_selected_recording(inputs)
         ("groups", "02", inputs.root),
         ("voice", "02", cast, reference),
     ]
-
-
-def mirror_differs(inputs):
-    (inputs.root / inputs.edition.mirror).write_text("数据先行。\n")
 
 
 def recording_changed(inputs):
@@ -114,7 +112,6 @@ def timeline(*keys, value):
 @pytest.mark.parametrize(
     ("damage", "message"),
     [
-        (mirror_differs, "Narration mirror differs"),
         (selected("script_sha256", value="0"), "custody"),
         (selected("cast_sha256", value="0"), "custody"),
         (assembly("script_sha256", value="0"), "custody"),

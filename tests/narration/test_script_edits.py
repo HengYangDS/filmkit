@@ -73,7 +73,12 @@ def test_edit_script_replaces_and_splits_thoughts_and_rebinds_retakes(
         ("首句。第二句。", "首句。第二句。"),
         ("甲句。乙句。丙句。", "甲句。乙句。丙句。"),
     ]
-    assert paths["mirror"].read_text() == "首句。第二句。\n\n甲句。乙句。丙句。\n"
+    # The edit writes the script and the cast alone: the edition's folder holds no copy of its
+    # narration.
+    assert sorted(path.name for path in paths["script"].parent.iterdir()) == [
+        "film-script.json",
+        "voice-reference.json",
+    ]
     assert repository.read(paths["cast"])["retakes"] == {
         "01": {"groups": {"2": retake(5, "第二句。")}},
         "02": {"seed": 9228, "groups": {"3": retake(9, "丙句。")}},
@@ -164,7 +169,7 @@ def segment_of(paths, sid: str) -> dict:
 
 
 def refused(tmp_path, paths, edits: dict, named: str) -> None:
-    """An edits file refused by name, which writes no script, cast or mirror."""
+    """An edits file refused by name, which writes no script or cast."""
     write_edits(tmp_path, edits)
     before = [path.read_bytes() for path in paths.values()]
     with pytest.raises(ValueError, match=named):
@@ -183,10 +188,9 @@ def test_a_rewording_outside_an_anchor_keeps_it_and_names_none(tmp_path, write_e
     report = apply(tmp_path, capsys, {"replace": {"zh": [["03.2", "最先是", "首先是"]]}})
     segment = segment_of(paths, "03")
     assert segment["anchored_groups"] == ["依据{order}有先后{/order}。", "首先是{law}法律{/law}。"]
-    # The plain thoughts, the text, the spoken text and the mirror are filled from them.
+    # The plain thoughts, the text and the spoken text are filled from them.
     assert segment["utterance_groups"] == ["依据有先后。", "首先是法律。"]
     assert segment["text"] == segment["spoken_text"] == "依据有先后。首先是法律。"
-    assert paths["mirror"].read_text().startswith("依据有先后。首先是法律。\n\n")
     moves = {key: value for key, value in report["zh"][0].items() if key.startswith("anchors_")}
     assert moves and not any(moves.values())
 

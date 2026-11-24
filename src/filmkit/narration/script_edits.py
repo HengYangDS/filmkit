@@ -23,14 +23,14 @@ refused by name, with its words and their new occurrences, unless the new though
 Marks that an edit places stand immediately before their first unit and after their last.
 
 Each segment whose thoughts changed has its text rebuilt from its plain thoughts and its spoken
-text derived through the script's pronunciation contract, the narration mirror is rewritten, and
-each bound retake follows its exact text to its new index; a retake whose text no longer occurs
-exactly once is released. An edit of marks alone is written and keeps the text, the speech and
-every retake. Nothing is written unless every edit of every edition applies, and a script that
-breaks an anchor's rule is refused before and after its edits. The report names each changed
-segment's thoughts and retakes and, for a segment that marks anchors, each anchor marked,
-restated, removed, reworded, moved, moved by rank and moved to another thought, each kind apart; a
-move by rank into another thought is named among both.
+text derived through the script's pronunciation contract, and each bound retake follows its
+exact text to its new index; a retake whose text no longer occurs exactly once is released. An
+edit of marks alone is written and keeps the text, the speech and every retake. Nothing is
+written unless every edit of every edition applies, and a script that breaks an anchor's rule
+is refused before and after its edits. The report names each changed segment's thoughts and
+retakes and, for a segment that marks anchors, each anchor marked, restated, removed, reworded,
+moved, moved by rank and moved to another thought, each kind apart; a move by rank into another
+thought is named among both.
 
 Usage: python -m filmkit.narration.script_edits --edits FILE [--dry-run]
 An edits file: {"replace": {"en": [["13.5", "proves no", "does not prove"]]},
@@ -411,12 +411,9 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def _write(edition: Edition, script: dict, cast: dict) -> None:
-    """Write an edition's edited script and cast, and its narration mirror."""
+    """Write an edition's edited script and cast, the one copy of its narration."""
     repository.write(edition.script, script)
     repository.write(edition.cast, cast)
-    (repository.ROOT / edition.mirror).write_text(
-        "\n\n".join(segment["text"] for segment in script["segments"]) + "\n"
-    )
 
 
 if __name__ == "__main__":

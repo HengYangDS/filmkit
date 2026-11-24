@@ -196,7 +196,7 @@ class Edition:
 
     @property
     def sources(self) -> str:
-        """The folder of the edition's script, cast and narration mirror, `content/<code>`."""
+        """The folder of the edition's script and cast, `content/<code>`."""
         return self.places.folder
 
     @property
@@ -211,11 +211,6 @@ class Edition:
     def shot_plan(self) -> Path:
         """The shot plan that packaging writes from the script, composition and timeline."""
         return self.evidence / "shot-plan.json"
-
-    @property
-    def mirror(self) -> str:
-        """The narration text, which equals the script's segment texts joined by blank lines."""
-        return f"{self.sources}/narration.md"
 
     @property
     def cover(self) -> str:

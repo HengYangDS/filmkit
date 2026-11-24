@@ -28,7 +28,7 @@ def write_edition(tmp_path, monkeypatch):
     """Write tiny editions under a temporary root.
 
     Each edition gets a script of authored thoughts bound to a shared pronunciation
-    contract, a cast holding only its retakes, and its narration mirror. A segment whose
+    contract and a cast holding only its retakes. A segment whose
     thoughts are written with anchors holds them as its anchored thoughts.
     """
     monkeypatch.setattr(repository, "ROOT", tmp_path)
@@ -54,13 +54,7 @@ def write_edition(tmp_path, monkeypatch):
                 segments[-1]["anchored_groups"] = list(groups)
         repository.write(edition.script, {"pronunciation_contract": CONTRACT, "segments": segments})
         repository.write(edition.cast, {"retakes": retakes})
-        mirror = tmp_path / edition.mirror
-        mirror.write_text("\n\n".join(segment["text"] for segment in segments) + "\n")
-        return {
-            "script": tmp_path / edition.script,
-            "cast": tmp_path / edition.cast,
-            "mirror": mirror,
-        }
+        return {"script": tmp_path / edition.script, "cast": tmp_path / edition.cast}
 
     return write
 

@@ -203,7 +203,7 @@ class Inputs:
 
 
 def narration(inputs: Inputs, texts: dict[str, str]) -> None:
-    """The script, cast, mirror, selected recordings, soundtrack, assembly and timeline."""
+    """The script, cast, selected recordings, soundtrack, assembly and timeline."""
     root, edition, sha = inputs.root, inputs.edition, repository.sha
     script = write_input(
         root / edition.script,
@@ -212,7 +212,6 @@ def narration(inputs: Inputs, texts: dict[str, str]) -> None:
     write_input(root / edition.places.reference, b"reference")
     reference = {"reference_sha256": sha(edition.places.reference)}
     cast = write_input(root / edition.cast, reference)
-    write_input(root / edition.mirror, "\n\n".join(texts.values()) + "\n")
     records = []
     for key, text in texts.items():
         recording = write_input(edition.ear_first / f"recordings/{key}.wav", f"take {key}")
