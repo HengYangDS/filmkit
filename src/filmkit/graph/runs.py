@@ -11,12 +11,17 @@ record (design decision 8). The outcome is `pass` for a run that completed, `ref
 left with a line (a `SystemExit`) or was told that it failed, and `error` for any other exception,
 each with the line it ended with. A command that does a node's work again opens that node's run
 inside its own (`filmkit.durations.node`), where a refusal of the owner it names is `refuse`.
+
+Opening or closing a node's run never stops or changes the command: a failure of either is named
+in one line on standard error and the node's last record stands, which the outputs this run
+writes then contradict, so the plan finds the node stale and `filmkit verify` refuses its bytes.
 """
 
 from __future__ import annotations
 
 import contextlib
 import os
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -108,8 +113,12 @@ class NodeRun:
             os.environ.pop(opens.NODE, None)
         else:
             os.environ[opens.NODE] = self.outer
-        with opens.quiet():
-            self.write(duration, ended, refusals)
+        try:
+            with opens.quiet():
+                self.write(duration, ended, refusals)
+        except Exception as error:
+            # A failure of the seam is never the command's.
+            unwritten(self.label, error)
 
     def write(
         self,
@@ -139,14 +148,28 @@ class NodeRun:
             records.write(records.PartialRecord(**common))
 
 
+def unwritten(label: str, error: Exception) -> None:
+    """Name a node's run record that was not written, and why, on standard error."""
+    print(
+        f"filmkit: the run record of {label} was not written: {type(error).__name__}: {error}",
+        file=sys.stderr,
+    )
+
+
 def open_node(
     code: str | None, command: str, run: Run, *, whole: bool = True, way: str | None = None
 ) -> NodeRun | None:
-    """The run of the node a command names, opened; None for a command that names none."""
+    """The run of the node a command names, opened; None for a command that names none, and for
+    one whose opening failed, which is named (`unwritten`)."""
     node = table().get(command)
     if code is None or node is None:
         return None
-    return NodeRun(node, code, run, whole=whole, way=way)
+    try:
+        return NodeRun(node, code, run, whole=whole, way=way)
+    except Exception as error:
+        # A failure of the seam is never the command's.
+        unwritten(nodes.key(node.name, code), error)
+        return None
 
 
 def own_places(code: str, command: str, arguments: list[str]) -> bool:

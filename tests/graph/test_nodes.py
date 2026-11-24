@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+import sample_sound
 
 import filmkit.produce as produce
 import filmkit.repository as repository
@@ -161,3 +162,14 @@ def test_the_derived_picture_reads_what_the_validation_of_the_captioned_picture_
         validated = table.nodes["validate-picture"].inputs(edition).values()
         missing = {nodes.place(p) for p in validated} - {nodes.place(p) for p in derived}
         assert not missing, sorted(str(path) for path in missing)
+
+
+def test_the_table_loads_beside_a_receipt_that_cannot_be_read(tmp_path, monkeypatch):
+    root = sample_sound.copy_film((tmp_path / "film").resolve())
+    monkeypatch.setattr(repository, "ROOT", root)
+    receipt = Edition("zh").rendered(captions=False).receipt
+    receipt.parent.mkdir(parents=True)
+    receipt.write_text("{damaged")
+    # A receipt that cannot be read is no derived picture's, as the way of the picture takes it.
+    compared = chain.table().nodes["compare-pictures"].inputs(Edition("zh"))
+    assert "uncaptioned_stage" in compared

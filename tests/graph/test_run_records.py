@@ -289,3 +289,32 @@ def test_the_sample_s_sound_chain_records_each_node_as_its_table_entry_declares(
     selected = found["select"].outputs["narration_selected"].sha256
     assert assembled.inputs["narration_selected"].sha256 == selected
     assert refreshed.inputs["narration_selected"].sha256 == selected
+
+
+def test_a_failure_of_the_seam_reaches_no_command_and_leaves_the_last_record(
+    root, monkeypatch, capsys
+):
+    stand_in_run(root)
+    before = read("stand")
+    table = runs.table()
+
+    def damaged(edition):
+        raise ValueError("a receipt that cannot be read")
+
+    def inputs(edition):
+        return {"in": root / "in.txt"}
+
+    # The opening fails, then the close: the command runs and ends with its own line each time.
+    for broken in (
+        nodes.Node("stand", {"default": damaged}, damaged, "light"),
+        nodes.Node("stand", {"default": inputs}, damaged, "light"),
+    ):
+        monkeypatch.setattr(runs, "table", lambda broken=broken: {**table, "stand": broken})
+        with pytest.raises(SystemExit, match="^stand: the input is not ready$"):
+            with durations.run("zh", "stand"):
+                (root / "out.txt").write_text("other")
+                raise SystemExit("stand: the input is not ready")
+        error = capsys.readouterr().err
+        assert "the run record of stand:zh was not written: ValueError: a receipt" in error
+        assert read("stand") == before
+        assert opens.NODE not in os.environ
