@@ -60,7 +60,7 @@ accent = "#7DB7D8"
 # What every edition's pronunciation shares, which binds no recording: the schema version the
 # readings check holds the film to, the boundary of what the targets control and the criteria a
 # listening accepts a reading by. Each edition's normalization, targets, status and the sources
-# it alone cites stand in content/<code>/pronunciation.json; a source that two editions cite would
+# it alone cites stand in content/<code>/pronunciation.json; a source that several editions cite would
 # stand here as [[pronunciation.sources]], and the sample has none.
 [pronunciation]
 schema_version = 2

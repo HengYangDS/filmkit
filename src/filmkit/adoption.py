@@ -251,7 +251,7 @@ def untied_runtime(root: Path, declared: dict) -> list[str]:
     field = f"{{{RUNTIME_FIELD}}}"
     return [
         f'{prompt}:{number} cites {field} in a line that does not say "This edition"; {field} is '
-        "the runtime of the prompt's own edition, and the two editions may differ in length: "
+        "the runtime of the prompt's own edition, and the editions may differ in length: "
         f'reword the line, as "This edition: exactly {field} s"'
         for number, line in enumerate(text.splitlines(), 1)
         if RUNTIME_FIELD in cited(line) and "this edition" not in line.casefold()

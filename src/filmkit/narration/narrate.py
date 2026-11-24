@@ -7,11 +7,11 @@ narration-receipt-06-07.json, alignment-06-07.json and asr-06-07.json.
 
 Before any speech model loads, and with --dry-run too, the edition must pass the concept
 check (`filmkit.concepts`), the register check (`filmkit.register`), its readings check
-(`filmkit.narration.readings`) and the check of what both editions' pictures read of their
+(`filmkit.narration.readings`) and the check of what every edition's picture reads of its
 scripts' anchors (`filmkit.picture.anchor_reads`); a refusal stops the run and names every failure.
 
 Usage: python -m filmkit.narration.narrate
-    --language zh|en [--ids 06,07] [--dry-run | --skip-generation]
+    --language <code> [--ids 06,07] [--dry-run | --skip-generation]
 --dry-run prints the narration plan without writing; --skip-generation aligns and
 transcribes the existing receipt. Each step runs under this tool's interpreter, and none
 outlives a narration that is interrupted, asked to end (SIGTERM) or hung up on. A run that is

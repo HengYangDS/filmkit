@@ -40,7 +40,7 @@ watched occurrence that no declaration resolves, the dictionary's word around it
 characters for a word character, with the dictionary's contextual reading. A proposal declares
 nothing; the author reads it and declares what the narration means.
 
-Usage: python -m filmkit.narration.readings [--language zh|en | --propose]
+Usage: python -m filmkit.narration.readings [--language <code> | --propose]
 """
 
 from __future__ import annotations

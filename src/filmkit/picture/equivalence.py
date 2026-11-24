@@ -36,7 +36,7 @@ The record, build/evidence/editions/<code>/caption-equivalence.json, binds the c
 timeline, the engine version and both pictures' stage documents, files and receipts, and holds
 each level's measures and its findings; a refusal raises `PictureError` after it is written.
 
-Usage: python -m filmkit.produce compare-pictures --language zh|en
+Usage: python -m filmkit.produce compare-pictures --language <code>
 """
 
 from __future__ import annotations

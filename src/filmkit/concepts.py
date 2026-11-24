@@ -5,8 +5,8 @@ concept the films name means in the canonical source, quoting the passage of a d
 source manifest pins, and which words each edition uses for it: one rendering, the forms the
 narration may also use, and the counterexamples it must not use.
 
-The check reads both editions' scripts, the film's caption terms, its entry page and its picture
-sources. Each segment declares the concepts it states; both editions of a segment declare the
+The check reads every edition's script, the film's caption terms, its entry page and its picture
+sources. Each segment declares the concepts it states; every edition of a segment declares the
 same ones, and each appears in that segment's narration by its rendering or a form. No
 counterexample appears in any narration, title, caption term, release synopsis, comment or
 description, the summary the edition's player shows, the text the entry page shows, or picture
@@ -18,7 +18,7 @@ checked. Every failure is reported at once, and thoughts are numbered from 1 wit
 
 A Latin-script word keeps its base form in Chinese, so Chinese words must carry its number. Each
 Chinese thought pairs with the English thought of its segment and index when the segment has as
-many thoughts in both editions, and otherwise with the whole English segment. Where that
+many thoughts in each, and otherwise with the whole English segment. Where that
 counterpart names such a word only by its plural, each Chinese clause that says the word holds a
 number word, or a numeral with its classifier before the word, other than a lone 一 (`counted`).
 The contract's optional [number] table declares more number words and reasoned exceptions, each
@@ -58,7 +58,7 @@ PICTURE = "picture"
 PICTURE_SUFFIXES = (".js", ".mjs", ".html", ".json")
 # The release fields a viewer reads in a film's metadata, in the order they are checked.
 RELEASE_PROSE = ("synopsis", "comment", "description")
-# The film's entry page, one bilingual page and so one place for both editions; the elements
+# The film's entry page, one page of every edition and so one place for all of them; the elements
 # whose content a page does not show, whose end tags HTML requires; the block elements, which
 # alone end a run of text, every other element, known or not, being read as inline; and the
 # attributes whose words a viewer meets.
@@ -223,7 +223,7 @@ class Shown(HTMLParser):
 class Unnumbered(NamedTuple):
     """A clause of an edition whose language marks no number, as Chinese, that says a Latin-script
     term with no number word, where another edition, whose language marks it, names the term only
-    by its plural: the two editions, the thought, the term, the plural and the clause."""
+    by its plural: the pair of editions, the thought, the term, the plural and the clause."""
 
     edition: str
     other: str
@@ -318,7 +318,7 @@ def found(text: str, phrase: str, code: str) -> list[int]:
 
 def places(scripts: dict[str, dict] | None = None) -> dict[str, list[Place]]:
     """The words a viewer meets outside the picture, by edition, from the editions' scripts
-    (read unless given), and under `ENTRY` the entry page's: one page for both editions, each
+    (read unless given), and under `ENTRY` the entry page's: one page for every edition, each
     run of its shown text and each of its labels a place of that one name."""
     if scripts is None:
         scripts = {code: repository.read(Edition(code).script) for code in CODES}
@@ -417,7 +417,7 @@ def declarations(contract: Contract, scripts: dict[str, dict]) -> list[str]:
 
 
 def counterexamples(contract: Contract, places: dict[str, list[Place]]) -> list[str]:
-    """Each counterexample in an edition's words, or in the words both editions share (the entry
+    """Each counterexample in an edition's words, or in the words every edition shares (the entry
     page, the picture), with where it occurs."""
     shared = [place for name, held in places.items() if name not in CODES for place in held]
     failures = []

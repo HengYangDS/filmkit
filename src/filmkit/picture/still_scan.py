@@ -41,9 +41,9 @@ and the composition as they stand); `record_draft` writes it, for this command a
 
 What the scan cannot read is its command's refusal, in one line, and no error of its own.
 
-Usage: python -m filmkit.picture.still_scan <movie> --language zh|en [--limit <seconds>]
+Usage: python -m filmkit.picture.still_scan <movie> --language <code> [--limit <seconds>]
        python -m filmkit.picture.still_scan <movie> <timeline> --out <record> [--limit <seconds>]
-       python -m filmkit.produce scan-film --language zh|en
+       python -m filmkit.produce scan-film --language <code>
 """
 
 from __future__ import annotations

@@ -52,7 +52,7 @@ says that it completed only where the edition ends settled and is not refused. A
 refused before its first effect writes none (`admitted`). Each narration
 it starts still writes the narration's own record, which a build's sum does not add again.
 
-Usage: python -m filmkit.narration.converge --language zh|en [--rounds 2] [--takes 3]
+Usage: python -m filmkit.narration.converge --language <code> [--rounds 2] [--takes 3]
 """
 
 from __future__ import annotations

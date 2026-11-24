@@ -16,7 +16,7 @@ A render that does not complete raises `PictureError` after its receipt is writt
 nothing; a draft that holds a still picture at the limit raises it after its record is written.
 A draft needs no passing gate record: it shows how the picture looks before the gates pass.
 
-Usage: python -m filmkit.produce render-draft --language zh|en [--deadline <seconds>]
+Usage: python -m filmkit.produce render-draft --language <code> [--deadline <seconds>]
 """
 
 from __future__ import annotations

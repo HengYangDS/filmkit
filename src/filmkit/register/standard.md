@@ -6,7 +6,7 @@ reviewers; neither restates them.
 
 ## Scope
 
-Every text a viewer of a film hears or reads, in both editions: the narration, the captions and transcript, the
+Every text a viewer of a film hears or reads, in every edition: the narration, the captions and transcript, the
 words in the picture, the title card and cover, the credits, the player page, and the release's description,
 synopsis and comment.
 

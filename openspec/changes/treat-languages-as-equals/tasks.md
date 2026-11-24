@@ -77,7 +77,7 @@ Shown by `tests/test_film_editions.py`, `tests/test_adoption_editions.py` and `t
 
 Shown by the repository's lint and Markdown check.
 
-- [ ] 9.1 Reword the docstrings and comments that state a fixed set, a pair, a first language or a script that stands for a language, and the usage strings `zh|en`, and state the new behaviour in the modules' docstrings. Done when `git grep -n -i -E 'chinese first|both editions|the other edition|two editions|bilingual|zh[|]en' -- src/ examples/` lists only text that describes a film of two editions as such, and the repository's lint passes.
+- [x] 9.1 Reword the docstrings and comments that state a fixed set, a pair, a first language or a script that stands for a language, and the usage strings `zh|en`, and state the new behaviour in the modules' docstrings. Done when `git grep -n -i -E 'chinese first|both editions|the other edition|two editions|bilingual|zh[|]en' -- src/ examples/` lists only text that describes a film of two editions as such, and the repository's lint passes.
 - [ ] 9.2 Replace in `README.md` only the statements this Change makes false (the engine's description at `:3`, the layout table and the line under it, the `[editions.<code>]` row at `:42`, the withdrawn keys), adding no section, and state in `CHANGELOG.md` each breaking change, what an adopting film does, and the release note of the design's Migration Plan, among it the films' pin of 0.22.3 and what their adoption carries from 0.23 to 0.30, the order of a film's adoption (`filmkit.adoption` run before any withdrawn key is removed) and the films' tests that change. Done when `README.md` is no larger in bytes than at the base and the repository's Markdown check passes on both files.
 
 ## 10. Acceptance

@@ -44,7 +44,7 @@ comparison record of a derived pair from the receipt, decoding no picture. Packa
 `film_source` which picture each film reads: the 1080p uncaptioned film of a derived pair is
 painted and scaled from the captioned picture in one pass.
 
-Usage: python -m filmkit.produce render-picture --language zh|en --uncaptioned [--native]
+Usage: python -m filmkit.produce render-picture --language <code> --uncaptioned [--native]
 """
 
 from __future__ import annotations

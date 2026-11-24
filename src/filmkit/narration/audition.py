@@ -28,10 +28,10 @@ current text is still the auditioned text. The retake records that text's SHA-25
 a later script edit releases it. Rows without a proposal are reported and left alone.
 
 Usage: python -m filmkit.narration.audition audition
-    --language zh|en --targets FILE [--takes 8] [--first 11]
+    --language <code> --targets FILE [--takes 8] [--first 11]
     [--prefer accurate|slower|brisker] [--name audition] [--receipt FILE]
        python -m filmkit.narration.audition apply
-    --language zh|en --proposals FILE [--dry-run]
+    --language <code> --proposals FILE [--dry-run]
 The targets file maps "segment.index" to the phrase the transcript must contain, such
 as {"12.3": "intended use"}, or to {"required": phrase, "run_on": true} for a run-on target.
 Paths are relative to the repository root.

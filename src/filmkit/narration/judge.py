@@ -14,7 +14,7 @@ the same record.
 A thought is refused when a line fails. The command then exits 1 and names every refused
 thought with every line it fails, at once.
 
-Usage: python -m filmkit.narration.judge --language zh|en
+Usage: python -m filmkit.narration.judge --language <code>
 """
 
 from __future__ import annotations

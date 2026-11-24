@@ -1,6 +1,6 @@
 # R5 of the formal register (`standard.md`), a class the document names:
 #   > no exclamations, no dashes, no ellipsis
-# Its members here, in both editions: the exclamation, the dash and the ellipsis in any of the forms
+# Its members here, in every edition: the exclamation, the dash and the ellipsis in any of the forms
 # a keyboard gives. A dash between words is judged by literal spaces (`[ ]`: Vale reads a bare
 # space in a token as any white space) within its own place, so one text gets one verdict wherever
 # it stands; an en dash without spaces joins a compound or a range and passes, and so does a double

@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 DECLARATION = repository.DECLARATION
-# The declaration's key that states the credits' length, once for both editions: the field
+# The declaration's key that states the credits' length, once for every edition: the field
 # `Film.credits_duration`, which a script no longer declares.
 CREDITS = "credits_duration"
 # The files every edition's sources folder holds: its script and its cast.
@@ -655,7 +655,7 @@ class Film(Declared):
     author: Stated
     entry: str
     source_manifest: str
-    # The credits' length in whole seconds, stated once: both editions draw them from one
+    # The credits' length in whole seconds, stated once: every edition draws them from one
     # composition, and each edition's assembly lays them out after its narration.
     credits_duration: Annotated[int, Field(strict=True, ge=0)]
     concepts: str | None = None

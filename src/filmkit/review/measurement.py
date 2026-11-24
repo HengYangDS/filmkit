@@ -569,7 +569,7 @@ def measure() -> dict:
 
 
 def write(out: Path) -> dict:
-    """Measure both editions and write the measurements where a round keeps them."""
+    """Measure every edition and write the measurements where a round keeps them."""
     report = measure()
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")

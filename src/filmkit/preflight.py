@@ -38,12 +38,12 @@ The answer is written as the edition's readiness receipt (`Edition.readiness`): 
 question's answer, the engine version and the SHA-256 of every input the answer was judged on,
 the declaration, which holds the film's register exceptions, and the entry page among them.
 `admitted` reads receipts without repeating the work: it refuses unless the edition's receipt
-passed and each input it bound still holds, and unless the other edition's receipt passed on the
-composition, stylesheet, fonts, declaration and entry page as they stand, since both editions
-render one composition and a finding in either changes it for both.
+passed and each input it bound still holds, and unless every other edition's receipt passed on the
+composition, stylesheet, fonts, declaration and entry page as they stand, since every edition
+renders one composition and a finding in any changes it for all.
 
-Usage: python -m filmkit.produce preflight --language zh|en
-       python -m filmkit.produce admitted --language zh|en
+Usage: python -m filmkit.produce preflight --language <code>
+       python -m filmkit.produce admitted --language <code>
 """
 
 from __future__ import annotations
@@ -294,7 +294,7 @@ def geometry(edition: Edition) -> str | None:
 
 
 def shared_inputs() -> dict:
-    """The SHA-256 of the inputs both editions share, by name: a receipt of either binds them."""
+    """The SHA-256 of the inputs every edition shares, by name: a receipt of any binds them."""
     faces = rendering.face_bindings()
     return {
         "composition": repository.sha(repository.ROOT / rendering.COMPOSITION_SCRIPT),
@@ -307,7 +307,7 @@ def shared_inputs() -> dict:
 
 def bound_inputs(edition: Edition) -> dict:
     """The SHA-256 of every input an edition's readiness is judged on, by its name: the inputs
-    both editions share, then the edition's own."""
+    every edition shares, then the edition's own."""
     root = repository.ROOT
     return {
         **shared_inputs(),
@@ -373,7 +373,7 @@ def preflight(edition: Edition) -> dict:
 
 def moved_inputs(receipt: dict, edition: Edition, *, own: bool) -> list[str]:
     """The inputs a receipt bound that no longer hold, an engine of another version first:
-    all of the edition's inputs, or with `own` False only those both editions share."""
+    all of the edition's inputs, or with `own` False only those every edition shares."""
     moved = [] if receipt.get("engine_version") == released.version() else ["engine_version"]
     try:
         current = bound_inputs(edition) if own else shared_inputs()
@@ -388,7 +388,7 @@ def admitted(edition: Edition) -> dict:
     the checks.
 
     Refused unless the edition's receipt passed and every input it bound still holds, and unless
-    the other edition's receipt passed on the shared inputs as they stand: a change of the other
+    every other edition's receipt passed on the shared inputs as they stand: a change of another
     edition's own script, cast, timeline or sound since its receipt refuses nothing here.
     """
     refusals = []

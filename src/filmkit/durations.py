@@ -30,7 +30,8 @@ whole narration started within a convergence's run, the build begins with that c
 the sum counts the convergence, and the narration is listed as inside it and not added again.
 A convergence that did not complete is not counted, and its narration then is.
 A command run twice in a build counts once, by its latest run. A sum adds each command's
-seconds, so two commands that ran at the same time, such as two editions' renders, count in full.
+seconds, so two commands that ran at the same time, such as several editions' renders, count in
+full.
 The time of the build is therefore the last line's first figure: the seconds during which at
 least one counted command of the selected editions was running, which counts such commands once
 and the waits between commands not at all. For commands run in a row the two figures are equal.
@@ -39,7 +40,7 @@ The two checks a film's build runs from the command line for an edition, the geo
 and the cover check (`filmkit.tools`), the verifier and the reproduction write records too, the
 last two unless they are asked to be read-only.
 
-Usage: python -m filmkit.durations [--language zh|en|all] [--since <time>] [--json]
+Usage: python -m filmkit.durations [--language <code>|all] [--since <time>] [--json]
 Prints each selected edition's records in the order their commands started, each with the
 host's load, its phases and settings, the sum of the seconds of the completed commands of its
 build, and last the time of the build with the range of the load its commands state.

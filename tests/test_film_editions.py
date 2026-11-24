@@ -135,7 +135,7 @@ def test_a_prompt_that_cites_the_former_fields_or_names_an_editions_files_is_ref
     said = str(refusal.value)
     end = len(text.splitlines())
     name = film.FILM.review.prompt
-    assert f"{name}:{end - 1} cites {{other}}, which the engine no longer fills; name the" in said
+    assert f"{name}:{end - 1} cites {{other}}, which the engine no longer fills; name every" in said
     assert f"{name}:{end - 1} cites {{other_language}}" in said and "by {others}" in said
     assert f"{name}:{end} names an edition's files by their path; name every edition's" in said
     assert f"{name}:{end} groups the editions' codes in braces;" in said

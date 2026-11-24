@@ -24,7 +24,7 @@ with `assemble`.
 `asked` gives the same reports and refusals without printing or refusing, for a caller that
 decides by them.
 
-Usage: python -m filmkit.produce fit --language zh|en [--variants <file>]
+Usage: python -m filmkit.produce fit --language <code> [--variants <file>]
 """
 
 from __future__ import annotations

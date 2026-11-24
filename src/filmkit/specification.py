@@ -1,4 +1,4 @@
-"""The delivery format of both editions: rates, levels, limits, tags and the credits' length that
+"""The delivery format of every edition: rates, levels, limits, tags and the credits' length that
 the film's declaration states; each edition's runtime is its own timeline's
 (`filmkit.production.Edition.runtime`)."""
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 def declared(key: str, read: Callable[[Any], Any]) -> Any:
-    """The value that both editions' scripts declare alike for a key, as `read` takes it."""
+    """The value that every edition's script declares alike for a key, as `read` takes it."""
     scripts = [json.loads((repository.ROOT / Edition(code).script).read_text()) for code in CODES]
     values = {read(script[key]) for script in scripts}
     if len(values) != 1:
@@ -30,13 +30,13 @@ RATE = 48000
 # The frame rate the engine renders and encodes (`filmkit.film.FPS`); the H.264 levels below are set
 # for it.
 FPS: int = film.FPS
-# The credits' length, which the film's declaration states once for both editions.
+# The credits' length, which the film's declaration states once for every edition.
 CREDITS_DURATION: int = FILM.credits_duration
 # The films' author, artist and copyright holder, which the film's declaration states once.
 AUTHOR: str = FILM.author
 # The films' chapter count; each edition titles the chapters in its own language.
 CHAPTERS: int = declared("chapters", len)
-# Both editions play at one spoken-word level; a single gain reaches it without dynamics
+# Every edition plays at one spoken-word level; a single gain reaches it without dynamics
 # processing, and the true-peak ceiling caps that gain.
 PROGRAM_LEVEL = {"integrated_lufs": -16.5, "true_peak_ceiling_dbtp": -1.0}
 # The picture's chapter card is fully shown 0.15 s after its scene starts and holds

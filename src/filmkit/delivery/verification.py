@@ -13,7 +13,7 @@ is each edition's duration record of the run (`filmkit.durations`), which says h
 verification took and nothing about the films: no check reads it, and with --read-only the
 verifier writes nothing at all.
 
-Usage: python -m filmkit.delivery.verification [--technical-only] --language zh|en|all
+Usage: python -m filmkit.delivery.verification [--technical-only] --language <code>|all
            [<films>]
 Without films, each selected edition's current delivered films are verified.
 """

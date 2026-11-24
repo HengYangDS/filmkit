@@ -27,7 +27,7 @@ Every action writes a duration record for its edition when it ends, named after 
 for the uncaptioned picture, with `-uncaptioned` after it (`filmkit.durations`).
 The command owns no goal, approval, repository lifecycle, service or task state.
 
-Usage: python -m filmkit.produce <edition action> --language zh|en [--uncaptioned [--native]]
+Usage: python -m filmkit.produce <edition action> --language <code> [--uncaptioned [--native]]
            [options]
 """
 

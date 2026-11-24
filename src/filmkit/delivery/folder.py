@@ -1,4 +1,4 @@
-"""Deliver both editions to the film's delivery folder with rsync, then read them back with shasum.
+"""Deliver every edition to the film's delivery folder with rsync, then read them back with shasum.
 
 The engine names no folder of a host. The destination is, in this order: the folder
 `--destination` names; the film's declared folder name (`delivery_folder`) below the root that

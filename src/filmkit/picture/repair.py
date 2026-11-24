@@ -19,7 +19,7 @@ for each picture not rendered again, then `compare-pictures`.
 A faulty render is evidence of a fault rather than a reproducible artifact, so the kept pictures
 stay with the edition's evidence and not with the reviewed builds that `set-aside` keeps.
 
-Usage: python -m filmkit.produce repair-pictures --language zh|en [--attempts <n>]
+Usage: python -m filmkit.produce repair-pictures --language <code> [--attempts <n>]
 """
 
 from __future__ import annotations

@@ -6,8 +6,8 @@ languages. A film declares only the summary each edition shows under the film,
 from the edition's script, timeline and delivered files:
 
 - the header: the title, then the author, the language, the film's version as the edition labels
-  it, the running time and the frame rate, and links to the other edition's player and to the
-  entry page;
+  it, the running time and the frame rate, and links to every other edition's player, in the
+  declared order, and to the entry page;
 - the video, which opens on the viewing film with its captions. Each version has two films: one
   whose picture draws the captions and one without them. The captions control, a button pressed
   while the captions show, switches the film to the other one of the same version, and a version
@@ -193,7 +193,7 @@ def version_label(code: str, version: str) -> str:
 
 
 def entry_version(version: str) -> str:
-    """The entry page's line under the film's title: the version with both editions' labels."""
+    """The entry page's line under the film's title: the version with every edition's label."""
     labels = " / ".join(
         f'<span lang="{player_words(code)["lang"]}">{player_words(code)["version"]}</span>'
         for code in CODES

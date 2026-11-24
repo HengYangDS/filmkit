@@ -59,7 +59,7 @@ def test_each_withdrawn_runtime_key_is_named_by_the_declaration_question_alone(p
 # How the question names a line of the review prompt that cites the runtime for no one edition.
 UNTIED = (
     'content/review/prompt.md:{line} cites {{duration}} in a line that does not say "This '
-    "edition\"; {{duration}} is the runtime of the prompt's own edition, and the two editions may "
+    "edition\"; {{duration}} is the runtime of the prompt's own edition, and the editions may "
     'differ in length: reword the line, as "This edition: exactly {{duration}} s"'
 )
 

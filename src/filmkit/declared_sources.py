@@ -65,7 +65,7 @@ def prompt_problems(root: Path, declared: dict) -> list[str]:
     for number, line in enumerate(text.splitlines(), 1):
         where = f"{prompt}:{number}"
         found += [
-            f"{where} cites {{{field}}}, which the engine no longer fills; name the other editions"
+            f"{where} cites {{{field}}}, which the engine no longer fills; name every other edition"
             f" by {WITHDRAWN_FIELDS[field]}"
             for field in sorted(_fields(line) & set(WITHDRAWN_FIELDS))
         ]

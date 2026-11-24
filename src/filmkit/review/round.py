@@ -1,4 +1,4 @@
-"""Prepare and record one independent review round of both editions.
+"""Prepare and record one independent review round of every edition.
 
 A round sets the packages of the previous build aside before the next render
 (`filmkit.review.set_aside`), prepares its directory, build/evidence/reviews/round-<n>/, with
@@ -27,10 +27,10 @@ the round's label or one given with --label. --language limits a set-aside to on
 --without-picture leaves the rendered pictures in place, for the editions it names or for both.
 
 Usage: python -m filmkit.review.round set-aside --round <n> --purpose <text>
-           [--review-dir <dir>] [--language zh|en] [--without-picture [zh|en ...]] [--dry-run]
+           [--review-dir <dir>] [--language <code>] [--without-picture [<code> ...]] [--dry-run]
        python -m filmkit.review.round set-aside --unreviewed --consumer <dir>
            (--round <n> | --label <label>) --purpose <text>
-           [--language zh|en] [--without-picture [zh|en ...]] [--dry-run]
+           [--language <code>] [--without-picture [<code> ...]] [--dry-run]
        python -m filmkit.review.round prepare --round <n>
            [--previous <dir> --dispositions <file>] [--changes <file>]
        python -m filmkit.review.round record --round-dir <dir> [--dry-run]

@@ -40,7 +40,7 @@ anchors its marks take from those words, as `place` does, and writes it back, so
 times its words otherwise still takes its anchors and those values from this module.
 
 Usage: python -m filmkit.narration.anchors [--json] [--timeline FOLDER]
-       python -m filmkit.narration.anchors --place TIMELINE --language zh|en
+       python -m filmkit.narration.anchors --place TIMELINE --language <code>
 """
 
 from __future__ import annotations
@@ -261,7 +261,7 @@ def require_placed(timeline: dict, code: str) -> None:
 
 
 def require_editions() -> dict[str, dict[str, list[Anchor]]]:
-    """Both editions' anchors by edition code, refusing every broken rule of either script."""
+    """Every edition's anchors by edition code, refusing every broken rule of any script."""
     found, refusals = {}, []
     for code in CODES:
         try:
@@ -394,7 +394,7 @@ def printed(listed: dict) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Report both editions' anchors.")
+    parser = argparse.ArgumentParser(description="Report every edition's anchors.")
     parser.add_argument("--json", action="store_true", help="Print the report as one document")
     parser.add_argument("--timeline", type=Path, help="Write each edition's derived timeline here")
     parser.add_argument(

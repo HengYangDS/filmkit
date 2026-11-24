@@ -92,7 +92,7 @@ LEVEL_FIELDS = ("levels", "sentences")
 REGISTER_FIELD = "register"
 REGISTERED = (
     "{report} is the register check's report on the words a viewer meets outside the picture, "
-    "in both editions and on the entry page. Its `{warnings}` are the forms the check records "
+    "in every edition and on the entry page. Its `{warnings}` are the forms the check records "
     "and does not refuse, each with its place and its rule's message; its `{excused}` are the "
     "exceptions the film declares that the check applied, each with the text its form stands "
     "within and the film's reason. The check judges single forms, and it does not read the "
@@ -291,7 +291,7 @@ def changes_text(changes: Path | None) -> str:
 
 
 def prompt_context(out_dir: Path, previous: Path | None, changes: Path | None) -> dict:
-    """The template fields both editions' prompts share.
+    """The template fields every edition's prompt shares.
 
     They name the canonical source, the film's concept contract and the readings' occurrence
     plans, the round's places, the delivery format but the runtime, which each edition's own
@@ -538,7 +538,7 @@ def read_round(
             "dispositions": stated[code],
             "language": Edition(code).language,
             "code": code,
-            # Each edition's own runtime: the two editions need not last alike.
+            # Each edition's own runtime: the editions need not last alike.
             RUNTIME_FIELD: Edition(code).runtime,
             "others": others_text(code),
             "editions": editions_text(code),
@@ -591,7 +591,7 @@ def prompts(
     as the repairs since the previous review, and dispositions the disposition of each finding
     of the previous round (`stated_dispositions`). The previous review is context to verify,
     never a score to inherit. Nothing is written unless everything that only reads passes
-    (`read_round`), the round's inputs exist and both editions' films are in place. For a film
+    (`read_round`), the round's inputs exist and every edition's films are in place. For a film
     with levels, each edition's sentences are then written into the round's directory as
     sentences-<code>.json, and the prompts after them.
     """
