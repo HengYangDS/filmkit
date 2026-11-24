@@ -221,3 +221,119 @@ def read(path: Path) -> RunRecord | PartialRecord:
         return model.model_validate(value)
     except ValidationError as error:
         raise Unreadable(f"{below_root(path)} does not hold a record: {error}") from None
+
+
+class Compared(NamedTuple):
+    """One file of a record against the file as it stands: `same` by size and time, or by its
+    digest when every file is hashed; `touched` with another size or time and the same digest;
+    `changed`; `missing`; or `blind`, the same size and time with another digest."""
+
+    side: str
+    name: str
+    path: str
+    result: str
+
+
+class Judgment(NamedTuple):
+    """A record judged against the files as they stand: each reason it is stale, none for a
+    fresh record, and each file it states as compared."""
+
+    reasons: tuple[str, ...]
+    files: tuple[Compared, ...]
+
+
+# What a reason says of a file of each result that makes its record stale.
+SAYS = {
+    "changed": "changed",
+    "missing": "missing",
+    "blind": "changed while keeping its size and time",
+}
+
+
+def at(recorded: State) -> Path:
+    """The file or folder a record states, below the film's root."""
+    return Path(repository.ROOT) / recorded.path
+
+
+def standing(recorded: State) -> tuple[tuple[int, int], ...] | None:
+    """The sizes and times of what a record states as it stands now, or None where it is gone."""
+    path = at(recorded)
+    if isinstance(recorded, FileState):
+        if not path.is_file():
+            return None
+        found = path.stat()
+        return ((found.st_size, found.st_mtime_ns),)
+    if not path.is_dir():
+        return None
+    folder = Folder(path, recorded.pattern)
+    return tuple((p.stat().st_size, p.stat().st_mtime_ns) for p in members(folder))
+
+
+def compare(side: str, name: str, recorded: State, *, full: bool) -> Compared:
+    """One stated file or folder against what stands: hashed only where a size or time differs,
+    or, with `full`, always."""
+    stats = standing(recorded)
+    if stats is None:
+        return Compared(side, name, recorded.path, "missing")
+    held = (
+        ((recorded.size, recorded.mtime_ns),)
+        if isinstance(recorded, FileState)
+        else tuple((m.size, m.mtime_ns) for m in recorded.members)
+    )
+    if stats == held and not full:
+        return Compared(side, name, recorded.path, "same")
+    path = at(recorded)
+    now = stated(Folder(path, recorded.pattern) if isinstance(recorded, FolderState) else path)
+    if now.sha256 == recorded.sha256:
+        return Compared(side, name, recorded.path, "same" if stats == held else "touched")
+    return Compared(side, name, recorded.path, "blind" if stats == held else "changed")
+
+
+def engine_reasons(recorded: Engine, running: Engine) -> list[str]:
+    """Why a record's engine is not the running one."""
+    reasons = []
+    if recorded.version != running.version:
+        reasons.append(f"another engine: recorded {recorded.version}, running {running.version}")
+    if recorded.released_sha256 != running.released_sha256:
+        reasons.append("another released.json: the engine's pins differ")
+    if recorded.pins != running.pins:
+        reasons.append("other model pins")
+    return reasons
+
+
+def judge(
+    record: RunRecord | PartialRecord | Unreadable | None,
+    *,
+    declared: dict[str, str] | None,
+    running: Engine,
+    full: bool = False,
+) -> Judgment:
+    """A record against the files as they stand (design decision 6 of record-every-run).
+
+    Stale, with each reason named, where no record stands or it cannot be read, its run did not
+    pass, it names another engine, `released.json` or pins, the inputs its way declares
+    (`declared`, each name's path below the root) are not the ones it recorded, or an input or
+    output is missing or changed. Each file is compared by size and time and hashed only where
+    they differ, unless `full` asks for every file to be hashed, which alone sees a change that
+    kept both. A partial record states no inputs, and its inputs are not compared.
+    """
+    if record is None:
+        return Judgment(("no record",), ())
+    if isinstance(record, Unreadable):
+        return Judgment((f"unreadable record: {record}",), ())
+    reasons = (
+        [] if record.outcome == "pass" else [f"its run ended with the outcome {record.outcome}"]
+    )
+    reasons += engine_reasons(record.engine, running)
+    inputs = record.inputs if isinstance(record, RunRecord) else {}
+    if declared is not None and isinstance(record, RunRecord):
+        held = {name: state.path for name, state in inputs.items()}
+        names = sorted({*held, *declared} - {n for n in held if declared.get(n) == held[n]})
+        if names:
+            reasons.append(
+                f"the inputs its way declares differ from those it recorded: {', '.join(names)}"
+            )
+    files = [compare("input", name, state, full=full) for name, state in inputs.items()]
+    files += [compare("output", name, state, full=full) for name, state in record.outputs.items()]
+    reasons += [f"{f.side} {f.name} {SAYS[f.result]}: {f.path}" for f in files if f.result in SAYS]
+    return Judgment(tuple(reasons), tuple(files))

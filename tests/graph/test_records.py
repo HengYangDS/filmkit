@@ -102,3 +102,75 @@ def test_a_record_of_another_schema_is_unreadable(root):
     path.write_text("{not json")
     with pytest.raises(records.Unreadable):
         records.read(path)
+
+
+@pytest.fixture
+def counted(monkeypatch):
+    """The core's hasher, counting the files it hashes."""
+    hashed = []
+    real = records.digest
+
+    def counting(path):
+        hashed.append(path)
+        return real(path)
+
+    monkeypatch.setattr(records, "digest", counting)
+    return hashed
+
+
+def judged(record, counted, *, full=False, declared=None):
+    counted.clear()
+    stated = {name: state.path for name, state in record.inputs.items()}
+    return records.judge(
+        record, declared=stated if declared is None else declared, running=record.engine, full=full
+    )
+
+
+def test_unchanged_files_are_not_hashed_and_a_touch_is_hashed_once(root, counted):
+    record = run_record(root).model_copy(update={"outcome": "pass", "refusal": None})
+    assert judged(record, counted).reasons == ()
+    assert counted == []
+    script = root / "content/zh/film-script.json"
+    stat = script.stat()
+    os.utime(script, ns=(stat.st_atime_ns, stat.st_mtime_ns + 5_000_000_000))
+    judgment = judged(record, counted)
+    assert judgment.reasons == ()
+    assert counted == [script]
+    assert [f.result for f in judgment.files if f.name == "script"] == ["touched"]
+
+
+def test_each_reason_of_a_stale_record_is_named(root, counted):
+    record = run_record(root)
+    assert judged(record, counted).reasons == ("its run ended with the outcome refuse",)
+    record = record.model_copy(update={"outcome": "pass", "refusal": None})
+    (root / "content/zh/film-script.json").write_bytes(b'{"segments": [1]}')
+    (root / "build/evidence/editions/zh/sound-gates.json").unlink()
+    other = record.engine.model_copy(update={"version": "0.33.0"})
+    reasons = records.judge(
+        record, declared={"script": "content/zh/film-script.json"}, running=other
+    ).reasons
+    assert reasons == (
+        "another engine: recorded 0.32.0, running 0.33.0",
+        "the inputs its way declares differ from those it recorded: stage",
+        "input script changed: content/zh/film-script.json",
+        "output sound_gates missing: build/evidence/editions/zh/sound-gates.json",
+    )
+    assert records.judge(None, declared={}, running=other).reasons == ("no record",)
+    unreadable = records.Unreadable("x.json is of schema 2, not 1")
+    assert records.judge(unreadable, declared={}, running=other).reasons == (
+        "unreadable record: x.json is of schema 2, not 1",
+    )
+
+
+def test_a_change_that_keeps_size_and_time_is_fresh_until_every_file_is_hashed(root, counted):
+    record = run_record(root).model_copy(update={"outcome": "pass", "refusal": None})
+    script = root / "content/zh/film-script.json"
+    stat = script.stat()
+    script.write_bytes(b'{"segments": {}}')
+    os.utime(script, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    assert judged(record, counted).reasons == ()
+    full = judged(record, counted, full=True)
+    assert full.reasons == (
+        "input script changed while keeping its size and time: content/zh/film-script.json",
+    )
+    assert [f.result for f in full.files if f.name == "script"] == ["blind"]
