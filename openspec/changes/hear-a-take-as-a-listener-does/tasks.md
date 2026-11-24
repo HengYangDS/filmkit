@@ -29,7 +29,7 @@ Shown by `tests/test_languages.py`, `tests/narration/test_cmudict.py`, `tests/te
       `tests/test_languages.py` holds both values, `xb`'s equal to English's and `xa`'s to Chinese's, and a
       declaration that names another kind, or none, refused when it loads with the language and the field named; and
       passes.
-- [ ] 2.2 Write `src/filmkit/narration/cmudict.py`: the pin (the file's URL at commit
+- [x] 2.2 Write `src/filmkit/narration/cmudict.py`: the pin (the file's URL at commit
       `74790861f652b15e4ac49015a90074ad62a27690`, its SHA-256
       `81917843c7f44ce2b094ac63873c2c7a4cf802040792c455ba3ca406891c3d22`, its 3,618,488 bytes and its place
       `build/runtime/tool-cache/cmudict/cmudict.dict`), and the reader of each headword's pronunciations in the file's
