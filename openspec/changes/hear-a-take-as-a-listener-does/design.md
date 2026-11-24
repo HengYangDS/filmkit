@@ -254,7 +254,7 @@ Read or measured on 24 November 2026, read only.
 - **[S2]** `build/evidence/engine-derivation/derivation-2026-11-23.md` in the engine's repository: §8 finding 1, §5.7.
 - **[S3]** The engine at `v0.31.0`: the files and lines cited, and `openspec/specs/`; read again at `v0.32.0`, whose
   `openspec/specs/` leaves the four capabilities this Change modifies as they were.
-- **[S4]** CMUdict, https://github.com/cmusphinx/cmudict, its commits and `LICENSE` at
+- **[S4]** CMUdict, <https://github.com/cmusphinx/cmudict>, its commits and `LICENSE` at
   `74790861f652b15e4ac49015a90074ad62a27690`; PyPI's JSON for `cmudict`, `pronouncing`, `g2p-en`, `nltk` and
   `breame`; `python-cmudict`'s submodule and `LICENSE` at its tag `v1.1.3`.
 - **[S5]** `content/voice-performance.json` of `ddwg-film`, `ddwg-essentials-film` and `ethos-film`.
