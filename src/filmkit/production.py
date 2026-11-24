@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING
 
 import filmkit.languages as languages
 import filmkit.repository as repository
-from filmkit.film import FILM, Places, places
+from filmkit.film import FILM
+from filmkit.places import Places, places
 
 if TYPE_CHECKING:
     from pathlib import Path

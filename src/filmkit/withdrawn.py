@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
+from filmkit.places import places
 from filmkit.repository import DECLARATION
 
 
@@ -25,6 +26,8 @@ class Withdrawn(NamedTuple):
     instead: str
 
 
+# Every edition's places, as the place rule gives them, by the code and file prefix they take.
+PLACE = places("<code>", "<slug>")
 # What the refusal of each key an edition's code derives says to do.
 BY_CODE = "remove it: the engine takes the edition's language from its code"
 
@@ -84,8 +87,8 @@ WITHDRAWN = (
     Withdrawn(
         "cast",
         "reference_audio",
-        "remove it and move the reference recording to "
-        "assets/audio/<code>/narration-reference.wav, the place the edition's code derives",
+        f"remove it and move the reference recording to {PLACE.reference}, the place the "
+        "edition's code derives",
     ),
     Withdrawn(
         "cast",
@@ -111,7 +114,7 @@ WITHDRAWN = (
         "script",
         "pronunciation_contract",
         "remove it and split the contract by edition: each edition's normalization, targets, own "
-        "sources and status into content/<code>/pronunciation.json, the place its code derives, "
+        f"sources and status into {PLACE.pronunciation}, the place its code derives, "
         f"and the schema version, control boundary, acceptance and shared sources into "
         f"[pronunciation] in {DECLARATION}",
     ),
@@ -124,18 +127,18 @@ WITHDRAWN = (
     Withdrawn(
         "review",
         "readings",
-        "remove it and move each edition's analyst readings to content/<code>/readings.json, the "
+        f"remove it and move each edition's analyst readings to {PLACE.readings}, the "
         "place its code derives",
     ),
     Withdrawn(
         "edition",
         "sources",
-        "remove it and move the edition's files to content/<code>/, the folder its code derives",
+        f"remove it and move the edition's files to {PLACE.folder}/, the folder its code derives",
     ),
     Withdrawn(
         "edition",
         "cover",
-        "remove it and move the cover to assets/cover/<slug>-cover-<code>.png, the place the "
+        f"remove it and move the cover to {PLACE.cover}, the place the "
         "file prefix and the edition's code derive",
     ),
 )

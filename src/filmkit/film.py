@@ -14,7 +14,7 @@ import itertools
 import tomllib
 import unicodedata
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from pydantic import (
     BaseModel,
@@ -29,6 +29,7 @@ from pydantic import (
 import filmkit.declared_sources as declared_sources
 import filmkit.languages as languages
 import filmkit.repository as repository
+from filmkit.places import CAST, SCRIPT, places
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -37,41 +38,11 @@ DECLARATION = repository.DECLARATION
 # The declaration's key that states the credits' length, once for every edition: the field
 # `Film.credits_duration`, which a script no longer declares.
 CREDITS = "credits_duration"
-# The files every edition's sources folder holds: its script and its cast.
-SCRIPT, CAST = "film-script.json", "voice-reference.json"
 # The frame rate the engine renders and encodes every film at.
 FPS = 60
 # The keys of a timeline's segment that the engine derives from its chapter (`timeline_values`).
 CHAPTER_VALUES = ("chapter_index", "chapter_title")
 EDITION_FILES = (SCRIPT, CAST)
-
-
-class Places(NamedTuple):
-    """Where an edition's files stand, each derived from its code (design decision 1): its
-    folder below `content/`, its script, cast, pronunciation and readings there, its reference
-    recording below `assets/audio/` and its cover below `assets/cover/`."""
-
-    folder: str
-    script: str
-    cast: str
-    pronunciation: str
-    readings: str
-    reference: str
-    cover: str
-
-
-def places(code: str, slug: str) -> Places:
-    """An edition's places, from its code and the film's file prefix; it loads nothing."""
-    folder = f"content/{code}"
-    return Places(
-        folder,
-        f"{folder}/{SCRIPT}",
-        f"{folder}/{CAST}",
-        f"{folder}/pronunciation.json",
-        f"{folder}/readings.json",
-        f"assets/audio/{code}/narration-reference.wav",
-        f"assets/cover/{slug}-cover-{code}.png",
-    )
 
 
 # The player template a sources folder once held; the engine renders each edition's player now.
