@@ -92,7 +92,7 @@ Shown by `tests/test_film_hearings.py`, `tests/narration/test_units_line.py`, `t
 - [x] 3.3 Let `selection.select` refuse, before it writes anything, each record of the edition whose take is not its
       thought's selected take. Done when `tests/narration/test_selection.py` holds the scenarios "A record of another
       take at selection" and "A record of no thought", each with no file written, and passes.
-- [ ] 3.4 Let `judge`'s clarity line name for the ear a take under its thought's line whose clarity no record
+- [x] 3.4 Let `judge`'s clarity line name for the ear a take under its thought's line whose clarity no record
       settles, outside the take's failing lines, and let `filmkit.narration.judge` record and name each thought for
       the ear and exit 1. Done when `tests/narration/test_units_line.py` holds the scenario "A hearing of the words
       alone", the scenarios "A film with a floor and no thought line", "A kept thought above its line", "A thought

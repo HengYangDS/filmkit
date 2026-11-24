@@ -165,10 +165,12 @@ def test_clarity_is_judged_only_where_the_film_declares_a_line_for_a_single_thou
     # A take that keeps no frame has no value: it is not judged, as the sound gate reads it.
     silent = narration_judgment.clarity_line({"cpp_db": None}, "26.1", held)
     assert (silent["passes"], silent["why"]) == (None, narration_judgment.NO_FRAMES)
-    # `judge` fails the line for a take under it and names the line a kept thought is held to.
+    # `judge` names for the owner's ear a take under its line, refusing it for nothing, and
+    # names the line a kept thought is held to.
     monkeypatch.setattr(narration_judgment, "take_clarity", lambda _path, _floor: {"cpp_db": 16.5})
     under = narration_judgment.judge(measured(), "26", 1, held)
-    assert (under["failed"], under["lines"]["clarity"]["line_db"]) == (["clarity"], 17.0)
+    assert (under["failed"], under["lines"]["clarity"]["line_db"]) == ([], 17.0)
+    assert narration_judgment.for_the_ear({"thought": "26.1", **under})
     kept_take = narration_judgment.judge(measured(), "26", 2, held)
     assert (kept_take["failed"], kept_take["lines"]["clarity"]["line_db"]) == ([], 16.0)
 

@@ -22,12 +22,16 @@ declares a floor for the edition, and its verdict on each line:
            record names each unit of the transcript that stood for a declared term in other
            letters (`terms_in_other_letters`, `recognition.stands_for`);
   clarity  it reads at or above the film's line for a single thought
-           (`review.clarity.under_its_line`, which `filmkit.preflight` asks too). A film that
+           (`review.clarity.under_its_line`, which `filmkit.preflight` asks too). A take under
+           its line is not refused but named for the owner's ear (`FOR_THE_EAR`, decision D-46
+           of 24 November 2026): it waits for his hearing and gets no candidate. A film that
            declares a floor and no line for a single thought has its takes' clarity recorded
            and not judged.
 
 Every limit but `UNIT_LIMIT` is the film's declaration or the engine's constant in the module
-named. A take is refused when a line fails, and `failed` names every failing line at once.
+named. A take is refused when a line fails, and `failed` names every failing line at once. The
+owner's hearing of one take passes the lines it settles for that take alone
+(`filmkit.narration.hearings`).
 
 Two lines are measured on another basis than the gates that judge the bound take later, and a
 caller that binds a take asks those gates too (`gate_refused`): a take is aligned alone with
@@ -121,6 +125,9 @@ SAID = {
     "gate-pause": "holds an unmarked pause above its limit as the selection measures its segment",
     "gate-terms": "says a declared term beyond its bounds as the selection measures its segment",
 }
+# What the clarity line says of a take under its line that no hearing settles: it is neither
+# passed nor refused, and waits for the owner's ear.
+FOR_THE_EAR = "for the owner's ear: under its line, and no hearing of this take settles it"
 # What a record says of the selection's gates when the narration's alignment is not at hand.
 GATE_NOT_ASKED = "not asked: no alignment of the receipt's recordings stands beside it"
 NOT_OPENING = "not judged: the thought does not open its recording"
@@ -502,8 +509,39 @@ def judge(take: dict, segment: str, index: int, held: Held) -> dict:
         ),
         "clarity": hearings.settled(clarity_line(voice, thought, held), records.get("clarity")),
     }
+    if lines["clarity"]["passes"] is False:
+        lines["clarity"] = {**lines["clarity"], "passes": None, "ear": FOR_THE_EAR}
     failed = [line for line in LINES if lines[line]["passes"] is False]
     return {**take, "clarity": voice, "lines": lines, "failed": failed}
+
+
+def for_the_ear(row: dict) -> bool:
+    """Whether a judged take waits for the owner's ear: no line refuses it, and it reads under
+    its clarity line with no hearing of it that settles its clarity."""
+    return not row["failed"] and row["lines"]["clarity"].get("ear") == FOR_THE_EAR
+
+
+def ear(rows: list[dict]) -> dict[str, dict]:
+    """Each thought for the ear, by name, with its take's path, audio SHA-256, clarity and line."""
+    return {
+        row["thought"]: {
+            "path": row["path"],
+            "wav_sha256": row["wav_sha256"],
+            "cpp_db": row["clarity"]["cpp_db"],
+            "line_db": row["lines"]["clarity"]["line_db"],
+        }
+        for row in rows
+        if for_the_ear(row)
+    }
+
+
+def waiting(rows: list[dict]) -> list[str]:
+    """One line for each thought for the ear, naming its take's path and audio SHA-256."""
+    return [
+        f"  {name}: {take['path']} ({take['wav_sha256']}) reads {take['cpp_db']} dB, under its "
+        f"line of {take['line_db']} dB"
+        for name, take in ear(rows).items()
+    ]
 
 
 def judge_thoughts(records: list[dict], bench: Bench, held: Held) -> list[dict]:

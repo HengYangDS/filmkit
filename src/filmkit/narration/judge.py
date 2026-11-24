@@ -13,8 +13,11 @@ Latin-script words by CMUdict's pronunciations, it names the dictionary's URL an
 the edition's pronunciation by its SHA-256 (`pronunciations`). Judging unchanged takes again writes
 the same record.
 
-A thought is refused when a line fails. The command then exits 1 and names every refused
-thought with every line it fails, at once.
+A thought is refused when a line fails. A thought whose take reads under its clarity line, with
+no hearing of that take that settles it, is for the owner's ear (`judgment.for_the_ear`): the
+record names it apart, with its take's path, audio SHA-256, clarity and line. The command exits 1
+while a thought is refused or waits for the ear, and names every refused thought with every line
+it fails and every thought for the ear, at once.
 
 Usage: python -m filmkit.narration.judge --language <code>
 """
@@ -98,6 +101,7 @@ def judged(code: str, records: list[dict], bench, held) -> dict:
         "gates": "asked" if gate is not None else judgment.GATE_NOT_ASKED,
         "thoughts": rows,
         "refused": {row["thought"]: row["failed"] for row in rows if row["failed"]},
+        "for_the_ear": judgment.ear(rows),
     }
     repository.write(Edition(code).ear_first / RECORD, record)
     return record
@@ -114,13 +118,21 @@ def main(argv: list[str] | None = None) -> None:
         "edition": code,
         "thoughts": len(rows),
         "refused": len(record["refused"]),
+        "for_the_ear": len(record["for_the_ear"]),
         "differing_by_reading": sum(1 for row in rows if row["differing_units_by_reading"]),
         "record": repository.relative(Edition(code).ear_first / RECORD),
     }
     print(json.dumps(summary), flush=True)
+    said = []
     if record["refused"]:
-        refused = f"{code}: {len(record['refused'])} of {len(rows)} thoughts are refused"
-        raise SystemExit("\n".join([refused, *judgment.refusal(rows)]))
+        said += [f"{code}: {len(record['refused'])} of {len(rows)} thoughts are refused"]
+        said += judgment.refusal(rows)
+    if record["for_the_ear"]:
+        waiting = len(record["for_the_ear"])
+        said += [f"{code}: {waiting} of {len(rows)} thoughts wait for the owner's ear"]
+        said += judgment.waiting(rows)
+    if said:
+        raise SystemExit("\n".join(said))
 
 
 if __name__ == "__main__":
