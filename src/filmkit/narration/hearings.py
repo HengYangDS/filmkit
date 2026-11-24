@@ -70,3 +70,29 @@ def settled(line: dict, record: Heard | None) -> dict:
     if line["passes"]:
         return {**line, "heard": NOT_NEEDED}
     return {**line, "passes": True, "heard": {"listener": record.listener, "date": record.date}}
+
+
+def stale(heard: Sequence[Heard], records: Sequence[dict]) -> list[str]:
+    """Each record of an edition whose take is not its thought's selected take, among the
+    selected segments' `records`, in one line each: a record of another take, and one of a
+    thought the script does not hold."""
+    selected = {
+        f"{record['id']}.{child['index']}": child["wav_sha256"]
+        for record in records
+        for child in record.get("utterance_groups", {}).get("records", [])
+    }
+    found = []
+    for record in heard:
+        take = selected.get(record.thought)
+        if take == record.take:
+            continue
+        said = (
+            f"the script holds no thought {record.thought}"
+            if take is None
+            else "the take it names is not the thought's selected take"
+        )
+        found.append(
+            f"narration.heard {record.edition} {record.thought} {record.take}: {said}; remove the "
+            "record or record the hearing of the selected take"
+        )
+    return found

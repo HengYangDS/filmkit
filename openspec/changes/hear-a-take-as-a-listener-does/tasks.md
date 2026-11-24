@@ -89,7 +89,7 @@ Shown by `tests/test_film_hearings.py`, `tests/narration/test_units_line.py`, `t
       hearing was not needed where the take passes the line without it. Done when `tests/narration/test_units_line.py`
       holds every scenario of the requirement "The owner's hearing settles the lines it names for one take" but "A
       hearing of the words alone", and passes.
-- [ ] 3.3 Let `selection.select` refuse, before it writes anything, each record of the edition whose take is not its
+- [x] 3.3 Let `selection.select` refuse, before it writes anything, each record of the edition whose take is not its
       thought's selected take. Done when `tests/narration/test_selection.py` holds the scenarios "A record of another
       take at selection" and "A record of no thought", each with no file written, and passes.
 - [ ] 3.4 Let `judge`'s clarity line name for the ear a take under its thought's line whose clarity no record

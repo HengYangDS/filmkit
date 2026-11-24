@@ -1,8 +1,9 @@
 """Select the narration recordings and validate their voice, text, alignment and speech.
 
 Selection refuses a recording whose voice, text or alignment differs from what binds it, an
-unmarked pause above the film's limit (`narration.flow`) and a declared term said unlike its
-reference occurrence (`narration.terms`), naming each before it writes anything.
+unmarked pause above the film's limit (`narration.flow`), a declared term said unlike its
+reference occurrence (`narration.terms`) and a record of the owner's hearing whose take is not
+its thought's selected take (`narration.hearings.stale`), naming each before it writes anything.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import filmkit.narration.flow as flow
+import filmkit.narration.hearings as hearings
 import filmkit.narration.terms as terms
 import filmkit.repository as repository
 from filmkit.film import FILM
@@ -104,6 +106,8 @@ def select(edition: Edition) -> None:
     for record in records:
         validate_aligned_recording(record, aligned[record["id"]])
     refused = speech_refusals(edition, script, records, aligned)
+    heard = [record for record in FILM.narration.heard if record.edition == edition.code]
+    refused += hearings.stale(heard, records)
     if refused:
         raise SelectionError("\n".join(refused))
     write(

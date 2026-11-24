@@ -355,3 +355,52 @@ def test_selection_refuses_a_term_said_unlike_its_reference(edition, monkeypatch
     declare(monkeypatch, terms=(stale,))
     with pytest.raises(narration_selection.SelectionError, match="Agent reference 26.1 #1 is not"):
         narration_selection.select(Edition("en"))
+
+
+def heard_of(thought: str, take: str) -> film.Heard:
+    """The owner's hearing of one English take."""
+    return film.Heard(
+        edition="en",
+        thought=thought,
+        take=take,
+        lines=("units",),
+        listener=film.FILM.author,
+        date="2026-11-24",
+        note="Heard on the clip.",
+    )
+
+
+def hearing(monkeypatch, *records: film.Heard) -> None:
+    narration = film.FILM.narration.model_copy(update={"heard": records})
+    monkeypatch.setattr(
+        narration_selection, "FILM", film.FILM.model_copy(update={"narration": narration})
+    )
+
+
+def test_a_record_of_the_selected_take_is_selected_with_it(edition, monkeypatch):
+    selected = receipt_record(edition)["utterance_groups"]["records"][1]["wav_sha256"]
+    hearing(monkeypatch, heard_of("26.2", selected))
+    narration_selection.select(Edition("en"))
+    assert (repository.ROOT / Edition("en").narration_selected).is_file()
+
+
+@pytest.mark.parametrize(
+    ("thought", "take", "said"),
+    [
+        ("26.2", "d" * 64, "the take it names is not the thought's selected take"),
+        ("14.9", "e" * 64, "the script holds no thought 14.9"),
+    ],
+    ids=["another-take", "no-thought"],
+)
+def test_a_record_that_names_no_selected_take_is_refused_before_anything_is_written(
+    edition, monkeypatch, thought, take, said
+):
+    hearing(monkeypatch, heard_of(thought, take))
+    with pytest.raises(narration_selection.SelectionError) as refusal:
+        narration_selection.select(Edition("en"))
+    assert str(refusal.value) == (
+        f"narration.heard en {thought} {take}: {said}; remove the record or record the hearing "
+        "of the selected take"
+    )
+    assert not (repository.ROOT / Edition("en").narration_selected).exists()
+    assert not (repository.ROOT / Edition("en").alignment_selected).exists()
