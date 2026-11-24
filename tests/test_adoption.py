@@ -105,7 +105,7 @@ def test_every_finding_of_every_question_is_listed_in_one_run(project):
     rewrite(
         project / ".config/mise/config.toml",
         "filmkit.delivery.folder",
-        "filmkit.delivery.documents_folder",
+        "filmkit.delivery.documents_folder content/voice-performance.json",
     )
     rewrite(
         project / "picture/index.html",

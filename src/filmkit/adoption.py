@@ -3,7 +3,7 @@
 Usage: python -m filmkit.adoption
 Run at the film's root, or anywhere with `FILMKIT_ROOT` naming it, in any environment that holds
 the engine. The command reads tracked files only: it needs no declaration that loads, none of
-the film's npm packages, no supply and no build. It asks seven questions and prints one JSON line
+the film's npm packages, no supply and no build. It asks eight questions and prints one JSON line
 with every finding of each; while one stands it exits with status 1 and names them all. A file
 of the film that cannot be read is a finding of the question that reads it.
 
@@ -39,6 +39,17 @@ of the film that cannot be read is a finding of the question that reads it.
   pin of Vale under another name or in another file of Mise's is not read, so the finding says
   that the file holds none under this name, not that the film pins none. A film without a Mise
   configuration is named as having none.
+- `editions`: each line of a tracked text file of the film, but the sources the loader reads
+  (the declaration, the review prompt, the entry page and each edition's files), that names a
+  file this release moves or removes by its former path, with what to write instead: the paths
+  that the declaration's withdrawn `sources` and `cover` and the casts' withdrawn
+  `reference_audio` still name, and the files the loader names as removed
+  (`filmkit.declared_sources`). It reads the declaration as TOML, so a declaration that does not
+  load hides none of them; it lists the tracked files by Git, or every file outside a work tree
+  but `NOT_SOURCES`, and a file that cannot be listed, or read as text where no other question
+  reads it, is its finding. A bridge: R2b deletes it with this module, when the films' build
+  chains and test loaders are gone. Run it before removing a withdrawn key, which names the
+  former paths.
 
 What the engine was released on is its own record (`filmkit.released`). The manifests, the locks
 and the tasks are read at the film's root or above it, up to the folder that holds the film's
@@ -54,6 +65,7 @@ import ast
 import json
 import re
 import string
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -63,7 +75,16 @@ import filmkit.repository as repository
 from filmkit.picture import template
 from filmkit.review import RUNTIME_FIELD
 
-QUESTIONS = ("declaration", "runtime", "npm_packages", "python_lock", "tasks", "template", "vale")
+QUESTIONS = (
+    "declaration",
+    "runtime",
+    "npm_packages",
+    "python_lock",
+    "tasks",
+    "template",
+    "vale",
+    "editions",
+)
 # Where a film's Mise tasks stand, in the order Mise's own documentation lists the files.
 TASK_FILES = (".config/mise/config.toml", "mise.toml", ".mise.toml")
 PRODUCE = "filmkit.produce"
@@ -425,6 +446,113 @@ def vale(root: Path) -> list[str]:
     return [] if pinned == asked else [f"{config.name} pins Vale {pinned}; {on}"]
 
 
+def former_paths(root: Path, declared: dict) -> tuple[dict[str, str], set[str]]:
+    """Each former path of a file this release moves or removes, with what to write instead, and
+    the sources the loader reads, whose findings are the `declaration` question's."""
+    from filmkit.declared_sources import NARRATION_COPY, REMOVED
+
+    instead = {old: f"this release removes it; {text}" for old, text in REMOVED.items()}
+    owned = {film.DECLARATION}
+    review = declared.get("review")
+    owned |= {
+        path
+        for path in (declared.get("entry"), review and review.get("prompt"))
+        if isinstance(path, str)
+    }
+    slug = str(declared.get("slug"))
+    for code, edition in table(declared.get("editions"), f"{film.DECLARATION}: editions").items():
+        edition = edition if isinstance(edition, dict) else {}
+        derived = film.places(code, slug)
+        sources = edition.get("sources")
+        folders = {derived.folder, *([sources] if isinstance(sources, str) else [])}
+        owned |= {*film.edition_files(code, slug)[:3], derived.readings}
+        owned |= {f"{folder}/{name}" for folder in folders for name in film.EDITION_FILES}
+        instead |= {f"{folder}/{NARRATION_COPY}": "this release removes it" for folder in folders}
+        moves = [
+            (f"{sources}/{name}", place)
+            for name, place in ((film.SCRIPT, derived.script), (film.CAST, derived.cast))
+            if isinstance(sources, str)
+        ]
+        moves.append((edition.get("cover"), derived.cover))
+        for cast in {f"{folder}/{film.CAST}" for folder in folders}:
+            try:
+                held = read_json(root / cast) if (root / cast).is_file() else {}
+            except UnreadableError:
+                held = {}
+            moves.append((held.get("reference_audio"), derived.reference))
+        instead |= {
+            old: f"write {new}" for old, new in moves if isinstance(old, str) and old != new
+        }
+    return instead, owned
+
+
+# What a film's folders hold besides its sources: Git's own records, built output, packages and
+# environments.
+NOT_SOURCES = frozenset({".git", "build", "node_modules", ".venv"})
+# The files another question reads, which names each that cannot be read.
+READ_ELSEWHERE = frozenset(
+    {*TASK_FILES, "package.json", "package-lock.json", "uv.lock", "pyproject.toml"}
+    | {"picture/index.html"}
+)
+
+
+def tracked(root: Path) -> list[str]:
+    """The files Git tracks below a root, by their paths from it; outside any work tree, every
+    file below it but `NOT_SOURCES`, as a copy that `git archive` extracted holds tracked files
+    alone."""
+    try:
+        inside = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"], cwd=root, capture_output=True, timeout=60
+        )
+        if inside.returncode != 0:
+            return sorted(
+                path.relative_to(root).as_posix()
+                for path in root.rglob("*")
+                if path.is_file() and not NOT_SOURCES & set(path.relative_to(root).parts)
+            )
+        listed = subprocess.run(
+            ["git", "ls-files", "-z"], cwd=root, capture_output=True, check=True, timeout=60
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        message = f"the film's tracked files cannot be listed: {error}"
+        raise UnreadableError(message) from error
+    return sorted(path for path in listed.stdout.decode("utf-8").split("\0") if path)
+
+
+def editions(root: Path) -> list[str]:
+    """Each line of the film's tracked text, but the sources the loader reads, that names a file
+    this release moves or removes by its former path, with what to write instead, and each file
+    that cannot be read as text and that no other question reads (`READ_ELSEWHERE`, and the
+    declaration, which the `declaration` question names). A file with a NUL byte in its first
+    8000 is binary and not read."""
+    try:
+        declared = read_toml(root / film.DECLARATION)
+    except UnreadableError:
+        return []
+    instead, owned = former_paths(root, declared)
+    found = []
+    for path in tracked(root):
+        if path in owned or not (root / path).is_file():
+            continue
+        with (root / path).open("rb") as file:
+            if b"\0" in file.read(8000):
+                continue
+        data = (root / path).read_bytes()
+        try:
+            lines = data.decode("utf-8").splitlines()
+        except UnicodeDecodeError as error:
+            if path not in READ_ELSEWHERE:
+                found.append(f"{path} cannot be read as text: {error}")
+            continue
+        found += [
+            f"{path}:{number} names {old}; {what}"
+            for number, line in enumerate(lines, 1)
+            for old, what in instead.items()
+            if old in line
+        ]
+    return found
+
+
 def report(root: Path) -> dict:
     """Every finding of each question for the film at a root, and what could not be compared."""
     not_read: list[str] = []
@@ -436,6 +564,7 @@ def report(root: Path) -> dict:
         "tasks": lambda: tasks(root, not_read),
         "template": lambda: picture_template(root),
         "vale": lambda: vale(root),
+        "editions": lambda: editions(root),
     }
     findings = {}
     for name, ask in questions.items():
