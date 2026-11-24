@@ -2,7 +2,7 @@
 
 The engine knows every dependency of a film's build, yet states none of them once. About twenty kinds of record each bind their inputs by SHA-256 with their own key shapes, and about a dozen functions each judge their own record stale [S1, §3.1]. Readiness (`preflight`, `admitted`), the durations sum, the verifier's re-asking and the set-aside each re-derive what one record of every run would state. Two of those binding lists are already kept twice: the sound gate's at `soundtrack/gates.py:71-75` and `preflight.py:202-206`, the picture gate's at `picture/gates.py:387-395` and `picture/rendering.py:405-411`.
 
-At 21:56 on 23 November 2026 the owner adopted the engine's re-derived architecture and its decision 1: an engine-owned record core, ordered by the standard library's `graphlib.TopologicalSorter`, with doit reading the engine's records through `uptodate` as the named alternative [S3, D-37; S1, §4.1, §5, §6]. This Change is that architecture's release R2a (0.32.0): the one record kind and `filmkit plan --json`, beside today's stages, retiring nothing [S1, §5.7]. R2b (0.33.0) then retires the records and checks this Change leaves standing.
+At 21:56 on 23 November 2026 the owner adopted the engine's re-derived architecture and its decision 1: an engine-owned record core, ordered by the standard library's `graphlib.TopologicalSorter`, with doit reading the engine's records in its up-to-date check as the named alternative [S3, D-37; S1, §4.1, §5, §6]. This Change is that architecture's release R2a (0.32.0): the one record kind and `filmkit plan --json`, beside today's stages, retiring nothing [S1, §5.7]. R2b (0.33.0) then retires the records and checks this Change leaves standing.
 
 ## What Changes
 
