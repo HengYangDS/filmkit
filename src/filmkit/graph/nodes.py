@@ -12,8 +12,9 @@ A path that several nodes write is declared in `SHARED` with each writer and its
 `rewrites` it after the writers it names, or one that `replaces` it whole (design decision 5).
 The edges follow: a node that reads a path comes after each node that writes it, a rewriter
 after the writers it names, and replacers of one path have no edge between them. Loading a
-table refuses a cycle, naming its nodes, and a path that two nodes write with no declaration,
-naming the path and the nodes.
+table refuses a cycle, naming its nodes, a path that two nodes write with no declaration,
+naming the path and the nodes, and a node whose places bind one name to two places, naming the
+name: a union of `Places` refuses it, so that no place is lost under another's name.
 """
 
 from __future__ import annotations
@@ -40,7 +41,6 @@ from filmkit.production import CODES, Edition
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-Places = dict[str, Path | Folder]
 # The kinds of a writer of a path that several nodes write (design decision 5).
 REWRITES, REPLACES = "rewrites", "replaces"
 # The tools whose reads the check of each run's opens sees only through their arguments.
@@ -83,7 +83,30 @@ class Writer(NamedTuple):
 
 
 class TableError(ValueError):
-    """A node table that cannot be ordered or leaves a writer undeclared."""
+    """A node table that cannot be ordered, leaves a writer undeclared or binds one name of a
+    node's places to two places."""
+
+
+class Places(dict[str, "Path | Folder"]):
+    """A node's places by name; a union that binds one name to two places is refused."""
+
+    def __or__(self, other: dict) -> Places:
+        return Places(joined(self, other))
+
+    def __ror__(self, other: dict) -> Places:
+        return Places(joined(other, self))
+
+    def __ior__(self, other: dict) -> Places:  # type: ignore[override]
+        self.update(joined(self, other))
+        return self
+
+
+def joined(first: dict, second: dict) -> dict:
+    """Two sets of places in one, refused where a name stands for two places."""
+    clash = sorted(n for n in first.keys() & second.keys() if place(first[n]) != place(second[n]))
+    if clash:
+        raise TableError(f"a node's places bind {', '.join(clash)} to two places each")
+    return {**first, **second}
 
 
 def key(node: str, code: str) -> str:
@@ -216,24 +239,24 @@ def root(path: str | Path) -> Path:
 
 def named(bindings: dict[str, Path]) -> Places:
     """An owner's binding list by the names its record keys them under, less `_sha256`."""
-    return {name.removesuffix("_sha256"): path for name, path in bindings.items()}
+    return Places({name.removesuffix("_sha256"): path for name, path in bindings.items()})
 
 
 def declared(edition: Edition) -> Places:
     """What every command reads: the film's declaration, which it loads."""
     del edition
-    return {"declaration": root(repository.DECLARATION)}
+    return Places({"declaration": root(repository.DECLARATION)})
 
 
 def sources(edition: Edition) -> Places:
     """The edition's tracked sources that its narration reads; its readings where it has them."""
     places = edition.places
-    found = {
-        "script": root(edition.script),
-        "cast": root(edition.cast),
-        "pronunciation": root(places.pronunciation),
-        "reference": root(places.reference),
-    }
+    found = Places(
+        script=root(edition.script),
+        cast=root(edition.cast),
+        pronunciation=root(places.pronunciation),
+        reference=root(places.reference),
+    )
     return found | ({"readings": root(places.readings)} if root(places.readings).is_file() else {})
 
 
@@ -241,10 +264,10 @@ def checked_words(edition: Edition) -> Places:
     """What the checks of words read: the source manifest, the concepts, every script and the
     composition's sources (`filmkit.concepts`, `filmkit.register`)."""
     del edition
-    found = {
-        "source_manifest": root(FILM.source_manifest),
-        "composition": Folder(root("picture"), "**/*"),
-    }
+    found = Places(
+        source_manifest=root(FILM.source_manifest),
+        composition_sources=Folder(root("picture"), "**/*"),
+    )
     found |= {f"script_{code}": root(Edition(code).script) for code in CODES}
     return found | ({"concepts": root(FILM.concepts)} if FILM.concepts else {})
 
@@ -252,31 +275,31 @@ def checked_words(edition: Edition) -> Places:
 def narration(edition: Edition) -> Places:
     """The edition's narration: its takes, their receipt, alignment and transcript."""
     paths = evidence_paths(edition.code)
-    return {
-        "recordings": Folder(root(paths["folder"]), "*"),
-        "receipt": root(paths["receipt"]),
-        "alignment": root(paths["alignment"]),
-        "asr": root(paths["asr"]),
-    }
+    return Places(
+        recordings=Folder(root(paths["folder"]), "**/*"),
+        receipt=root(paths["receipt"]),
+        alignment=root(paths["alignment"]),
+        asr=root(paths["asr"]),
+    )
 
 
 def documents(edition: Edition) -> Places:
     """What the assembly writes and the caption refresh writes again."""
-    return {
-        "soundtrack": edition.soundtrack,
-        "timeline": edition.timeline,
-        "assembly": edition.audio_assembly,
-        "srt": edition.srt,
-        "vtt": edition.vtt,
-        "chapters": edition.chapters,
-        "transcript": edition.transcript,
-        "chapter_metadata": edition.chapter_metadata,
-    }
+    return Places(
+        soundtrack=edition.soundtrack,
+        timeline=edition.timeline,
+        assembly=edition.audio_assembly,
+        srt=edition.srt,
+        vtt=edition.vtt,
+        chapters=edition.chapters,
+        transcript=edition.transcript,
+        chapter_metadata=edition.chapter_metadata,
+    )
 
 
 def faces() -> Places:
     """The stylesheet and the declared fonts, each by its path."""
-    return {f"face {name}": path for name, path in rendering.face_places().items()}
+    return Places({f"face {name}": path for name, path in rendering.face_places().items()})
 
 
 def staging(edition: Edition) -> Places:
@@ -292,13 +315,13 @@ def staging(edition: Edition) -> Places:
 
 def stage(edition: Edition, captions: bool = True) -> Places:
     """A picture's stage, as a folder."""
-    return {"stage": Folder(edition.rendered(captions).stage, "**/*")}
+    return Places({"stage": Folder(edition.rendered(captions).stage, "**/*")})
 
 
 def rendered(edition: Edition, captions: bool = True) -> Places:
     """A picture and its receipt."""
     picture = edition.rendered(captions)
-    return {"picture": picture.file, "receipt": picture.receipt}
+    return Places({"picture": picture.file, "receipt": picture.receipt})
 
 
 def staged_picture(edition: Edition, captions: bool = True) -> Places:
@@ -342,13 +365,13 @@ def compared(edition: Edition) -> Places:
 
 def metadata_inputs(edition: Edition) -> Places:
     """What the viewing package and the entry page are made from."""
-    found = {
-        "cover": root(edition.cover),
-        "version": root(packaging.VERSION),
-        "script": root(edition.script),
-        "composition": root(rendering.COMPOSITION_SCRIPT),
-        "entry_source": root(FILM.entry),
-    }
+    found = Places(
+        cover=root(edition.cover),
+        version=root(packaging.VERSION),
+        script=root(edition.script),
+        composition=root(rendering.COMPOSITION_SCRIPT),
+        entry_source=root(FILM.entry),
+    )
     kept = ("srt", "vtt", "chapters", "transcript", "chapter_metadata")
     found |= {name: path for name, path in documents(edition).items() if name in kept}
     found |= {f"timeline_{code}": Edition(code).timeline for code in CODES}
@@ -358,20 +381,22 @@ def metadata_inputs(edition: Edition) -> Places:
 def metadata(edition: Edition) -> Places:
     """The viewing package's own files and the entry page, which every edition replaces."""
     output = edition.artifacts
-    return {
-        "cover_png": output / packaging.COVER_PNG,
-        "cover_jpg": output / packaging.COVER_JPEG,
-        "player": output / packaging.PAGE,
-        "shot_plan": edition.shot_plan,
-        "viewing_package": edition.viewing_package,
-        "entry": repository.ROOT / packaging.LANGUAGE_INDEX,
-    }
+    return Places(
+        cover_png=output / packaging.COVER_PNG,
+        cover_jpg=output / packaging.COVER_JPEG,
+        player=output / packaging.PAGE,
+        shot_plan=edition.shot_plan,
+        viewing_package=edition.viewing_package,
+        entry=repository.ROOT / packaging.LANGUAGE_INDEX,
+    )
 
 
 def packaged(edition: Edition) -> Places:
-    """What the films are made from: their inputs (`packaging.film_inputs`) but the cover the
-    packaging writes itself, both pictures' validations, and the viewing package's inputs."""
-    films = {k: p for k, p in named(packaging.film_inputs(edition)).items() if k != "cover"}
+    """What the films are made from: their inputs (`packaging.film_inputs`, each name marked
+    `film_`) but the cover the packaging writes itself, both pictures' validations, and the
+    viewing package's inputs."""
+    bound = named(packaging.film_inputs(edition)).items()
+    films = {f"film_{k}": p for k, p in bound if k != "cover"}
     return compared(edition) | metadata_inputs(edition) | films
 
 
@@ -392,7 +417,7 @@ def readiness(edition: Edition) -> Places:
 
 def only(name: str, path: Callable[[Edition], Path | Folder]) -> Callable[[Edition], Places]:
     """A node's outputs that are one file or folder."""
-    return lambda edition: {name: path(edition)}
+    return lambda edition: Places({name: path(edition)})
 
 
 def work(name: str) -> Callable[[Edition], Path]:

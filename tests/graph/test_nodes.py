@@ -89,6 +89,24 @@ def test_an_undeclared_second_writer_is_refused_naming_the_path():
     assert nodes.load(both, declared, ("zh",)).edges == {"a:zh": set(), "b:zh": set()}
 
 
+def test_a_node_whose_places_bind_one_name_to_two_places_is_refused_naming_it():
+    root = Path(repository.ROOT)
+    owner = {"composition": root / "picture/film.js", "script": root / "script.json"}
+    clashing = nodes.Node(
+        "a",
+        {"default": lambda e: nodes.Places(composition=Folder(root / "picture", "**/*")) | owner},
+        lambda e: {},
+        "light",
+    )
+    with pytest.raises(nodes.TableError, match=r"bind composition to two places"):
+        nodes.load([clashing], {}, ("zh",))
+    # The same place under one name twice is no clash.
+    same = nodes.Places(script=root / "script.json")
+    assert same | owner == {**owner}
+    same |= {"script": root / "script.json"}
+    assert same == {"script": root / "script.json"}
+
+
 def test_a_rewriter_follows_the_writers_it_names():
     rewritten = (stand_in("a", writes=["t"]), stand_in("b", reads=["t"], writes=["t"]))
     shared = {"t": (nodes.Writer("a", nodes.REPLACES), nodes.Writer("b", nodes.REWRITES, ("a",)))}

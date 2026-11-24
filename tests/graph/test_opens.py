@@ -7,6 +7,7 @@ import subprocess
 import sys
 
 import pytest
+import sample_sound
 
 import filmkit.repository as repository
 import filmkit.tools as tools
@@ -167,3 +168,22 @@ def test_nothing_is_recorded_and_node_starts_unaudited_when_the_variable_is_unse
     monkeypatch.delenv("NODE_OPTIONS", raising=False)
     assert tools.run(next(iter(tools.TOOLS)), []) == 0
     assert "--permission-audit" not in started[0].get("NODE_OPTIONS", "")
+
+
+@pytest.mark.ffmpeg
+def test_every_node_the_light_suite_runs_reads_and_writes_only_what_it_declares(built, monkeypatch):
+    root, log = built
+    monkeypatch.setattr(repository, "ROOT", root)
+    report = opens.check(log)
+    assert report.findings == []
+    assert report.unjudged == set()
+    assert report.seen == {nodes.key(command, code) for command, code in sample_sound.CHAIN}
+    # The nodes whose tools are seen only through their arguments are named with them.
+    named = report.unseen
+    for code in sample_sound.NARRATED:
+        assert named[nodes.key("assemble", code)] == nodes.MEDIA
+        assert named[nodes.key("check-sound", code)] == nodes.MEDIA
+    assert named[nodes.key("preflight", "zh")] == nodes.BROWSER
+    # Each exemption is reported with the nodes it covered.
+    records = f"records: {opens.EXEMPT['records']}"
+    assert report.exempted[records] == report.seen

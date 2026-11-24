@@ -53,10 +53,22 @@ QUIET |= {",": 0.08, ";": 0.15, ":": 0.15, ".": 0.18, "?": 0.18, "!": 0.18}
 # A phrase and the marks that end it; a word, a Chinese character or a Latin word.
 PHRASE = re.compile(rf"([^{re.escape(''.join(QUIET))}]+)([{re.escape(''.join(QUIET))}]*)")
 WORD = re.compile(r"[\u3400-\u9fff]|[A-Za-z0-9'’]+")
-# The editions narrated, and the commands run after, each with its edition.
-NARRATED = ("zh",)
+# The editions narrated, and the commands run after, each with its edition, in the order of the
+# sample's tasks: every node the light suite can run.
+NARRATED = ("zh", "en")
 SOUND = ("select", "assemble", "refresh-captions", "check-sound")
-CHAIN = tuple((command, "zh") for command in SOUND)
+CHAIN = (
+    *((command, "zh") for command in SOUND),
+    *((command, "en") for command in SOUND),
+    ("stage-picture", "zh"),
+    ("preflight", "zh"),
+    ("package-metadata", "zh"),
+    ("package-metadata", "en"),
+)
+# The runs that end refused here, each with its reason.
+REFUSED = {
+    ("preflight", "zh"): "the picture's heavy nodes have not run and no browser is supplied",
+}
 
 
 def copy_film(root: Path) -> Path:
@@ -249,7 +261,8 @@ def narrate(code: str) -> None:
 
 def run(root: Path, command: str, code: str, log: Path | None = None) -> str:
     """Run a command of the film's chain on an edition, in its own process with `root` as the
-    film's root, as the film's task runs it; its output, or a failure naming its lines."""
+    film's root, as the film's task runs it; its output. A failure names its lines, and so does
+    a run that `REFUSED` names and that passed."""
     environment = {**os.environ, repository.ROOT_VARIABLE: str(root)}
     environment.pop(opens.NODE, None)
     if log is not None:
@@ -263,6 +276,6 @@ def run(root: Path, command: str, code: str, log: Path | None = None) -> str:
         timeout=90,
         check=False,
     )
-    if done.returncode:
+    if bool(done.returncode) != ((command, code) in REFUSED):
         raise AssertionError(f"{command} {code} exited {done.returncode}:\n{done.stderr[-3000:]}")
     return done.stdout
