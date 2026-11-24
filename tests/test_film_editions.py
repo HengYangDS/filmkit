@@ -2,6 +2,7 @@
 needs a language declaration, and everything the declaration states of an edition names one of
 them."""
 
+import json
 import shutil
 from pathlib import Path
 
@@ -152,3 +153,86 @@ def test_an_entry_page_that_breaks_its_rule_is_refused_at_load_beside_other_prob
     page.write_text(page.read_text().replace('<html lang="zh-CN">', '<html lang="mul">'))
     rewrite(declared, 'slug = "Two Words"', 'slug = "sample-reel"')
     assert film.load(declared) == film.FILM
+
+
+def test_every_place_of_an_edition_comes_from_its_code_alone():
+    for code in ("zh", "en"):
+        assert film.places(code, "sample-reel") == (
+            f"content/{code}",
+            f"content/{code}/film-script.json",
+            f"content/{code}/voice-reference.json",
+            f"content/{code}/pronunciation.json",
+            f"content/{code}/readings.json",
+            f"assets/audio/{code}/narration-reference.wav",
+            f"assets/cover/sample-reel-cover-{code}.png",
+        )
+
+
+def declare(path: Path, **fields) -> None:
+    """Add fields to a JSON file of the film."""
+    path.write_text(json.dumps({**json.loads(path.read_text()), **fields}, ensure_ascii=False))
+
+
+# What the loader says of a script's withdrawn runtime, at whichever place the script stands.
+DURATION = "declares duration; " + film.withdrawn("script")["duration"]
+
+
+def test_a_withdrawn_key_is_refused_where_the_declaration_still_names_the_files(declared):
+    # A film that has not moved its Chinese files keeps them where its declaration names them.
+    for name in film.EDITION_FILES:
+        (declared / "content/zh" / name).rename(declared / "content" / name)
+    rewrite(declared, 'sources = "content/zh"', 'sources = "content"')
+    declare(declared / "content" / film.SCRIPT, duration=1500)
+    rewrite(declared, 'slug = "sample-reel"', 'slug = "Two Words"')
+    with pytest.raises(FilmError) as refusal:
+        film.load(declared)
+    first, other = str(refusal.value).split("\n", 1)
+    assert first == f"content/film-script.json {DURATION}"
+    assert "\nslug\n" in other
+
+
+def test_a_withdrawn_key_is_refused_at_the_derived_place_under_no_sources(declared):
+    rewrite(declared, 'sources = "content/zh"\n', "")
+    declare(declared / "content/zh" / film.SCRIPT, duration=1500)
+    rewrite(declared, 'slug = "sample-reel"', 'slug = "Two Words"')
+    first, other = film.problems(declared)
+    assert first == f"content/zh/film-script.json {DURATION}"
+    assert "\nslug\n" in other
+    rewrite(declared, 'slug = "Two Words"', 'slug = "sample-reel"')
+    assert film.problems(declared) == [first]
+
+
+@pytest.mark.parametrize(
+    "fields", [{"reserve_seconds": 0.5}, {"reserve_seconds": 0.0}, {}, 0.1, None]
+)
+def test_a_cast_that_declares_runtime_fit_is_refused_whatever_it_holds(declared, fields):
+    # Nothing reads it, since an edition lasts as long as its narration: a reserve, an empty
+    # table and any other value are refused alike, before any command runs.
+    declare(declared / "content/en" / film.CAST, runtime_fit=fields)
+    assert film.problems(declared) == [
+        "content/en/voice-reference.json declares runtime_fit; remove it: nothing reads it, since "
+        "an edition lasts as long as its narration"
+    ]
+
+
+def test_every_kind_of_place_is_read_for_its_withdrawn_keys(declared, monkeypatch):
+    # The table names no key of a declaration, an edition's table, a segment or a part yet;
+    # each later withdrawal adds its row, and the loader reads every kind of place for it.
+    rows = [
+        film.Withdrawn(kind, "held", "remove it")
+        for kind in ("declaration", "edition", "segment", "part")
+    ]
+    monkeypatch.setattr(film, "WITHDRAWN", (*film.WITHDRAWN, *rows))
+    rewrite(declared, "credits_duration = 3", "credits_duration = 3\nheld = 1")
+    rewrite(declared, "[editions.en]\n", "[editions.en]\nheld = 1\n")
+    script = json.loads((declared / "content/zh" / film.SCRIPT).read_text())
+    script["segments"][0]["held"] = 1
+    (declared / "content/zh" / film.SCRIPT).write_text(json.dumps(script, ensure_ascii=False))
+    (declared / "content/en/pronunciation.json").write_text('{"held": 1}')
+    segment = script["segments"][0]["id"]
+    assert film.problems(declared)[:4] == [
+        "content/film.toml declares held; remove it",
+        f"content/zh/film-script.json segment {segment} declares held; remove it",
+        "content/film.toml editions.en declares held; remove it",
+        "content/en/pronunciation.json declares held; remove it",
+    ]

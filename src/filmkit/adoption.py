@@ -8,15 +8,12 @@ with every finding of each; while one stands it exits with status 1 and names th
 of the film that cannot be read is a finding of the question that reads it.
 
 - `declaration`: every problem of `content/film.toml` (`filmkit.film.problems`).
-- `runtime`: what the film's scripts, casts and review prompt state of the runtime and the
-  credits that this release removes or moves, read as text: each edition's script that declares
-  `duration` or `credits_duration` and each cast that declares `runtime_fit`
-  (`filmkit.film.WITHDRAWN`), each named with what to do instead; and each line of the review
-  prompt that cites the runtime's field and does not say "This edition", since each prompt fills
-  it with its own edition's runtime and the two editions may differ in length. That reading fails
-  closed: such a line is named whatever else it says. A declaration that states no
-  `credits_duration`, and a script or cast that the declaration names and that is missing, are
-  the `declaration` question's.
+- `runtime`: each line of the review prompt that cites the runtime's field and does not say
+  "This edition", since each prompt fills it with its own edition's runtime and the editions may
+  differ in length, read as text. That reading fails closed: such a line is named whatever else
+  it says. A key the engine has withdrawn, `duration` or `credits_duration` in a script and
+  `runtime_fit` in a cast among them, is the `declaration` question's, which the loader refuses
+  (`filmkit.film.WITHDRAWN`), as is a declaration that states no `credits_duration`.
 - `npm_packages`: the film's `package.json` declares each package the engine runs at the version
   the engine was released on, and its lock holds each at that version and integrity. A package
   the film alone holds is the film's.
@@ -32,8 +29,8 @@ of the film that cannot be read is a finding of the question that reads it.
   action of this engine by a word is named under `not_read`, whatever else it names, and the
   tasks' readiness is then not judged either.
 - `template`: `picture/index.html` holds each text staging replaces as often as staging
-  expects, and names no script or stylesheet that staging does not inline
-  (`filmkit.picture.template`).
+  expects, a root that names one language's tag named with the anchor to write instead, and
+  names no script or stylesheet that staging does not inline (`filmkit.picture.template`).
 - `vale`: the film's Mise configuration, the file its tasks are read from, pins under `[tools]`
   the Vale the engine was released on, which the register check runs and beside which it
   refuses every other (`filmkit.register`). Only the tool the engine itself pins is read
@@ -241,28 +238,9 @@ def untied_runtime(root: Path, declared: dict) -> list[str]:
 
 
 def runtime(root: Path) -> list[str]:
-    """What the film's scripts, casts and review prompt state of the runtime and the credits that
-    this release removes or moves: edition by edition, each key of `filmkit.film.WITHDRAWN` that
-    the edition's script or cast declares, with what to do instead, then each line of the review
-    prompt that ties the runtime to no one edition (`untied_runtime`). Read as text, so that no
-    declaration need load; the declaration's own `credits_duration` and a file it names that is
-    missing are the `declaration` question's."""
-    declared = read_toml(root / film.DECLARATION)
-    found = []
-    editions = table(declared.get("editions"), f"{film.DECLARATION}: editions")
-    for code, edition in editions.items():
-        sources = table(edition, f"{film.DECLARATION}: editions.{code}").get("sources")
-        for name, keys in film.WITHDRAWN.items():
-            path = root / str(sources) / name
-            if not isinstance(sources, str) or not path.is_file():
-                continue
-            held = read_json(path)
-            found += [
-                f"{sources}/{name} declares {key}; {instead}"
-                for key, instead in keys.items()
-                if key in held
-            ]
-    return found + untied_runtime(root, declared)
+    """Each line of the review prompt that ties the runtime to no one edition (`untied_runtime`),
+    read as text, so that no declaration need load."""
+    return untied_runtime(root, read_toml(root / film.DECLARATION))
 
 
 def npm_packages(root: Path) -> list[str]:

@@ -5,13 +5,17 @@ declaration's other problems, before any work, each in one line that says what t
 The review prompt may cite no field the engine no longer fills, `{other}` or `{other_language}`,
 and may name no edition's files by their path or the declared codes grouped in braces, which
 `{editions}` and `{others}` state for every edition (`filmkit.review.prompts`). The entry page
-must keep its rule (`filmkit.delivery.entry`).
+must keep its rule (`filmkit.delivery.entry`). No place of the film may declare a key the engine
+has withdrawn (`filmkit.film.WITHDRAWN`), read where the declaration names an edition's files
+and where their code derives them (`filmkit.film.places`).
 """
 
 from __future__ import annotations
 
+import json
 import re
 import string
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -92,3 +96,52 @@ def entry_problems(root: Path, declared: dict) -> list[str]:
         return []
     tags = {code: languages.LANGUAGES[code].tag for code in editions if code in languages.LANGUAGES}
     return entry.problems(text, tags, page)
+
+
+def _json(path: Path) -> object:
+    """A JSON file's value, or None where it cannot be read as JSON: a file that is missing or
+    malformed is a problem of the declaration or of the step that reads it, not of this one."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError):
+        return None
+
+
+def _held(where: str, value: object, kind: str) -> list[str]:
+    """Each withdrawn key of a kind (`filmkit.film.withdrawn`) that a value holds, named where."""
+    from filmkit.film import withdrawn
+
+    if not isinstance(value, dict):
+        return []
+    return [
+        f"{where} declares {key}; {instead}"
+        for key, instead in withdrawn(kind).items()
+        if key in value
+    ]
+
+
+def withdrawn_problems(root: Path, declared: dict) -> list[str]:
+    """Each key of the one table of withdrawn keys (`filmkit.film.WITHDRAWN`) that the declaration,
+    an edition's table, script, segments, cast or pronunciation part declares, each in one line
+    with what to do instead. An edition's files are read in the folder its declaration still
+    names, and in the folder its code derives where it names none (`filmkit.film.places`), so a
+    film that has not moved them and one that has are read alike."""
+    from filmkit.film import CAST, DECLARATION, SCRIPT, places
+
+    found = _held(DECLARATION, declared, "declaration")
+    editions = declared.get("editions")
+    for code, table in (editions if isinstance(editions, dict) else {}).items():
+        found += _held(f"{DECLARATION} editions.{code}", table, "edition")
+        derived = places(code, str(declared.get("slug")))
+        sources = table.get("sources") if isinstance(table, dict) else None
+        folder = sources if isinstance(sources, str) else derived.folder
+        script = _json(root / folder / SCRIPT)
+        found += _held(f"{folder}/{SCRIPT}", script, "script")
+        segments = script.get("segments") if isinstance(script, dict) else None
+        for segment in segments if isinstance(segments, list) else ():
+            named = segment.get("id") if isinstance(segment, dict) else None
+            found += _held(f"{folder}/{SCRIPT} segment {named}", segment, "segment")
+        found += _held(f"{folder}/{CAST}", _json(root / folder / CAST), "cast")
+        part = PurePosixPath(derived.pronunciation).name
+        found += _held(f"{folder}/{part}", _json(root / folder / part), "part")
+    return found

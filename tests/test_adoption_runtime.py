@@ -1,5 +1,7 @@
-"""The adoption command's runtime question: what a film's scripts, casts and declaration state of
-the runtime and the credits that this release removes or moves, read as text."""
+"""What a film states of the runtime and the credits that this release removes or moves: a
+withdrawn key of a script or a cast, which the loader refuses and the adoption command's
+`declaration` question names, and a line of the review prompt that ties the runtime to no one
+edition, which its `runtime` question names, read as text."""
 
 import json
 
@@ -31,20 +33,23 @@ def test_a_declaration_without_the_credits_is_one_finding_of_the_declaration_que
     assert findings["runtime"] == []
 
 
-def test_each_runtime_or_credits_declaration_a_script_or_cast_holds_is_named(project):
+def test_each_withdrawn_runtime_key_is_named_by_the_declaration_question_alone(project):
     declare(project / "content/zh/film-script.json", duration=1500, credits_duration=3)
     declare(project / "content/en/film-script.json", duration=1500)
     declare(project / "content/en/voice-reference.json", runtime_fit={"reserve_seconds": 0.5})
-    rewrite(project / film.DECLARATION, "credits_duration = 3\n", "")
-    # The question reads the files as text: a declaration that does not load is no obstacle.
+    # The loader reads the files whatever else the declaration holds: one that does not load is
+    # no obstacle, and its problem stands beside them.
     rewrite(project / film.DECLARATION, 'slug = "sample-reel"', 'slug = "Two Words"')
-    script, cast = film.WITHDRAWN["film-script.json"], film.WITHDRAWN["voice-reference.json"]
-    assert found(project)["runtime"] == [
+    script, cast = film.withdrawn("script"), film.withdrawn("cast")
+    findings = found(project)
+    assert findings["declaration"][:4] == [
         f"content/zh/film-script.json declares duration; {script['duration']}",
         f"content/zh/film-script.json declares credits_duration; {script['credits_duration']}",
         f"content/en/film-script.json declares duration; {script['duration']}",
         f"content/en/voice-reference.json declares runtime_fit; {cast['runtime_fit']}",
     ]
+    assert "\nslug\n" in findings["declaration"][4]
+    assert findings["runtime"] == []
     assert script["duration"] == (
         "remove it: an edition lasts as long as its narration, which the assembly counts"
     )
@@ -63,7 +68,9 @@ def test_a_review_prompt_that_states_one_runtime_for_both_editions_is_named(proj
     # fills with its own edition's runtime.
     prompt = project / "content/review/prompt.md"
     rewrite(prompt, "This edition: exactly {duration} s", "Each edition: exactly {duration} s")
-    assert found(project)["runtime"] == [UNTIED.format(line=9)]
+    findings = found(project)
+    assert findings["runtime"] == [UNTIED.format(line=9)]
+    assert "{duration}" not in " ".join(findings["declaration"])
     # The reading fails closed: a line that cites the runtime and does not tie it to this
     # edition is named whatever it says, also with a format; an escaped brace cites nothing.
     rewrite(prompt, "Each edition: exactly {duration} s", "This edition: exactly {duration} s")

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import filmkit.languages as languages
 import filmkit.repository as repository
-from filmkit.film import CAST, FILM, SCRIPT
+from filmkit.film import CAST, FILM, SCRIPT, folder_of
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -190,7 +190,7 @@ class Edition:
     @property
     def sources(self) -> str:
         """The folder of the edition's script, cast and narration mirror."""
-        return FILM.editions[self.code].sources
+        return folder_of(FILM, self.code)
 
     @property
     def script(self) -> str:

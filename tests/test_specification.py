@@ -44,13 +44,18 @@ LOAD_REFUSALS = {
     ),
     "a script that declares the credits": (
         lambda root: declare(root / Edition("zh").script, credits_duration=3),
-        "ValueError: content/zh/film-script.json declares credits_duration; state the credits' "
-        "length once, as credits_duration in content/film.toml",
+        "filmkit.film.FilmError: content/zh/film-script.json declares credits_duration; state the "
+        "credits' length once, as credits_duration in content/film.toml",
     ),
     "a script that declares a duration": (
         lambda root: declare(root / Edition("zh").script, duration=1500),
-        "ValueError: content/zh/film-script.json declares duration; remove it: an edition lasts as "
-        "long as its narration, which the assembly counts",
+        "filmkit.film.FilmError: content/zh/film-script.json declares duration; remove it: an "
+        "edition lasts as long as its narration, which the assembly counts",
+    ),
+    "a cast that declares runtime_fit": (
+        lambda root: declare(root / Edition("en").cast, runtime_fit={"reserve_seconds": 0.5}),
+        "filmkit.film.FilmError: content/en/voice-reference.json declares runtime_fit; remove it: "
+        "nothing reads it, since an edition lasts as long as its narration",
     ),
 }
 
@@ -83,21 +88,8 @@ def test_a_refusal_at_load_ends_what_a_command_prints_in_its_one_line(declared, 
     assert not (declared / "build").exists()
 
 
-def test_the_credits_are_the_declarations(tmp_path, monkeypatch):
+def test_the_credits_are_the_declarations():
     assert specification.CREDITS_DURATION == FILM.credits_duration == 3
-    monkeypatch.setattr(repository, "ROOT", tmp_path)
-    for code in CODES:
-        script = tmp_path / Edition(code).script
-        script.parent.mkdir(parents=True, exist_ok=True)
-        script.write_text(json.dumps({"author": "One Author"}))
-    specification.refuse_withdrawn()
-    (tmp_path / Edition("en").script).write_text(json.dumps({"credits_duration": 3}))
-    with pytest.raises(ValueError) as refused:
-        specification.refuse_withdrawn()
-    assert str(refused.value) == (
-        "content/en/film-script.json declares credits_duration; state the credits' length once, "
-        "as credits_duration in content/film.toml"
-    )
 
 
 def test_the_declaration_states_the_credits_once_in_whole_seconds(declared):
@@ -128,19 +120,9 @@ def test_a_declaration_without_the_credits_is_refused_in_one_line_and_never_load
     assert "\nslug\n" in other and "credits_duration" not in other
 
 
-def test_a_script_that_declares_a_duration_is_refused_when_the_engine_loads(tmp_path, monkeypatch):
-    # An edition lasts as long as its narration: no script states a runtime, and the engine
-    # holds none of its own.
+def test_no_script_states_a_runtime_and_the_loader_refuses_one_first():
+    # An edition lasts as long as its narration: the engine holds no runtime of its own, and a
+    # script's withdrawn key is the loader's to refuse (`filmkit.film.WITHDRAWN`), with the film,
+    # before this module reads a script.
     assert not hasattr(specification, "DURATION")
-    monkeypatch.setattr(repository, "ROOT", tmp_path)
-    for code in CODES:
-        script = tmp_path / Edition(code).script
-        script.parent.mkdir(parents=True, exist_ok=True)
-        script.write_text(json.dumps({"author": "One Author"}))
-    (tmp_path / Edition("zh").script).write_text(json.dumps({"duration": 1500}))
-    with pytest.raises(ValueError) as refused:
-        specification.refuse_withdrawn()
-    assert str(refused.value) == (
-        "content/zh/film-script.json declares duration; remove it: an edition lasts as long as its "
-        "narration, which the assembly counts"
-    )
+    assert not hasattr(specification, "refuse_withdrawn")

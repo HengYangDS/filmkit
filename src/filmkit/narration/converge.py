@@ -34,8 +34,8 @@ of an ended run holds its `fit`: the runtime the count gives and the seconds of 
 fraction that the gaps and the credits take, or why the count was not asked. The command also
 exits 1, with one line, for a settled edition that the selection or the assembly refuses, with
 that reason. A fault of the count that is no refusal keeps its traceback, after the record is
-ended with it. A cast that declares `runtime_fit`, which nothing reads, is refused before the
-run's first effect.
+ended with it. A cast that declares `runtime_fit`, which nothing reads, is refused with the
+film as the engine loads (`filmkit.film.WITHDRAWN`), before the command runs.
 
 A run that changes nothing is a no-op: with nothing missing and nothing refused it narrates
 nothing and leaves the cast as it is, and a candidate whose recording a former run left in

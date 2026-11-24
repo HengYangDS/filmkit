@@ -114,10 +114,13 @@ def test_every_finding_of_every_question_is_listed_in_one_run(project):
     rewrite(project / ".config/mise/config.toml", PIN, PIN.replace(released.vale(), "9.9.9"))
     script = project / "content/zh/film-script.json"
     script.write_text(json.dumps({**json.loads(script.read_text()), "duration": 1500}))
+    prompt = project / "content/review/prompt.md"
+    rewrite(prompt, "This edition: exactly {duration} s", "Each edition: exactly {duration} s")
     findings = found(project)
     assert all(findings[name] for name in adoption.QUESTIONS), findings
     assert "declares documents_folder" in " ".join(findings["declaration"])
-    assert "content/zh/film-script.json declares duration" in " ".join(findings["runtime"])
+    assert "content/zh/film-script.json declares duration" in " ".join(findings["declaration"])
+    assert "prompt.md:9 cites {duration}" in " ".join(findings["runtime"])
     asked = f"{renderer.RENDERER_NAME} {renderer.RENDERER_VERSION}"
     assert asked in " ".join(findings["npm_packages"])
     assert f"transformers 0.0.1 (the engine: {held})" in " ".join(findings["python_lock"])
@@ -213,6 +216,15 @@ def test_the_template_is_asked_for_every_anchor_at_once(project):
     text = " ".join(found(project)["template"])
     assert "data-duration" in text and "2 times" in text
     assert "FILM_DATA" in text and "0 times" in text
+
+
+def test_a_template_whose_root_names_one_language_is_named_with_the_anchor_to_write(project):
+    # A film's template written before this release opens with its Chinese edition's tag.
+    rewrite(project / "picture/index.html", '<html lang="und">', '<html lang="zh-CN">')
+    assert found(project)["template"] == [
+        'The picture template opens with <html lang="zh-CN">, one language\'s tag; staging gives '
+        'each edition its own, in place of <html lang="und">, which the template holds once'
+    ]
 
 
 def test_the_command_prints_one_line_and_exits_by_its_findings(project, monkeypatch, capsys):

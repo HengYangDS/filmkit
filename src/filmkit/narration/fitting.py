@@ -22,7 +22,8 @@ policy as `produce fit` does (`filmkit.soundtrack.fit`). What it returns is the 
   judged.
 
 `declared` refuses, before a run's first effect and in one line, a pause policy that the
-assembly would refuse and a cast that declares `runtime_fit`, which nothing reads.
+assembly would refuse. A cast that declares `runtime_fit`, which nothing reads, never reaches
+it: the loader refuses the film first (`filmkit.film.WITHDRAWN`).
 
 The reading replaces no take and changes no pause policy and no tracked file. Below `build/` it
 writes what those two commands write for the edition: the selection's two records and the
@@ -41,14 +42,10 @@ from pathlib import Path
 
 import filmkit.repository as repository
 import filmkit.soundtrack.fit as soundtrack_fit
-from filmkit.film import CAST, WITHDRAWN
 from filmkit.narration.selection import select
 from filmkit.production import Edition
 from filmkit.soundtrack.policy import PausePolicyError, designed_pause_policy
 
-# A cast's declaration that nothing reads, since an edition lasts as long as its narration: the
-# one key a cast may no longer declare (`filmkit.film.WITHDRAWN`).
-(DECLARATION,) = WITHDRAWN[CAST]
 FITS, REFUSED, FAILED = soundtrack_fit.FITS, "refused", "failed"
 # What the record's fit states of a counted edition, as the dry run reports them.
 COUNTED = ("runtime_seconds", "free_seconds", "credits_free_seconds")
@@ -85,8 +82,7 @@ def of_the_host(error: Exception) -> bool:
 
 def declared(code: str) -> None:
     """Refuse, before a run's first effect, what the count does not take: a pause policy in the
-    script that the assembly refuses, which the judgment reads too, and a cast that declares
-    `runtime_fit`, with any fields or none."""
+    script that the assembly refuses, which the judgment reads too."""
     performance = repository.read(Edition(code).script).get("voice_performance")
     try:
         if performance:
@@ -94,9 +90,6 @@ def declared(code: str) -> None:
     except PausePolicyError as error:
         msg = f"{code}: the script's pause policy is refused: {one_line(error)}"
         raise SystemExit(msg) from None
-    if DECLARATION in repository.read(Edition(code).cast):
-        instead = WITHDRAWN[CAST][DECLARATION]
-        raise SystemExit(f"{code}: the cast declares {DECLARATION}; {instead}")
 
 
 def not_asked(why: str) -> dict:

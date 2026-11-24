@@ -14,7 +14,7 @@ import itertools
 import tomllib
 import unicodedata
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple
 
 from pydantic import (
     BaseModel,
@@ -40,27 +40,75 @@ CREDITS = "credits_duration"
 # The files every edition's sources folder holds: its script and its cast.
 SCRIPT, CAST = "film-script.json", "voice-reference.json"
 EDITION_FILES = (SCRIPT, CAST)
+
+
+class Places(NamedTuple):
+    """Where an edition's files stand, each derived from its code (design decision 1): its
+    folder below `content/`, its script, cast, pronunciation and readings there, its reference
+    recording below `assets/audio/` and its cover below `assets/cover/`."""
+
+    folder: str
+    script: str
+    cast: str
+    pronunciation: str
+    readings: str
+    reference: str
+    cover: str
+
+
+def places(code: str, slug: str) -> Places:
+    """An edition's places, from its code and the film's file prefix; it loads nothing."""
+    folder = f"content/{code}"
+    return Places(
+        folder,
+        f"{folder}/{SCRIPT}",
+        f"{folder}/{CAST}",
+        f"{folder}/pronunciation.json",
+        f"{folder}/readings.json",
+        f"assets/audio/{code}/narration-reference.wav",
+        f"assets/cover/{slug}-cover-{code}.png",
+    )
+
+
 # The player template a sources folder once held; the engine renders each edition's player now.
 PLAYER_TEMPLATE = "player.html"
 # The key that named the delivery folder through 0.22.3, refused with the key that names it now.
 RENAMED_FOLDER = "documents_folder"
-# What an edition's script and cast may no longer declare, by file, each with what to do instead:
-# an edition lasts as long as its narration, and this declaration states the credits once. The
-# engine refuses each where it reads the file (`filmkit.specification`,
-# `filmkit.narration.fitting`), and the adoption command names every one at once.
-WITHDRAWN = {
-    SCRIPT: {
-        "duration": (
-            "remove it: an edition lasts as long as its narration, which the assembly counts"
-        ),
-        CREDITS: f"state the credits' length once, as {CREDITS} in {DECLARATION}",
-    },
-    CAST: {
-        "runtime_fit": (
-            "remove it: nothing reads it, since an edition lasts as long as its narration"
-        ),
-    },
-}
+
+
+class Withdrawn(NamedTuple):
+    """A key a film may no longer declare: the kind of place that held it (`declaration`, an
+    `edition`'s table there, its `script`, a `segment` of it, its `cast` or its pronunciation
+    `part`), the key, and what to do instead."""
+
+    kind: str
+    key: str
+    instead: str
+
+
+# Every key a film may no longer declare, in one table. The loader refuses each where it finds it,
+# all at once and beside the declaration's other problems (`filmkit.declared_sources`), and the
+# adoption command's `declaration` question names them so.
+WITHDRAWN = (
+    Withdrawn(
+        "script",
+        "duration",
+        "remove it: an edition lasts as long as its narration, which the assembly counts",
+    ),
+    Withdrawn("script", CREDITS, f"state the credits' length once, as {CREDITS} in {DECLARATION}"),
+    Withdrawn(
+        "cast",
+        "runtime_fit",
+        "remove it: nothing reads it, since an edition lasts as long as its narration",
+    ),
+)
+
+
+def withdrawn(kind: str) -> dict[str, str]:
+    """The keys a kind of place may no longer declare, each with what to do instead."""
+    return {entry.key: entry.instead for entry in WITHDRAWN if entry.kind == kind}
+
+
 # A lowercase name of words joined by hyphens.
 Name = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")]
 Floor = Annotated[int, Field(ge=0, le=100)]
@@ -88,9 +136,10 @@ class Declared(BaseModel):
 
 class EditionDeclaration(Declared):
     """One edition's folder of script and cast, its cover, the summary its player shows under the
-    film, and its caption terms."""
+    film, and its caption terms. A declaration that names no folder holds the edition's files at
+    the folder its code derives (`places`)."""
 
-    sources: str
+    sources: str | None = None
     cover: str
     summary: Stated
     caption_terms: tuple[str, ...] = ()
@@ -659,6 +708,12 @@ class Film(Declared):
         return self
 
 
+def folder_of(film: Film, code: str) -> str:
+    """An edition's folder of script and cast: the one its declaration still names, until the
+    release withdraws that key, else the one its code derives (`places`)."""
+    return film.editions[code].sources or places(code, film.slug).folder
+
+
 def named_files(film: Film) -> list[tuple[str, str]]:
     """Each file the declaration names except the covers, with the field that names it."""
     named = [
@@ -666,9 +721,9 @@ def named_files(film: Film) -> list[tuple[str, str]]:
         ("source_manifest", film.source_manifest),
         ("review.prompt", film.review.prompt),
     ]
-    for code, edition in film.editions.items():
+    for code in film.editions:
         field = f"editions.{code}.sources"
-        named += [(field, f"{edition.sources}/{name}") for name in EDITION_FILES]
+        named += [(field, f"{folder_of(film, code)}/{name}") for name in EDITION_FILES]
     named += [("picture.fonts", font) for font in film.picture.fonts]
     if film.review.readings is not None:
         named.append(("review.readings", film.review.readings))
@@ -681,9 +736,9 @@ def copied_players(root: Path, film: Film) -> str | None:
     """Why a film's sources may not hold player pages of their own, naming each one and the
     declarations that replace it, or None when they hold none."""
     pages = [
-        f"{edition.sources}/{PLAYER_TEMPLATE}"
-        for edition in film.editions.values()
-        if (root / edition.sources / PLAYER_TEMPLATE).is_file()
+        f"{folder_of(film, code)}/{PLAYER_TEMPLATE}"
+        for code in film.editions
+        if (root / folder_of(film, code) / PLAYER_TEMPLATE).is_file()
     ]
     if not pages:
         return None
@@ -728,6 +783,7 @@ def read(root: Path) -> tuple[Film | None, list[str]]:
     for code in unknown:
         found.append(f"{DECLARATION} declares editions.{code}: {languages.unknown(code)}")
         editions.pop(code)
+    found += declared_sources.withdrawn_problems(root, declared)
     found += declared_sources.prompt_problems(root, declared)
     found += declared_sources.entry_problems(root, declared)
     undeclared = CREDITS not in declared

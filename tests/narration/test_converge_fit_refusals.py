@@ -1,6 +1,7 @@
 """A settled narration that the count refuses, or whose count ends in a fault: what the
 convergence says in one line as the edition's refusal, what it raises as a fault with the record
-ended first, and what it refuses before anything runs."""
+ended first, and what it refuses before anything runs. A cast that declares `runtime_fit` never
+reaches it: the loader refuses the film first (`tests/test_film_editions.py`)."""
 
 import subprocess
 import wave
@@ -21,26 +22,6 @@ def begun(*_taken: object) -> None:
     """Stand in for the beginning of a run (`converge.begin`), whatever it is given: a refusal
     that comes before the first effect never reaches it."""
     pytest.fail("the run began before it was refused")
-
-
-@pytest.mark.parametrize(
-    "fields",
-    [{"reserve_seconds": 0.5}, {"reserve_seconds": 0.0}, {}, 0.1, None],
-)
-def test_a_cast_that_declares_runtime_fit_is_refused_before_anything_runs(
-    count, fields, monkeypatch
-):
-    # Nothing reads it, since an edition lasts as long as its narration: a reserve, an empty
-    # table and any other value are refused alike.
-    cast = repository.read(Edition("en").cast)
-    repository.write(Edition("en").cast, {**cast, "runtime_fit": fields})
-    monkeypatch.setattr(narration_converge, "begin", begun)
-    assert refused() == (
-        "en: the cast declares runtime_fit; remove it: nothing reads it, since an edition lasts "
-        "as long as its narration"
-    )
-    assert not (Edition("en").ear_first / narration_converge.RECORD).exists()
-    assert count.selected == 0
 
 
 def test_a_script_that_declares_no_thought_range_is_refused_before_anything_runs(

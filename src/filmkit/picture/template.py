@@ -8,6 +8,7 @@ can be asked before its film's declaration loads (`filmkit.adoption`).
 
 from __future__ import annotations
 
+import re
 from html.parser import HTMLParser
 
 # The template, and the stylesheet and the script staging inlines, as the template names them.
@@ -16,9 +17,13 @@ STYLESHEET = "film.css"
 SCRIPT = "film.js"
 # The two tags staging replaces by the stylesheet and the script themselves.
 INLINED = (f'<link rel="stylesheet" href="{STYLESHEET}">', f'<script src="{SCRIPT}"></script>')
+# The root staging gives each edition's language tag: the template's root names no language.
+LANGUAGE = '<html lang="und">'
+# A root that names a language, as a template written for one edition opens.
+ROOT = re.compile(r'<html lang="[^"]+">')
 # Each text staging replaces, in the order it replaces them, and how often the template holds it.
 ANCHORS: tuple[tuple[str, int], ...] = (
-    ('<html lang="und">', 1),
+    (LANGUAGE, 1),
     ('data-duration="1200"', 1),
     ('data-width="1920"', 1),
     ('data-height="1080"', 1),
@@ -62,12 +67,19 @@ def sources(html: str) -> list[str]:
 
 def problems(html: str) -> list[str]:
     """Every anchor a template does not hold as often as staging replaces it, each counted where
-    staging would count it, and every script or stylesheet it names beside the two tags staging
-    replaces: a second naming of the inlined stylesheet or script is one of them."""
+    staging would count it, a root that names one language's tag named with the anchor to write
+    instead, and every script or stylesheet it names beside the two tags staging replaces: a
+    second naming of the inlined stylesheet or script is one of them."""
     found, left = [], html
     for old, count in ANCHORS:
         held = left.count(old)
-        if held != count:
+        named = ROOT.search(left) if old == LANGUAGE and not held else None
+        if named:
+            found.append(
+                f"The picture template opens with {named[0]}, one language's tag; staging gives "
+                f"each edition its own, in place of {LANGUAGE}, which the template holds once"
+            )
+        elif held != count:
             found.append(f"The picture template holds {old!r} {held} times, not {count}")
         left = left.replace(old, "")
     rest = html.replace(INLINED[0], "").replace(INLINED[1], "")
