@@ -19,6 +19,8 @@ name: a union of `Places` refuses it, so that no place is lost under another's n
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import graphlib
 import os
 from dataclasses import dataclass
@@ -30,10 +32,13 @@ from filmkit.graph.records import Folder, HostClass
 from filmkit.production import CODES, Edition
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Iterator
 
 # The kinds of a writer of a path that several nodes write (design decision 5).
 REWRITES, REPLACES = "rewrites", "replaces"
+# While it holds, a place that a table names only where it stands is named as if it stood, so
+# that the check of each run's opens can ask which absent files a node would read.
+_AS_IF_STANDING: contextvars.ContextVar[bool] = contextvars.ContextVar("as_if", default=False)
 
 
 @dataclass(frozen=True)
@@ -218,3 +223,19 @@ def load(nodes: Iterable[Node], shared: dict, codes: tuple[str, ...] = CODES) ->
         raise TableError(f"the node table has a cycle: {cycle}") from None
     frozen = {name: frozenset(found) for name, found in before.items()}
     return Table(named, dict(shared), tuple(codes), frozen, order)
+
+
+def stands(path: Path) -> bool:
+    """Whether a place that a table names only where it stands is named: it stands, or
+    `as_if_standing` holds."""
+    return _AS_IF_STANDING.get() or path.is_file()
+
+
+@contextlib.contextmanager
+def as_if_standing() -> Iterator[None]:
+    """Name every place that a table names only where it stands, while the block runs."""
+    token = _AS_IF_STANDING.set(True)
+    try:
+        yield
+    finally:
+        _AS_IF_STANDING.reset(token)

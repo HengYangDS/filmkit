@@ -84,12 +84,14 @@ class NodeRun:
     def __init__(self, node: nodes.Node, code: str, run: Run, *, whole: bool, way: str | None):
         self.node, self.code, self.whole = node, code, whole
         edition = Edition(code)
-        self.before = previous(node.name, code)
-        if len(node.ways) > 1:
-            run.settings["way"] = node.way(edition, way)
-        known = self.before.inputs if self.before else {}
-        chosen = run.settings.get("way")
-        self.inputs = stated(node.inputs(edition, chosen), known) if whole else {}
+        # What the seam reads itself is no access of the run, nor of a run it is nested in.
+        with opens.quiet():
+            self.before = previous(node.name, code)
+            if len(node.ways) > 1:
+                run.settings["way"] = node.way(edition, way)
+            known = self.before.inputs if self.before else {}
+            chosen = run.settings.get("way")
+            self.inputs = stated(node.inputs(edition, chosen), known) if whole else {}
         self.label, self.outer = nodes.key(node.name, code), os.environ.get(opens.NODE)
         os.environ[opens.NODE] = self.label
         self.meter = host.start()
@@ -106,6 +108,16 @@ class NodeRun:
             os.environ.pop(opens.NODE, None)
         else:
             os.environ[opens.NODE] = self.outer
+        with opens.quiet():
+            self.write(duration, ended, refusals)
+
+    def write(
+        self,
+        duration: dict,
+        ended: BaseException | None,
+        refusals: tuple[type[BaseException], ...],
+    ) -> None:
+        """State the outputs and write the record."""
         measures = self.meter.stop()
         result, line = outcome(duration["completed"], ended, refusals)
         previous_class = self.before.host_class if self.before else None

@@ -6,18 +6,24 @@ Python process (`install`), and the engine starts Node with its recorder (`node_
 off by default, and a run is the same either way: Python's audit hook only appends, and Node's
 permission audit refuses nothing. Each entry is one JSON line: the node whose run was open
 (`FILMKIT_NODE`, which a node's run sets and every child inherits), the process, the kind and the
-path. Python records, below the film's root, each `open` with whether it writes, each `os.rename`
-(which `os.replace` raises) with its source marked, each hard link, each removal, and each
-`subprocess.Popen` with the paths in its arguments and environment that exist. Node records each
-file access outside its allowances on the channel `node:permission-model:fs` (`opens.cjs`): reads
-of the node's inputs and outputs, `build/runtime/`, the engine's package and the film's packages,
-writes of its outputs and `build/runtime/`, so every other access below the root is in the log.
-Network use and paths outside the root are judged by nothing.
+path. Python records, below the film's root, each `open` with whether it writes, an open for
+reading of a path that does not stand as a `probe`, each `os.rename` (which `os.replace` raises)
+with its source marked, each hard link, each removal, and each `subprocess.Popen` with the paths
+in its arguments and environment that exist; a read made while the engine starts, as an engine
+module loads or the film loader (`filmkit.film.read`) runs, is a `load`. What the recorder and
+the seam read themselves, such as the node table's places, they read with the hook quiet
+(`quiet`). Node records each file access outside its allowances on the channel
+`node:permission-model:fs` (`opens.cjs`): reads of the node's inputs and outputs,
+`build/runtime/`, the engine's package and the film's packages, writes of its outputs and
+`build/runtime/`, so every other access below the root is in the log. Network use and paths
+outside the root are judged by nothing.
 
 `check` compares a log with the table: it fails a read outside the inputs and outputs of the way
-a node's run took and a write outside its outputs, names each node whose tools are seen only
-through their arguments, and reports each exemption with its reason and the nodes it covered. It
-fails closed: nothing below the root is let through without a declaration or a named exemption.
+a node's run took, a probe of a path that the node would not declare were it to stand, and a
+write outside its outputs, names each node whose tools are seen only through their arguments,
+and reports each exemption with its reason and the nodes it covered. It fails closed: nothing
+below the root is let through without a declaration or a named exemption, and a read at start-up
+by another path than the two the recorder knows is judged as a read.
 """
 
 from __future__ import annotations
@@ -46,7 +52,13 @@ RUNTIME = Path("build/runtime")
 WRITING = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_TRUNC
 # The kinds of entry that write, and what a finding says each did.
 WRITES = ("write", "rename", "link", "remove")
-DID = {"write": "wrote", "rename": "wrote", "link": "linked", "remove": "removed"}
+DID = {
+    "write": "wrote",
+    "rename": "wrote",
+    "link": "linked",
+    "remove": "removed",
+    "probe": "looked for",
+}
 # What a path below the root may be read or written without a declaration, each with its reason.
 EXEMPT = {
     "environment": "the Python environment and the npm packages, which the lock files supply",
@@ -54,6 +66,9 @@ EXEMPT = {
     "work": "bounded work and tool copies below build/runtime/, which no node declares",
     "resolution": "the package.json files that Node's module resolution looks up",
     "log": "the recorder's own log",
+    "start-up": "what every engine process reads as it starts, before a command's run opens: "
+    "the film loader's validation of the files the declaration names, and the film-wide values "
+    "the engine's modules derive as they load; the node binds the declaration whole",
 }
 _installed = threading.Event()
 _inside = threading.local()
@@ -83,11 +98,31 @@ def _below(path: str, tops: tuple[str, ...]) -> bool:
     return any(path.startswith(top + os.sep) for top in tops)
 
 
+def _starting() -> bool:
+    """Whether the engine is starting on this thread: an engine module's body runs as it is
+    imported, or the film loader, `filmkit.film.read`, runs."""
+    loader = getattr(sys.modules.get("filmkit.film"), "read", None)
+    code = getattr(loader, "__code__", None)
+    frame = sys._getframe(1)
+    while frame is not None:
+        if frame.f_code is code or (
+            frame.f_code.co_name == "<module>"
+            and str(frame.f_globals.get("__name__", "")).startswith("filmkit.")
+        ):
+            return True
+        frame = frame.f_back
+    return False
+
+
 def _note(event: str, args: tuple, write) -> None:
-    """Turn one audit event into entries: an open, a rename, a link, a removal or a child."""
+    """Turn one audit event into entries: an open, a probe, a rename, a link, a removal or a
+    child; a read or probe made while the engine starts is a load."""
     if event == "open" and isinstance(args[0], (str, bytes, os.PathLike)):
-        flags = args[2] if isinstance(args[2], int) else 0
-        write("write" if flags & WRITING else "read", absolute(args[0]))
+        flags, path = (args[2] if isinstance(args[2], int) else 0), absolute(args[0])
+        if flags & WRITING:
+            write("write", path)
+        else:
+            write("load" if _starting() else "read" if os.path.lexists(path) else "probe", path)
     elif event == "os.rename":
         write("source", absolute(args[0]))
         write("rename", absolute(args[1]))
@@ -105,6 +140,18 @@ def _note(event: str, args: tuple, write) -> None:
                 named = absolute(word, folder)
                 if os.path.lexists(named):
                     write("argument", named)
+
+
+@contextlib.contextmanager
+def quiet():
+    """Hold the hook quiet while the block runs: what the recorder and the seam read themselves
+    is no access of the run."""
+    was = getattr(_inside, "busy", False)
+    _inside.busy = True
+    try:
+        yield
+    finally:
+        _inside.busy = was
 
 
 def install() -> None:
@@ -154,7 +201,8 @@ def node_options() -> dict[str, str]:
         return {}
     import filmkit.repository as repository
 
-    reads, writes = declared(label())
+    with quiet():
+        reads, writes = declared(label())
     runtime = repository.ROOT / RUNTIME
     with contextlib.suppress(repository.FilmRootError):
         reads.append(repository.node_modules())
@@ -251,10 +299,11 @@ def covered(path: Path, places: Iterable[tuple[Path, str | None]]) -> bool:
 
 class _Judged:
     """One node of the table as the check compares a log with it: what it may read and write,
-    what it reads aside, and every place any node of its edition declares."""
+    what it may look for and not find, what it reads aside, and every place any node of its
+    edition declares."""
 
     def __init__(self, table, named: str) -> None:
-        from filmkit.graph import chain, records
+        from filmkit.graph import chain, nodes, records
 
         self.node, self.edition = table.node(named)
         way = None
@@ -263,6 +312,8 @@ class _Judged:
         inputs = list(self.node.inputs(self.edition, way).values())
         outputs = list(self.node.outputs(self.edition).values())
         self.reads, self.writes = real([*inputs, *outputs]), real(outputs)
+        with nodes.as_if_standing():
+            self.probes = real(self.node.inputs(self.edition, way).values())
         self.aside = real(chain.aside(self.node.name, self.edition).values())
         everything = [
             item
@@ -292,7 +343,9 @@ def exemption(path: Path, kind: str, judged: _Judged, log: Path) -> str:
     if path == Path(os.path.realpath(log)):
         return "log"
     if "node_modules" in relative.parts or any(
-        (parent / "pyvenv.cfg").is_file() for parent in path.parents if parent.is_relative_to(root)
+        (folder / "pyvenv.cfg").is_file()
+        for folder in (path, *path.parents)
+        if folder.is_relative_to(root)
     ):
         return "environment"
     if (
@@ -336,11 +389,13 @@ def check(log: Path, table=None) -> Report:
         path, writes = Path(os.path.realpath(access.path)), access.kind in WRITES
         if covered(path, judging.writes if writes else judging.reads):
             continue
+        if access.kind == "probe" and covered(path, judging.probes):
+            continue
         if not writes and covered(path, judging.aside):
             reason = f"aside: {chain.ASIDE[judging.node.name][0]}"
             report.exempted.setdefault(reason, set()).add(access.node)
             continue
-        reason = exemption(path, access.kind, judging, log)
+        reason = "start-up" if access.kind == "load" else exemption(path, access.kind, judging, log)
         if reason == "outside":
             continue
         if reason:

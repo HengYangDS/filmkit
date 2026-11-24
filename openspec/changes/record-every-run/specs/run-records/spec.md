@@ -84,6 +84,16 @@ Each node SHALL take its inputs from one function of paths, the owner's where th
 - **WHEN** a node's run writes a record through `repository.write`
 - **THEN** the check counts the record's own path as written and the `.partial` sibling as no write
 
+#### Scenario: What the engine reads as it starts is judged alike in every process
+
+- **WHEN** a child of a node's run starts the engine, whose film loader validates every file the declaration names and whose modules read every script for the chapter count
+- **THEN** the check reports those reads as the exemption `start-up` with the node, as a command's own start-up before its run opens is not recorded, and fails none of them
+
+#### Scenario: A file looked for and not found
+
+- **WHEN** a node's process opens for reading a file that does not stand
+- **THEN** the check lets it through where the node would declare the file were it to stand, and otherwise fails it, naming the file as looked for
+
 #### Scenario: What the check cannot see is named
 
 - **WHEN** the check reports on a node whose run starts FFmpeg, ffprobe, ExifTool, `mdimport` or Chrome

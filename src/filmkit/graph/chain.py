@@ -20,7 +20,7 @@ import filmkit.preflight as preflight
 import filmkit.repository as repository
 import filmkit.soundtrack.gates as sound_gates
 from filmkit.film import FILM
-from filmkit.graph.nodes import REPLACES, REWRITES, Node, Places, Table, Writer, load
+from filmkit.graph.nodes import REPLACES, REWRITES, Node, Places, Table, Writer, load, stands
 from filmkit.graph.records import Folder
 from filmkit.narration.narrate import evidence_paths
 from filmkit.production import CODES, Edition
@@ -50,7 +50,8 @@ def declared(edition: Edition) -> Places:
 
 
 def sources(edition: Edition) -> Places:
-    """The edition's tracked sources that its narration reads; its readings where it has them."""
+    """The edition's tracked sources that its narration reads; its readings where it has them
+    (`nodes.stands`)."""
     places = edition.places
     found = Places(
         script=root(edition.script),
@@ -58,7 +59,7 @@ def sources(edition: Edition) -> Places:
         pronunciation=root(places.pronunciation),
         reference=root(places.reference),
     )
-    return found | ({"readings": root(places.readings)} if root(places.readings).is_file() else {})
+    return found | ({"readings": root(places.readings)} if stands(root(places.readings)) else {})
 
 
 def checked_words(edition: Edition) -> Places:

@@ -187,3 +187,56 @@ def test_every_node_the_light_suite_runs_reads_and_writes_only_what_it_declares(
     # Each exemption is reported with the nodes it covered.
     records = f"records: {opens.EXEMPT['records']}"
     assert report.exempted[records] == report.seen
+
+
+@pytest.mark.ffmpeg
+def test_the_engine_s_start_up_reads_in_a_child_are_exempted_as_start_up(
+    built, tmp_path, monkeypatch
+):
+    root, _ = built
+    monkeypatch.setattr(repository, "ROOT", root)
+    log = tmp_path / "opens.jsonl"
+    # A child of a node's run starts the engine: the film loader validates every file the
+    # declaration names (the other edition's sources, the review prompt, the entry page, readings
+    # that do not stand) and the delivery format reads every script for the chapter count.
+    code = "from filmkit.film import FILM\nimport filmkit.specification\n"
+    python_child(root, log, code, node="check-sound:zh")
+    report = opens.check(log)
+    assert report.findings == []
+    assert report.exempted[f"start-up: {opens.EXEMPT['start-up']}"] == {"check-sound:zh"}
+    kinds = {entry["kind"] for entry in map(json.loads, log.read_text().splitlines())}
+    assert kinds == {"load"}
+
+
+@pytest.mark.ffmpeg
+def test_a_file_looked_for_and_not_found_is_judged_as_a_probe(built, tmp_path, monkeypatch):
+    root, _ = built
+    monkeypatch.setattr(repository, "ROOT", root)
+    log = tmp_path / "opens.jsonl"
+    # The Chinese edition has no readings, which the table names as select's input only where
+    # they stand; a look for them is let through, a look for anything else is not.
+    code = "from filmkit.film import FILM\n"
+    for name in ("content/zh/readings.json", "content/zh/nothing.json"):
+        code += f"try:\n    open(repository.ROOT / {name!r})\nexcept FileNotFoundError:\n    pass\n"
+    python_child(root, log, code, node="select:zh")
+    (finding,) = opens.check(log).findings
+    assert "looked for content/zh/nothing.json, which its declaration does not name" in finding
+
+
+@pytest.mark.ffmpeg
+def test_the_recorder_s_own_reads_of_the_table_are_no_reads_of_the_run(
+    built, tmp_path, monkeypatch
+):
+    root, _ = built
+    monkeypatch.setattr(repository, "ROOT", root)
+    log = tmp_path / "opens.jsonl"
+    # A function of the table that reads a file, as the way of a derived picture reads its
+    # receipt, read while the recorder states Node's allowances inside the run.
+    code = "from filmkit.graph import chain, opens\nfrom filmkit.production import Edition\n"
+    code += "real = chain.derived_uncaptioned\n"
+    code += "def reading(edition):\n"
+    code += "    (repository.ROOT / Edition('en').script).read_bytes()\n"
+    code += "    return real(edition)\n"
+    code += "chain.derived_uncaptioned = reading\nassert opens.node_options()\n"
+    python_child(root, log, code, node="compare-pictures:zh")
+    assert opens.check(log).findings == []
