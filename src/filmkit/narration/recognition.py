@@ -279,27 +279,6 @@ def hearing(
     return Heard(supplied(), declared)
 
 
-def let_through(words: Sequence[str], heard: Heard) -> dict[str, list[str]]:
-    """For each text word, the other spellings a transcript may hold that `alike` takes for it:
-    every headword in other letters whose first pronunciation is one of the word's readings, and
-    that a recognition unit can spell. A word declared by its letter names, and one the
-    dictionary does not hold, have none."""
-    by_first: dict[tuple[str, ...], list[str]] = {}
-    for headword, said in heard.said.items():
-        if UNIT.fullmatch(headword) and HAN_UNIT.fullmatch(headword) is None:
-            by_first.setdefault(said[0], []).append(headword)
-    found = {}
-    for word in words:
-        unit = word.lower()
-        own, _ = heard.of(unit)
-        letters = unit.replace("'", "")
-        found[word] = sorted(
-            {other for said in own for other in by_first.get(said, ())}
-            - {other for other in heard.said if other.replace("'", "") == letters}
-        )
-    return found
-
-
 def edition_names(
     declared: Sequence[NarrationTerm],
     texts: Sequence[str],
