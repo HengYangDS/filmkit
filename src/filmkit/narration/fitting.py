@@ -16,14 +16,14 @@ policy as `produce fit` does (`filmkit.soundtrack.fit`). What it returns is the 
   record that lacks a segment, or in an error that names no file by an absolute path, such
   as a decoder that is not installed (`of_the_host`): the fault keeps its traceback, and the
   record is ended first;
-- not asked, with the reason: thoughts are unsettled, or the edition declares nothing to
-  count: no performance recording with its alignment in the cast, or no pause policy in the
-  script. Such an edition is not declared for the assembly yet, and its takes can still be
+- not asked, with the reason: thoughts are unsettled, or the edition holds nothing to count:
+  no narration receipt with its alignment where the narration writes them, or no pause policy
+  in the script. Such an edition is not ready for the assembly yet, and its takes can still be
   judged.
 
 `declared` refuses, before a run's first effect and in one line, a pause policy that the
 assembly would refuse. A cast that declares `runtime_fit`, which nothing reads, never reaches
-it: the loader refuses the film first (`filmkit.film.WITHDRAWN`).
+it: the loader refuses the film first (`filmkit.withdrawn`).
 
 The reading replaces no take and changes no pause policy and no tracked file. Below `build/` it
 writes what those two commands write for the edition: the selection's two records and the
@@ -42,6 +42,7 @@ from pathlib import Path
 
 import filmkit.repository as repository
 import filmkit.soundtrack.fit as soundtrack_fit
+from filmkit.narration.narrate import evidence_paths
 from filmkit.narration.selection import select
 from filmkit.production import Edition
 from filmkit.soundtrack.policy import PausePolicyError, designed_pause_policy
@@ -50,7 +51,7 @@ FITS, REFUSED, FAILED = soundtrack_fit.FITS, "refused", "failed"
 # What the record's fit states of a counted edition, as the dry run reports them.
 COUNTED = ("runtime_seconds", "free_seconds", "credits_free_seconds")
 UNSETTLED = "not asked: thoughts are unsettled"
-NO_RECORDING = "not asked: the cast declares no performance recording with its alignment"
+NO_RECORDING = "not asked: the edition has no narration receipt with its alignment"
 NO_POLICY = "not asked: the script declares no pause policy (voice_performance)"
 # What reading the edition's files or decoding its recordings may fail with, beside the
 # refusals that the count names: a file that is missing or cannot be read, a decoder that
@@ -133,8 +134,8 @@ def refusal_of(error: Exception) -> str:
 def read(code: str) -> dict:
     """What the assembly's count says of the edition as its narration stands: the record's fit."""
     edition = Edition(code)
-    declared = repository.read(edition.cast).get("performance_recording") or {}
-    if not (declared.get("receipt") and declared.get("alignment")):
+    recorded = evidence_paths(code)
+    if not all((repository.ROOT / recorded[name]).is_file() for name in ("receipt", "alignment")):
         return not_asked(NO_RECORDING)
     if not repository.read(edition.script).get("voice_performance"):
         return not_asked(NO_POLICY)

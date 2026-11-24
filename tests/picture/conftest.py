@@ -86,7 +86,7 @@ class FilmRoot:
         runtime."""
         script = repository.read(edition.script)
         segment = {**script["segments"][0], "words": list(words)}
-        timeline = {**script, "duration": runtime, "segments": [segment]}
+        timeline = {**script, "edition": edition.code, "duration": runtime, "segments": [segment]}
         put(edition.timeline, {**timeline, "captions": list(captions)})
 
     def checked(self, edition: Edition) -> None:

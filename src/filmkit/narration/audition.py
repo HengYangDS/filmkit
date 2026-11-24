@@ -48,6 +48,7 @@ import filmkit.repository as repository
 from filmkit.film import FILM
 from filmkit.narration.candidates import FIRST, bind
 from filmkit.narration.judgment import load_aligner
+from filmkit.narration.narrate import evidence_paths
 from filmkit.narration.receipts import bound_records
 from filmkit.narration.recognition import heard_phrase
 from filmkit.narration.run_on import following_spoken_text
@@ -106,10 +107,8 @@ def audition(
         raise FileExistsError(msg)
     targets = _targets(targets_file)
     script, cast = repository.read(edition.script), repository.read(edition.cast)
-    records = bound_records(
-        receipt_file or cast["performance_recording"]["receipt"], edition.language
-    )
-    chosen = judgment.checked(script, cast, records, targets)
+    records = bound_records(receipt_file or evidence_paths(code)["receipt"], edition.language)
+    chosen = judgment.checked(script, cast, records, targets, edition.places.reference)
     run_ons = {
         (record["id"], child["index"]): following_spoken_text(records, record["id"], child["index"])
         for record, child, (_, run_on) in chosen

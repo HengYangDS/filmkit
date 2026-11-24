@@ -76,50 +76,6 @@ PLAYER_TEMPLATE = "player.html"
 RENAMED_FOLDER = "documents_folder"
 
 
-class Withdrawn(NamedTuple):
-    """A key a film may no longer declare: the kind of place that held it (`declaration`, an
-    `edition`'s table there, its `script`, a `segment` of it, its `cast` or its pronunciation
-    `part`), the key, and what to do instead."""
-
-    kind: str
-    key: str
-    instead: str
-
-
-# Every key a film may no longer declare, in one table. The loader refuses each where it finds it,
-# all at once and beside the declaration's other problems (`filmkit.declared_sources`), and the
-# adoption command's `declaration` question names them so.
-WITHDRAWN = (
-    Withdrawn(
-        "script",
-        "duration",
-        "remove it: an edition lasts as long as its narration, which the assembly counts",
-    ),
-    Withdrawn("script", CREDITS, f"state the credits' length once, as {CREDITS} in {DECLARATION}"),
-    Withdrawn(
-        "cast",
-        "runtime_fit",
-        "remove it: nothing reads it, since an edition lasts as long as its narration",
-    ),
-    Withdrawn(
-        "edition",
-        "sources",
-        "remove it and move the edition's files to content/<code>/, the folder its code derives",
-    ),
-    Withdrawn(
-        "edition",
-        "cover",
-        "remove it and move the cover to assets/cover/<slug>-cover-<code>.png, the place the "
-        "file prefix and the edition's code derive",
-    ),
-)
-
-
-def withdrawn(kind: str) -> dict[str, str]:
-    """The keys a kind of place may no longer declare, each with what to do instead."""
-    return {entry.key: entry.instead for entry in WITHDRAWN if entry.kind == kind}
-
-
 # A lowercase name of words joined by hyphens.
 Name = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")]
 Floor = Annotated[int, Field(ge=0, le=100)]

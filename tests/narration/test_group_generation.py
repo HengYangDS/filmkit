@@ -128,7 +128,7 @@ def test_new_thoughts_join_with_only_the_quiet_they_lack(retained_group_record, 
         Model(), retaken, path, {"parent_fingerprint": "f" * 64, **settings}
     )
     assert [call["text"] for call in calls] == ["First thought.", " Second thought."]
-    assert all(call["ref_audio"] == str(root / "reference.wav") for call in calls)
+    assert all(call["ref_audio"] == str(root / settings["reference_audio"]) for call in calls)
     assert all(call["ref_text"] == "Reference." for call in calls)
     assert seeds == [1, 7]
     assert grouped["joins"] == [

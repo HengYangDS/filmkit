@@ -484,13 +484,14 @@ def test_a_receipt_that_lacks_a_segment_of_the_script_is_refused(narrated, voice
         narration_judge.main(["--language", "en"])
 
 
-def test_the_judgment_reads_the_receipt_the_cast_declares(narrated, voiced):
+def test_the_judgment_reads_the_receipt_where_the_narration_writes_it(narrated, voiced):
     narrated([voiced(), voiced()])
-    assert narration_judge.receipt_of("en").endswith("ear-first/narration-receipt.json")
-    cast = repository.read(Edition("en").cast)
-    cast["performance_recording"] = {"receipt": "build/other-receipt.json"}
-    repository.write(Edition("en").cast, cast)
-    assert narration_judge.receipt_of("en") == "build/other-receipt.json"
+    assert narration_judge.receipt_of("en") == (
+        "build/evidence/editions/en/ear-first/narration-receipt.json"
+    )
+    assert (
+        narration_judge.alignment_of("en") == "build/evidence/editions/en/ear-first/alignment.json"
+    )
 
 
 @pytest.mark.usefixtures("test_editions")

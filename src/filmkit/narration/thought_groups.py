@@ -104,11 +104,18 @@ def authored_groups(section: dict) -> list[str]:
 
 
 def cast_speech(
-    cast: dict, *, language: str, contract_sha256: str, seed: int, temperature: float
+    cast: dict,
+    *,
+    reference: str,
+    language: str,
+    contract_sha256: str,
+    seed: int,
+    temperature: float,
 ) -> dict:
-    """The speech settings a cast narrates one segment with."""
+    """The speech settings a cast narrates one segment with, its reference recording at its
+    place, `reference` (`filmkit.film.places`)."""
     speech = {
-        "reference_audio": cast["reference_audio"],
+        "reference_audio": reference,
         "reference_sha256": cast["reference_sha256"],
         "reference_text": cast["reference_text"],
         "reference_treatment": cast.get("reference_treatment"),

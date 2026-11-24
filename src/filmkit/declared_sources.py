@@ -6,7 +6,7 @@ The review prompt may cite no field the engine no longer fills, `{other}` or `{o
 and may name no edition's files by their path or the declared codes grouped in braces, which
 `{editions}` and `{others}` state for every edition (`filmkit.review.prompts`). The entry page
 must keep its rule (`filmkit.delivery.entry`). No place of the film may declare a key the engine
-has withdrawn (`filmkit.film.WITHDRAWN`), read where the declaration names an edition's files
+has withdrawn (`filmkit.withdrawn`), read where the declaration names an edition's files
 and where their code derives them (`filmkit.film.places`).
 """
 
@@ -17,6 +17,8 @@ import re
 import string
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
+
+import filmkit.withdrawn as withdrawn
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -108,27 +110,25 @@ def _json(path: Path) -> object:
 
 
 def _held(where: str, value: object, kind: str) -> list[str]:
-    """Each withdrawn key of a kind (`filmkit.film.withdrawn`) that a value holds, named where."""
-    from filmkit.film import withdrawn
-
+    """Each withdrawn key of a kind (`filmkit.withdrawn`) that a value holds, named where."""
     if not isinstance(value, dict):
         return []
     return [
         f"{where} declares {key}; {instead}"
-        for key, instead in withdrawn(kind).items()
+        for key, instead in withdrawn.keys(kind).items()
         if key in value
     ]
 
 
 def withdrawn_problems(root: Path, declared: dict, withdraw: bool = False) -> list[str]:
-    """Each key of the one table of withdrawn keys (`filmkit.film.WITHDRAWN`) that the declaration,
+    """Each key of the one table of withdrawn keys (`filmkit.withdrawn`) that the declaration,
     an edition's table, script, segments, cast or pronunciation part declares, each in one line
     with what to do instead. An edition's files are read in the folder its declaration still
     names, and in the folder its code derives where it names none (`filmkit.film.places`), so a
     film that has not moved them and one that has are read alike. With `withdraw`, the
     declaration's and the edition tables' withdrawn keys are then set aside, so that they hide
     none of its other fields' problems."""
-    from filmkit.film import CAST, DECLARATION, SCRIPT, places, withdrawn
+    from filmkit.film import CAST, DECLARATION, SCRIPT, places
 
     found = _held(DECLARATION, declared, "declaration")
     editions = declared.get("editions")
@@ -149,6 +149,6 @@ def withdrawn_problems(root: Path, declared: dict, withdraw: bool = False) -> li
     if withdraw:
         tables = editions.values() if isinstance(editions, dict) else ()
         for value, kind in ((declared, "declaration"), *((table, "edition") for table in tables)):
-            for key in withdrawn(kind) if isinstance(value, dict) else ():
+            for key in withdrawn.keys(kind) if isinstance(value, dict) else ():
                 value.pop(key, None)
     return found

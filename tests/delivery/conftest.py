@@ -209,11 +209,8 @@ def narration(inputs: Inputs, texts: dict[str, str]) -> None:
         root / edition.script,
         {"segments": [{"id": key, "text": text} for key, text in texts.items()]},
     )
-    write_input(root / "assets/reference.wav", b"reference")
-    reference = {
-        "reference_audio": "assets/reference.wav",
-        "reference_sha256": sha("assets/reference.wav"),
-    }
+    write_input(root / edition.places.reference, b"reference")
+    reference = {"reference_sha256": sha(edition.places.reference)}
     cast = write_input(root / edition.cast, reference)
     write_input(root / edition.mirror, "\n\n".join(texts.values()) + "\n")
     records = []
@@ -379,7 +376,9 @@ def inputs(tmp_path, monkeypatch) -> Inputs:
     monkeypatch.setattr(
         narration_selection,
         "validate_voice_record",
-        lambda record, cast: current.checked.append(("voice", record["id"], cast)),
+        lambda record, cast, reference: current.checked.append(
+            ("voice", record["id"], cast, reference)
+        ),
     )
     monkeypatch.setattr(picture_rendering, "validate_picture_binding", lambda *_, **__: None)
     narration(current, {"01": "数据先行。", "02": "交付在后。"})

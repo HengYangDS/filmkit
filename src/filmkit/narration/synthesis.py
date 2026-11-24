@@ -13,7 +13,8 @@ as after any other run.
 Usage: python -m filmkit.narration.synthesis --language CODE --script FILE --cast FILE
     --folder DIR --receipt FILE [--ids 06,07] [--dry-run]
 CODE names the edition, whose language the text and the reference must be in
-(`pronunciation.validate_language_reference`) and whose name the speech model takes. With
+(`pronunciation.validate_language_reference`), whose name the speech model takes, and whose
+reference recording stands at the place the code derives (`filmkit.film.places`). With
 --ids only those segments are narrated, and their records replace theirs in an existing receipt.
 --dry-run prints each segment's plan: its fingerprint, its recording path and whether
 it would be reused, generated or refused. Paths are relative to the repository root, and a
@@ -64,6 +65,8 @@ class Request:
     """One run's narration: the cast, the contract, the chosen segments and their places."""
 
     cast: dict
+    # The edition's reference recording, at the place its code derives (`filmkit.film.places`).
+    reference: str
     language: str
     contract: dict
     contract_path: str
@@ -166,12 +169,18 @@ def load_request(argv: list[str] | None = None) -> Request:
     receipt = below_root("--receipt", options.receipt, file=True)
     script = repository.read(options.script)
     cast = repository.read(options.cast)
-    _check_cast(cast)
+    # The film is read here, when a request is, and not as the module loads: a command that
+    # stands in for the narration imports it with no film below its root.
+    from filmkit.film import FILM, places
+
+    reference = places(options.language, FILM.slug).reference
+    _check_cast(cast, reference)
     segments = _chosen(script["segments"], options.ids)
     language = validate_language_reference({**script, "segments": segments}, cast, options.language)
     contract, contract_sha256 = pronunciation_contract(script, language)
     return Request(
         cast=cast,
+        reference=reference,
         language=language,
         contract=contract,
         contract_path=script["pronunciation_contract"],
@@ -220,23 +229,14 @@ def below_root(option: str, named: str, *, file: bool = False) -> Path:
     return place
 
 
-def _check_cast(cast: dict) -> None:
-    """Refuse a cast that is not the local narrator conditioned on its exact reference."""
-    provider = cast.get("provider")
-    if provider not in (None, "mlx"):
-        msg = f"Narration provider {provider!r} is not the local MLX voice model"
-        raise ValueError(msg)
+def _check_cast(cast: dict, reference: str) -> None:
+    """Refuse a cast that does not condition the narrator on its exact reference: the recording
+    at `reference` and the cast's transcript."""
     if cast.get("reference_mode", "icl") != "icl" or not cast.get("reference_text"):
         msg = "A cast conditions the narrator in ICL mode on its reference transcript"
         raise ValueError(msg)
-    if repository.sha(cast["reference_audio"]) != cast["reference_sha256"]:
+    if repository.sha(reference) != cast["reference_sha256"]:
         msg = "Reference identity changed"
-        raise RuntimeError(msg)
-    if (
-        cast.get("reference_text_sha256")
-        and repository.content_sha(cast["reference_text"]) != cast["reference_text_sha256"]
-    ):
-        msg = "Reference transcript identity changed"
         raise RuntimeError(msg)
     # mlx-audio raises ICL penalties to 1.5 (read in 0.6.6); a cast may declare a lower one.
     penalty = cast.get("icl_repetition_penalty")
@@ -265,6 +265,7 @@ def speech_plan(request: Request) -> list[Job]:
         seed, temperature, plan = segment_take(segment, request.cast, thoughts)
         speech = cast_speech(
             request.cast,
+            reference=request.reference,
             language=request.language,
             contract_sha256=request.contract_sha256,
             seed=seed,

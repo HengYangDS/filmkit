@@ -289,9 +289,9 @@ def listening_plan(out: Path) -> dict:
                 },
                 "cast": {"path": cast_path, "sha256": repository.sha(cast_path)},
                 "selected_reference": {
-                    "path": cast["reference_audio"],
+                    "path": Edition(code).places.reference,
                     "sha256": cast["reference_sha256"],
-                    "transcript_sha256": cast["reference_text_sha256"],
+                    "transcript_sha256": repository.content_sha(cast["reference_text"]),
                 },
                 "status": "planned-not-listened",
             }

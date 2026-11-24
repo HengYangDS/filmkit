@@ -267,7 +267,9 @@ def holds_script(script: dict, records: list[dict]) -> None:
         raise ValueError(msg)
 
 
-def checked(script: dict, cast: dict, records: list[dict], targets: dict) -> list[tuple]:
+def checked(
+    script: dict, cast: dict, records: list[dict], targets: dict, reference: str
+) -> list[tuple]:
     """The receipt's target thoughts, each checked against the script, its recording and cast.
 
     Returns:
@@ -291,7 +293,7 @@ def checked(script: dict, cast: dict, records: list[dict], targets: dict) -> lis
     sections = {segment["id"]: segment for segment in script["segments"]}
     for record in {record["id"]: record for record, _, _ in found}.values():
         validate_group_inputs(record, root=repository.ROOT, section=sections[record["id"]])
-        validate_voice_record(record, cast)
+        validate_voice_record(record, cast, reference)
     return found
 
 

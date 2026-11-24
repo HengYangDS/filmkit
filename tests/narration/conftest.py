@@ -186,10 +186,8 @@ def narrated(retained_records, declared, stand_ins, tmp_path, monkeypatch):
         )
         if not (tmp_path / edition.cast).exists():
             cast = {
-                "reference_audio": settings["reference_audio"],
                 "reference_sha256": settings["reference_sha256"],
                 "reference_text": settings["reference_text"],
-                "narration_language": "English",
             }
             repository.write(edition.cast, cast)
         repository.write(evidence_paths("en")["receipt"], {"records": [record]})
@@ -304,7 +302,8 @@ def engine(stand_ins, declared, voiced, monkeypatch, tmp_path):
         narration_group_generation.mx.random, "seed", lambda seed: setattr(state, "seed", seed)
     )
     edition, paths = Edition("en"), narration_converge.evidence_paths("en")
-    reference = tmp_path / "reference.wav"
+    reference = tmp_path / edition.places.reference
+    reference.parent.mkdir(parents=True, exist_ok=True)
     reference.write_bytes(b"approved synthetic reference")
     contract = "content/voice-performance.json"
     repository.write(contract, {"pronunciation": {"languages": {"English": {"normalization": []}}}})
@@ -315,11 +314,8 @@ def engine(stand_ins, declared, voiced, monkeypatch, tmp_path):
     }
     repository.write(edition.script, {"pronunciation_contract": contract, "segments": [section]})
     cast = {
-        "reference_audio": "reference.wav",
         "reference_sha256": repository.sha(reference),
         "reference_text": "A reference.",
-        "narration_language": "English",
-        "reference_language": "English",
         "full_narration_seed": 4677,
     }
     repository.write(edition.cast, cast)
@@ -364,12 +360,10 @@ def bench(studio, voiced, monkeypatch):
     edition, paths = Edition("en"), narration_converge.evidence_paths("en")
 
     def declare(**fields) -> None:
-        cast = repository.read(edition.cast)
-        cast["performance_recording"] = {
-            "receipt": paths["receipt"],
-            "alignment": paths["alignment"],
-        }
-        repository.write(edition.cast, cast)
+        # The narration's alignment beside its receipt, where the count reads both, unless a
+        # test's narration wrote one: the studio's narration writes the receipt alone.
+        if not (repository.ROOT / paths["alignment"]).exists():
+            repository.write(paths["alignment"], {"records": []})
         script = repository.read(edition.script)
         policy = {**script.get("voice_performance", fit_bench.PERFORMANCE), **fields}
         repository.write(edition.script, {**script, "voice_performance": policy})

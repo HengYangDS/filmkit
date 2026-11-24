@@ -8,6 +8,7 @@ import json
 import test_adoption as base
 
 import filmkit.film as film
+import filmkit.withdrawn as withdrawn
 
 # A film that holds what the release asks, its findings, and the rewriting of one of its files.
 project, found, rewrite = base.project, base.found, base.rewrite
@@ -40,7 +41,7 @@ def test_each_withdrawn_runtime_key_is_named_by_the_declaration_question_alone(p
     # The loader reads the files whatever else the declaration holds: one that does not load is
     # no obstacle, and its problem stands beside them.
     rewrite(project / film.DECLARATION, 'slug = "sample-reel"', 'slug = "Two Words"')
-    script, cast = film.withdrawn("script"), film.withdrawn("cast")
+    script, cast = withdrawn.keys("script"), withdrawn.keys("cast")
     findings = found(project)
     assert findings["declaration"][:4] == [
         f"content/zh/film-script.json declares duration; {script['duration']}",

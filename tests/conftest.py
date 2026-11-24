@@ -242,7 +242,8 @@ def write_pcm(path, pcm, rate) -> None:
 
 
 GROUP_SETTINGS = {
-    "reference_audio": "reference.wav",
+    # The English edition's reference recording, at the place its code derives.
+    "reference_audio": "assets/audio/en/narration-reference.wav",
     "reference_text": "Reference.",
     "reference_treatment": None,
     "seed": 1,
@@ -266,7 +267,8 @@ def retained_record(root, plans: list[dict], pcms: list[np.ndarray]) -> tuple[di
     Returns:
         The joined recording's record and the speech settings its thoughts share.
     """
-    reference = root / "reference.wav"
+    reference = root / GROUP_SETTINGS["reference_audio"]
+    reference.parent.mkdir(parents=True, exist_ok=True)
     write_pcm(reference, np.full(24000, 300, dtype=np.int16), 24000)
     settings = {
         **GROUP_SETTINGS,

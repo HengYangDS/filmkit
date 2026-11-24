@@ -20,7 +20,6 @@
       "narration": "中文旁白"
     }
   },
-  "language": "Chinese",
   "fps": 60,
   "source": "content/source-manifest.json",
   "chapters": [
@@ -105,7 +104,6 @@
       "chapter_index": 0,
       "chapter_title": "从源文件开始",
       "title": "三类源文件",
-      "language": "Chinese",
       "source_sections": [
         "README:Layout"
       ],
@@ -129,7 +127,6 @@
       "chapter_index": 1,
       "chapter_title": "一次离线构建",
       "title": "旁白、音轨和字幕",
-      "language": "Chinese",
       "source_sections": [
         "README:Rebuilding the films"
       ],
@@ -152,7 +149,6 @@
       "chapter_index": 1,
       "chapter_title": "一次离线构建",
       "title": "画面与成片",
-      "language": "Chinese",
       "source_sections": [
         "README:Rebuilding the films"
       ],
@@ -176,7 +172,6 @@
       "chapter_index": 2,
       "chapter_title": "逐项核对",
       "title": "核对成片",
-      "language": "Chinese",
       "source_sections": [
         "README:Rebuilding the films"
       ],

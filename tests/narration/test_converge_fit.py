@@ -74,15 +74,11 @@ DAMAGED = {
 def staged(refusal: str) -> str:
     """Stage what refuses a convergence before its first effect; what its refusal begins with."""
     edition, paths = Edition("en"), narration_converge.evidence_paths("en")
-    cast, script = repository.read(edition.cast), repository.read(edition.script)
+    script = repository.read(edition.script)
     if refusal == "a refused pause policy":
         del script["voice_performance"]["thought_pause_range"]
         repository.write(edition.script, script)
         return "en: the script's pause policy is refused: thought_pause_range requires"
-    if refusal == "another receipt":
-        declared = {**cast["performance_recording"], "receipt": "elsewhere/receipt.json"}
-        repository.write(edition.cast, {**cast, "performance_recording": declared})
-        return "en: the cast declares the receipt elsewhere/receipt.json, and a convergence"
     if refusal in DAMAGED:
         former = edition.ear_first / narration_converge.RECORD
         former.unlink()
@@ -99,7 +95,6 @@ def staged(refusal: str) -> str:
     "refusal",
     [
         "a refused pause policy",
-        "another receipt",
         *DAMAGED,
         "a leftover request",
     ],
@@ -258,11 +253,13 @@ def test_an_edition_that_declares_nothing_to_count_is_not_asked(count, capsys):
     converge()
     why = "not asked: the script declares no pause policy (voice_performance)"
     assert (record_of()["fit"], counts(capsys)["fit"]) == ({"asked": False, "why": why}, why)
-    cast = repository.read(edition.cast)
-    repository.write(edition.cast, {**cast, "performance_recording": {"receipt": paths["receipt"]}})
+    # The narration writes its receipt and alignment where the count reads them; without the
+    # alignment there is nothing to count.
+    assert (repository.ROOT / paths["receipt"]).is_file()
+    (repository.ROOT / paths["alignment"]).unlink()
     converge()
     assert record_of()["fit"]["why"] == (
-        "not asked: the cast declares no performance recording with its alignment"
+        "not asked: the edition has no narration receipt with its alignment"
     )
     assert (count.selected, count.bound) == (0, 0)
 

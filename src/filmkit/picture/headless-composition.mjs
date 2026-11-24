@@ -26,15 +26,11 @@ import { characterClass } from "../languages/scripts.mjs";
 /* The composition, below the root of the film, the folder an audit runs in. */
 const COMPOSITION = "picture/film.js";
 
-/** The timeline as staging hands it to the composition: the edition of its language and no render offset, unless
- * the timeline gives them. */
+/** The timeline as staging hands it to the composition: with the edition the assembly wrote into it, and no render
+ * offset unless the timeline gives one. */
 export function readTimeline(path) {
   const authored = JSON.parse(readFileSync(path, "utf8"));
-  return {
-    ...authored,
-    edition: authored.edition ?? { Chinese: "zh", English: "en" }[authored.language],
-    render_offset: authored.render_offset ?? 0,
-  };
+  return { ...authored, render_offset: authored.render_offset ?? 0 };
 }
 
 const fontSize = (font) => Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 30);

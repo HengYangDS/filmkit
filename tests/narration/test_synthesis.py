@@ -20,6 +20,8 @@ from filmkit.production import CODES, Edition
 RATE = 24000
 GROUPS = ["先核验实际工作。", "再说明结论和限度。"]
 ARGUMENTS = ["--language", "zh", "--script", "script.json", "--cast", "cast.json"]
+# The Chinese edition's reference recording, at the place its code derives: no cast names it.
+REFERENCE = "assets/audio/zh/narration-reference.wav"
 ARGUMENTS += ["--folder", "audio"]
 ARGUMENTS += ["--receipt", "receipt.json"]
 GOLDEN = json.loads((Path(__file__).parent / "golden/receipts.json").read_text())
@@ -29,9 +31,11 @@ def sha256(data: bytes | str) -> str:
     return hashlib.sha256(data.encode() if isinstance(data, str) else data).hexdigest()
 
 
-def write_sources(root, segments, **cast_changes) -> dict:
-    """Write a script of grouped segments, its contract, a reference and its cast."""
-    reference = root / "reference.wav"
+def write_sources(root, segments, code="zh", **cast_changes) -> dict:
+    """Write a script of grouped segments, its contract, the reference of the edition `code` at
+    its place and its cast."""
+    reference = root / Edition(code).places.reference
+    reference.parent.mkdir(parents=True, exist_ok=True)
     reference.write_bytes(b"approved synthetic reference")
     contract = {"normalization": []}
     repository.write(
@@ -47,10 +51,8 @@ def write_sources(root, segments, **cast_changes) -> dict:
     }
     repository.write(root / "script.json", script)
     cast = {
-        "reference_audio": "reference.wav",
         "reference_sha256": sha256(reference.read_bytes()),
         "reference_text": "看清事实，作出判断。",
-        "narration_language": "Chinese",
         "full_narration_seed": 4677,
         **cast_changes,
     }
@@ -127,7 +129,9 @@ def test_complete_thought_narration_preserves_source_native_tails_and_provenance
     record = repository.read("receipt.json")["records"][0]
     assert [call["text"] for call in voice.calls] == GROUPS
     assert [call["stream"] for call in voice.calls] == [False, False]
-    assert [call["ref_audio"] for call in voice.calls] == [str(tmp_path / "reference.wav")] * 2
+    assert [call["ref_audio"] for call in voice.calls] == [str(tmp_path / REFERENCE)] * 2
+    assert record["reference_audio"] == REFERENCE
+    assert record["reference_text_sha256"] == sha256("看清事实，作出判断。")
     assert record["text"] == "".join(GROUPS)
     assert record["spoken_text"] == "".join(GROUPS)
     assert record["duration"] == 4.3
@@ -176,9 +180,8 @@ def test_narration_entrypoint_preserves_vendor_decoder(tmp_path, voice, capsys):
     write_sources(
         tmp_path,
         {"26": ["A complete spoken thought.", " Another complete thought."]},
+        code="en",
         reference_text="A retained reference thought.",
-        reference_language="English",
-        narration_language="English",
     )
 
     class Tokenizer:
@@ -233,7 +236,7 @@ def test_declared_penalty_and_thought_retakes_bind_through_reuse(tmp_path, voice
     assert [call["text"] for call in calls] == GROUPS
     assert [call["repetition_penalty"] for call in calls] == [1.05, 1.05]
     assert [call["language"] for call in calls] == ["Chinese", "Chinese"]
-    assert references == [(str(tmp_path / "reference.wav"), RATE)] * 2
+    assert references == [(str(tmp_path / REFERENCE), RATE)] * 2
     assert seeds == [4677 + 26, 9999]
     children = record["utterance_groups"]["records"]
     assert [child["seed"] for child in children] == [4677 + 26, 9999]
@@ -258,10 +261,7 @@ def test_declared_penalty_and_thought_retakes_bind_through_reuse(tmp_path, voice
         ({"icl_repetition_penalty": 0.9}, ValueError, "ICL repetition penalty"),
         ({"icl_repetition_penalty": 1}, ValueError, "ICL repetition penalty"),
         ({"reference_sha256": "0" * 64}, RuntimeError, "Reference identity changed"),
-        ({"reference_text_sha256": "0" * 64}, RuntimeError, "Reference transcript identity"),
         ({"reference_mode": "x_vector"}, ValueError, "ICL mode"),
-        ({"provider": "edge"}, ValueError, "local MLX voice model"),
-        ({"provider": "dmxapi"}, ValueError, "local MLX voice model"),
     ],
 )
 def test_a_cast_is_refused_before_any_effect(tmp_path, voice, cast_changes, error, message):
@@ -446,6 +446,7 @@ def test_the_speech_plan_reproduces_the_retained_requests(code):
     segment = golden["segment"]
     request = narration_synthesis.Request(
         cast=golden["cast"],
+        reference=Edition(code).places.reference,
         language=golden["language"],
         contract={"normalization": golden["normalization"]},
         contract_path=golden["pronunciation_contract"],

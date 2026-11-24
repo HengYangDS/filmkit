@@ -47,7 +47,7 @@ def stage(tmp_path, monkeypatch, code, groups, words, captions=()):
         "segments": [segment],
     }
     write_json(tmp_path / edition.script, script)
-    write_json(tmp_path / edition.cast, {"narration_language": "Chinese"})
+    write_json(tmp_path / edition.cast, {})
     timed = {
         **segment,
         "start": 0.0,
@@ -61,6 +61,7 @@ def stage(tmp_path, monkeypatch, code, groups, words, captions=()):
     # What an assembly writes beside and over the script's keys (`production.ASSEMBLED`).
     timeline = {
         **script,
+        "edition": edition.code,
         "duration": 9,
         "credits_duration": 3.0,
         "segments": [timed],

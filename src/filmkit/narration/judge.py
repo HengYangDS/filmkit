@@ -32,15 +32,13 @@ RECORD = "judgment.json"
 
 
 def receipt_of(code: str) -> str:
-    """The edition's narration receipt: the one its cast declares, or the narration's own."""
-    declared = repository.read(Edition(code).cast).get("performance_recording", {})
-    return declared.get("receipt") or evidence_paths(code)["receipt"]
+    """The edition's narration receipt, where the narration writes it."""
+    return evidence_paths(code)["receipt"]
 
 
 def alignment_of(code: str) -> str:
-    """The alignment of the edition's receipt: the one its cast declares, or the narration's own."""
-    declared = repository.read(Edition(code).cast).get("performance_recording", {})
-    return declared.get("alignment") or evidence_paths(code)["alignment"]
+    """The alignment of the edition's receipt, where the narration writes it."""
+    return evidence_paths(code)["alignment"]
 
 
 def gate_of(code: str, records: list[dict]) -> dict | None:
@@ -75,7 +73,7 @@ def current(code: str) -> list[dict]:
     script, cast = repository.read(edition.script), repository.read(edition.cast)
     judgment.holds_script(script, records)
     every = {(record["id"], child["index"]): None for record, child in judgment.thoughts(records)}
-    judgment.checked(script, cast, records, every)
+    judgment.checked(script, cast, records, every, Edition(code).places.reference)
     return records
 
 

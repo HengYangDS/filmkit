@@ -245,15 +245,3 @@ def test_the_narration_is_given_twice_the_time_it_may_itself_wait_for_its_childr
     assert command[-4:] == ["-m", "filmkit.narration.narrate", "--language", "en"]
     assert options["seconds"] == 4 * child_processes.STOP_SECONDS
     assert json.loads(capsys.readouterr().out)["step"] == "narration"
-
-
-def test_a_cast_that_declares_another_receipt_is_refused_before_anything_runs(
-    studio, voiced, monkeypatch
-):
-    studio.begin([voiced(), voiced()])
-    cast = repository.read(Edition("en").cast)
-    cast["performance_recording"] = {"receipt": "build/other-receipt.json"}
-    repository.write(Edition("en").cast, cast)
-    monkeypatch.setattr(narration_converge, "narration_due", pytest.fail)
-    with pytest.raises(SystemExit, match="the cast declares the receipt build/other-receipt.json"):
-        narration_converge.main(["--language", "en"])

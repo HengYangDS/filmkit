@@ -145,11 +145,11 @@ def row(index: int, text: str, seed: int | None) -> dict:
 
 
 def test_proposals_bind_the_current_thoughts_and_skip_those_without_a_seed():
-    cast = {"reference_audio": "reference.wav"}
+    cast = {"reference_sha256": "0" * 64}
     rows = [row(2, "决定由有权的人作出。", 99711), row(1, "按标准，这次交付不合格。", None)]
     bound_cast, bound, skipped = narration_retakes.bind_proposals(SCRIPT, cast, rows, CONTRACT)
     assert bound_cast == {
-        "reference_audio": "reference.wav",
+        "reference_sha256": "0" * 64,
         "retakes": {
             "06": {
                 "groups": {
@@ -163,7 +163,7 @@ def test_proposals_bind_the_current_thoughts_and_skip_those_without_a_seed():
         },
     }
     assert (bound, skipped) == (["06.2=99711"], ["06.1"])
-    assert cast == {"reference_audio": "reference.wav"}
+    assert cast == {"reference_sha256": "0" * 64}
 
 
 def test_a_proposal_binds_the_speech_its_audition_narrated():

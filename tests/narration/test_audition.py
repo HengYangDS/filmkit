@@ -14,7 +14,12 @@ import filmkit.narration.audition as narration_audition
 import filmkit.narration.group_generation as narration_group_generation
 import filmkit.narration.terms as narration_terms
 import filmkit.repository as repository
+from filmkit.narration.narrate import evidence_paths
 from filmkit.production import Edition
+
+# Where the English edition's narration writes its receipt, which the audition reads: no cast
+# names it.
+RECEIPT = evidence_paths("en")["receipt"]
 
 
 def sha256(data: bytes | str) -> str:
@@ -147,14 +152,11 @@ def auditioned(retained_group_record, declared, monkeypatch):
     }
     repository.write(edition.script, {"segments": [section]})
     cast = {
-        "reference_audio": settings["reference_audio"],
         "reference_sha256": settings["reference_sha256"],
         "reference_text": settings["reference_text"],
-        "narration_language": "English",
-        "performance_recording": {"receipt": "build/receipt.json"},
     }
     repository.write(edition.cast, cast)
-    repository.write("build/receipt.json", {"records": [record]})
+    repository.write(RECEIPT, {"records": [record]})
     repository.write("targets.json", {"26.2": "second thought"})
 
     def unloaded():
@@ -167,9 +169,10 @@ def auditioned(retained_group_record, declared, monkeypatch):
 
 
 def other_narrator(cast: dict) -> None:
-    """Point the cast at another narrator's reference recording."""
-    (repository.ROOT / "other.wav").write_bytes(b"another narrator")
-    cast.update(reference_audio="other.wav", reference_sha256=sha256(b"another narrator"))
+    """Put another narrator's reference recording in the edition's place, and its SHA-256 in
+    the cast."""
+    (repository.ROOT / Edition("en").places.reference).write_bytes(b"another narrator")
+    cast.update(reference_sha256=sha256(b"another narrator"))
 
 
 def rewrite(path, change) -> None:
@@ -194,7 +197,7 @@ def rewrite(path, change) -> None:
         (lambda: repository.write("targets.json", {"26.3": "third"}), ValueError, "Every target"),
         (
             lambda: rewrite(
-                "build/receipt.json",
+                RECEIPT,
                 lambda receipt: receipt["records"][0]["utterance_groups"]["records"][1].update(
                     receipt_sha256="0" * 64
                 ),
@@ -208,9 +211,9 @@ def rewrite(path, change) -> None:
             "26: the recording's narrator reference differs from the cast",
         ),
         (
-            lambda: (
-                repository.ROOT / repository.read("build/receipt.json")["records"][0]["path"]
-            ).write_bytes(b"changed"),
+            lambda: (repository.ROOT / repository.read(RECEIPT)["records"][0]["path"]).write_bytes(
+                b"changed"
+            ),
             ValueError,
             "26: the recording differs from its receipt",
         ),
@@ -225,8 +228,9 @@ def rewrite(path, change) -> None:
 )
 def test_audition_refuses_before_loading_any_model(auditioned, tamper, error, message):
     tamper()
+    # The audition reads the receipt where the narration writes it, named by no cast.
     with pytest.raises(error, match=message):
-        narration_audition.audition("en", "targets.json", "build/receipt.json")
+        narration_audition.audition("en", "targets.json")
     assert not (auditioned["root"] / narration_audition.AUDITIONS).exists()
 
 

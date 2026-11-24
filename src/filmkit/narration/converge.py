@@ -35,7 +35,7 @@ fraction that the gaps and the credits take, or why the count was not asked. The
 exits 1, with one line, for a settled edition that the selection or the assembly refuses, with
 that reason. A fault of the count that is no refusal keeps its traceback, after the record is
 ended with it. A cast that declares `runtime_fit`, which nothing reads, is refused with the
-film as the engine loads (`filmkit.film.WITHDRAWN`), before the command runs.
+film as the engine loads (`filmkit.withdrawn`), before the command runs.
 
 A run that changes nothing is a no-op: with nothing missing and nothing refused it narrates
 nothing and leaves the cast as it is, and a candidate whose recording a former run left in
@@ -92,18 +92,6 @@ UNRESOLVED = (
 )
 
 __all__ = ["FIRST", "STRIDE", "converge", "main"]
-
-
-def own_receipt(code: str) -> str:
-    """The receipt the convergence narrates into, which the cast must not declare elsewhere."""
-    declared, own = judge.receipt_of(code), evidence_paths(code)["receipt"]
-    if declared != own:
-        msg = (
-            f"{code}: the cast declares the receipt {declared}, and a convergence narrates "
-            f"into {own}"
-        )
-        raise SystemExit(msg)
-    return own
 
 
 def narration_due(code: str) -> bool:
@@ -261,7 +249,8 @@ def round_of(session, state, found, number, ks, *, run_on: bool) -> list[dict]:
     edition = Edition(session.code)
     script, cast = repository.read(edition.script), repository.read(edition.cast)
     proposals = []
-    for record, child, row in judgment.checked(script, cast, records, refused):
+    checked = judgment.checked(script, cast, records, refused, edition.places.reference)
+    for record, child, row in checked:
         entry = entry_of(found, row)
         following = None
         if run_on:
@@ -372,15 +361,13 @@ def begin(code: str, asked: dict, former: dict) -> None:
 
 def admitted(code: str) -> dict:
     """What refuses a run before its first effect, each in its own words; then what a run takes
-    from these checks: the record that a former run left. The cast's receipt is the
-    convergence's own, the script's pause policy can be read and the cast declares nothing the
-    count does not take (`fitting.declared`), no narration left a request started, and the
-    former record can be read (`left`).
+    from these checks: the record that a former run left. The script's pause policy can be
+    read (`fitting.declared`), no narration left a request started, and the former record can
+    be read (`left`).
 
     The command asks this before it opens its run (`main`), so that such a refusal writes no
     duration record and leaves the record of the convergence that narrated the standing build.
     """
-    own_receipt(code)
     fitting.declared(code)
     started = leftovers(code)
     if started:

@@ -92,6 +92,10 @@ def test_assembly_lays_out_each_recording_with_its_own_level_and_exact_samples(t
     assert receipt["credits_duration"] == timeline["credits_duration"] == 4
     # The credits as laid out are seconds with a fraction, also where they keep their length.
     assert type(timeline["credits_duration"]) is type(receipt["credits_duration"]) is float
+    # The timeline names its edition by the code, which the assembly alone writes, and states no
+    # language, at its top or in a segment.
+    assert timeline["edition"] == two_chapters.code and "language" not in timeline
+    assert not any("language" in segment for segment in timeline["segments"])
     assert sum(gaps) + speech + closing + 4 * RATE == runtime * RATE
     assert receipt["samples_per_channel"] == runtime * RATE
     # What the assembly writes beside and over the script's keys is what every comparison of a

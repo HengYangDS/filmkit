@@ -64,11 +64,7 @@ def test_listening_plan_binds_each_occurrence_and_refuses_unrecorded_readings(ro
         put(root / script, {"pronunciation_contract": CONTRACT, "segments": [segment]})
         put(
             root / cast,
-            {
-                "reference_audio": f"assets/{code}.wav",
-                "reference_sha256": "a" * 64,
-                "reference_text_sha256": "b" * 64,
-            },
+            {"reference_sha256": "a" * 64, "reference_text": f"{code} reference"},
         )
     put(root / "content/source-manifest.json", {"members": []})
     lead = {"noun": review_listening_plan.arpabet("L IY1 D", 1)}

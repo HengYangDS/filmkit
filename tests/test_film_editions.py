@@ -11,6 +11,7 @@ import pytest
 import filmkit.film as film
 import filmkit.production as production
 import filmkit.repository as repository
+import filmkit.withdrawn as withdrawn
 from filmkit.film import FilmError
 
 
@@ -174,7 +175,7 @@ def declare(path: Path, **fields) -> None:
 
 
 # What the loader says of a script's withdrawn runtime, at whichever place the script stands.
-DURATION = "declares duration; " + film.withdrawn("script")["duration"]
+DURATION = "declares duration; " + withdrawn.keys("script")["duration"]
 
 
 def test_a_withdrawn_key_is_refused_where_the_declaration_still_names_the_files(declared):
@@ -203,7 +204,7 @@ def test_a_withdrawn_key_is_refused_at_the_place_its_code_derives(declared):
 
 
 # What the loader says of each key an edition's table may no longer declare.
-WITHDRAWN = film.withdrawn("edition")
+WITHDRAWN = withdrawn.keys("edition")
 
 
 @pytest.mark.parametrize(("key", "value"), [("sources", '"content/en"'), ("cover", '"c.png"')])
@@ -237,10 +238,10 @@ def test_every_kind_of_place_is_read_for_its_withdrawn_keys(declared, monkeypatc
     # The table names no key of a declaration, an edition's table, a segment or a part yet;
     # each later withdrawal adds its row, and the loader reads every kind of place for it.
     rows = [
-        film.Withdrawn(kind, "held", "remove it")
+        withdrawn.Withdrawn(kind, "held", "remove it")
         for kind in ("declaration", "edition", "segment", "part")
     ]
-    monkeypatch.setattr(film, "WITHDRAWN", (*film.WITHDRAWN, *rows))
+    monkeypatch.setattr(withdrawn, "WITHDRAWN", (*withdrawn.WITHDRAWN, *rows))
     rewrite(declared, "credits_duration = 3", "credits_duration = 3\nheld = 1")
     rewrite(declared, "[editions.en]\n", "[editions.en]\nheld = 1\n")
     script = json.loads((declared / "content/zh" / film.SCRIPT).read_text())
@@ -253,4 +254,29 @@ def test_every_kind_of_place_is_read_for_its_withdrawn_keys(declared, monkeypatc
         f"content/zh/film-script.json segment {segment} declares held; remove it",
         "content/film.toml editions.en declares held; remove it",
         "content/en/pronunciation.json declares held; remove it",
+    ]
+
+
+@pytest.mark.parametrize("place", ["top", "segment"])
+def test_a_script_that_declares_its_language_is_refused_at_load(declared, place):
+    path = declared / "content/zh" / film.SCRIPT
+    script = json.loads(path.read_text())
+    where = "content/zh/film-script.json"
+    if place == "segment":
+        script["segments"][1]["language"] = "Chinese"
+        where += f" segment {script['segments'][1]['id']}"
+    else:
+        script["language"] = "Chinese"
+    path.write_text(json.dumps(script, ensure_ascii=False))
+    assert film.problems(declared) == [
+        f"{where} declares language; remove it: the engine takes the edition's language from "
+        "its code"
+    ]
+
+
+@pytest.mark.parametrize("key", withdrawn.keys("cast"))
+def test_a_cast_that_declares_a_withdrawn_key_is_refused_at_load(declared, key):
+    declare(declared / "content/en" / film.CAST, **{key: "a value"})
+    assert film.problems(declared) == [
+        f"content/en/voice-reference.json declares {key}; {withdrawn.keys('cast')[key]}"
     ]

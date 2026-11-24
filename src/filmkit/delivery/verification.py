@@ -158,7 +158,7 @@ def verify_narration(edition: production.Edition) -> dict:
         narration_thought_groups.validate_group_inputs(
             record, root=repository.ROOT, section=section
         )
-        narration_selection.validate_voice_record(record, cast)
+        narration_selection.validate_voice_record(record, cast, edition.places.reference)
     return {
         "segments": len(order),
         "captions": verify_captions(timeline, edition.code),

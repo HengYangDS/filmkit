@@ -94,21 +94,14 @@ for (const code of ["zh", "en"]) {
   });
 }
 
-test("the headless timeline is the staged one: its language's edition and no render offset unless given", async () => {
+test("the headless timeline is the staged one: the edition the assembly wrote, no render offset unless given", async () => {
   const folder = await scratchFolder(),
     path = join(folder, "timeline.json");
-  await writeFile(path, JSON.stringify({ language: "English", duration: 10 }));
-  assert.deepEqual(readTimeline(path), {
-    language: "English",
-    duration: 10,
-    edition: "en",
-    render_offset: 0,
-  });
-  await writeFile(
-    path,
-    JSON.stringify({ language: "Chinese", edition: "zh", render_offset: 12.5 }),
-  );
-  assert.deepEqual(readTimeline(path), { language: "Chinese", edition: "zh", render_offset: 12.5 });
+  // A timeline names its edition by its code and states no language, which nothing maps.
+  await writeFile(path, JSON.stringify({ edition: "en", duration: 10 }));
+  assert.deepEqual(readTimeline(path), { edition: "en", duration: 10, render_offset: 0 });
+  await writeFile(path, JSON.stringify({ edition: "zh", render_offset: 12.5 }));
+  assert.deepEqual(readTimeline(path), { edition: "zh", render_offset: 12.5 });
 });
 
 test("each rendered frame hands over every paint with the scene that drew it", async () => {

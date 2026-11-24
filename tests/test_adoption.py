@@ -14,6 +14,7 @@ import filmkit.adoption as adoption
 import filmkit.film as film
 import filmkit.released as released
 import filmkit.repository as repository
+import filmkit.withdrawn as withdrawn
 from filmkit.picture import renderer
 
 ENGINE = Path(__file__).resolve().parents[1]
@@ -223,7 +224,7 @@ def test_an_edition_s_withdrawn_folder_is_named_by_the_declaration_question_alon
         project / film.DECLARATION, "[editions.zh]\n", '[editions.zh]\nsources = "content/zh"\n'
     )
     findings = found(project)
-    instead = film.withdrawn("edition")["sources"]
+    instead = withdrawn.keys("edition")["sources"]
     assert findings["declaration"] == [f"content/film.toml editions.zh declares sources; {instead}"]
     assert [name for name in adoption.QUESTIONS if findings[name]] == ["declaration"]
 

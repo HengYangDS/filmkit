@@ -619,6 +619,9 @@ def assemble(edition: Edition) -> None:
         raise AssemblyError("\n".join(refused))
     timeline = {
         **script,
+        # The edition's code, which the timeline's readers take as its language; staging copies
+        # it into the picture's data.
+        "edition": edition.code,
         "segments": timeline_segments,
         "timing_state": "Actual waveform alignment with designed native-speech pauses",
         # The runtime in whole seconds, and the credits as laid out, whose start every reader

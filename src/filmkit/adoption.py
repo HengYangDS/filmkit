@@ -13,7 +13,7 @@ of the film that cannot be read is a finding of the question that reads it.
   differ in length, read as text. That reading fails closed: such a line is named whatever else
   it says. A key the engine has withdrawn, `duration` or `credits_duration` in a script and
   `runtime_fit` in a cast among them, is the `declaration` question's, which the loader refuses
-  (`filmkit.film.WITHDRAWN`), as is a declaration that states no `credits_duration`.
+  (`filmkit.withdrawn`), as is a declaration that states no `credits_duration`.
 - `npm_packages`: the film's `package.json` declares each package the engine runs at the version
   the engine was released on, and its lock holds each at that version and integrity. A package
   the film alone holds is the film's.

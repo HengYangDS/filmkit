@@ -12,6 +12,7 @@ import filmkit.film as film
 import filmkit.narration.selection as narration_selection
 import filmkit.narration.terms as narration_terms
 import filmkit.repository as repository
+from filmkit.narration.narrate import evidence_paths
 from filmkit.production import Edition
 
 
@@ -29,7 +30,6 @@ def edition(retained_group_record, monkeypatch):
         "id": record["id"],
         "text": record["text"],
         "spoken_text": record["spoken_text"],
-        "language": "English",
         "utterance_groups": [plan["text"] for plan in plans],
     }
     repository.write(
@@ -37,21 +37,12 @@ def edition(retained_group_record, monkeypatch):
         {"pronunciation": {"languages": {"English": {"normalization": []}}}},
     )
     script = {
-        "language": "English",
         "pronunciation_contract": "content/voice-performance.json",
         "segments": [section],
     }
     cast = {
-        "reference_audio": settings["reference_audio"],
         "reference_sha256": settings["reference_sha256"],
         "reference_text": settings["reference_text"],
-        "reference_text_sha256": sha256(settings["reference_text"]),
-        "narration_language": "English",
-        "reference_language": "English",
-        "performance_recording": {
-            "receipt": "build/receipt.json",
-            "alignment": "build/alignment.json",
-        },
     }
     alignment = {
         "records": [
@@ -77,12 +68,17 @@ def edition(retained_group_record, monkeypatch):
     return values
 
 
+# Where the English edition's narration writes its receipt and alignment, which the selection
+# reads: no cast names them.
+PERFORMANCE = evidence_paths("en")
+
+
 def write_edition(values: dict) -> None:
     edition = Edition("en")
     repository.write(edition.script, values["script"])
     repository.write(edition.cast, values["cast"])
-    repository.write("build/receipt.json", values["receipt"])
-    repository.write("build/alignment.json", values["alignment"])
+    repository.write(PERFORMANCE["receipt"], values["receipt"])
+    repository.write(PERFORMANCE["alignment"], values["alignment"])
 
 
 def test_selection_binds_each_current_recording_and_its_alignment(edition, capsys):
@@ -106,11 +102,6 @@ def receipt_record(values: dict) -> dict:
 @pytest.mark.parametrize(
     ("tamper", "error", "message"),
     [
-        (
-            lambda values: values["cast"].pop("performance_recording"),
-            ValueError,
-            "A current declared performance recording is required",
-        ),
         (
             lambda values: receipt_record(values).update(text="Changed."),
             ValueError,
@@ -153,6 +144,16 @@ def test_selection_refuses_a_recording_that_differs(edition, tamper, error, mess
     assert not Edition("en").narration_selected.exists()
 
 
+def test_selection_reads_the_receipt_where_the_narration_writes_it(edition):
+    assert (PERFORMANCE["receipt"], PERFORMANCE["alignment"]) == (
+        "build/evidence/editions/en/ear-first/narration-receipt.json",
+        "build/evidence/editions/en/ear-first/alignment.json",
+    )
+    (repository.ROOT / PERFORMANCE["receipt"]).unlink()
+    with pytest.raises(ValueError, match="the edition has no narration receipt; narrate it first"):
+        narration_selection.select(Edition("en"))
+
+
 def test_selection_refuses_a_recording_outside_the_production_root(edition, tmp_path_factory):
     outside = tmp_path_factory.mktemp("outside") / "recording.wav"
     outside.write_bytes(b"recording")
@@ -168,7 +169,11 @@ def test_selection_refuses_a_recording_outside_the_production_root(edition, tmp_
 
 def test_a_voice_record_binds_the_cast_reference(edition):
     record, cast = receipt_record(edition), edition["cast"]
-    narration_selection.validate_voice_record(record, cast)
+    reference = Edition("en").places.reference
+    # The recording and the transcript the take records are the edition's derived ones.
+    assert record["reference_audio"] == reference == "assets/audio/en/narration-reference.wav"
+    assert record["reference_text_sha256"] == sha256(cast["reference_text"])
+    narration_selection.validate_voice_record(record, cast, reference)
     for field, value in (
         ("reference_audio", "other.wav"),
         ("reference_sha256", "0" * 64),
@@ -176,16 +181,17 @@ def test_a_voice_record_binds_the_cast_reference(edition):
         ("reference_treatment", {"pitch_shift": 0}),
     ):
         with pytest.raises(ValueError, match="narrator reference differs from the cast"):
-            narration_selection.validate_voice_record({**record, field: value}, cast)
+            narration_selection.validate_voice_record({**record, field: value}, cast, reference)
 
 
 def test_a_voice_record_refuses_a_changed_cast_reference(edition):
     record, cast = receipt_record(edition), copy.deepcopy(edition["cast"])
-    narration_selection.validate_voice_record(record, cast)
-    reference = repository.ROOT / cast["reference_audio"]
+    place = Edition("en").places.reference
+    narration_selection.validate_voice_record(record, cast, place)
+    reference = repository.ROOT / place
     reference.write_bytes(reference.read_bytes() + b"\0\0")
     with pytest.raises(ValueError, match="differs from the cast's SHA-256"):
-        narration_selection.validate_voice_record(record, cast)
+        narration_selection.validate_voice_record(record, cast, place)
 
 
 RECORD = {"id": "01", "text": "先核验。", "text_sha256": sha256("先核验。"), "wav_sha256": "a" * 64}

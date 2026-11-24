@@ -87,7 +87,8 @@ def root(tmp_path, monkeypatch):
         script = {"segments": [{"id": "01", "text": text}]}
         put(root / edition.script, script)
         segment = {"id": "01", "text": text, "words": []}
-        timeline = {**script, "duration": RUNTIME, "segments": [segment], "captions": []}
+        timeline = {**script, "edition": code, "duration": RUNTIME, "segments": [segment]}
+        timeline["captions"] = []
         put(edition.timeline, timeline)
         put(edition.soundtrack, f"{code} narration")
         assembly = {
@@ -211,7 +212,9 @@ def test_staging_twice_writes_the_same_complete_document(code):
     binding = json.loads(written[0][1])
     inputs, timeline = picture_rendering.candidate_picture_inputs(edition)
     assert binding["inputs"] == inputs
-    assert film == {**timeline, "render_offset": 0, "edition": code}
+    # The edition is the one the assembly wrote into the timeline, which staging copies.
+    assert timeline["edition"] == code
+    assert film == {**timeline, "render_offset": 0}
     assert [(member["path"], member["source"]) for member in binding["members"]] == [
         (path, str(source)) for path, source in picture_rendering.staged_members()
     ]

@@ -9,10 +9,10 @@ import pytest
 from fit_bench import Count
 
 import filmkit.narration.fitting as fitting
-import filmkit.narration.selection as narration_selection
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as soundtrack_assembly
 import filmkit.soundtrack.fit as soundtrack_fit
+from filmkit.narration.narrate import evidence_paths
 from filmkit.soundtrack.level import LevelError
 from filmkit.soundtrack.pauses import PauseError
 from filmkit.soundtrack.policy import PausePolicyError
@@ -274,12 +274,12 @@ def test_the_reports_are_given_with_their_refusals_to_a_caller_that_decides(two_
 
 @pytest.fixture
 def settled(two_chapters, monkeypatch):
-    """The two chapters as the convergence asks of them (`filmkit.narration.fitting.read`): the
-    cast declares a performance recording, and the selection alone stands in, since the bench
-    stages the two records it writes. The binding, the decoding and the measure are the
-    assembly's own."""
-    cast = {"performance_recording": {"receipt": "receipt.json", "alignment": "alignment.json"}}
-    (repository.ROOT / two_chapters.cast).write_text(json.dumps(cast))
+    """The two chapters as the convergence asks of them (`filmkit.narration.fitting.read`): a
+    narration receipt and its alignment stand where the narration writes them, and the
+    selection alone stands in, since the bench stages the two records it writes. The binding,
+    the decoding and the measure are the assembly's own."""
+    for name in ("receipt", "alignment"):
+        repository.write(evidence_paths("zh")[name], {"records": []})
     monkeypatch.setattr(fitting, "select", lambda _edition: None)
     return two_chapters
 
@@ -325,20 +325,10 @@ def test_a_decoder_not_installed_is_the_host_s_fault_and_a_missing_recording_the
     }
 
 
-def test_a_missing_file_the_edition_names_outside_the_root_is_refused_in_one_line(
+def test_a_missing_recording_outside_the_root_is_refused_in_one_line(
     settled, monkeypatch, tmp_path_factory
 ):
     outside = tmp_path_factory.mktemp("outside")
-    # The receipt, which the cast names by an absolute path and the selection itself reads.
-    receipt = outside / "receipt.json"
-    cast = {"performance_recording": {"receipt": str(receipt), "alignment": "alignment.json"}}
-    (repository.ROOT / settled.cast).write_text(json.dumps(cast))
-    monkeypatch.setattr(fitting, "select", narration_selection.select)
-    assert fitting.read("zh") == {
-        "asked": True,
-        "verdict": "refused",
-        "refusal": f"the selection: [Errno 2] No such file or directory: '{receipt}'",
-    }
     # A recording, which its record names by an absolute path and the binding reads.
     monkeypatch.setattr(fitting, "select", lambda _edition: None)
     recording = outside / "take-01.wav"

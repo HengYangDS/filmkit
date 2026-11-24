@@ -131,11 +131,10 @@ def substitute(html: str, old: str, new: str, count: int = 1) -> str:
 def film_data(
     edition: Edition, start: float, *, timeline: dict | None = None, captions: bool = True
 ) -> str:
-    """The picture's data as JSON, the document's `window.FILM`: the timeline with its render
-    offset and edition, and with `captions` False no captions."""
+    """The picture's data as JSON, the document's `window.FILM`: the timeline, with the edition
+    the assembly wrote into it, its render offset, and with `captions` False no captions."""
     data = dict(timeline) if timeline is not None else read(edition.timeline)
     data["render_offset"] = start
-    data["edition"] = edition.code
     if not captions:
         data["captions"] = []
     return json.dumps(data, ensure_ascii=False)

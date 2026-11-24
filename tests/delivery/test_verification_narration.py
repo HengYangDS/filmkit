@@ -81,11 +81,13 @@ def test_current_narration_passes_and_validates_every_selected_recording(inputs)
         "program_level": {"integrated_lufs": -16.6, "true_peak_dbtp": -1.2},
     }
     cast = json.loads((inputs.root / edition.cast).read_text())
+    # Each recording is bound to the edition's reference recording at its derived place.
+    reference = edition.places.reference
     assert inputs.checked == [
         ("groups", "01", inputs.root),
-        ("voice", "01", cast),
+        ("voice", "01", cast, reference),
         ("groups", "02", inputs.root),
-        ("voice", "02", cast),
+        ("voice", "02", cast, reference),
     ]
 
 
