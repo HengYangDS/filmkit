@@ -139,12 +139,12 @@ Shown by `tests/narration/test_synthesis.py`.
 Records under `build/evidence/hear-a-take-as-a-listener-does/`. Tasks 6.1 to 6.4 are light and load no model; 6.5
 and 6.6 run models and each waits for its own GPU ticket under the host's rules.
 
-- [ ] 6.1 Run `uv run --frozen --offline python -m filmkit.supply` in the engine's repository with the built engine,
+- [x] 6.1 Run `uv run --frozen --offline python -m filmkit.supply` in the engine's repository with the built engine,
       its models already in place (the supply step reaches the network for the dictionary alone). Done when `trial.md`
       records the dictionary's place, size and SHA-256, equal to the pin, and the models kept.
-- [ ] 6.2 Run `uv run --frozen --offline pytest -m cmudict tests/narration/test_cmudict.py` with the supplied file in
+- [x] 6.2 Run `uv run --frozen --offline pytest -m cmudict tests/narration/test_cmudict.py` with the supplied file in
       place. Done when the marked test of task 2.6 passes on the pinned file and `trial.md` records the run.
-- [ ] 6.3 Write `build/runtime/work/hear-a-take-as-a-listener-does/recompare.py`, which compares a recorded
+- [x] 6.3 Write `build/runtime/work/hear-a-take-as-a-listener-does/recompare.py`, which compares a recorded
       transcript with its spoken text by the built engine's `recognition.compared` over the supplied dictionary and
       loads no model, and with it compare again each English thought's recorded transcript in the fused trial's judgments
       (`build/runtime/work/trial-fused/<copy>/build/evidence/editions/en/ear-first/judgment.json`, for `ch1-5`,
@@ -154,7 +154,7 @@ and 6.6 run models and each waits for its own GPU ticket under the host's rules.
       Done when `trial.md` shows 13.2 differing by no unit by reading, 28.3 (`ch6-11`), 29.3 (`ch9-10`), 09.1,
       28.4, 24.9, 28.2 and 28.8 differing as recorded, the December full film's eight mismatches differing as recorded
       but 19.3 by one unit fewer, and no thought that passed the units line differing.
-- [ ] 6.4 Compare again in the same way each English recording of the released films, `ddwg-film`,
+- [x] 6.4 Compare again in the same way each English recording of the released films, `ddwg-film`,
       `ddwg-essentials-film` and `ethos-film`, read without changing them: each segment's transcript in
       `build/evidence/editions/en/ear-first/asr.json` against its spoken text in the receipt beside it, by
       `uv run --frozen --offline python -I -B build/runtime/work/hear-a-take-as-a-listener-does/recompare.py --film <root>`
