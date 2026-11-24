@@ -20,6 +20,7 @@ name: a union of `Places` refuses it, so that no place is lost under another's n
 from __future__ import annotations
 
 import graphlib
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
@@ -120,8 +121,10 @@ def place(path: Path | Folder) -> Path:
 
 
 def overlaps(a: Path, b: Path) -> bool:
-    """Whether two declared places name one file or one holds the other."""
-    return a == b or a.is_relative_to(b) or b.is_relative_to(a)
+    """Whether two resolved places name one file or one holds the other, compared by their names
+    (`Path.is_relative_to` compares them part by part, many times slower)."""
+    first, second = f"{a}{os.sep}", f"{b}{os.sep}"
+    return first.startswith(second) or second.startswith(first)
 
 
 @dataclass(frozen=True)
