@@ -62,6 +62,7 @@ import filmkit.register as register
 import filmkit.released as released
 import filmkit.repository as repository
 import filmkit.review.clarity as review_clarity
+import filmkit.soundtrack.gates as sound_gates
 import filmkit.sources as sources
 import filmkit.tools as tools
 from filmkit.captions.timing import captions_above_rate, reading_rate
@@ -193,17 +194,14 @@ def gates(edition: Edition) -> str | None:
 
 
 def sound(edition: Edition) -> str | None:
-    """Whether check-sound passed the edition's current soundtrack and timeline."""
+    """Whether check-sound passed the edition's current inputs, those its record binds
+    (`filmkit.soundtrack.gates.bound_inputs`)."""
     path, named = edition.sound_gates, repository.relative(edition.sound_gates)
     if not path.is_file():
         return f"no sound gate record at {named}; run check-sound"
     record = repository.read(path)
     try:
-        current = {
-            "soundtrack_sha256": repository.sha(edition.soundtrack),
-            "timeline_sha256": repository.sha(edition.timeline),
-            "engine_version": released.version(),
-        }
+        current = sound_gates.bindings(edition)
     except FileNotFoundError as error:
         return missing(error)
     stale = [key for key, value in current.items() if record.get(key) != value]
@@ -293,30 +291,46 @@ def geometry(edition: Edition) -> str | None:
     return None
 
 
+def shared_places() -> dict[str, Path]:
+    """The inputs every edition shares besides the faces (`rendering.face_places`), by name."""
+    root = repository.ROOT
+    return {
+        "composition": root / rendering.COMPOSITION_SCRIPT,
+        "declaration": root / repository.DECLARATION,
+        "entry": root / FILM.entry,
+    }
+
+
+def own_places(edition: Edition) -> dict[str, Path]:
+    """The edition's own inputs of its readiness, by name."""
+    root = repository.ROOT
+    return {
+        "script": root / edition.script,
+        "cast": root / edition.cast,
+        "timeline": edition.timeline,
+        "assembly": edition.audio_assembly,
+        "soundtrack": edition.soundtrack,
+    }
+
+
 def shared_inputs() -> dict:
     """The SHA-256 of the inputs every edition shares, by name: a receipt of any binds them."""
     faces = rendering.face_bindings()
+    digests = {name: repository.sha(path) for name, path in shared_places().items()}
     return {
-        "composition": repository.sha(repository.ROOT / rendering.COMPOSITION_SCRIPT),
+        "composition": digests["composition"],
         "stylesheet": faces["stylesheet_sha256"],
         "fonts": faces["fonts_sha256"],
-        "declaration": repository.sha(repository.ROOT / repository.DECLARATION),
-        "entry": repository.sha(repository.ROOT / FILM.entry),
+        "declaration": digests["declaration"],
+        "entry": digests["entry"],
     }
 
 
 def bound_inputs(edition: Edition) -> dict:
     """The SHA-256 of every input an edition's readiness is judged on, by its name: the inputs
     every edition shares, then the edition's own."""
-    root = repository.ROOT
-    return {
-        **shared_inputs(),
-        "script": repository.sha(root / edition.script),
-        "cast": repository.sha(root / edition.cast),
-        "timeline": repository.sha(edition.timeline),
-        "assembly": repository.sha(edition.audio_assembly),
-        "soundtrack": repository.sha(edition.soundtrack),
-    }
+    own = {name: repository.sha(path) for name, path in own_places(edition).items()}
+    return {**shared_inputs(), **own}
 
 
 def preflight(edition: Edition) -> dict:

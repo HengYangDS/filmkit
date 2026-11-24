@@ -43,6 +43,7 @@ def edition(tmp_path, monkeypatch):
         if not (root / source).exists():
             put(root / source, f"fixture {path}")
     put(root / "content/source-manifest.json", {"members": []})
+    put(root / repository.DECLARATION, 'slug = "sample-reel"\n')
     edition = Edition("zh")
     script = {"segments": [{"id": "01", "text": "先看数据。"}]}
     put(root / edition.script, script)
@@ -57,6 +58,7 @@ def edition(tmp_path, monkeypatch):
     put(edition.audio_assembly, assembly)
     composition = repository.sha(root / picture_rendering.COMPOSITION_SCRIPT)
     gates = {"composition_sha256": composition, "timeline_sha256": repository.sha(edition.timeline)}
+    gates |= {"declaration_sha256": repository.sha(root / repository.DECLARATION)}
     gates |= {"engine_version": released.version(), **picture_rendering.face_bindings()}
     put(edition.picture_gates, {**gates, "verdict": "pass"})
     fake = tmp_path / "native-canvas"

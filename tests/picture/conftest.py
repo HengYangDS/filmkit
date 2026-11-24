@@ -94,6 +94,7 @@ class FilmRoot:
         record = {
             "composition_sha256": repository.sha(self.path / picture_rendering.COMPOSITION_SCRIPT),
             "timeline_sha256": repository.sha(edition.timeline),
+            "declaration_sha256": repository.sha(self.path / repository.DECLARATION),
             "engine_version": released.version(),
             **picture_rendering.face_bindings(),
             "verdict": "pass",
@@ -174,6 +175,7 @@ def film_root(tmp_path, monkeypatch) -> FilmRoot:
         if not (root / source).exists():
             put(root / source, f"fixture {path}")
     put(root / "content/source-manifest.json", {"members": []})
+    put(root / repository.DECLARATION, 'slug = "sample-reel"\n')
     for code, text in TEXTS.items():
         edition = Edition(code)
         script = {"segments": [{"id": "01", "text": text}]}

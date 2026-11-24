@@ -103,24 +103,37 @@ DECODE_DEADLINE = 7200
 DECODED = ("identical_frames", "first_differing_frame", "lowest_psnr_db", "lowest_psnr_frame")
 
 
-def picture_bindings(edition: Edition, captions: bool) -> dict:
-    """What a record binds of one picture: its file and its receipt, with its stage document when
-    it was rendered; a derived picture has no stage and is marked instead."""
+def picture_places(edition: Edition, captions: bool) -> dict[str, Path]:
+    """The files a record binds of one picture, by the key of each one's SHA-256: its stage
+    document when it was rendered, its file and its receipt."""
     rendered = edition.rendered(captions)
-    files = {
-        "picture_sha256": repository.sha(rendered.file),
-        "receipt_sha256": repository.sha(rendered.receipt),
-    }
+    files = {"picture_sha256": rendered.file, "receipt_sha256": rendered.receipt}
     if not captions and isinstance(repository.read(rendered.receipt).get("derived"), dict):
-        return {"derived": True, **files}
-    return {"stage_sha256": repository.sha(rendered.page), **files}
+        return files
+    return {"stage_sha256": rendered.page, **files}
+
+
+def picture_bindings(edition: Edition, captions: bool) -> dict:
+    """What a record binds of one picture: the SHA-256 of each file of `picture_places`; a
+    derived picture has no stage and is marked instead."""
+    places = picture_places(edition, captions)
+    digests = {key: repository.sha(path) for key, path in places.items()}
+    return digests if "stage_sha256" in places else {"derived": True, **digests}
+
+
+def bound_inputs(edition: Edition) -> dict[str, Path]:
+    """The inputs a record binds besides the pictures (`picture_places`), by the key of each
+    one's SHA-256: the composition and the timeline."""
+    return {
+        "composition_sha256": repository.ROOT / COMPOSITION_SCRIPT,
+        "timeline_sha256": edition.timeline,
+    }
 
 
 def current_bindings(edition: Edition) -> dict:
     """The inputs a record binds: the composition, the timeline, the engine and both pictures."""
     return {
-        "composition_sha256": repository.sha(repository.ROOT / COMPOSITION_SCRIPT),
-        "timeline_sha256": repository.sha(edition.timeline),
+        **{key: repository.sha(path) for key, path in bound_inputs(edition).items()},
         "engine_version": released.version(),
         "pictures": {
             name: picture_bindings(edition, captions)

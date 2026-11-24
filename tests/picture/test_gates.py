@@ -8,6 +8,16 @@ from importlib.metadata import version
 from pathlib import Path
 
 import pytest
+from gate_reports import (
+    BROKEN,
+    BROKEN_FINDING,
+    CLEAN,
+    ECHO,
+    RAGGED_ROW,
+    continuity,
+    opening,
+    wrapped,
+)
 
 import filmkit.languages as languages
 import filmkit.picture.gates as gates
@@ -20,87 +30,6 @@ from filmkit.production import Edition
 
 # The sample film, whose stylesheet and fonts the gate's film declares.
 SAMPLE = Path(__file__).resolve().parents[2] / "examples/sample-film"
-
-
-def opening(title, seconds, *, contrast=15.6, step=1 / 30):
-    """Text trace rows of a title card shown from the start for `seconds`."""
-    return "".join(
-        f"{k * step:.2f}\t\ttitle\t{contrast:.3f}\t1.000\t{title}\n"
-        for k in range(round(seconds / step))
-    )
-
-
-# Reports of a clean picture: no gated frame finding, every label in sync, no long still, a
-# title card through the 2 s before the first word, and no finding of the detail audit on a
-# composition that publishes its drawn strokes.
-CLEAN = {
-    "frame": {
-        **dict.fromkeys(gates.FRAME_GATES, {}),
-        "errors": [],
-        "overlaps": [],
-        "frames_checked": 301,
-        "long_names": {"03": ["a name@4.0"]},
-    },
-    "sync": {
-        "findings": [],
-        "out_of_sync": 0,
-        "labels_judged": 12,
-        "continuity": {"unnamed_speech": [], "held_over": [], "seats": [], "caption_echoes": []},
-    },
-    "motion": {
-        "still": [{"start": 4.0, "end": 7.2, "seconds": 3.2}],
-        "pops": [1],
-        "followed": {"findings": []},
-    },
-    "detail": {
-        "lines": {"pace": 450, "race": 900, "rail_clear": 48},
-        "ink_drops": [],
-        "outside_runs": [],
-        "draws_published": True,
-        "part_drawn": [],
-        "racing_tips": [],
-        "rails": [],
-    },
-    "texts": opening("示例影片", 2.0),
-}
-# A caption cue that labels drawn during it repeat, as the sync audit lists it.
-ECHO = {
-    "start": 717.7,
-    "segment": "08",
-    "text": "The people watching the pipeline report this back,",
-}
-
-
-def continuity(**rows):
-    """The clean reports with the sync audit's continuity lists replaced by `rows`."""
-    return {
-        **CLEAN,
-        "sync": {**CLEAN["sync"], "continuity": {**CLEAN["sync"]["continuity"], **rows}},
-    }
-
-
-# A text-layout run as the frame audit reports it per scene.
-RAGGED_ROW = {
-    "start": 1.0,
-    "end": 3.0,
-    "texts": ["Sources", "Films"],
-    "baselines": [500.0, 506.0],
-    "gap": 199.2,
-}
-
-
-def wrapped(lines, breaks, at=12.25):
-    """A wrapped label as the frame audit reports it per scene."""
-    shares = [1.0] * len(lines)
-    return {"lines": lines, "seen": at - 0.5, "at": at, "breaks": breaks, "shares": shares}
-
-
-# A label that ends a line on a preposition, and its finding.
-BROKEN = wrapped(["A trade in", "the market"], ['line 1 ends on the lead word "in"'])
-BROKEN_FINDING = (
-    'frame wrapped label 10 "A trade in" / "the market" at rest 12.25 s: '
-    'line 1 ends on the lead word "in"'
-)
 
 
 def put(path, data):
@@ -116,6 +45,7 @@ def film(tmp_path, monkeypatch):
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
     put(root / COMPOSITION_SCRIPT, "scenes = {};\n")
+    put(root / repository.DECLARATION, (SAMPLE / repository.DECLARATION).read_text())
     for path in (STYLE, *FILM.picture.fonts):
         (root / path).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(SAMPLE / path, root / path)
@@ -152,6 +82,19 @@ def audits(monkeypatch, reports, *, change=None):
     monkeypatch.setattr(gates.tools, "run", run)
     monkeypatch.setattr(gates.sync_audit, "full_report", lambda *arguments: reports["sync"])
     return calls
+
+
+def test_a_record_is_refused_by_the_pre_render_check_after_an_edit_of_the_declaration(
+    film, monkeypatch
+):
+    edition = Edition("zh")
+    audits(monkeypatch, CLEAN)
+    record = gates.check_picture(edition)
+    assert record["declaration_sha256"] == repository.sha(film / repository.DECLARATION)
+    rendering.require_passing_gates(edition)
+    (film / repository.DECLARATION).write_text('slug = "edited"\n')
+    with pytest.raises(PictureError, match="binds another declaration_sha256; run check-picture"):
+        rendering.require_passing_gates(edition)
 
 
 def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkeypatch):

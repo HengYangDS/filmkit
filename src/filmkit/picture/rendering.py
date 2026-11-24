@@ -25,7 +25,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import filmkit.media as media
-import filmkit.released as released
 import filmkit.repository as repository
 import filmkit.sources as sources
 from filmkit.film import CHAPTER_VALUES, FILM
@@ -84,6 +83,18 @@ def follows_script(timeline: dict, script: dict) -> bool:
     )
 
 
+def stage_places(edition: Edition) -> dict[str, str | Path]:
+    """The inputs a stage record binds, by name: the source manifest, the script, the timeline,
+    the assembly record and the soundtrack (`candidate_picture_inputs`)."""
+    return {
+        "source_manifest": SOURCE_MANIFEST,
+        "script": edition.script,
+        "timeline": edition.timeline,
+        "assembly": edition.audio_assembly,
+        "soundtrack": edition.soundtrack,
+    }
+
+
 def candidate_picture_inputs(edition: Edition) -> tuple[dict, dict]:
     """Bind a reviewable current render without claiming artistic acceptance.
 
@@ -93,8 +104,9 @@ def candidate_picture_inputs(edition: Edition) -> tuple[dict, dict]:
     timeline must keep its script's authored fields and the soundtrack must be the one its
     assembly records for that script.
     """
-    script, script_sha256 = read_bound(edition.script)
-    timeline, timeline_sha256 = read_bound(edition.timeline)
+    places = stage_places(edition)
+    script, script_sha256 = read_bound(places["script"])
+    timeline, timeline_sha256 = read_bound(places["timeline"])
     try:
         anchors.require(script, edition.code)
         anchors.require_placed(timeline, edition.code)
@@ -103,23 +115,23 @@ def candidate_picture_inputs(edition: Edition) -> tuple[dict, dict]:
     if not follows_script(timeline, script):
         msg = "Current candidate timeline differs from its authored script"
         raise PictureError(msg)
-    assembly, assembly_sha256 = read_bound(edition.audio_assembly)
-    soundtrack_sha256 = sha(edition.soundtrack)
+    assembly, assembly_sha256 = read_bound(places["assembly"])
+    soundtrack_sha256 = sha(places["soundtrack"])
     if (
         assembly.get("script_sha256") != script_sha256
         or assembly.get("soundtrack_sha256") != soundtrack_sha256
     ):
         msg = "Current candidate soundtrack differs from its native assembly"
         raise PictureError(msg)
-    bound = {
-        "source_manifest": (SOURCE_MANIFEST, sha(SOURCE_MANIFEST)),
-        "script": (edition.script, script_sha256),
-        "timeline": (edition.timeline, timeline_sha256),
-        "assembly": (edition.audio_assembly, assembly_sha256),
-        "soundtrack": (edition.soundtrack, soundtrack_sha256),
+    digests = {
+        "source_manifest": sha(places["source_manifest"]),
+        "script": script_sha256,
+        "timeline": timeline_sha256,
+        "assembly": assembly_sha256,
+        "soundtrack": soundtrack_sha256,
     }
     inputs = {
-        key: {"path": below_root(path), "sha256": digest} for key, (path, digest) in bound.items()
+        key: {"path": below_root(path), "sha256": digests[key]} for key, path in places.items()
     }
     return inputs, timeline
 
@@ -398,32 +410,35 @@ def require_receipt_places(receipt: dict, stage: Path, picture: Path) -> None:
         raise PictureError(msg)
 
 
+def face_places() -> dict[str, Path]:
+    """The stylesheet and each declared font, by its path below the film's root."""
+    return {name: repository.ROOT / name for name in (STYLE, *FILM.picture.fonts)}
+
+
 def face_bindings() -> dict:
     """The stylesheet's and each declared font's SHA-256, from which the audits measure text."""
+    digests = {name: sha(path) for name, path in face_places().items()}
     return {
-        "stylesheet_sha256": sha(repository.ROOT / STYLE),
-        "fonts_sha256": {font: sha(repository.ROOT / font) for font in FILM.picture.fonts},
+        "stylesheet_sha256": digests[STYLE],
+        "fonts_sha256": {font: digests[font] for font in FILM.picture.fonts},
     }
 
 
 def require_passing_gates(edition: Edition) -> None:
     """Refuse a render unless check-picture passed the edition's current picture.
 
-    The gate record (`filmkit.picture.gates`) must have passed and must name the current
-    composition's, timeline's, stylesheet's and declared fonts' SHA-256 and the running engine
-    version.
+    The gate record (`filmkit.picture.gates`) must have passed and must name the SHA-256 of each
+    input it binds as it stands and the running engine version (`gates.current_bindings`).
     """
     path = edition.picture_gates
     if not path.is_file():
         msg = f"The {edition.code} picture has no gate record; run check-picture"
         raise PictureError(msg)
     record = read(path)
-    current = {
-        "composition_sha256": sha(repository.ROOT / COMPOSITION_SCRIPT),
-        "timeline_sha256": sha(edition.timeline),
-        "engine_version": released.version(),
-        **face_bindings(),
-    }
+    # The gate's owner imports this module, so its list is read when a render asks.
+    from filmkit.picture import gates
+
+    current = gates.current_bindings(edition)
     stale = [key for key, value in current.items() if record.get(key) != value]
     if stale:
         msg = (

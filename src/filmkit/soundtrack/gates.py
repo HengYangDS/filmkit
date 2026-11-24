@@ -25,6 +25,8 @@ import filmkit.review.endings as endings
 from filmkit.soundtrack.assembly import AssemblyError
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from filmkit.production import Edition
 
 
@@ -64,15 +66,31 @@ def sound_findings(clarity_measured: dict, endings_measured: dict) -> list[str]:
     return clarity_findings(clarity_measured) + ending_findings(endings_measured)
 
 
+def bound_inputs(edition: Edition) -> dict[str, Path]:
+    """The inputs the gate record binds, by the key of each one's SHA-256: the soundtrack and
+    the timeline it measures, the assembly record whose levels its endings read, and the film's
+    declaration, whose clarity floors it holds them to. The pre-render check judges the record
+    by the same list (`filmkit.preflight.sound`)."""
+    return {
+        "soundtrack_sha256": edition.soundtrack,
+        "timeline_sha256": edition.timeline,
+        "assembly_sha256": edition.audio_assembly,
+        "declaration_sha256": repository.ROOT / repository.DECLARATION,
+    }
+
+
+def bindings(edition: Edition) -> dict:
+    """What the gate record binds: each input's SHA-256 (`bound_inputs`) and the engine's
+    version."""
+    digests = {key: repository.sha(path) for key, path in bound_inputs(edition).items()}
+    return {**digests, "engine_version": released.version()}
+
+
 def check_sound(edition: Edition) -> dict:
     """Measure the edition's assembled soundtrack, write its gate record and refuse a finding."""
     timeline = repository.read(edition.timeline)
     assembly = repository.read(edition.audio_assembly)
-    bound = {
-        "soundtrack_sha256": repository.sha(edition.soundtrack),
-        "timeline_sha256": repository.sha(edition.timeline),
-        "engine_version": released.version(),
-    }
+    bound = bindings(edition)
     clarity_measured = clarity.voice_clarity(edition.code, edition.soundtrack, timeline)
     endings_measured = endings.endings(edition, timeline, assembly)
     findings = sound_findings(clarity_measured, endings_measured)

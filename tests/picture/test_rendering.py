@@ -78,6 +78,7 @@ def root(tmp_path, monkeypatch):
     }
     put(root / "node_modules" / picture_renderer.RENDERER_PACKAGE, supported)
     shutil.copytree(COMPOSITION, root / picture_rendering.COMPOSITION)
+    put(root / repository.DECLARATION, 'slug = "sample-reel"\n')
     for path, source in picture_rendering.staged_members():
         if not (root / source).exists():
             put(root / source, f"fixture {path}")
@@ -105,6 +106,7 @@ def passing_gates(edition, **changes):
     record = {
         "composition_sha256": repository.sha(composition),
         "timeline_sha256": repository.sha(edition.timeline),
+        "declaration_sha256": repository.sha(repository.ROOT / repository.DECLARATION),
         "engine_version": released.version(),
         **picture_rendering.face_bindings(),
         "verdict": "pass",

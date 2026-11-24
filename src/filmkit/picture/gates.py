@@ -401,15 +401,23 @@ def motion_findings(motion: dict, policy: Motion, code: str) -> tuple[list[str],
     return gated, recorded
 
 
-def current_bindings(edition: Edition) -> dict:
-    """The inputs a gate record binds: the composition, the timeline, the engine version, and the
-    stylesheet and fonts from which the audits measure text."""
+def bound_inputs(edition: Edition) -> dict[str, Path]:
+    """The inputs a gate record binds besides the faces, by the key of each one's SHA-256: the
+    composition, the timeline, and the film's declaration, whose wrapping, motion and detail
+    exceptions the gates apply."""
     return {
-        "composition_sha256": repository.sha(repository.ROOT / COMPOSITION_SCRIPT),
-        "timeline_sha256": repository.sha(edition.timeline),
-        "engine_version": released.version(),
-        **face_bindings(),
+        "composition_sha256": repository.ROOT / COMPOSITION_SCRIPT,
+        "timeline_sha256": edition.timeline,
+        "declaration_sha256": repository.ROOT / repository.DECLARATION,
     }
+
+
+def current_bindings(edition: Edition) -> dict:
+    """What a gate record binds: each input's SHA-256 (`bound_inputs`), the engine version, and
+    the stylesheet and fonts from which the audits measure text. The render's check reads this
+    function (`filmkit.picture.rendering.require_passing_gates`)."""
+    digests = {key: repository.sha(path) for key, path in bound_inputs(edition).items()}
+    return {**digests, "engine_version": released.version(), **face_bindings()}
 
 
 def run_audits(audits: list[tuple[str, list[str], Path, dict | None]]) -> None:
