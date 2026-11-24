@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-11-24
+
 ### Added
 
 - Every command of an edition's build chain records its run (OpenSpec Change `record-every-run`, the derivation's R2a): `build/evidence/records/editions/<code>/<node>.json`, of schema 1, states each input and output by its path, size, time and SHA-256, the engine, its `released.json` digest and the node's model pins, the outcome and the line the run ended with, the start, seconds, load, phases and settings its duration record states, and the host class measured by host rule 3. A run of part of a node, `narrate --ids` or `stage-picture --output`, writes `<node>.partial.json` instead. A render or comparison that `repair-pictures` runs, and the selection a convergence runs, write the record of the node they do again. The duration records stay as they are. A record binds no version of the host's FFmpeg or ExifTool, which Homebrew supplies: an upgrade of either leaves every node that encodes fresh, although on 24 November 2026 FFmpeg 9.1 wrote other audio packets into the films from a byte-equal soundtrack; the next release decides how a record binds them.
@@ -691,7 +693,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.31.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.32.0...HEAD
+[0.32.0]: https://github.com/HengYangDS/filmkit/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/HengYangDS/filmkit/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/HengYangDS/filmkit/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/HengYangDS/filmkit/compare/v0.28.0...v0.29.0
