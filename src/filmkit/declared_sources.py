@@ -158,3 +158,117 @@ def withdrawn_problems(root: Path, declared: dict, withdraw: bool = False) -> li
             for key in withdrawn.keys(kind) if isinstance(value, dict) else ():
                 value.pop(key, None)
     return found
+
+
+# The recording every edition's reference derives from, at the place the layout gives it.
+IDENTITY = "assets/audio/narrator-identity.wav"
+# A recording a cast's derivation cites, by its path below the film's root.
+RECORDING = re.compile(r"assets/audio/[\w./-]+?\.wav")
+# The files this release removes, each with what to do instead; and the narration's former copy,
+# which stood in an edition's folder.
+REMOVED = {
+    "content/voice-performance.json": "split it by edition into content/<code>/pronunciation.json"
+    " and the declaration's [pronunciation], then remove it",
+    "content/review/readings.json": "move each edition's analyst readings into "
+    "content/<code>/readings.json, then remove it",
+}
+NARRATION_COPY = "narration.md"
+
+
+def _unreadable(root: Path, path: str) -> str | None:
+    """Why a source that stands below a root cannot be read as JSON, or None."""
+    try:
+        json.loads((root / path).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeDecodeError, ValueError) as error:
+        return f"{path} cannot be read: {error}"
+    return None
+
+
+def placement_problems(root: Path, declared: dict) -> list[str]:
+    """Each source of a film at a place this release retires, missing at the place its code
+    derives, removed by this release or unreadable, each in one line that says what to do.
+
+    An edition's script or cast that stands where the withdrawn `sources` still names, or in
+    `content/` above the editions' folders, and its reference recording and cover where the
+    cast's withdrawn `reference_audio` and the edition's withdrawn `cover` still name them, are
+    named with their destinations and not as missing. A cast's derivation names the recording
+    every reference derives from at `IDENTITY`, wherever the film holds one. It reads the
+    declaration as declared, so a field's problem hides none of these.
+    """
+    from filmkit.film import CAST, DECLARATION, SCRIPT, edition_files, places
+
+    editions = declared.get("editions")
+    editions = editions if isinstance(editions, dict) else {}
+    slug = str(declared.get("slug"))
+    references = {places(code, slug).reference for code in editions}
+    found, claimed, folders = [], set(), {"content"}
+    for code, table in editions.items():
+        table = table if isinstance(table, dict) else {}
+        derived = places(code, slug)
+        sources = table.get("sources")
+        folders |= {derived.folder, *([sources] if isinstance(sources, str) else [])}
+        # Each place the edition's file is missing from, with the old place it stands at.
+        moved = {}
+        old_folders = [
+            f for f in (sources, "content") if isinstance(f, str) and f != derived.folder
+        ]
+        for name, place in ((SCRIPT, derived.script), (CAST, derived.cast)):
+            olds = [f"{f}/{name}" for f in old_folders if (root / f / name).is_file()]
+            olds = [old for old in olds if old not in claimed]
+            if olds and not (root / place).is_file():
+                claimed.add(olds[0])
+                moved[place] = olds[0]
+        cast_path = moved.get(derived.cast, derived.cast)
+        cast = _json(root / cast_path)
+        cast = cast if isinstance(cast, dict) else {}
+        for old, place in (
+            (table.get("cover"), derived.cover),
+            (cast.get("reference_audio"), derived.reference),
+        ):
+            stands = isinstance(old, str) and old != place and (root / old).is_file()
+            if stands and not (root / place).is_file():
+                moved[place] = old
+        found += [
+            f"{old} is the {code} edition's file at its old place; move it to {place}"
+            for place, old in moved.items()
+        ]
+        found += [
+            f"{DECLARATION} names a missing file: editions.{code}: {place}"
+            for place in edition_files(code, slug)
+            if place not in moved and not (root / place).is_file()
+        ]
+        found += [
+            problem
+            for path in (*edition_files(code, slug)[:3], derived.readings, *moved.values())
+            if path.endswith(".json") and (problem := _unreadable(root, path))
+        ]
+        cited = set(RECORDING.findall(json.dumps(cast.get("derivation", ""))))
+        found += [
+            f"{cast_path} derivation cites {path}; move the recording every reference derives "
+            f"from to {IDENTITY} and cite it there"
+            for path in sorted(cited - references - {IDENTITY})
+        ]
+        if (root / IDENTITY).is_file() and IDENTITY not in cited:
+            found.append(
+                f"{cast_path} has no derivation that names {IDENTITY}, the recording every "
+                "reference derives from; record there how the reference was made from it"
+            )
+    found += [
+        f"{path}: this release removes it; {instead}"
+        for path, instead in REMOVED.items()
+        if (root / path).is_file()
+    ]
+    found += [
+        f"{folder}/{NARRATION_COPY}: this release removes it; the engine keeps no copy of the "
+        "narration beside its script"
+        for folder in sorted(folders)
+        if (root / folder / NARRATION_COPY).is_file()
+    ]
+    if "pronunciation" not in declared:
+        found.append(
+            f"{DECLARATION} declares no [pronunciation]; declare there the schema "
+            "version, control boundary and acceptance every edition's pronunciation shares"
+        )
+    return found

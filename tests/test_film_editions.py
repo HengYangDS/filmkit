@@ -187,7 +187,12 @@ def test_a_withdrawn_key_is_refused_where_the_declaration_still_names_the_files(
     rewrite(declared, 'slug = "sample-reel"', 'slug = "Two Words"')
     with pytest.raises(FilmError) as refusal:
         film.load(declared)
-    sources, script, other = str(refusal.value).split("\n", 2)
+    *moved, sources, script, other = str(refusal.value).split("\n", 4)
+    # Each file is named with its destination (task 8.1), and its keys where it stands.
+    assert moved == [
+        f"content/{name} is the zh edition's file at its old place; move it to content/zh/{name}"
+        for name in film.EDITION_FILES
+    ]
     assert sources == f"content/film.toml editions.zh declares sources; {WITHDRAWN['sources']}"
     assert script == f"content/film-script.json {DURATION}"
     assert "\nslug\n" in other
@@ -419,3 +424,132 @@ def test_the_pause_policys_prose_is_refused_with_where_its_records_go(declared, 
         "it; move any words that record how the voice, its reference or its takes were made or "
         "approved into the edition's cast derivation, each under its own key"
     ]
+
+
+# How the loader names an edition's file missing at the place its code derives.
+MISSING = "content/film.toml names a missing file: "
+
+
+def as_at_the_base(root: Path) -> None:
+    """Put the sample's sources below a root back as they stood at the base, 0.30.0: the Chinese
+    script and cast in content/ under a declared folder, its reference recording and cover
+    without its code, a narration copy in each folder, one pronunciation contract named by each
+    script and the analyst readings in content/review/."""
+    rewrite(root, "[editions.zh]\n", '[editions.zh]\nsources = "content"\n')
+    rewrite(root, 'sources = "content"\n', 'sources = "content"\ncover = "c.png"\n')
+    rewrite(root, "[editions.en]\n", '[editions.en]\nsources = "content/en"\n')
+    without(root, "pronunciation")
+    for name in film.EDITION_FILES:
+        (root / "content/zh" / name).rename(root / "content" / name)
+    (root / "assets/audio/zh/narration-reference.wav").rename(root / "assets/audio/clear.wav")
+    declare(root / "content" / film.CAST, reference_audio="assets/audio/clear.wav")
+    (root / "c.png").write_bytes(b"cover")
+    for folder in ("content", "content/en"):
+        (root / folder / "narration.md").write_text("Narration.\n")
+        declare(
+            root / folder / film.SCRIPT, pronunciation_contract="content/voice-performance.json"
+        )
+    for part in ("content/zh/pronunciation.json", "content/en/pronunciation.json"):
+        (root / part).unlink()
+    (root / "content/voice-performance.json").write_text("{}")
+    (root / "content/review/readings.json").write_text("{}")
+
+
+def test_the_sample_as_it_stood_at_the_base_is_named_once_in_one_refusal(declared):
+    as_at_the_base(declared)
+    with pytest.raises(FilmError) as refusal:
+        film.load(declared)
+    problems = str(refusal.value).splitlines()
+    moved = {
+        "content/film-script.json": "content/zh/film-script.json",
+        "content/voice-reference.json": "content/zh/voice-reference.json",
+        "c.png": "assets/cover/sample-reel-cover-zh.png",
+        "assets/audio/clear.wav": "assets/audio/zh/narration-reference.wav",
+    }
+    named = [
+        f"{old} is the zh edition's file at its old place; move it to {new}"
+        for old, new in moved.items()
+    ]
+    named += [
+        f"{MISSING}editions.{code}: content/{code}/pronunciation.json" for code in ("zh", "en")
+    ]
+    named += [
+        f"{path}: this release removes it; "
+        for path in (
+            "content/voice-performance.json",
+            "content/review/readings.json",
+            "content/narration.md",
+            "content/en/narration.md",
+        )
+    ]
+    named += [
+        "content/film.toml declares no [pronunciation]; ",
+        "content/film.toml editions.zh declares sources; ",
+        "content/film.toml editions.zh declares cover; ",
+        "content/film.toml editions.en declares sources; ",
+        "content/film-script.json declares pronunciation_contract; ",
+        "content/en/film-script.json declares pronunciation_contract; ",
+        "content/voice-reference.json declares reference_audio; ",
+    ]
+    for fact in named:
+        assert sum(line.startswith(fact) for line in problems) == 1, fact
+    assert not any("missing file: editions.zh: content/zh/film-script" in line for line in problems)
+
+
+def test_a_film_that_removed_its_contract_without_splitting_it_is_named(declared):
+    (declared / "content/voice-performance.json").write_text("{}")
+    without(declared, "pronunciation")
+    for code in ("zh", "en"):
+        (declared / f"content/{code}/pronunciation.json").unlink()
+    problems = film.problems(declared)
+    assert problems[0].startswith(f"{MISSING}editions.zh: content/zh/pronunciation.json")
+    assert problems[1].startswith(f"{MISSING}editions.en: content/en/pronunciation.json")
+    assert problems[2].startswith(
+        "content/voice-performance.json: this release removes it; split it by edition"
+    )
+    assert problems[3].startswith("content/film.toml declares no [pronunciation]; ")
+    assert len(problems) == 4
+
+
+def test_a_reference_recording_the_cast_no_longer_names_is_named_missing_at_its_place(declared):
+    (declared / "assets/audio/zh/narration-reference.wav").unlink()
+    assert film.problems(declared) == [
+        f"{MISSING}editions.zh: assets/audio/zh/narration-reference.wav"
+    ]
+
+
+def test_a_cast_names_the_identity_recording_at_its_place(declared):
+    declare(
+        declared / "content/zh" / film.CAST,
+        derivation={"from": "assets/audio/narration-reference.wav"},
+    )
+    assert film.problems(declared) == [
+        "content/zh/voice-reference.json derivation cites assets/audio/narration-reference.wav; "
+        "move the recording every reference derives from to assets/audio/narrator-identity.wav and "
+        "cite it there"
+    ]
+    # Where the film holds the identity recording, each cast's derivation names it.
+    (declared / "assets/audio/narrator-identity.wav").write_bytes(b"identity")
+    declare(
+        declared / "content/zh" / film.CAST,
+        derivation={"from": "assets/audio/narrator-identity.wav"},
+    )
+    assert film.problems(declared) == [
+        "content/en/voice-reference.json has no derivation that names "
+        "assets/audio/narrator-identity.wav, the recording every reference derives from; record "
+        "there how the reference was made from it"
+    ]
+
+
+def test_a_script_at_its_old_place_is_named_with_its_destination_and_not_as_missing(declared):
+    (declared / "content/zh" / film.SCRIPT).rename(declared / "content" / film.SCRIPT)
+    assert film.problems(declared) == [
+        "content/film-script.json is the zh edition's file at its old place; move it to "
+        "content/zh/film-script.json"
+    ]
+
+
+def test_an_unreadable_cast_is_named(declared):
+    (declared / "content/en" / film.CAST).write_text("{")
+    (problem,) = film.problems(declared)
+    assert problem.startswith("content/en/voice-reference.json cannot be read: ")

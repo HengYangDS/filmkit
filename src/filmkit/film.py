@@ -726,17 +726,24 @@ def timeline_values(script: dict, film: Film) -> dict:
     return {**script, "author": film.author, "fps": FPS, "segments": segments}
 
 
-def named_files(film: Film) -> list[tuple[str, str]]:
-    """Each file the declaration names or its editions derive, except the covers, with the field
-    that names it or the edition's table."""
+def edition_files(code: str, slug: str) -> tuple[str, ...]:
+    """The files every edition holds at the places its code derives: its script, cast and
+    pronunciation, and its reference recording."""
+    edition = places(code, slug)
+    return edition.script, edition.cast, edition.pronunciation, edition.reference
+
+
+def named_files(film: Film, *, editions: bool = True) -> list[tuple[str, str]]:
+    """Each file the declaration names or, unless `editions` is false, its editions derive (their
+    script, cast, pronunciation and reference recording), except the covers, with the field that
+    names it or the edition's table."""
     named = [
         ("entry", film.entry),
         ("source_manifest", film.source_manifest),
         ("review.prompt", film.review.prompt),
     ]
-    for code in film.editions:
-        edition = places(code, film.slug)
-        named += [(f"editions.{code}", path) for path in (edition.script, edition.cast)]
+    for code in film.editions if editions else ():
+        named += [(f"editions.{code}", path) for path in edition_files(code, film.slug)]
     named += [("picture.fonts", font) for font in film.picture.fonts]
     if film.concepts is not None:
         named.append(("concepts", film.concepts))
@@ -797,6 +804,7 @@ def read(root: Path) -> tuple[Film | None, list[str]]:
     for code in unknown:
         found.append(f"{DECLARATION} declares editions.{code}: {languages.unknown(code)}")
         editions.pop(code)
+    found += declared_sources.placement_problems(root, declared)
     found += declared_sources.withdrawn_problems(root, declared, withdraw=True)
     found += declared_sources.prompt_problems(root, declared)
     found += declared_sources.entry_problems(root, declared)
@@ -811,7 +819,8 @@ def read(root: Path) -> tuple[Film | None, list[str]]:
         film = Film.model_validate(declared)
     except ValidationError as error:
         return None, [*found, f"{DECLARATION} is not a film declaration: {error}"]
-    named = named_files(film)
+    # Each edition's files were judged before the fields (`declared_sources.placement_problems`).
+    named = named_files(film, editions=False)
     missing = [f"{field}: {path}" for field, path in named if not (root / path).is_file()]
     if missing:
         found.append(f"{DECLARATION} names missing files: {'; '.join(missing)}")
