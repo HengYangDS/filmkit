@@ -776,8 +776,11 @@ def read(root: Path) -> tuple[Film | None, list[str]]:
         found.append(f"{DECLARATION} declares editions.{code}: {languages.unknown(code)}")
         editions.pop(code)
     found += declared_sources.placement_problems(root, declared)
+    # The prompt is read before the withdrawn keys are set aside, so that it is read beside the
+    # folder the withdrawn `sources` still names.
+    prompted = declared_sources.prompt_problems(root, declared)
     found += declared_sources.withdrawn_problems(root, declared, withdraw=True)
-    found += declared_sources.prompt_problems(root, declared)
+    found += prompted
     found += declared_sources.entry_problems(root, declared)
     undeclared = CREDITS not in declared
     if undeclared:

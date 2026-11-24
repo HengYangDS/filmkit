@@ -574,3 +574,16 @@ def test_a_prompt_that_names_a_former_place_or_is_no_template_is_refused(declare
         f"{name}:{end + 2} is no str.format template (expected '}}' before end of string); "
         "write each brace that is no field twice",
     ]
+
+
+def test_a_prompt_line_naming_the_folder_the_withdrawn_sources_names_is_refused_at_load(declared):
+    # The withdrawn key is set aside as the declaration loads; the prompt is read before.
+    prompt = declared / film.FILM.review.prompt
+    prompt.parent.mkdir(parents=True, exist_ok=True)
+    text = (repository.ROOT / film.FILM.review.prompt).read_text(encoding="utf-8")
+    text += "- The cast: ROOT/content/old/voice-reference.json.\n"
+    prompt.write_text(text, encoding="utf-8")
+    rewrite(declared, "[editions.zh]\n", '[editions.zh]\nsources = "content/old"\n')
+    end = len(text.splitlines())
+    said = "\n".join(film.problems(declared))
+    assert f"{film.FILM.review.prompt}:{end} names an edition's files by their path" in said
