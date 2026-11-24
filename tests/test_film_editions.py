@@ -72,6 +72,10 @@ def test_a_film_of_one_edition_loads(declared):
         "clarity_minimum_db = { zh = 18.0, en = 16.0 }",
         "clarity_minimum_db = { en = 16.0 }",
     )
+    # Its entry page links its one edition alone.
+    page = declared / film.FILM.entry
+    lines = page.read_text(encoding="utf-8").splitlines(keepends=True)
+    page.write_text("".join(line for line in lines if 'href="zh/' not in line), encoding="utf-8")
     loaded = film.load(declared)
     assert tuple(loaded.editions) == ("en",)
 

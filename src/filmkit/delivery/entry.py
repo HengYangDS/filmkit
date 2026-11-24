@@ -48,8 +48,20 @@ def problems(page: str, editions: dict[str, str], name: str) -> list[str]:
         for code in editions
         if f"{code}/{PAGE}" not in linked
     ]
-    if sorted(linked) == sorted(targets) and linked != targets:
-        found.append(f"{name} links the editions as {', '.join(linked)}, not in the declared order")
+    found += [
+        f"{name} links {target} {linked.count(target)} times in its <nav>; link each edition once"
+        for target in targets
+        if linked.count(target) > 1
+    ]
+    found += [
+        f"{name} links {href}, which names no declared edition"
+        for href, _ in links
+        if href not in targets and re.fullmatch(rf"[^/]+/{re.escape(PAGE)}", href)
+    ]
+    # The order is that of each edition's first link, judged once every edition is linked.
+    first = list(dict.fromkeys(linked))
+    if sorted(first) == sorted(targets) and first != targets:
+        found.append(f"{name} links the editions as {', '.join(first)}, not in the declared order")
     found += [
         f'{name} links {href} with {f"lang={lang!r}" if lang else "no lang"}, not lang="{tag}"'
         for href, lang in links

@@ -181,3 +181,22 @@ def test_the_entry_module_loads_no_declaration_and_judges_a_page_by_its_rule():
 ENTRY_ALONE = (
     "import filmkit.delivery.entry as e; assert 'filmkit.film' not in __import__('sys').modules"
 )
+
+
+def test_an_entry_page_that_links_an_edition_twice_or_an_undeclared_one_is_refused():
+    sample = (repository.ROOT / FILM.entry).read_text(encoding="utf-8")
+    tags = {"zh": "zh-CN", "en": "en"}
+    nav = sample.index("</nav>")
+    extra = (
+        '<a href="zh/index.html" lang="zh-CN">中文</a><a href="ja/index.html" lang="ja">日本語</a>'
+    )
+    assert delivery_entry.problems(sample[:nav] + extra + sample[nav:], tags, "index.html") == [
+        "index.html links zh/index.html 2 times in its <nav>; link each edition once",
+        "index.html links ja/index.html, which names no declared edition",
+    ]
+    # The order is judged on each edition's first link once every declared edition is linked.
+    swapped = sample.replace('href="zh/', 'href="tmp/').replace('href="en/', 'href="zh/')
+    swapped = swapped.replace('href="tmp/', 'href="en/').replace('lang="zh-CN">', 'lang="en">')
+    nav = swapped.index("</nav>")
+    twice = swapped[:nav] + '<a href="en/index.html" lang="en">English</a>' + swapped[nav:]
+    assert "not in the declared order" in "\n".join(delivery_entry.problems(twice, tags, "x"))
