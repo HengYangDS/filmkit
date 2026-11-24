@@ -124,7 +124,7 @@ A node SHALL state the editions it applies to, every edition by default, and the
 
 #### Scenario: The renderer is qualified once a build
 
-- **WHEN** a film's chain qualifies the renderer for its first declared edition alone
+- **WHEN** a film's chain qualifies the renderer for one edition, its first declared one or the one `[picture] qualified_edition` names
 - **THEN** the table holds no `qualify-renderer` of any other edition, and a plan of that build states every node fresh
 
 ### Requirement: A file several runs write is bound by its latest declared writer, in order

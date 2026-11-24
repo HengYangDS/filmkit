@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import filmkit.delivery.packaging as packaging
+import filmkit.film as film
 import filmkit.picture.derivation as derivation
 import filmkit.picture.equivalence as equivalence
 import filmkit.picture.gates as picture_gates
@@ -416,9 +417,9 @@ TABLE = (
         only("renderer_qualification", lambda e: e.renderer_qualification),
         "heavy",
         tools=MEDIA,
-        # Once a build: every engine release qualifies the canvas build it pins
-        # (`picture/qualification.py`), for the film's first declared edition.
-        editions=lambda codes: codes[:1],
+        # Once a build, on the edition the film qualifies (`film.qualified_edition`): every engine
+        # release qualifies the canvas build it pins (`picture/qualification.py`).
+        editions=lambda codes: tuple(c for c in codes if c == film.qualified_edition(FILM)),
     ),
     Node(
         "compare-pictures",

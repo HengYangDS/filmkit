@@ -248,6 +248,11 @@ class Picture(Declared):
     pictures (`filmkit.picture.draft`): `preflight` asks for that scan only of a film that
     declares them, since `check-picture` audits every frame.
 
+    `qualified_edition` names the edition whose captioned stage the renderer's qualification
+    renders again (`filmkit.picture.qualification`), once a build: every engine release qualifies
+    the canvas build it pins, so one edition does. It is the film's first declared edition where
+    the declaration names none (`Film.qualified_edition`).
+
     `capture` is `fast`, the default, `screenshot` or `software`. It named how a browser
     captured the frames while a browser drew them. No render reads it now: the engine draws on
     a native canvas (`filmkit.picture.renderer`). It decides only how the uncaptioned picture is
@@ -260,6 +265,7 @@ class Picture(Declared):
     motion: Motion = Field(default_factory=Motion)
     detail: Detail = Field(default_factory=Detail)
     drafts: bool = False
+    qualified_edition: Code | None = None
     capture: Literal["fast", "screenshot", "software"] = "fast"
 
     @field_validator("fonts")
@@ -648,6 +654,9 @@ class Film(Declared):
             "picture.wrapping.exceptions": [e.edition for e in self.picture.wrapping.exceptions],
             "picture.motion.exceptions": [e.edition for e in self.picture.motion.exceptions],
             "picture.detail.exceptions": [e.edition for e in self.picture.detail.exceptions],
+            "picture.qualified_edition": [
+                self.picture.qualified_edition or next(iter(self.editions))
+            ],
             "review.clarity_exceptions": [e.edition for e in self.review.clarity_exceptions],
             "review.clarity_minimum_db": list(self.review.clarity_minimum_db or {}),
             "narration.flow.exceptions": [e.edition for e in self.narration.flow.exceptions],
@@ -671,6 +680,12 @@ class Film(Declared):
         if problems:
             raise ValueError("; ".join(problems))
         return self
+
+
+def qualified_edition(film: Film) -> str:
+    """The edition the renderer is qualified on: the one `[picture] qualified_edition` names, else
+    the film's first declared edition."""
+    return film.picture.qualified_edition or next(iter(film.editions))
 
 
 def timeline_values(script: dict, film: Film) -> dict:
@@ -724,9 +739,11 @@ def named_files(film: Film, *, editions: bool = True) -> list[tuple[str, str]]:
 def start_up_files(film: Film) -> list[str]:
     """Every file below a film's root that an engine process may read as it starts, before a
     command's run opens: the declaration, each file it names or its editions derive, each
-    edition's readings, which the loader reads where they stand (`declared_sources`), and the
-    scripts whose chapters `filmkit.specification` counts. The recorder of each run's opens
-    exempts a start-up read of these files alone (`filmkit.graph.opens`)."""
+    edition's readings, which the loader reads where they stand (`declared_sources`). The scripts
+    whose chapters `filmkit.specification` counts at import come in through `edition_files`, as
+    every edition's script; a module that read another file at import would have it judged as an
+    undeclared read. The recorder of each run's opens exempts a start-up read of these files alone
+    (`filmkit.graph.opens`)."""
     named = [path for _, path in named_files(film)]
     readings = [places(code, film.slug).readings for code in film.editions]
     return [DECLARATION, *named, *readings]

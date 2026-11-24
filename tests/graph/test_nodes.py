@@ -1,10 +1,12 @@
 """The node table: the chain's commands as data, the edges derived from paths, and its refusals."""
 
+import tomllib
 from pathlib import Path
 
 import pytest
 import sample_sound
 
+import filmkit.film as film
 import filmkit.produce as produce
 import filmkit.repository as repository
 import filmkit.tools as tools
@@ -187,3 +189,20 @@ def test_the_renderer_is_qualified_once_a_build_for_the_first_edition(table):
     assert not any(nodes.key("qualify-renderer", code) in table.edges for code in others)
     # The sample declares drafts, so each edition renders its draft.
     assert all(nodes.key("render-draft", code) in table.edges for code in table.codes)
+
+
+def test_the_renderer_is_qualified_for_the_edition_the_film_declares(monkeypatch):
+    # A film that declares English first and qualifies its renderer on the Chinese edition.
+    picture = chain.FILM.picture.model_copy(update={"qualified_edition": "zh"})
+    film = chain.FILM.model_copy(update={"picture": picture})
+    monkeypatch.setattr(chain, "FILM", film)
+    table = nodes.load(chain.TABLE, chain.SHARED, ("en", "zh"))
+    assert nodes.key("qualify-renderer", "zh") in table.edges
+    assert nodes.key("qualify-renderer", "en") not in table.edges
+
+
+def test_a_qualified_edition_the_film_does_not_declare_is_refused():
+    declared = tomllib.loads((repository.ROOT / repository.DECLARATION).read_text())
+    declared["picture"]["qualified_edition"] = "fr"
+    with pytest.raises(ValueError, match="picture.qualified_edition names the edition fr"):
+        film.Film.model_validate(declared)
