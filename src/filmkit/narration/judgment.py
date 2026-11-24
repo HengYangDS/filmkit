@@ -59,6 +59,7 @@ from mlx_audio.stt.utils import load_model
 import filmkit.languages as languages
 import filmkit.narration.cmudict as cmudict
 import filmkit.narration.flow as flow
+import filmkit.narration.hearings as hearings
 import filmkit.narration.readings as readings
 import filmkit.narration.selection as selection
 import filmkit.narration.terms as terms
@@ -164,13 +165,15 @@ class Held:
     """What a film holds a take to beyond its measures.
 
     The releases its pause contract declares by thought join, the edition's clarity floor, the
-    line no kept thought may read under, and the thoughts the film keeps between the two.
+    line no kept thought may read under, the thoughts the film keeps between the two, and the
+    owner's hearings of the edition's takes (`filmkit.narration.hearings`).
     """
 
     releases: dict
     floor: float | None = None
     line: float | None = None
     kept: frozenset = frozenset()
+    heard: tuple = ()
 
 
 def load_aligner() -> dict:
@@ -234,7 +237,9 @@ def held(code: str, script: dict, film=None) -> Held:
         if performance
         else {}
     )
-    return Held(releases, *clarity.thought_lines(code, film=film or FILM))
+    film = film or FILM
+    heard = tuple(record for record in film.narration.heard if record.edition == code)
+    return Held(releases, *clarity.thought_lines(code, film=film), heard)
 
 
 def require_terms(code: str, records: list[dict], film=None) -> None:
@@ -478,6 +483,8 @@ def judge(take: dict, segment: str, index: int, held: Held) -> dict:
     # A run-on take that found no quiet to be cut in holds the next words: no release keeps it.
     released = index in held.releases.get(segment, {}) and take.get("run_on", True) is not None
     by_reading = take["differing_units_by_reading"]
+    thought = f"{segment}.{index}"
+    records = hearings.settling(held.heard, thought, take.get("wav_sha256"))
     lines = {
         "length": {"passes": not take["short"]},
         "ending": {
@@ -490,8 +497,10 @@ def judge(take: dict, segment: str, index: int, held: Held) -> dict:
         else {"passes": None, "why": NOT_OPENING},
         "pause": {"passes": bool(take["fluent"])},
         "terms": {"passes": bool(take["terms_pass"])},
-        "units": {"passes": by_reading <= UNIT_LIMIT, "limit": UNIT_LIMIT},
-        "clarity": clarity_line(voice, f"{segment}.{index}", held),
+        "units": hearings.settled(
+            {"passes": by_reading <= UNIT_LIMIT, "limit": UNIT_LIMIT}, records.get("units")
+        ),
+        "clarity": hearings.settled(clarity_line(voice, thought, held), records.get("clarity")),
     }
     failed = [line for line in LINES if lines[line]["passes"] is False]
     return {**take, "clarity": voice, "lines": lines, "failed": failed}

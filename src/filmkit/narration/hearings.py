@@ -45,3 +45,28 @@ def refusals(heard: Sequence[Heard], author: str) -> list[str]:
         if takes.count(take) > 1
     ]
     return found
+
+
+# What a line's record says of a hearing that its take passes without.
+NOT_NEEDED = "not needed"
+
+
+def settling(heard: Sequence[Heard], thought: str, take: str) -> dict[str, Heard]:
+    """The records that settle a line of one take of a thought, by line: those that name the
+    thought and the take's audio SHA-256."""
+    return {
+        line: record
+        for record in heard
+        if record.thought == thought and record.take == take
+        for line in record.lines
+    }
+
+
+def settled(line: dict, record: Heard | None) -> dict:
+    """A line's verdict with the owner's hearing: passed, naming the listener and the date, where
+    it failed and a record settles it; said not needed where it passed and a record names it."""
+    if record is None or line["passes"] is None:
+        return line
+    if line["passes"]:
+        return {**line, "heard": NOT_NEEDED}
+    return {**line, "passes": True, "heard": {"listener": record.listener, "date": record.date}}

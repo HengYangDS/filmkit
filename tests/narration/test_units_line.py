@@ -4,6 +4,7 @@ CMUdict, read only where the supply step placed it, and named in the judgment's 
 import pronounced
 import pytest
 
+import filmkit.film as film
 import filmkit.narration.cmudict as narration_cmudict
 import filmkit.narration.converge as narration_converge
 import filmkit.narration.judge as narration_judge
@@ -127,3 +128,97 @@ def test_the_pronunciation_declares_the_readings_the_bench_hears_by(tmp_path, mo
         "catalogue": (("K", "AE1", "T", "AH0", "L", "AO0", "G"),),
     }
     assert heard.said == narration_cmudict.parse(pronounced.RAW)
+
+
+SHA = "b" * 64
+
+
+def record_of(*lines: str, take: str = SHA, thought: str = "26.1") -> film.Heard:
+    """The owner's hearing of one English take, settling `lines`."""
+    return film.Heard(
+        edition="en",
+        thought=thought,
+        take=take,
+        lines=lines,
+        listener=film.FILM.author,
+        date="2026-11-24",
+        note="Heard on the clip.",
+    )
+
+
+def a_take(*, by_reading=0, stops=(), clarity=None, sha=SHA) -> dict:
+    """A measured take of thought 26.1, its clarity read as `clarity` dB."""
+    return {
+        "path": "take.wav",
+        "wav_sha256": sha,
+        "natural": True,
+        "clip_opens_quiet": True,
+        "phrase_stops": list(stops),
+        "fluent": True,
+        "terms_pass": True,
+        "differing_units": by_reading,
+        "differing_units_by_reading": by_reading,
+        "short": False,
+        "_clarity": clarity,
+    }
+
+
+@pytest.fixture
+def judged(monkeypatch):
+    """Judge a take of 26.1 under an 18.0 dB floor and thought line, with the records given."""
+    reading = {}
+
+    def take_clarity(_path, floor):
+        value = reading["value"]
+        return None if floor is None else {"cpp_db": value, "below_floor": value < floor}
+
+    monkeypatch.setattr(narration_judgment, "take_clarity", take_clarity)
+
+    def judge(take: dict, *records: film.Heard) -> dict:
+        reading["value"] = take.pop("_clarity")
+        floor = None if reading["value"] is None else 18.0
+        held = narration_judgment.Held({}, floor, floor, frozenset(), records)
+        return narration_judgment.judge(take, "26", 1, held)
+
+    return judge
+
+
+def test_a_take_heard_to_say_its_words_passes_its_units_line_naming_the_listener(judged):
+    row = judged(a_take(by_reading=1), record_of("units"))
+    assert row["failed"] == []
+    assert row["lines"]["units"] == {
+        "passes": True,
+        "limit": 0,
+        "heard": {"listener": film.FILM.author, "date": "2026-11-24"},
+    }
+    assert row["differing_units_by_reading"] == 1
+
+
+def test_a_take_heard_clear_passes_its_clarity_line_and_keeps_its_reading(judged):
+    row = judged(a_take(clarity=17.4), record_of("clarity"))
+    assert row["failed"] == []
+    assert row["lines"]["clarity"]["passes"] is True
+    assert row["lines"]["clarity"]["heard"] == {"listener": film.FILM.author, "date": "2026-11-24"}
+    assert row["clarity"]["cpp_db"] == 17.4
+
+
+def test_a_heard_take_that_cuts_a_phrase_end_is_refused_by_the_phrase_line_alone(judged):
+    row = judged(
+        a_take(by_reading=1, stops=[{"stops": True}], clarity=17.4), record_of("units", "clarity")
+    )
+    assert row["failed"] == ["phrase"]
+
+
+def test_another_take_of_the_heard_thought_is_judged_as_if_no_record_stood(judged):
+    row = judged(a_take(by_reading=1, sha="c" * 64), record_of("units", "clarity"))
+    assert row["failed"] == ["units"]
+    assert "heard" not in row["lines"]["units"]
+    # A record of another thought settles nothing of this one.
+    row = judged(a_take(by_reading=1), record_of("units", thought="26.2"))
+    assert row["failed"] == ["units"]
+
+
+def test_a_record_the_take_does_not_need_says_so_and_refuses_nothing(judged):
+    row = judged(a_take(), record_of("units"))
+    assert row["failed"] == []
+    assert row["lines"]["units"] == {"passes": True, "limit": 0, "heard": "not needed"}

@@ -84,7 +84,7 @@ Shown by `tests/test_film_hearings.py`, `tests/narration/test_units_line.py`, `t
       than the film's `author`, a missing or empty field and a second record of one take. Done when a new
       `tests/test_film_hearings.py` holds a record loaded and the scenarios "A listener who is not the owner" and "A
       record that names no audio or no line", and passes.
-- [ ] 3.2 Let `judgment.held` carry the edition's records, and `judge` pass each line a record names for the take
+- [x] 3.2 Let `judgment.held` carry the edition's records, and `judge` pass each line a record names for the take
       whose thought and audio SHA-256 it names, the line's record naming the listener and the date, or saying that the
       hearing was not needed where the take passes the line without it. Done when `tests/narration/test_units_line.py`
       holds every scenario of the requirement "The owner's hearing settles the lines it names for one take" but "A
