@@ -45,6 +45,7 @@ from pathlib import Path
 import filmkit.child_processes as child_processes
 import filmkit.released as released
 import filmkit.repository as repository
+from filmkit.graph import opens
 from filmkit.picture import encoding
 from filmkit.picture.errors import PictureError
 from filmkit.repository import sha, write
@@ -268,6 +269,7 @@ def run_renderer(command: list[str], deadline: float) -> tuple[int | None, bool]
     further request.
     """
     environment = {name: value for name, value in os.environ.items() if name != LIBRARY_VARIABLE}
+    environment |= opens.node_options()
     # From a first request to end until the renderer's group is ended, every further one is
     # dropped: each stop lies inside the block that takes the requests.
     with child_processes.terminable():

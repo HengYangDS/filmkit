@@ -43,6 +43,7 @@ import filmkit.picture.browser as picture_browser
 import filmkit.picture.renderer as picture_renderer
 import filmkit.released as released
 import filmkit.repository as repository
+from filmkit.graph import opens
 from filmkit.picture import metrics
 from filmkit.picture.errors import PictureError
 from filmkit.production import CODES, STAGE
@@ -146,6 +147,7 @@ def run(
         **os.environ,
         **(environment or {}),
         "FILM_CHROMIUM_PATH": str(picture_browser.browser_path()),
+        **opens.node_options(),
     }
     if tool in MEASURING and metrics.VARIABLE not in variables:
         variables[metrics.VARIABLE] = str(metrics.current_table())
