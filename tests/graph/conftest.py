@@ -4,6 +4,7 @@ import pytest
 import sample_sound
 import stand_ins
 
+import filmkit.durations as durations
 import filmkit.repository as repository
 from filmkit.graph import opens, runs
 
@@ -18,7 +19,9 @@ def built(tmp_path_factory):
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(repository, "ROOT", root)
         for code in sample_sound.NARRATED:
-            sample_sound.narrate(code)
+            # The stand-in narration runs through the seam, as `narrate` does, and is recorded.
+            with durations.run(code, "narrate"):
+                sample_sound.narrate(code)
     for command, code in sample_sound.CHAIN:
         sample_sound.run(root, command, code, log)
     return root, log
