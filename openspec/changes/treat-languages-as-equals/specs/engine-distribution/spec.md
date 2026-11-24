@@ -38,6 +38,15 @@ Until the release that retires the command, the question `editions` SHALL name e
 - **WHEN** no tracked text that the loader does not read names an old path
 - **THEN** the question reports no finding
 
+### Requirement: The command asks no edit of a film's history
+
+A film's history and the record the engine writes of its release, its changelog, its archived OpenSpec changes and `content/release.json`, listed once in the command's module, SHALL hold no finding of the question `editions`: the command SHALL list each of their lines that names an old path under `history`, with its file, its number and the new path, and SHALL NOT fail for them, since a film keeps them as they stand.
+
+#### Scenario: History and the release record
+
+- **WHEN** `CHANGELOG.md`, a file below `openspec/changes/archive/` and `content/release.json` each name `content/film-script.json`, and no other text names an old path
+- **THEN** the command lists each of their lines under `history` with its file, its number and the new path, the question `editions` reports no finding, and the command does not fail for them
+
 ## MODIFIED Requirements
 
 ### Requirement: The command reads a film's picture template

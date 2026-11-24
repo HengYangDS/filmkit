@@ -113,3 +113,16 @@ def test_the_recording_a_cast_s_derivation_cites_is_named_with_the_identity_s_pl
     assert "NOTICE:1 names assets/audio/voice.wav; write assets/audio/narrator-identity.wav" in (
         asked(film)
     )
+
+
+def test_history_and_the_engine_s_records_are_reported_and_ask_no_edit(film):
+    put(film, "CHANGELOG.md", "- Moved the script out of content/film-script.json.\n")
+    put(film, "openspec/changes/archive/2026-10-30-adopt/tasks.md", "- [x] content/narration.md\n")
+    put(film, "content/release.json", '{"script": "content/film-script.json"}\n')
+    assert asked(film) == FOUND
+    assert adoption.report(film)["history"] == [
+        "CHANGELOG.md:1 names content/film-script.json; write content/zh/film-script.json",
+        "content/release.json:1 names content/film-script.json; write content/zh/film-script.json",
+        "openspec/changes/archive/2026-10-30-adopt/tasks.md:1 names content/narration.md; this "
+        "release removes it",
+    ]

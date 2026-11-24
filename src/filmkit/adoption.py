@@ -5,7 +5,9 @@ Run at the film's root, or anywhere with `FILMKIT_ROOT` naming it, in any enviro
 the engine. The command reads tracked files only: it needs no declaration that loads, none of
 the film's npm packages, no supply and no build. It asks eight questions and prints one JSON line
 with every finding of each; while one stands it exits with status 1 and names them all. A file
-of the film that cannot be read is a finding of the question that reads it.
+of the film that cannot be read is a finding of the question that reads it. What a film keeps as
+it stands, its history and the records the engine writes, is listed under `history` and fails
+nothing.
 
 - `declaration`: every problem of `content/film.toml` (`filmkit.film.problems`).
 - `runtime`: each line of the review prompt that cites the runtime's field and does not say
@@ -48,7 +50,10 @@ of the film that cannot be read is a finding of the question that reads it.
   (`filmkit.declared_sources`). It reads the declaration as TOML, so a declaration that does not
   load hides none of them; it lists the tracked files by Git, or every file but `NOT_SOURCES`
   where Git holds none of them (`tracked`), and a file that cannot be listed, or read as text
-  where no other question reads it, is its finding. A bridge: R2b deletes it with this module,
+  where no other question reads it, is its finding. A line of a file in `HISTORY`, the film's
+  changelog, its archived OpenSpec changes and its release record, is listed under `history`
+  instead: it records what was, and the release record's paths change at the next release. A
+  bridge: R2b deletes it with this module,
   when the films' build chains and test loaders are gone. Run it before removing a withdrawn
   key, which names the former paths.
 
@@ -493,6 +498,9 @@ def former_paths(root: Path, declared: dict) -> tuple[dict[str, str], set[str]]:
 # What a film's folders hold besides its sources: Git's own records, built output, packages and
 # environments.
 NOT_SOURCES = frozenset({".git", "build", "node_modules", ".venv"})
+# The film's history and the record the engine writes of its release, which a film keeps as they
+# stand: a file, or a folder by its trailing slash.
+HISTORY = ("CHANGELOG.md", "openspec/changes/archive/", "content/release.json")
 # The files another question reads, which names each that cannot be read.
 READ_ELSEWHERE = frozenset(
     {*TASK_FILES, "package.json", "package-lock.json", "uv.lock", "pyproject.toml"}
@@ -530,12 +538,13 @@ def tracked(root: Path) -> list[str]:
     )
 
 
-def editions(root: Path) -> list[str]:
+def editions(root: Path, history: list[str]) -> list[str]:
     """Each line of the film's tracked text, but the sources the loader reads, that names a file
     this release moves or removes by its former path, with what to write instead, and each file
     that cannot be read as text and that no other question reads (`READ_ELSEWHERE`, and the
-    declaration, which the `declaration` question names). A file with a NUL byte in its first
-    8000 is binary and not read."""
+    declaration, which the `declaration` question names). Such a line of a file in `HISTORY` is
+    added to `history` instead. A file with a NUL byte in its first 8000 is binary and not
+    read."""
     try:
         declared = read_toml(root / film.DECLARATION)
     except UnreadableError:
@@ -555,18 +564,21 @@ def editions(root: Path) -> list[str]:
             if path not in READ_ELSEWHERE:
                 found.append(f"{path} cannot be read as text: {error}")
             continue
-        found += [
+        kept = any(path.startswith(at) if at.endswith("/") else path == at for at in HISTORY)
+        (history if kept else found).extend(
             f"{path}:{number} names {old}; {what}"
             for number, line in enumerate(lines, 1)
             for old, what in instead.items()
             if old in line
-        ]
+        )
     return found
 
 
 def report(root: Path) -> dict:
-    """Every finding of each question for the film at a root, and what could not be compared."""
+    """Every finding of each question for the film at a root, what could not be compared, and
+    each line of the film's history that names a former path."""
     not_read: list[str] = []
+    history: list[str] = []
     questions = {
         "declaration": lambda: film.problems(root),
         "runtime": lambda: runtime(root),
@@ -575,7 +587,7 @@ def report(root: Path) -> dict:
         "tasks": lambda: tasks(root, not_read),
         "template": lambda: picture_template(root),
         "vale": lambda: vale(root),
-        "editions": lambda: editions(root),
+        "editions": lambda: editions(root, history),
     }
     findings = {}
     for name, ask in questions.items():
@@ -583,7 +595,12 @@ def report(root: Path) -> dict:
             findings[name] = ask()
         except UnreadableError as error:
             findings[name] = [str(error)]
-    return {"engine": released.version(), "findings": findings, "not_read": not_read}
+    return {
+        "engine": released.version(),
+        "findings": findings,
+        "not_read": not_read,
+        "history": history,
+    }
 
 
 def main(argv: list[str] | None = None) -> None:
