@@ -241,6 +241,7 @@ def test_audition_preserves_existing_proposals(auditioned):
         narration_audition.audition("en", "targets.json")
 
 
+@pytest.mark.parametrize("retained_group_record", ["kept", "moved"], indirect=True)
 def test_audition_records_each_take_with_its_waveform_hash(auditioned, monkeypatch, capsys):
     calls, seeds, heard = [], [], []
 
@@ -273,6 +274,10 @@ def test_audition_records_each_take_with_its_waveform_hash(auditioned, monkeypat
     seed = auditioned["record"]["seed"]
     assert seeds == [seed + 11 * 7919, seed + 12 * 7919]
     assert [call["text"] for call in calls] == [" Second thought."] * 2
+    # Each candidate is narrated from the edition's reference at its place, wherever the kept
+    # take recorded it.
+    place = str(auditioned["root"] / Edition("en").places.reference)
+    assert [call["ref_audio"] for call in calls] == [place] * 2
     folder = auditioned["root"] / narration_audition.AUDITIONS / "en"
     (row,) = json.loads((folder / "audition.json").read_text())
     assert [take["seed"] for take in row["takes"]] == seeds

@@ -21,6 +21,7 @@ from mlx_audio.audio_io import write
 
 import filmkit.narration.group_generation as group_generation
 import filmkit.narration.judgment as judgment
+import filmkit.narration.selection as selection
 import filmkit.repository as repository
 from filmkit.narration.pronunciation import pronunciation
 from filmkit.narration.retakes import bind_proposals
@@ -65,16 +66,22 @@ def request_sha256(child: dict, seed: int, run_on: str | None) -> str:
     return request_fingerprint({**request, "seed": seed, "run_on": run_on, "libraries": LIBRARIES})
 
 
-def taken(model, path: Path, child: dict, thought: str, seed: int, run_on: str | None, bench):
+def taken(
+    model, path: Path, child: dict, thought: str, seed: int, run_on: str | None, bench
+) -> dict:
     """Generate a thought's candidate at `path` and measure it.
 
-    A candidate with a run-on is narrated on into it, retained whole beside its file and cut
-    in the quiet after its thought (`judgment.run_on_measured`).
+    The candidate is narrated from the reference recording at the place of the edition the bench
+    measures, which must hold the SHA-256 the thought's take recorded; the path the take
+    recorded is not opened. A candidate with a run-on is narrated on into it, retained whole
+    beside its file and cut in the quiet after its thought (`judgment.run_on_measured`).
     """
+    reference = Edition(bench.code).places.reference
+    selection.require_reference(reference, child["reference_sha256"], f"the take {thought}")
     audio, _ = group_generation.synthesize(
         model,
         child["spoken_text"] + (run_on or ""),
-        repository.ROOT / child["reference_audio"],
+        repository.ROOT / reference,
         child["reference_text"],
         child,
         seed,

@@ -258,8 +258,13 @@ GROUP_SETTINGS = {
 }
 
 
-def retained_record(root, plans: list[dict], pcms: list[np.ndarray]) -> tuple[dict, dict]:
+def retained_record(
+    root, plans: list[dict], pcms: list[np.ndarray], reference: str | None = None
+) -> tuple[dict, dict]:
     """Retain thought recordings of the given PCM, joined with only added quiet, and their receipts.
+
+    The takes record their reference recording at `reference`, the English edition's place
+    unless one is named, where the recording is written.
 
     A thought whose plan reads on into its run-on records the frames of its native take, which
     are its own frames plus those cut after them, as many again here.
@@ -267,11 +272,12 @@ def retained_record(root, plans: list[dict], pcms: list[np.ndarray]) -> tuple[di
     Returns:
         The joined recording's record and the speech settings its thoughts share.
     """
-    reference = root / GROUP_SETTINGS["reference_audio"]
+    recorded = {**GROUP_SETTINGS, **({"reference_audio": reference} if reference else {})}
+    reference = root / recorded["reference_audio"]
     reference.parent.mkdir(parents=True, exist_ok=True)
     write_pcm(reference, np.full(24000, 300, dtype=np.int16), 24000)
     settings = {
-        **GROUP_SETTINGS,
+        **recorded,
         "reference_sha256": hashlib.sha256(reference.read_bytes()).hexdigest(),
     }
     text = "".join(plan["text"] for plan in plans)
@@ -375,12 +381,27 @@ def retained_record(root, plans: list[dict], pcms: list[np.ndarray]) -> tuple[di
     return record, settings
 
 
+# Where an English reference recording stood before its edition's reference came to stand at the
+# place its code derives: the path a take recorded then.
+MOVED_FROM = "assets/audio/narration-reference.wav"
+
+
 @pytest.fixture
-def retained_group_record(tmp_path):
-    """Construct native PCM and exact receipts without loading a speech model."""
+def retained_group_record(tmp_path, request):
+    """Construct native PCM and exact receipts without loading a speech model.
+
+    With the indirect parameter "moved", the takes record their reference where it stood
+    before the move, `MOVED_FROM`, and the recording is then moved, its bytes unchanged, to the
+    English edition's place.
+    """
     plans = [{"text": text, "spoken_text": text} for text in ("First thought.", " Second thought.")]
     pcms = [np.full(48000, 1000 * index, dtype=np.int16) for index in (1, 2)]
-    record, settings = retained_record(tmp_path, plans, pcms)
+    moved = getattr(request, "param", None) == "moved"
+    record, settings = retained_record(tmp_path, plans, pcms, MOVED_FROM if moved else None)
+    if moved:
+        place = tmp_path / GROUP_SETTINGS["reference_audio"]
+        place.parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / MOVED_FROM).rename(place)
     return tmp_path, record, plans, settings
 
 

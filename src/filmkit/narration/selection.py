@@ -28,21 +28,29 @@ class SelectionError(ValueError):
     """A recording or alignment differs from the script, cast or receipt it must match."""
 
 
-def validate_voice_record(record: dict, cast: dict, reference: str) -> None:
-    """Bind a recording to the edition's narrator reference: the recording at its place,
-    `reference` (`filmkit.film.places`), and the cast's SHA-256, transcript and treatment.
+def require_reference(reference: str, sha256: str, owner: str) -> None:
+    """Refuse unless the edition's reference recording at its place, `reference`
+    (`filmkit.film.places`), holds the SHA-256 that `owner`, the cast or a take, records.
 
-    The reference recording's SHA-256 is computed once for each state of its file, so a run
-    that checks every recording of a cast reads the reference once.
+    No step opens the path a take recorded: a path is where a recording stood, and its digest
+    is what it is. The SHA-256 is computed once for each state of the file, so a run that checks
+    every recording of a cast reads the reference once.
     """
     path = repository.ROOT / reference
     status = path.stat()
     state = (status.st_dev, status.st_ino, status.st_size, status.st_mtime_ns, status.st_ctime_ns)
-    if not _reference_matches(path, cast["reference_sha256"], state):
-        msg = f"{reference}: the narrator reference differs from the cast's SHA-256"
+    if not _reference_matches(path, sha256, state):
+        msg = f"{reference}: the narrator reference differs from {owner}'s SHA-256"
         raise SelectionError(msg)
+
+
+def validate_voice_record(record: dict, cast: dict, reference: str) -> None:
+    """Bind a recording to the edition's narrator reference: the recording at its place,
+    `reference`, holding the cast's SHA-256, and the cast's SHA-256, transcript and treatment
+    as the recording records them. The path the recording records its reference at is not
+    compared: a reference moved with its bytes keeps every take."""
+    require_reference(reference, cast["reference_sha256"], "the cast")
     expected = {
-        "reference_audio": reference,
         "reference_sha256": cast["reference_sha256"],
         "reference_text_sha256": repository.content_sha(cast["reference_text"]),
         "reference_treatment": cast.get("reference_treatment"),

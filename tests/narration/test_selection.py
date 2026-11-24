@@ -181,8 +181,11 @@ def test_a_voice_record_binds_the_cast_reference(edition):
     assert record["reference_audio"] == reference == "assets/audio/en/narration-reference.wav"
     assert record["reference_text_sha256"] == sha256(cast["reference_text"])
     narration_selection.validate_voice_record(record, cast, reference)
+    # The path a take recorded is what it records: another binds it to the same recording.
+    narration_selection.validate_voice_record(
+        {**record, "reference_audio": "a.wav"}, cast, reference
+    )
     for field, value in (
-        ("reference_audio", "other.wav"),
         ("reference_sha256", "0" * 64),
         ("reference_text_sha256", sha256("Other.")),
         ("reference_treatment", {"pitch_shift": 0}),
@@ -199,6 +202,20 @@ def test_a_voice_record_refuses_a_changed_cast_reference(edition):
     reference.write_bytes(reference.read_bytes() + b"\0\0")
     with pytest.raises(ValueError, match="differs from the cast's SHA-256"):
         narration_selection.validate_voice_record(record, cast, place)
+
+
+@pytest.mark.parametrize("retained_group_record", ["moved"], indirect=True)
+def test_a_take_is_selected_after_its_reference_moved_with_the_same_bytes(edition):
+    # The take records where its reference stood; the selection binds it to the edition's
+    # recording at its place by the SHA-256, transcript and treatment, and opens no recorded path.
+    place = Edition("en").places.reference
+    assert receipt_record(edition)["reference_audio"] != place
+    assert not (repository.ROOT / receipt_record(edition)["reference_audio"]).exists()
+    narration_selection.select(Edition("en"))
+    assert repository.read(Edition("en").narration_selected)["records"] == [receipt_record(edition)]
+    (repository.ROOT / place).write_bytes(b"another narrator")
+    with pytest.raises(narration_selection.SelectionError, match="differs from the cast's SHA-256"):
+        narration_selection.select(Edition("en"))
 
 
 RECORD = {"id": "01", "text": "先核验。", "text_sha256": sha256("先核验。"), "wav_sha256": "a" * 64}
