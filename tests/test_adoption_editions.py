@@ -2,6 +2,7 @@
 sources the loader reads, that names a file this release moves or removes by its former path."""
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -44,13 +45,34 @@ def asked(root: Path) -> list[str]:
     return adoption.report(root)["findings"]["editions"]
 
 
+# What the question names in the film of the fixture.
+FOUND = [
+    ".config/mise/config.toml:2 names assets/a.wav; write assets/audio/zh/narration-reference.wav",
+    "NOTICE:2 names content/film-script.json; write content/zh/film-script.json",
+    "tests/picture/page.mjs:1 names content/narration.md; this release removes it",
+]
+
+
 def test_each_former_path_is_named_with_its_file_its_line_and_what_to_write(film):
-    assert asked(film) == [
-        ".config/mise/config.toml:2 names assets/a.wav; write "
-        "assets/audio/zh/narration-reference.wav",
-        "NOTICE:2 names content/film-script.json; write content/zh/film-script.json",
-        "tests/picture/page.mjs:1 names content/narration.md; this release removes it",
-    ]
+    assert asked(film) == FOUND
+
+
+@pytest.mark.parametrize("ignore", ["/build/\n", ""])
+def test_a_copy_inside_another_work_tree_that_tracks_none_of_it_is_read_whole(
+    film, tmp_path_factory, ignore
+):
+    # A copy that `git archive` extracted below another repository's folder, ignored there or
+    # untracked, as task 10.3 places its copies below the engine's build/.
+    engine = tmp_path_factory.mktemp("engine")
+    put(engine, ".gitignore", ignore)
+    subprocess.run(["git", "init", "-q"], cwd=engine, check=True, timeout=30)
+    copy = engine / "build" / "film"
+    shutil.copytree(film, copy)
+    if ignore:
+        # One file added past the ignore rule leaves the rest of the ignored copy untracked.
+        command = ["git", "add", "-f", "build/film/NOTICE"]
+        subprocess.run(command, cwd=engine, check=True, timeout=30)
+    assert adoption.report(copy)["findings"]["editions"] == FOUND
 
 
 def test_the_declaration_s_former_cover_is_the_declaration_question_s(film):

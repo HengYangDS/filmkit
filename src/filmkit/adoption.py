@@ -45,11 +45,11 @@ of the film that cannot be read is a finding of the question that reads it.
   that the declaration's withdrawn `sources` and `cover` and the casts' withdrawn
   `reference_audio` still name, and the files the loader names as removed
   (`filmkit.declared_sources`). It reads the declaration as TOML, so a declaration that does not
-  load hides none of them; it lists the tracked files by Git, or every file outside a work tree
-  but `NOT_SOURCES`, and a file that cannot be listed, or read as text where no other question
-  reads it, is its finding. A bridge: R2b deletes it with this module, when the films' build
-  chains and test loaders are gone. Run it before removing a withdrawn key, which names the
-  former paths.
+  load hides none of them; it lists the tracked files by Git, or every file but `NOT_SOURCES`
+  where Git holds none of them (`tracked`), and a file that cannot be listed, or read as text
+  where no other question reads it, is its finding. A bridge: R2b deletes it with this module,
+  when the films' build chains and test loaders are gone. Run it before removing a withdrawn
+  key, which names the former paths.
 
 What the engine was released on is its own record (`filmkit.released`). The manifests, the locks
 and the tasks are read at the film's root or above it, up to the folder that holds the film's
@@ -497,26 +497,33 @@ READ_ELSEWHERE = frozenset(
 
 
 def tracked(root: Path) -> list[str]:
-    """The files Git tracks below a root, by their paths from it; outside any work tree, every
-    file below it but `NOT_SOURCES`, as a copy that `git archive` extracted holds tracked files
-    alone."""
+    """The files Git tracks below a root, by their paths from it. A root that Git does not hold,
+    outside any work tree, ignored by the one that encloses it, or with nothing tracked below it,
+    is a copy of the film's tracked files, as `git archive` extracts one (task 10.3 extracts its
+    copies below the engine's ignored `build/`): every file below it but `NOT_SOURCES` is read,
+    which can only add findings, so that no file goes unread for want of Git's record."""
+
+    def git(*command: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", *command], cwd=root, capture_output=True, timeout=60)
+
     try:
-        inside = subprocess.run(
-            ["git", "rev-parse", "--is-inside-work-tree"], cwd=root, capture_output=True, timeout=60
-        )
-        if inside.returncode != 0:
-            return sorted(
-                path.relative_to(root).as_posix()
-                for path in root.rglob("*")
-                if path.is_file() and not NOT_SOURCES & set(path.relative_to(root).parts)
-            )
-        listed = subprocess.run(
-            ["git", "ls-files", "-z"], cwd=root, capture_output=True, check=True, timeout=60
-        )
+        listed = b""
+        if git("rev-parse", "--is-inside-work-tree").returncode == 0:
+            ignored = git("check-ignore", "-q", "--no-index", ".").returncode
+            if ignored not in (0, 1):
+                raise subprocess.SubprocessError(f"git check-ignore exited with {ignored}")
+            if ignored == 1:
+                files = git("ls-files", "-z")
+                files.check_returncode()
+                listed = files.stdout
     except (OSError, subprocess.SubprocessError) as error:
         message = f"the film's tracked files cannot be listed: {error}"
         raise UnreadableError(message) from error
-    return sorted(path for path in listed.stdout.decode("utf-8").split("\0") if path)
+    return sorted(path for path in listed.decode("utf-8").split("\0") if path) or sorted(
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file() and not NOT_SOURCES & set(path.relative_to(root).parts)
+    )
 
 
 def editions(root: Path) -> list[str]:
