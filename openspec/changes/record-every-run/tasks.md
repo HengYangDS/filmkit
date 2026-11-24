@@ -17,7 +17,7 @@ Shown by `tests/graph/test_records.py`.
 
 Shown by `tests/graph/test_host.py`.
 
-- [ ] 3.1 Write `src/filmkit/graph/host.py` (design decision 7): CPU time from `resource.getrusage` of the process and its children at the run's two ends; a daemon thread that samples the command's process tree from `ps -A -o pid=,ppid=,%cpu=` every five seconds; the class from both measures, the node's declaration and its previous record, with host rule 3's numbers as named constants that cite the rule. Done when `tests/graph/test_host.py` holds stand-in measures of 1.9 and 2.1 cores, samples with one and with two consecutive values above 200 %, a GPU node measured light, a previous heavy record kept heavy, and one real child that sleeps for a second measured `light` with no sample, at `nice -n 15`; and passes in under two minutes.
+- [x] 3.1 Write `src/filmkit/graph/host.py` (design decision 7): CPU time from `resource.getrusage` of the process and its children at the run's two ends; a daemon thread that samples the command's process tree from `ps -A -o pid=,ppid=,%cpu=` every five seconds; the class from both measures, the node's declaration and its previous record, with host rule 3's numbers as named constants that cite the rule. Done when `tests/graph/test_host.py` holds stand-in measures of 1.9 and 2.1 cores, samples with one and with two consecutive values above 200 %, a GPU node measured light, a previous heavy record kept heavy, and one real child that sleeps for a second measured `light` with no sample, at `nice -n 15`; and passes in under two minutes.
 
 ## 4. The node table
 
