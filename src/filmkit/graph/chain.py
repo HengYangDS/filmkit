@@ -226,7 +226,8 @@ def packaged(edition: Edition) -> Places:
 
 def readiness(edition: Edition) -> Places:
     """What the pre-render check reads: its receipt's own list and the records and stages it
-    judges."""
+    judges, the selection among them, whose takes the owner's hearings name
+    (`preflight.selected_takes`)."""
     found = preflight.shared_places() | faces() | preflight.own_places(edition)
     found |= stage(edition) | {"uncaptioned_stage": stage(edition, captions=False)["stage"]}
     found |= {
@@ -234,6 +235,7 @@ def readiness(edition: Edition) -> Places:
         "sound_gates": edition.sound_gates,
         "picture_geometry": edition.picture_geometry,
         "cover": root(edition.cover),
+        "narration_selected": edition.narration_selected,
     }
     found |= {"draft_stills": edition.draft_stills} if FILM.picture.drafts else {}
     return checked_words(edition) | found

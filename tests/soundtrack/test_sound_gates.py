@@ -128,3 +128,32 @@ def test_a_gated_finding_is_recorded_and_refused(measured):
     record = repository.read(edition.sound_gates)
     assert record["verdict"] == "refuse"
     assert len(record["gated_findings"]) == 1
+
+
+def test_a_segment_whose_thoughts_were_heard_clear_is_still_refused_under_the_floor(monkeypatch):
+    import filmkit.film as film
+
+    # The owner heard every take of segment 08 clear; the gate reads no record of hearing.
+    heard = tuple(
+        film.Heard(
+            edition="en",
+            thought=f"08.{index}",
+            take=f"{index}" * 64,
+            lines=("clarity",),
+            listener=film.FILM.author,
+            date="2026-11-24",
+            note="Heard clear.",
+        )
+        for index in (1, 2)
+    )
+    narration = film.FILM.narration.model_copy(update={"heard": heard})
+    monkeypatch.setattr(film, "FILM", film.FILM.model_copy(update={"narration": narration}))
+    clarity = {
+        "floor_db": 18.0,
+        "soundtrack": {"cpp_db": 18.3, "frames": 9000, "below_floor": False},
+        "segments": [{"id": "08", "cpp_db": 17.6, "frames": 400, "below_floor": True}],
+        "segments_below_floor": ["08"],
+    }
+    assert sound_gates.sound_findings(clarity, NATURAL) == [
+        "segment 08's clarity is 17.6 dB, below the declared 18.0 dB"
+    ]

@@ -281,6 +281,23 @@ def test_the_narration_s_caches_are_outputs_of_narrate(tmp_path, monkeypatch):
     assert opens.check(log).findings == []
 
 
+def test_preflight_declares_the_selection_its_clarity_reads(tmp_path, monkeypatch):
+    root = fresh_copy(tmp_path)
+    monkeypatch.setattr(repository, "ROOT", root)
+    log = tmp_path / "opens.jsonl"
+    # Preflight reads each thought's selected take from the selection, to know whether the owner
+    # heard it (`preflight.selected_takes`).
+    selected = root / "build/evidence/editions/zh/narration-selected.json"
+    selected.parent.mkdir(parents=True)
+    take = {"index": 1, "wav_sha256": "a" * 64}
+    record = {"id": "01", "wav_sha256": "b" * 64, "utterance_groups": {"records": [take]}}
+    selected.write_text(json.dumps({"records": [record]}))
+    code = "import filmkit.preflight as preflight\nfrom filmkit.production import Edition\n"
+    code += "assert preflight.selected_takes(Edition('zh')) == {'01.1': 'a' * 64}\n"
+    python_child(root, log, code, node="preflight:zh")
+    assert opens.check(log).findings == []
+
+
 def test_a_virtual_environment_named_whole_is_an_environment(film):
     root, log, table = film
     (root / ".venv").mkdir()

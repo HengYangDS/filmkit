@@ -106,7 +106,7 @@ Shown by `tests/test_film_hearings.py`, `tests/narration/test_units_line.py`, `t
 - [x] 3.6 Let `audition.propose` put a take above its clarity line before one for the ear, and its proposals name a
       take for the ear as such. Done when `tests/narration/test_audition.py` holds every scenario of "An audition
       qualifies a take by the judgment's lines" over stub takes, loading no model; and passes.
-- [ ] 3.7 Let `preflight.clarity` refuse nothing for a thought whose selected take the owner's hearing settles for its
+- [x] 3.7 Let `preflight.clarity` refuse nothing for a thought whose selected take the owner's hearing settles for its
       clarity, and name each thought it refuses for its clarity for the ear with its selected take's audio SHA-256;
       leave `check-sound` reading no record. Done when `tests/test_preflight.py` holds every scenario of the
       requirements "Preflight takes the owner's hearing of the selected take" and "A film declares the line a single

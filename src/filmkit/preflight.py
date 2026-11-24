@@ -26,7 +26,9 @@ with `PreflightError` while any remains:
 - the thoughts under the clarity floor, for a film that declares the line a single thought is
   judged against (`review.clarity_thought_margin_db`): none under that line, which with a
   margin of zero is the floor, and each between the line and the floor declared by its name
-  (`review.clarity_exceptions`);
+  (`review.clarity_exceptions`), but a thought whose selected take the owner heard clear
+  (`narration.heard`, its lines naming `clarity`); each it refuses is named for the owner's
+  ear with its selected take's audio SHA-256, where the selection bound one;
 - the caption cues above the edition's reading rate, each declared by its text
   (`captions.rate_exceptions`);
 - the geometry: the record that the delivery's verification requires, passed on the whole
@@ -230,22 +232,34 @@ def clarity(edition: Edition) -> str | None:
     lines = review_clarity.thought_lines(edition.code, floor=measured["floor_db"], film=FILM)
     line, declared = lines.line, lines.kept
     below = {row["id"]: row["cpp_db"] for row in measured["thoughts"] if row["below_floor"]}
+    takes = selected_takes(edition)
+    clear = {
+        record.thought
+        for record in FILM.narration.heard
+        if record.edition == edition.code
+        and "clarity" in record.lines
+        and takes.get(record.thought) == record.take
+    }
     refused = {
         name: value
         for name, value in below.items()
-        if review_clarity.under_its_line(value, name, lines)
+        if review_clarity.under_its_line(value, name, lines) and name not in clear
     }
     held = f"the thought line of {line} dB"
     if not margin:
         held = f"the floor of {line} dB, to which the film holds every thought"
+    ear = {
+        name: f": for the owner's ear, its selected take {takes[name]}" if name in takes else ""
+        for name in refused
+    }
     found = [
-        f"thought {name} reads {value} dB, under {held}"
+        f"thought {name} reads {value} dB, under {held}{ear[name]}"
         for name, value in refused.items()
         if value < line
     ]
     found += [
         f"thought {name} reads {value} dB, under the floor of {measured['floor_db']} dB, and is"
-        " not declared in review.clarity_exceptions"
+        f" not declared in review.clarity_exceptions{ear[name]}"
         for name, value in refused.items()
         if value >= line
     ]
@@ -254,6 +268,19 @@ def clarity(edition: Edition) -> str | None:
         for name in sorted(declared - set(below))
     ]
     return "; ".join(found) or None
+
+
+def selected_takes(edition: Edition) -> dict[str, str]:
+    """Each thought's selected take by its audio SHA-256, as the selection bound it; none where
+    the edition has no selected narration."""
+    path = repository.ROOT / edition.narration_selected
+    if not path.is_file():
+        return {}
+    return {
+        f"{record['id']}.{child['index']}": child["wav_sha256"]
+        for record in repository.read(path)["records"]
+        for child in record.get("utterance_groups", {}).get("records", [])
+    }
 
 
 def caption_rate(edition: Edition) -> str | None:
