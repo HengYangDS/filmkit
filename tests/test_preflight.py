@@ -70,8 +70,9 @@ def edition(tmp_path, monkeypatch):
     put(root / edition.script, script)
     put(root / edition.cast, {"voice": "narrator"})
     segment = {"id": "01", "text": "先看数据。", "words": []}
-    # The timeline states the runtime, a minute, as the assembly writes it.
-    put(edition.timeline, {**script, "duration": 60, "segments": [segment], "captions": []})
+    # The timeline states its edition and the runtime, a minute, as the assembly writes them.
+    timeline = {**script, "edition": "zh", "duration": 60, "segments": [segment], "captions": []}
+    put(edition.timeline, timeline)
     put(edition.soundtrack, "zh narration")
     assembly = {
         "script_sha256": repository.sha(edition.script),

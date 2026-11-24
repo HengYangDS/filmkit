@@ -39,6 +39,7 @@ window.renderFrame = (t) => {
 };
 `;
 const TIMELINE = {
+  edition: "zh",
   duration: 4,
   segments: [],
   captions: [

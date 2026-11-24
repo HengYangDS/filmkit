@@ -51,7 +51,7 @@ async function film(composition = COMPOSITION, { marked = true } = {}) {
   const segments = [segment("03", 0), segment("05", 2), segment("04", 4)];
   if (marked) segments.forEach((s) => (s.anchors = s.id === "03" ? { kept: KEPT } : {}));
   const timeline = join(root, "timeline.json");
-  await writeFile(timeline, JSON.stringify({ language: "Chinese", duration: 6, segments }));
+  await writeFile(timeline, JSON.stringify({ edition: "zh", duration: 6, segments }));
   return { root, timeline };
 }
 

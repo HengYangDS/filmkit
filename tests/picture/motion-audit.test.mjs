@@ -112,7 +112,7 @@ test("the motion audit reports each artefact a composition shows, at its time an
   await writeFile(
     path,
     JSON.stringify({
-      language: "English",
+      edition: "en",
       duration: 16,
       credits_duration: 1,
       captions: [],

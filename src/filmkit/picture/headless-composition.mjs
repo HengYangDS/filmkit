@@ -30,6 +30,8 @@ const COMPOSITION = "picture/film.js";
  * offset unless the timeline gives one. */
 export function readTimeline(path) {
   const authored = JSON.parse(readFileSync(path, "utf8"));
+  // The composition draws an edition's words by its code, which the assembly writes.
+  if (!authored.edition) throw new Error(`${path} states no edition; assemble it again`);
   return { ...authored, render_offset: authored.render_offset ?? 0 };
 }
 

@@ -226,7 +226,7 @@ test("the frame audit reports a ragged row with its scene, span, texts and basel
   };
   await writeFile(
     path,
-    JSON.stringify({ language: "English", duration: 6, segments: [segment], captions: [] }),
+    JSON.stringify({ edition: "en", duration: 6, segments: [segment], captions: [] }),
   );
   const report = JSON.parse(
     execFileSync(process.execPath, [AUDIT_FRAMES, path, "0.0333333"], {
@@ -299,7 +299,7 @@ test("the frame audit measures balance as the reviewers do, with the widths of t
   };
   await writeFile(
     path,
-    JSON.stringify({ language: "English", duration: 6, segments: [segment], captions: [] }),
+    JSON.stringify({ edition: "en", duration: 6, segments: [segment], captions: [] }),
   );
   await writeFile(
     metrics,
@@ -385,7 +385,7 @@ test("the frame audit reports each wrapped label with when it first rests and th
   };
   await writeFile(
     path,
-    JSON.stringify({ language: "English", duration: 6, segments: [segment], captions: [] }),
+    JSON.stringify({ edition: "en", duration: 6, segments: [segment], captions: [] }),
   );
   await writeFile(rules, JSON.stringify(english(["versus"])));
   const audit = (env) =>
@@ -473,7 +473,7 @@ test("the frame audit reports each stroked whole turn the browser may not paint,
   };
   await writeFile(
     path,
-    JSON.stringify({ language: "English", duration: 3, segments: [segment], captions: [] }),
+    JSON.stringify({ edition: "en", duration: 3, segments: [segment], captions: [] }),
   );
   const report = JSON.parse(
     execFileSync(process.execPath, [AUDIT_FRAMES, path, "0.0333333"], {

@@ -102,6 +102,9 @@ test("the headless timeline is the staged one: the edition the assembly wrote, n
   assert.deepEqual(readTimeline(path), { edition: "en", duration: 10, render_offset: 0 });
   await writeFile(path, JSON.stringify({ edition: "zh", render_offset: 12.5 }));
   assert.deepEqual(readTimeline(path), { edition: "zh", render_offset: 12.5 });
+  // A timeline that states no edition, as one assembled before the assembly wrote it, is refused.
+  await writeFile(path, JSON.stringify({ duration: 10 }));
+  assert.throws(() => readTimeline(path), /states no edition; assemble it again/);
 });
 
 test("each rendered frame hands over every paint with the scene that drew it", async () => {

@@ -179,7 +179,7 @@ async function audit(composition = MOTIONS) {
   await writeFile(
     path,
     JSON.stringify({
-      language: "English",
+      edition: "en",
       duration: 10,
       credits_duration: 1,
       captions: [],

@@ -47,7 +47,8 @@ def edition(tmp_path, monkeypatch):
     script = {"segments": [{"id": "01", "text": "先看数据。"}]}
     put(root / edition.script, script)
     segment = {"id": "01", "text": "先看数据。", "words": []}
-    put(edition.timeline, {**script, "duration": 60, "segments": [segment], "captions": CUES})
+    timeline = {**script, "edition": "zh", "duration": 60, "segments": [segment], "captions": CUES}
+    put(edition.timeline, timeline)
     put(edition.soundtrack, "zh narration")
     assembly = {
         "script_sha256": repository.sha(edition.script),

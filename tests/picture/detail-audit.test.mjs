@@ -89,7 +89,7 @@ window.renderFrame = function (t) {
 `;
 const word = (text, start, end) => ({ text, start, end });
 const TIMELINE = {
-  language: "English",
+  edition: "en",
   duration: 11,
   credits_duration: 1,
   captions: [],

@@ -183,7 +183,7 @@ test("the motion audit reports a jump and a pop a declared cut brings, each from
   await writeFile(
     path,
     JSON.stringify({
-      language: "English",
+      edition: "en",
       duration: 5,
       credits_duration: 0,
       captions: [],

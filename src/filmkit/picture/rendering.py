@@ -137,8 +137,17 @@ def film_data(
     edition: Edition, start: float, *, timeline: dict | None = None, captions: bool = True
 ) -> str:
     """The picture's data as JSON, the document's `window.FILM`: the timeline, with the edition
-    the assembly wrote into it, its render offset, and with `captions` False no captions."""
+    the assembly wrote into it, its render offset, and with `captions` False no captions. A
+    timeline that states no edition, or another edition's, is refused: the composition draws an
+    edition's words by that code, so it would draw another language's without a word said."""
     data = dict(timeline) if timeline is not None else read(edition.timeline)
+    if data.get("edition") != edition.code:
+        stated = f"states {data['edition']}" if data.get("edition") else "states no edition"
+        msg = (
+            f"{Path(edition.timeline).name} {stated}; assemble the {edition.code} edition again, "
+            "which writes its code"
+        )
+        raise PictureError(msg)
     data["render_offset"] = start
     if not captions:
         data["captions"] = []

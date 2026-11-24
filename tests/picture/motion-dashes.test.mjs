@@ -147,7 +147,7 @@ test("the motion audit reports a dash snap from the line that drew the stroke", 
   await writeFile(
     path,
     JSON.stringify({
-      language: "English",
+      edition: "en",
       duration: 3,
       credits_duration: 0,
       captions: [],
