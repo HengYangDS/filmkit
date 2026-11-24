@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-11-24
+
 ### Added
 
 - English words are heard by their pronunciation (OpenSpec Change `hear-a-take-as-a-listener-does`): a language declares `latin_heard`, English `cmudict-pronunciations` and Chinese `letters`; in an English edition a transcript's word in other letters passes the units line where its first pronunciation in the pinned CMUdict is one of the text word's readings (those the pronunciation declares, else CMUdict's first, secondary stress read as none), and a word declared by its letter names is compared by its letters.
@@ -708,7 +710,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.32.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.33.0...HEAD
+[0.33.0]: https://github.com/HengYangDS/filmkit/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/HengYangDS/filmkit/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/HengYangDS/filmkit/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/HengYangDS/filmkit/compare/v0.29.0...v0.30.0
