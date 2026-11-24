@@ -9,7 +9,8 @@ takes the start, seconds, load, phases and settings from the duration record the
 gave, and writes the node's run record, or for a run that is not the node's whole run a partial
 record (design decision 8). The outcome is `pass` for a run that completed, `refuse` for one that
 left with a line (a `SystemExit`) or was told that it failed, and `error` for any other exception,
-each with the line it ended with.
+each with the line it ended with. A command that does a node's work again opens that node's run
+inside its own (`filmkit.durations.node`), where a refusal of the owner it names is `refuse`.
 """
 
 from __future__ import annotations
@@ -60,13 +61,18 @@ def stated(places: nodes.Places, known: dict[str, records.State]) -> dict[str, r
     return found
 
 
-def outcome(completed: bool, ended: BaseException | None) -> tuple[records.Outcome, str | None]:
-    """How a run ended, and the line it ended with."""
+def outcome(
+    completed: bool, ended: BaseException | None, refusals: tuple[type[BaseException], ...] = ()
+) -> tuple[records.Outcome, str | None]:
+    """How a run ended, and the line it ended with: a command's `SystemExit`, or for a node run
+    inside another command one of its owner's `refusals`, is a refusal."""
     if completed:
         return "pass", None
     if isinstance(ended, SystemExit):
         code = ended.code
         return "refuse", code if isinstance(code, str) else f"exit status {code}"
+    if refusals and isinstance(ended, refusals):
+        return "refuse", str(ended)
     if ended is None:
         return "refuse", None
     return "error", f"{type(ended).__name__}: {ended}".rstrip(": ")
@@ -88,14 +94,20 @@ class NodeRun:
         os.environ[opens.NODE] = self.label
         self.meter = host.start()
 
-    def close(self, duration: dict, ended: BaseException | None) -> None:
-        """Write the node's record from the duration record of the same run."""
+    def close(
+        self,
+        duration: dict,
+        ended: BaseException | None,
+        refusals: tuple[type[BaseException], ...] = (),
+    ) -> None:
+        """Write the node's record from the duration record of the same run, or for a node run
+        inside another command from its own measurement (`filmkit.durations.node`)."""
         if self.outer is None:
             os.environ.pop(opens.NODE, None)
         else:
             os.environ[opens.NODE] = self.outer
         measures = self.meter.stop()
-        result, line = outcome(duration["completed"], ended)
+        result, line = outcome(duration["completed"], ended, refusals)
         previous_class = self.before.host_class if self.before else None
         known = self.before.outputs if self.before else {}
         common = {

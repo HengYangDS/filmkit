@@ -17,7 +17,9 @@ comparison that fails inside an attempt is recorded there with the receipts so f
 refusal names the attempt's folder and the commands that bring the edition back: `render-picture`
 for each picture not rendered again, then `compare-pictures`.
 A faulty render is evidence of a fault rather than a reproducible artifact, so the kept pictures
-stay with the edition's evidence and not with the reviewed builds that `set-aside` keeps.
+stay with the edition's evidence and not with the reviewed builds that `set-aside` keeps. Each
+render and comparison runs as the node whose work it does again (`filmkit.durations.node`), so
+those nodes' run records bind the repaired pictures and the new comparison.
 
 Usage: python -m filmkit.produce repair-pictures --language <code> [--attempts <n>]
 """
@@ -32,6 +34,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import filmkit.child_processes as child_processes
+import filmkit.durations as durations
 import filmkit.picture.derivation as derivation
 import filmkit.picture.equivalence as equivalence
 import filmkit.picture.faults as faults
@@ -149,15 +152,19 @@ def cut_short(error: BaseException) -> str:
 
 def render_and_compare(edition: Edition, attempt: dict, deadline: float) -> dict:
     """Render each picture an attempt names again, keeping each receipt in the attempt as it is
-    written, and compare the two pictures; the comparison record."""
+    written, and compare the two pictures; the comparison record. Each render and the comparison
+    runs as the node whose work it does again, which writes that node's run record."""
     for name in attempt["faults"]:
         captions = name == "captioned"
         try:
             if captions:
-                rendering.render_picture(edition, deadline, captions=True)
+                with durations.node(edition.code, "render-picture", refusals=REFUSALS):
+                    rendering.render_picture(edition, deadline, captions=True)
             else:
                 # The uncaptioned picture's render states why it is rendered and not derived.
-                derivation.render_uncaptioned(edition, deadline)
+                node = "render-picture-uncaptioned"
+                with durations.node(edition.code, node, way="native", refusals=REFUSALS):
+                    derivation.render_uncaptioned(edition, deadline)
         finally:
             receipt = edition.rendered(captions).receipt
             if receipt.is_file():
@@ -169,7 +176,8 @@ def compare(edition: Edition) -> dict:
     """Compare the two pictures again; the record the comparison wrote, which binds them, or the
     comparison's own refusal where it wrote none."""
     try:
-        return equivalence.compare_pictures(edition)
+        with durations.node(edition.code, "compare-pictures", refusals=REFUSALS):
+            return equivalence.compare_pictures(edition)
     except PictureError as error:
         refusal = error
     try:

@@ -198,6 +198,36 @@ def run(
 
 
 @contextlib.contextmanager
+def node(
+    code: str,
+    name: str,
+    *,
+    way: str | None = None,
+    refusals: tuple[type[BaseException], ...] = (),
+) -> Iterator[None]:
+    """Open the run of a node whose work another command does again, nested in that command's
+    run, and write the node's run record when the block ends; no duration record, so the
+    command's own counts the seconds once (design decision 5 of record-every-run). The node's
+    run measures its own seconds and load; the phases and settings the work names stay with the
+    command's run, whose record states them as before. A refusal of the owner, an exception of
+    `refusals`, is the node's outcome `refuse`, as the command's line would be."""
+    from filmkit.graph import runs
+
+    measured = Run(code, name)
+    node_run = runs.open_node(code, name, measured, way=way)
+    completed, ended = False, None
+    try:
+        yield
+        completed = True
+    except BaseException as error:
+        ended = error
+        raise
+    finally:
+        if node_run is not None:
+            node_run.close(measured.record(completed=completed), ended, refusals)
+
+
+@contextlib.contextmanager
 def phase(name: str) -> Iterator[None]:
     """Measure the block as a phase of the current run; outside a run, measure nothing."""
     opened = _RUN.get()

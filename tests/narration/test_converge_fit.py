@@ -25,16 +25,20 @@ import filmkit.child_processes as child_processes
 import filmkit.narration.converge as narration_converge
 import filmkit.narration.fitting as fitting
 import filmkit.repository as repository
+from filmkit.graph import records
 from filmkit.production import Edition
 
 
 def kept() -> dict[str, bytes]:
-    """Every file below the film's root with its bytes, but the duration records: a duration
-    differs from run to run, and no record binds it."""
+    """Every file below the film's root with its bytes, but the duration records and the run
+    records: each states when its run started and how long it took, which differs from run to
+    run (`filmkit.graph.records`)."""
     return {
         path.relative_to(repository.ROOT).as_posix(): path.read_bytes()
         for path in sorted(repository.ROOT.rglob("*"))
-        if path.is_file() and path.parent != duration_path().parent
+        if path.is_file()
+        and path.parent != duration_path().parent
+        and not path.relative_to(repository.ROOT).is_relative_to(records.FOLDER)
     }
 
 

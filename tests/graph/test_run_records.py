@@ -11,7 +11,9 @@ import pytest
 import sample_sound
 
 import filmkit.durations as durations
+import filmkit.narration.fitting as fitting
 import filmkit.narration.narrate as narrate
+import filmkit.picture.repair as picture_repair
 import filmkit.produce as produce
 import filmkit.repository as repository
 import filmkit.soundtrack.gates as sound_gates
@@ -173,6 +175,81 @@ def test_a_stage_written_elsewhere_writes_a_partial_record(root, monkeypatch):
     assert partial["partial"] is True
     assert "inputs" not in partial
     assert len(staged) == 2
+
+
+@pytest.fixture
+def repairable(root, monkeypatch):
+    """The Chinese edition's two pictures, their receipts and a refused comparison of them, with
+    the repair's owners replaced by stand-ins that write what each writes: a render its picture
+    and receipt, the comparison its record, which passes."""
+    edition, named = Edition("zh"), iter([{"captioned": ["a"], "uncaptioned": ["a"]}, {}])
+
+    def render(edition, deadline, captions=True, made=b"repaired"):
+        picture = edition.rendered(captions)
+        picture.file.parent.mkdir(parents=True, exist_ok=True)
+        picture.file.write_bytes(made + picture.name.encode())
+        repository.write(picture.receipt, {"exit": 0, "timed_out": False, "made": made.decode()})
+
+    def compare(edition):
+        repository.write(edition.caption_equivalence, {"verdict": "pass", "findings": []})
+        return repository.read(edition.caption_equivalence)
+
+    for captions in (True, False):
+        render(edition, 60, captions, b"faulty")
+    repository.write(edition.caption_equivalence, {"verdict": "refuse", "findings": ["a"]})
+    monkeypatch.setattr(
+        picture_repair, "current_record", lambda e: repository.read(e.caption_equivalence)
+    )
+    monkeypatch.setattr(picture_repair.faults, "repairable", lambda record, code: next(named))
+    monkeypatch.setattr(picture_repair, "require_renderable", lambda e, named: None)
+    monkeypatch.setattr(picture_repair.rendering, "render_picture", render)
+    monkeypatch.setattr(
+        picture_repair.derivation, "render_uncaptioned", lambda e, d: render(e, d, False)
+    )
+    monkeypatch.setattr(picture_repair.equivalence, "compare_pictures", compare)
+    return edition
+
+
+def test_a_repair_writes_the_records_of_the_renders_and_the_comparison_it_runs(repairable):
+    edition = repairable
+    produce.main(["repair-pictures", "--language", "zh"])
+    captioned, uncaptioned = read("render-picture"), read("render-picture-uncaptioned")
+    compared = read("compare-pictures")
+    for record, captions in ((captioned, True), (uncaptioned, False)):
+        assert record.outputs["picture"].sha256 == records.digest(edition.rendered(captions).file)
+        assert record.outcome == "pass"
+    assert uncaptioned.settings["way"] == "native"
+    assert compared.outcome == "pass"
+    assert compared.outputs["caption_equivalence"].sha256 == records.digest(
+        edition.caption_equivalence
+    )
+    # The repair's duration record is the only one it writes, which counts its seconds once.
+    written = sorted(path.name for path in (edition.evidence / durations.FOLDER).iterdir())
+    assert written == ["repair-pictures.json"]
+    assert opens.NODE not in os.environ
+
+
+def test_a_convergence_s_selection_writes_the_record_of_select(root, monkeypatch):
+    edition, paths = Edition("zh"), narrate.evidence_paths("zh")
+    for name in ("receipt", "alignment"):
+        repository.write(paths[name], {"records": []})
+    repository.write(edition.script, {"voice_performance": {"assembly_mode": "designed"}})
+
+    def select(asked):
+        repository.write(asked.narration_selected, {"records": []})
+        repository.write(asked.alignment_selected, {"records": []})
+
+    monkeypatch.setattr(fitting, "select", select)
+    monkeypatch.setattr(
+        fitting.soundtrack_fit, "asked", lambda e: [({"verdict": "too long"}, "too long")]
+    )
+    with durations.run("zh", "converge"):
+        fitting.read("zh")
+    record = read("select")
+    assert (record.outcome, record.refusal) == ("pass", None)
+    selected = record.outputs["narration_selected"].sha256
+    assert selected == records.digest(edition.narration_selected)
+    assert not (edition.evidence / durations.FOLDER / "select.json").exists()
 
 
 def below_root(places):

@@ -40,6 +40,7 @@ import subprocess
 import wave
 from pathlib import Path
 
+import filmkit.durations as durations
 import filmkit.repository as repository
 import filmkit.soundtrack.fit as soundtrack_fit
 from filmkit.narration.narrate import evidence_paths
@@ -141,8 +142,12 @@ def read(code: str) -> dict:
         return not_asked(NO_POLICY)
     found = asked()
     try:
-        # The selection prints its own line, which is not among the convergence's reports.
-        with contextlib.redirect_stdout(io.StringIO()):
+        # The selection prints its own line, which is not among the convergence's reports. It
+        # runs as the node `select`, whose run record binds the selection the search leaves.
+        with (
+            durations.node(code, "select", refusals=ANSWERED),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
             select(edition)
     except ANSWERED as error:
         return found | {"verdict": REFUSED, "refusal": f"the selection: {refusal_of(error)}"}
