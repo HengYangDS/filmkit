@@ -31,7 +31,7 @@ import filmkit.narration.flow as narration_flow
 import filmkit.narration.terms as narration_terms
 import filmkit.repository as repository
 import filmkit.sources as sources
-from filmkit.film import DECLARATION, FILM, Declared
+from filmkit.film import FILM, Declared
 from filmkit.narration.pronunciation import PronunciationError, pronunciation
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
@@ -264,9 +264,6 @@ def listening_plan(out: Path) -> dict:
     refused, so a script edit cannot silently inherit a stale reading.
     """
     shared = FILM.pronunciation
-    if shared is None:
-        msg = f"{DECLARATION} declares no [pronunciation] table, which the plan cites"
-        raise ReviewError(msg)
     manifest = repository.ROOT / sources.MANIFEST
     entries, bindings, derived, parts = [], [], [], {}
     for code in CODES:

@@ -427,7 +427,7 @@ def check(code: str) -> dict:
         raise ReadingError(str(error)) from None
     thoughts = edition_thoughts(script, contract)
     declared = term_failures(code, thoughts, contract)
-    version = FILM.pronunciation.schema_version if FILM.pronunciation else None
+    version = FILM.pronunciation.schema_version
     if version != SCHEMA and declared:
         raise ReadingError("\n".join(declared))
     if version != SCHEMA:

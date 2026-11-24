@@ -634,7 +634,7 @@ class Film(Declared):
     picture: Picture
     player: Player
     review: Review
-    pronunciation: Pronunciation | None = None
+    pronunciation: Pronunciation
     narration: Narration = Field(default_factory=Narration)
     captions: Captions = Field(default_factory=Captions)
     # Declared as [register]: `register` would shadow the model class's own (ABCMeta's).
@@ -782,13 +782,19 @@ def read(root: Path) -> tuple[Film | None, list[str]]:
     found += declared_sources.withdrawn_problems(root, declared, withdraw=True)
     found += prompted
     found += declared_sources.entry_problems(root, declared)
-    undeclared = CREDITS not in declared
-    if undeclared:
+    undeclared = CREDITS not in declared or "pronunciation" not in declared
+    if CREDITS not in declared:
         found.append(
             f"{DECLARATION} declares no {CREDITS}; declare the credits' length there once, in "
             "whole seconds"
         )
         declared[CREDITS] = 0
+    # The loader names a declaration without [pronunciation] (`placement_problems`); a table
+    # stands in for it, so that the validation names it no second time, and the film is then not
+    # loaded.
+    declared.setdefault(
+        "pronunciation", {"schema_version": 0, "control_boundary": "-", "acceptance": ["-"]}
+    )
     try:
         film = Film.model_validate(declared)
     except ValidationError as error:

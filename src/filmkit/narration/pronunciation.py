@@ -44,7 +44,7 @@ def pronunciation(code: str) -> tuple[dict, str]:
         msg = f"{code}: {path} does not exist; write the edition's pronunciation there"
         raise PronunciationError(msg) from None
     part = json.loads(raw)
-    shared = FILM.pronunciation.sources if FILM.pronunciation else ()
+    shared = FILM.pronunciation.sources
     validate_part(code, part, path, {source.id for source in shared})
     return part, repository.content_sha(raw)
 
