@@ -519,3 +519,41 @@ def test_a_narration_names_its_edition():
     with pytest.raises(SystemExit) as refusal:
         narration_synthesis.load_request(ARGUMENTS[2:])
     assert refusal.value.code == 2
+
+
+# The golden files as they stood before the hearing of takes and the pinned CMUdict existed
+# (hear-a-take-as-a-listener-does, task 1.2).
+GOLDEN_SHA256 = {
+    "sample-requests.json": "91dc662e70928269f491110febfc956d601d258fb276e58f2ebe919be4e01792",
+    "receipts.json": "ad83f6409cef00a9d6749ee895e44313752fd4c5a8f8a1c049bd4b8c9e87570f",
+}
+
+
+def test_what_judges_a_take_binds_no_request(tmp_path, monkeypatch):
+    import pronounced
+
+    import filmkit.narration.candidates as narration_candidates
+
+    for folder in ("content", "assets/audio"):
+        shutil.copytree(repository.ROOT / folder, tmp_path / folder)
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    child = GOLDEN["en"]["record"]["utterance_groups"]["records"][0]
+    before = narration_candidates.request_sha256(child, child["seed"] + 7919, None)
+    # The fixture lines of CMUdict stand where the supply step places the pinned file, and the
+    # film records the owner's hearing of the golden English take.
+    pronounced.supplied(monkeypatch)
+    heard = film.Heard(
+        edition="en",
+        thought=f"{GOLDEN['en']['record']['id']}.{child['index']}",
+        take=child["wav_sha256"],
+        lines=("units", "clarity"),
+        listener=film.FILM.author,
+        date="2026-11-24",
+        note="Heard on the clip.",
+    )
+    narration = film.FILM.narration.model_copy(update={"heard": (heard,)})
+    monkeypatch.setattr(film, "FILM", film.FILM.model_copy(update={"narration": narration}))
+    assert {code: planned(code) for code in CODES} == SAMPLE_REQUESTS["editions"]
+    assert narration_candidates.request_sha256(child, child["seed"] + 7919, None) == before
+    golden = Path(__file__).parent / "golden"
+    assert {name: repository.sha(golden / name) for name in GOLDEN_SHA256} == GOLDEN_SHA256

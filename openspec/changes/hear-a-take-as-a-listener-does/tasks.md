@@ -117,7 +117,7 @@ Shown by `tests/test_film_hearings.py`, `tests/narration/test_units_line.py`, `t
 
 Shown by `tests/narration/test_synthesis.py`.
 
-- [ ] 4.1 Add the test of the requirement "What judges a take binds no take's request": in a copy of the sample with
+- [x] 4.1 Add the test of the requirement "What judges a take binds no take's request": in a copy of the sample with
       a record of hearing declared for one English thought and the fixture dictionary in the pin's place, each
       edition's planned requests equal `SAMPLE_REQUESTS`, and `candidates.request_sha256` of one golden receipt child
       at one seed equals its value without them. Done when the test passes, and
