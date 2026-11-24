@@ -22,6 +22,7 @@ import filmkit.soundtrack.gates as sound_gates
 from filmkit.film import FILM
 from filmkit.graph.nodes import REPLACES, REWRITES, Node, Places, Table, Writer, load, stands
 from filmkit.graph.records import Folder
+from filmkit.narration import alignment_records, transcript_records
 from filmkit.narration.narrate import evidence_paths
 from filmkit.production import CODES, Edition
 
@@ -82,6 +83,18 @@ def narration(edition: Edition) -> Places:
         receipt=root(paths["receipt"]),
         alignment=root(paths["alignment"]),
         asr=root(paths["asr"]),
+    )
+
+
+def caches(edition: Edition) -> Places:
+    """The narration's caches, which each narration reads and adds to: each recording's alignment
+    and transcript, under the recording and the model that made it, in a folder for each
+    language. Its outputs, not its inputs: a run reads them as they stood and leaves them grown,
+    and a read of a node's own output is allowed."""
+    language = edition.language.lower()
+    return Places(
+        alignments=Folder(root(alignment_records.CACHE) / language, "*"),
+        transcripts=Folder(root(transcript_records.CACHE) / language, "*"),
     )
 
 
@@ -148,10 +161,12 @@ def uncaptioned_way(edition: Edition) -> str:
 
 def derived_from(edition: Edition) -> Places:
     """What the derived uncaptioned picture is made from: the captioned picture and receipt,
-    the composition and the timeline."""
+    the composition and the timeline, and what the validation of the captioned picture reads
+    first (`derivation.derive_uncaptioned` calls `rendering.validate_picture`): its stage and the
+    stage's sources."""
     found = {f"captioned_{name}": path for name, path in rendered(edition).items()}
     found |= {"composition": root(rendering.COMPOSITION_SCRIPT), "timeline": edition.timeline}
-    return declared(edition) | found
+    return declared(edition) | found | staged_picture(edition)
 
 
 def compared(edition: Edition) -> Places:
@@ -231,7 +246,7 @@ TABLE = (
     Node(
         "narrate",
         {"default": lambda e: declared(e) | sources(e) | checked_words(e)},
-        narration,
+        lambda e: narration(e) | caches(e),
         "gpu",
         gpu=True,
     ),
@@ -380,7 +395,7 @@ TABLE = (
         "validate-picture-uncaptioned",
         {
             "native": lambda e: staged_picture(e, captions=False) | rendered(e, captions=False),
-            "derived": lambda e: derived_from(e) | staged_picture(e) | rendered(e, captions=False),
+            "derived": lambda e: derived_from(e) | rendered(e, captions=False),
         },
         lambda e: {},
         "light",
@@ -408,6 +423,7 @@ TABLE = (
         lambda e: (
             {f"film_{kind}": e.film(kind) for kind in packaging.RENDITIONS}
             | {"film_package": e.film_package}
+            | {"packaging_failure": e.evidence / packaging.FAILURE_RECEIPT}
             | metadata(e)
         ),
         "heavy",

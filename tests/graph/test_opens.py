@@ -240,3 +240,42 @@ def test_the_recorder_s_own_reads_of_the_table_are_no_reads_of_the_run(
     code += "chain.derived_uncaptioned = reading\nassert opens.node_options()\n"
     python_child(root, log, code, node="compare-pictures:zh")
     assert opens.check(log).findings == []
+
+
+def fresh_copy(tmp_path):
+    """A copy of the sample's sources alone, which a test may write below."""
+    return sample_sound.copy_film((tmp_path / "film").resolve())
+
+
+def test_a_failed_packaging_s_receipt_is_an_output_of_package_film(tmp_path, monkeypatch):
+    root = fresh_copy(tmp_path)
+    monkeypatch.setattr(repository, "ROOT", root)
+    log = tmp_path / "opens.jsonl"
+    # An encode that fails writes what it was bound to, as package-film's encodes do.
+    code = "import subprocess\nimport filmkit.delivery.packaging as packaging\n"
+    code += "from filmkit.production import Edition\n"
+    code += "work = repository.ROOT / 'build/runtime/work/failed.mp4'\n"
+    code += "Edition('zh').evidence.mkdir(parents=True)\n"
+    code += "try:\n    packaging.encode(Edition('zh'), {'editions': []}, ['false'], 60, work)\n"
+    code += "except subprocess.CalledProcessError:\n    pass\n"
+    python_child(root, log, code, node="package-film:zh")
+    assert (root / "build/evidence/editions/zh/packaging-failure.json").is_file()
+    assert opens.check(log).findings == []
+
+
+def test_the_narration_s_caches_are_outputs_of_narrate(tmp_path, monkeypatch):
+    root = fresh_copy(tmp_path)
+    monkeypatch.setattr(repository, "ROOT", root)
+    log = tmp_path / "opens.jsonl"
+    # A narration caches each recording's alignment and transcript at its owner's place.
+    code = "from filmkit.narration.alignment_records import alignment_record\n"
+    code += "from filmkit.narration.transcript_records import transcript_record\n"
+    code += "from filmkit.production import Edition\n"
+    code += "language, sha = Edition('zh').language, 'a' * 64\n"
+    code += "aligned = repository.ROOT / alignment_record(language, '01', sha, 'b' * 64)\n"
+    code += "heard = transcript_record(language, '01', sha, {'repo': 'recognizer'})\n"
+    code += "for path in (aligned, heard):\n"
+    code += "    path.parent.mkdir(parents=True, exist_ok=True)\n"
+    code += "    repository.write(path, {})\n"
+    python_child(root, log, code, node="narrate:zh")
+    assert opens.check(log).findings == []

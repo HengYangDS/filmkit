@@ -133,8 +133,12 @@ def test_the_uncaptioned_picture_reads_the_inputs_of_its_way(table):
     node, edition = table.node("render-picture-uncaptioned:zh")
     derived, native = node.inputs(edition, "derived"), node.inputs(edition, "native")
     assert derived["captioned_picture"] == edition.picture
-    assert "stage" not in derived
-    assert native["stage"] == Folder(edition.rendered(captions=False).stage, "**/*")
+    # The derived way reads the captioned picture's stage, which its validation reads, and no
+    # stage of its own.
+    assert derived["stage"] == Folder(edition.rendered().stage, "**/*")
+    own = edition.rendered(captions=False).stage
+    assert nodes.place(own) not in {nodes.place(path) for path in derived.values()}
+    assert native["stage"] == Folder(own, "**/*")
     assert node.way(edition, "native") == "native"
 
 
@@ -146,3 +150,14 @@ def test_the_occurrence_plan_is_no_output_of_any_node(table):
         for node in table.nodes.values():
             outputs = {nodes.place(p) for p in node.outputs(Edition(code)).values()}
             assert plan not in outputs, node.name
+
+
+def test_the_derived_picture_reads_what_the_validation_of_the_captioned_picture_reads(table):
+    # Deriving begins with the captioned picture's validation (`derivation.derive_uncaptioned`
+    # calls `rendering.validate_picture`), so the derived way reads every input of that node.
+    for code in table.codes:
+        edition = Edition(code)
+        derived = table.nodes["render-picture-uncaptioned"].inputs(edition, "derived").values()
+        validated = table.nodes["validate-picture"].inputs(edition).values()
+        missing = {nodes.place(p) for p in validated} - {nodes.place(p) for p in derived}
+        assert not missing, sorted(str(path) for path in missing)
