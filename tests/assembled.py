@@ -9,6 +9,7 @@ import derived_languages
 
 import filmkit.production as production
 import filmkit.repository as repository
+from filmkit.film import FILM, timeline_values
 
 # The sample film, whose release the staged scripts declare.
 SAMPLE = Path(__file__).resolve().parents[1] / "examples/sample-film"
@@ -44,12 +45,15 @@ def stage(tmp_path, monkeypatch, code, groups, words, captions=()):
         "title": "Sample Reel",
         "caption_timing": {"tail_seconds": 0.25, "short_cue_lead_seconds": 0.1},
         "release": release,
+        "chapters": [{"id": "a", "title": "A"}],
         "segments": [segment],
     }
     write_json(tmp_path / edition.script, script)
+    # The assembly lays out the script with what the engine derives for every timeline.
+    derived = timeline_values(script, FILM)
     write_json(tmp_path / edition.cast, {})
     timed = {
-        **segment,
+        **derived["segments"][0],
         "start": 0.0,
         "voice_start": 2.0,
         "voice_end": 4.3,
@@ -60,7 +64,7 @@ def stage(tmp_path, monkeypatch, code, groups, words, captions=()):
     }
     # What an assembly writes beside and over the script's keys (`production.ASSEMBLED`).
     timeline = {
-        **script,
+        **derived,
         "edition": edition.code,
         "duration": 9,
         "credits_duration": 3.0,

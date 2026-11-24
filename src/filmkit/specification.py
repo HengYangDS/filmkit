@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
+import filmkit.film as film
 import filmkit.repository as repository
 from filmkit.film import FILM
 from filmkit.production import CODES, Edition
@@ -25,21 +26,14 @@ def declared(key: str, read: Callable[[Any], Any]) -> Any:
     return values.pop()
 
 
-def rendered_rate(fps: int) -> int:
-    """A script's frame rate, refused unless it is the 60 fps the engine renders and encodes."""
-    if fps != 60:
-        message = f"The engine renders 60 fps films, not the {fps} fps the scripts declare"
-        raise ValueError(message)
-    return fps
-
-
 RATE = 48000
-# The H.264 levels below are set for this frame rate.
-FPS: int = declared("fps", lambda fps: rendered_rate(int(fps)))
+# The frame rate the engine renders and encodes (`filmkit.film.FPS`); the H.264 levels below are set
+# for it.
+FPS: int = film.FPS
 # The credits' length, which the film's declaration states once for both editions.
 CREDITS_DURATION: int = FILM.credits_duration
-# The films' author, artist and copyright holder.
-AUTHOR: str = declared("author", str)
+# The films' author, artist and copyright holder, which the film's declaration states once.
+AUTHOR: str = FILM.author
 # The films' chapter count; each edition titles the chapters in its own language.
 CHAPTERS: int = declared("chapters", len)
 # Both editions play at one spoken-word level; a single gain reaches it without dynamics

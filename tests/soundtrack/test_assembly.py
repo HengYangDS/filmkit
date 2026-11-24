@@ -14,6 +14,7 @@ import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as soundtrack_assembly
 from filmkit.captions import CaptionError
+from filmkit.film import FILM
 
 REPOSITORY = repository.ROOT
 RATE = 48000
@@ -65,9 +66,19 @@ def test_assembly_refuses_a_recording_whose_waveform_differs(edition):
 
 @pytest.mark.ffmpeg
 def test_assembly_lays_out_each_recording_with_its_own_level_and_exact_samples(two_chapters):
+    # A segment that states another chapter title than its chapter's is laid out with its
+    # chapter's, and the timeline states the film's author and the engine's frame rate.
+    script = json.loads((repository.ROOT / two_chapters.script).read_text())
+    script["segments"][0]["chapter_title"] = "Not the chapter's"
+    (repository.ROOT / two_chapters.script).write_text(json.dumps(script, ensure_ascii=False))
     soundtrack_assembly.assemble(two_chapters)
     receipt = json.loads(two_chapters.audio_assembly.read_text())
     timeline = json.loads(two_chapters.timeline.read_text())
+    assert [(s["chapter_index"], s["chapter_title"]) for s in timeline["segments"]] == [
+        (0, "A"),
+        (1, "B"),
+    ]
+    assert (timeline["author"], timeline["fps"]) == (FILM.author, 60)
     records = receipt["records"]
     # Each record carries its own declared level gain.
     assert [record["level_gain_db"] for record in records] == [1.0, 0]
@@ -247,17 +258,24 @@ def test_assembly_refuses_a_value_the_chapter_metadata_cannot_hold_before_it_dec
     two_chapters, monkeypatch
 ):
     # A chapter title that ends in a backslash cannot be kept in chapters.ffmeta: the assembly
-    # refuses it before a recording is decoded and before anything is written.
+    # refuses it before a recording is decoded and before anything is written. It checks the
+    # title of the segment's chapter, not one the segment states, which nothing reads.
     script = repository.ROOT / two_chapters.script
     declared = json.loads(script.read_text())
     declared["segments"][1]["chapter_title"] = "B\\"
     script.write_text(json.dumps(declared, ensure_ascii=False))
     monkeypatch.setattr(soundtrack_assembly, "_decode", decoding)
+    with pytest.raises(Decoded):
+        soundtrack_assembly.assemble(two_chapters)
+    # That run made the edition's folder and wrote nothing in it.
+    two_chapters.artifacts.rmdir()
+    declared["chapters"][1]["title"] = "B\\"
+    script.write_text(json.dumps(declared, ensure_ascii=False))
     with pytest.raises(CaptionError) as refusal:
         soundtrack_assembly.assemble(two_chapters)
     # The assembly reads the script, and says so.
     assert str(refusal.value).startswith(
-        'content/zh/film-script.json holds chapter_title of segment 02 "B\\\\": '
+        'content/zh/film-script.json holds the title of chapter b (segment 02) "B\\\\": '
         "chapters.ffmeta cannot"
     )
     assert not two_chapters.artifacts.exists()

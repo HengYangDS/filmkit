@@ -28,10 +28,10 @@ def test_scripts_that_disagree_refuse(tmp_path, monkeypatch):
         specification.declared("author", str)
 
 
-def test_the_engine_renders_60_fps_only():
-    assert specification.rendered_rate(60) == 60
-    with pytest.raises(ValueError, match="60 fps films, not the 30 fps"):
-        specification.rendered_rate(30)
+def test_the_frame_rate_is_the_engines_and_the_author_the_declarations():
+    # No script is read for either: the engine renders 60 fps, and the film states its author once.
+    assert specification.FPS == film.FPS == 60
+    assert specification.AUTHOR == film.FILM.author == "Yang HENG"
 
 
 # A film refused while the engine loads, and the one line that the refusal ends in: the

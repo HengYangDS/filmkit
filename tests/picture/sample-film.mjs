@@ -57,7 +57,8 @@ async function withAnchors(timeline, code) {
 
 /* A timeline as staging builds it from a script: each word 0.2 s after the last, a chapter's first segment after a
  * longer pause, one caption over each segment's voice, the credits the film's declaration states, and each segment's
- * anchors on its words, as the engine places them. */
+ * anchors on its words, as the engine places them, with the author, the frame rate and each segment's chapter values
+ * that the engine derives for every timeline. */
 export async function authoredTimeline(code) {
   const script = JSON.parse(
     await readFile(

@@ -1,10 +1,12 @@
 # The sample film that this repository's tests load and its local acceptance builds. The engine
 # takes every film-specific value from this declaration and the files it names; each edition's
-# script declares its title, author, frame rate and chapters, and each edition lasts as long as its
-# narration. Paths are below this folder.
+# script declares its title and chapters, and each edition lasts as long as its narration. Paths
+# are below this folder.
 
 # The prefix of every delivered file.
 slug = "sample-reel"
+# The films' author, artist and copyright holder, which every edition's metadata names.
+author = "Yang HENG"
 # The name of the folder a delivery fills, below the host's delivery root or the user's videos
 # folder (`filmkit.delivery.folder`).
 delivery_folder = "sample-reel"

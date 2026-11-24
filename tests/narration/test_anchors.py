@@ -17,6 +17,7 @@ import filmkit.preflight as preflight
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as assembly
 import filmkit.tools as tools
+from filmkit.film import FILM
 from filmkit.narration.anchors import AnchorError
 from filmkit.narration.spoken_units import units
 from filmkit.picture import anchor_reads
@@ -29,14 +30,19 @@ def segment(sid: str, *written: str) -> dict:
     groups = anchors.plain(list(written))
     return {
         "id": sid,
+        "chapter": "one",
         "anchored_groups": list(written),
         "utterance_groups": groups,
         "text": "".join(groups),
     }
 
 
+# The one chapter of the tests' scripts.
+CHAPTERS = [{"id": "one", "title": "One"}]
+
+
 def script(*segments: dict) -> dict:
-    return {"segments": list(segments)}
+    return {"chapters": CHAPTERS, "segments": list(segments)}
 
 
 def refusal(value: dict, code: str = "zh") -> str:
@@ -293,11 +299,16 @@ def test_the_engine_places_the_anchors_on_a_timeline_of_other_words(editions, tm
     words = [
         {"text": unit, "start": index, "end": index + 1} for index, unit in enumerate("依据有先后")
     ]
-    timed = {"segments": [{**editions["zh"]["segments"][0], "words": words}]}
-    put(tmp_path / "own.json", timed)
+    # The segment states another chapter title than its chapter's, which nothing reads.
+    own = {**editions["zh"]["segments"][0], "chapter_title": "Other", "words": words}
+    put(tmp_path / "own.json", {"chapters": CHAPTERS, "segments": [own]})
     anchors.main(["--place", str(tmp_path / "own.json"), "--language", "zh"])
-    placed = json.loads((tmp_path / "own.json").read_text())["segments"][0]["anchors"]
-    assert placed == {"order": {"start": 2, "end": 5, "units": [2, 5], "thought": 1}}
+    timeline = json.loads((tmp_path / "own.json").read_text())
+    placed = timeline["segments"][0]
+    assert placed["anchors"] == {"order": {"start": 2, "end": 5, "units": [2, 5], "thought": 1}}
+    # It takes what the engine derives for every timeline, as the derived timeline does.
+    assert (timeline["author"], timeline["fps"]) == (FILM.author, 60)
+    assert (placed["chapter_index"], placed["chapter_title"]) == (0, "One")
 
 
 def test_the_derived_timeline_is_the_same_twice_and_times_each_anchor_by_its_words(
@@ -324,6 +335,8 @@ def test_the_derived_timeline_is_the_same_twice_and_times_each_anchor_by_its_wor
         "thought": 1,
     }
     assert derived["captions"] == []
+    assert (derived["author"], derived["fps"]) == (FILM.author, 60)
+    assert {(s["chapter_index"], s["chapter_title"]) for s in derived["segments"]} == {(0, "One")}
 
 
 def test_the_sample_films_derived_timelines_time_every_unit_of_its_thoughts():

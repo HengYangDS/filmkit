@@ -39,6 +39,10 @@ DECLARATION = repository.DECLARATION
 CREDITS = "credits_duration"
 # The files every edition's sources folder holds: its script and its cast.
 SCRIPT, CAST = "film-script.json", "voice-reference.json"
+# The frame rate the engine renders and encodes every film at.
+FPS = 60
+# The keys of a timeline's segment that the engine derives from its chapter (`timeline_values`).
+CHAPTER_VALUES = ("chapter_index", "chapter_title")
 EDITION_FILES = (SCRIPT, CAST)
 
 
@@ -647,6 +651,8 @@ class Film(Declared):
 
     slug: Name
     delivery_folder: Name
+    # The films' author, artist and copyright holder, stated once for every edition.
+    author: Stated
     entry: str
     source_manifest: str
     # The credits' length in whole seconds, stated once: both editions draw them from one
@@ -694,6 +700,30 @@ class Film(Declared):
         if problems:
             raise ValueError("; ".join(problems))
         return self
+
+
+def timeline_values(script: dict, film: Film) -> dict:
+    """A script with what the engine derives for its timeline (decision 10 of
+    treat-languages-as-equals): the film's `author`, the engine's `fps` and each segment's
+    `chapter_index` and `chapter_title`, from the script's `chapters` through the segment's
+    `chapter`. A value the script still states is replaced, so nothing reads it; it loads nothing.
+
+    Raises:
+        ValueError: a segment names a chapter that the script's chapters do not hold.
+    """
+    chapters = {
+        chapter["id"]: (index, chapter["title"])
+        for index, chapter in enumerate(script.get("chapters", []))
+    }
+    unheld = [s["id"] for s in script["segments"] if s.get("chapter") not in chapters]
+    if unheld:
+        message = f"The script's chapters hold no chapter of segment {', '.join(unheld)}"
+        raise ValueError(message)
+    segments = [
+        {**s, **dict(zip(CHAPTER_VALUES, chapters[s["chapter"]], strict=True))}
+        for s in script["segments"]
+    ]
+    return {**script, "author": film.author, "fps": FPS, "segments": segments}
 
 
 def named_files(film: Film) -> list[tuple[str, str]]:

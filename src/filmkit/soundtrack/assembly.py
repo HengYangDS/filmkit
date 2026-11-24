@@ -35,7 +35,7 @@ import filmkit.repository as repository
 from filmkit.captions.documents import require_metadata_values, subtitle_files
 from filmkit.captions.phrasing import segment_caption_phrases
 from filmkit.captions.timing import caption_receipt_fields, timed_caption_cues
-from filmkit.film import FILM
+from filmkit.film import FILM, timeline_values
 from filmkit.narration.selection import validate_aligned_recording
 from filmkit.narration.spoken_units import aligned_lookup
 from filmkit.narration.take_edges import ending, kept_ending
@@ -582,6 +582,9 @@ def assemble(edition: Edition) -> None:
     if abrupt:
         msg = f"Thought takes end abruptly without a declared release: {', '.join(abrupt)}"
         raise AssemblyError(msg)
+    # The timeline's author, frame rate and each segment's chapter fields are the engine's.
+    script = timeline_values(script, FILM)
+    segments = script["segments"]
     # Refused before a recording is decoded or a file written: a value the chapter metadata
     # cannot keep would otherwise be met after the soundtrack and the timeline were written.
     require_metadata_values(script, edition.script, edition)

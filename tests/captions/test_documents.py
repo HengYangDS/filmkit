@@ -11,6 +11,7 @@ import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.specification as specification
 from filmkit.captions import CaptionError
+from filmkit.film import FILM, timeline_values
 
 
 @pytest.mark.parametrize(
@@ -210,9 +211,9 @@ SCRIPT, TIMELINE = "content/en/film-script.json", "build/artifacts/film/en/timel
     ("field", "named"),
     [
         ("title", f"{TIMELINE} holds title"),
-        ("author", f"{SCRIPT} holds author"),
+        ("author", "content/film.toml holds author"),
         ("comment", f"{SCRIPT} holds release.comment"),
-        ("chapter_title", f"{TIMELINE} holds chapter_title of segment 01"),
+        ("chapter_title", f"{TIMELINE} holds the title of chapter one (segment 01)"),
     ],
 )
 def test_a_value_that_ends_in_a_backslash_is_refused_before_a_document_is_written(
@@ -220,7 +221,8 @@ def test_a_value_that_ends_in_a_backslash_is_refused_before_a_document_is_writte
 ):
     # FFmpeg reads the line after such a value into it, whatever is written, so the value is
     # refused by the file that holds it, its field and its JSON text: the documents are written
-    # from a timeline's title and chapter titles and from the script's author and comment.
+    # from a timeline's title and chapter titles, the declaration's author and the script's
+    # comment.
     timeline, edition = marked(tmp_path, monkeypatch, **{field: "Ends \\"})
     with pytest.raises(CaptionError) as refusal:
         captions_documents.subtitle_files(timeline, edition)
@@ -246,7 +248,9 @@ def test_a_chapter_that_returns_is_refused_by_the_title_the_writer_would_write(
     ]
     with pytest.raises(CaptionError) as refusal:
         captions_documents.subtitle_files(timeline, edition)
-    assert f'{TIMELINE} holds chapter_title of segment 03 "Again \\\\": ' in str(refusal.value)
+    assert f'{TIMELINE} holds the title of chapter a (segment 03) "Again \\\\": ' in str(
+        refusal.value
+    )
     assert list(edition.artifacts.iterdir()) == []
     # Without the backslash the three chapters are written, the third under its own title.
     timeline["segments"][2]["chapter_title"] = "Again"
@@ -313,3 +317,16 @@ def test_the_transcript_parts_give_each_chapter_its_scenes_and_each_scene_its_th
 def test_a_test_language_is_bylined_by_its_declared_name_and_byline(code, byline):
     transcript = captions_documents._transcript("Title", [], code, 27 * 60 + 30)
     assert transcript.splitlines()[2] == byline
+
+
+def test_the_metadata_check_reads_a_scripts_derived_chapter_title(tmp_path, monkeypatch):
+    # The assembly checks a script with what the engine derives for its timeline: the title of
+    # each segment's chapter from the script's chapters, not one the segment states.
+    timeline, edition = marked(tmp_path, monkeypatch)
+    stated = {**timeline["segments"][0], "chapter_title": "Ends \\"}
+    script = {**timeline, "chapters": [{"id": "one", "title": "One"}], "segments": [stated]}
+    captions_documents.require_metadata_values(timeline_values(script, FILM), SCRIPT, edition)
+    script["chapters"][0]["title"] = "Ends \\"
+    with pytest.raises(CaptionError) as refusal:
+        captions_documents.require_metadata_values(timeline_values(script, FILM), SCRIPT, edition)
+    assert str(refusal.value).startswith(f'{SCRIPT} holds the title of chapter one (segment 01) "')

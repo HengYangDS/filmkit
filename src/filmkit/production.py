@@ -28,10 +28,20 @@ def codes(film: Film) -> tuple[str, ...]:
 CODES = codes(FILM)
 # The keys of an assembled timeline that its script does not author: what the assembly writes
 # beside the script's own keys or over them (`filmkit.soundtrack.assembly.assemble`), the
-# edition's code, the laid-out segments and their captions, the timing state, the runtime and
-# the credits as laid out. Every comparison of a timeline with its script leaves them out.
+# edition's code, the film's author and the engine's frame rate (`filmkit.film.timeline_values`),
+# the laid-out segments and their captions, the timing state, the runtime and the credits as laid
+# out. Every comparison of a timeline with its script leaves them out.
 ASSEMBLED = frozenset(
-    {"edition", "segments", "captions", "timing_state", "duration", "credits_duration"}
+    {
+        "edition",
+        "author",
+        "fps",
+        "segments",
+        "captions",
+        "timing_state",
+        "duration",
+        "credits_duration",
+    }
 )
 # The name of an edition's captioned picture's stage below the work folder, which the uncaptioned
 # picture's extends.

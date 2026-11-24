@@ -28,7 +28,7 @@ import filmkit.media as media
 import filmkit.released as released
 import filmkit.repository as repository
 import filmkit.sources as sources
-from filmkit.film import FILM
+from filmkit.film import CHAPTER_VALUES, FILM
 from filmkit.narration import anchors
 from filmkit.picture import encoding, faces, renderer, template
 from filmkit.picture.errors import PictureError
@@ -67,13 +67,18 @@ def below_root(path: str | Path) -> str:
 
 def follows_script(timeline: dict, script: dict) -> bool:
     """Whether a timeline keeps its script's declarations, but what the assembly writes over them
-    (`production.ASSEMBLED`), and each segment's authored fields."""
+    (`production.ASSEMBLED`), and each segment's authored fields, but the chapter values the
+    engine derives (`film.CHAPTER_VALUES`)."""
     segments = timeline.get("segments", [])
     return (
         all(timeline.get(key) == value for key, value in script.items() if key not in ASSEMBLED)
         and len(segments) == len(script["segments"])
         and all(
-            all(actual.get(key) == value for key, value in source.items())
+            all(
+                actual.get(key) == value
+                for key, value in source.items()
+                if key not in CHAPTER_VALUES
+            )
             for source, actual in zip(script["segments"], segments, strict=True)
         )
     )

@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 import filmkit.languages as languages
 from filmkit.captions import CaptionError
 from filmkit.captions.timing import shown_text, typeset
-from filmkit.repository import relative, write
+from filmkit.repository import DECLARATION, relative, write
 from filmkit.specification import AUTHOR, CHAPTER_CARD_SHOWN
 
 if TYPE_CHECKING:
@@ -177,7 +177,8 @@ def require_metadata_values(titled: dict, source: str, edition: Edition) -> None
     FFmpeg reads a newline after a backslash as part of the value, whether or not that backslash
     is itself escaped, so it reads the next line into such a value and loses that line's own tag;
     no escape keeps the value. The values are the film's: the title and each chapter's title of
-    `titled`, a script or a timeline read from the file `source`, and the author and the release
+    `titled`, a script with what the engine derives for its timeline (`film.timeline_values`) or a
+    timeline, read from the file `source`, the author the declaration states and the release
     comment of the edition's script. A chapter's title is the one the metadata would be written
     with, the title of the chapter's first segment (`_chapter_segments`). The refusal names, for
     each value, the file that holds it, its field and the value as JSON writes it, and changes
@@ -185,10 +186,14 @@ def require_metadata_values(titled: dict, source: str, edition: Edition) -> None
     """
     values = [
         (source, "title", titled["title"]),
-        (edition.script, "author", AUTHOR),
+        (DECLARATION, "author", AUTHOR),
         (edition.script, "release.comment", edition.comment),
         *(
-            (source, f"chapter_title of segment {held[0]['id']}", held[0]["chapter_title"])
+            (
+                source,
+                f"the title of chapter {held[0]['chapter']} (segment {held[0]['id']})",
+                held[0]["chapter_title"],
+            )
             for held in _chapter_segments(titled["segments"])
         ),
     ]

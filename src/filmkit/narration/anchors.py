@@ -35,8 +35,9 @@ which refuses nothing; times that are stale, of other marks than the script's, a
 not given. With --json it prints the same as one document, and with --timeline it writes each
 edition's derived timeline as <folder>/<code>.json, so that a film's own tests draw the timeline
 that narration's check draws. With --place it gives a timeline that other code built, of its own
-words, the anchors its marks take from those words, as `place` does, and writes it back, so that a
-test that times its words otherwise still takes its anchors from this module.
+words, what the engine derives for every timeline (`filmkit.film.timeline_values`) and the
+anchors its marks take from those words, as `place` does, and writes it back, so that a test that
+times its words otherwise still takes its anchors and those values from this module.
 
 Usage: python -m filmkit.narration.anchors [--json] [--timeline FOLDER]
        python -m filmkit.narration.anchors --place TIMELINE --language zh|en
@@ -52,7 +53,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import filmkit.repository as repository
-from filmkit.film import FILM
+from filmkit.film import FILM, timeline_values
 from filmkit.narration.spoken_units import HAN, LATIN, units
 from filmkit.production import CODES, Edition
 
@@ -274,7 +275,9 @@ def require_editions() -> dict[str, dict[str, list[Anchor]]]:
 
 def derived_timeline(script: dict, code: str) -> dict:
     """The timeline that the checks before narration draw an edition's picture over, derived from
-    its script alone; the same script gives the same bytes."""
+    its script alone, with what the engine derives for every timeline (`film.timeline_values`);
+    the same script gives the same bytes."""
+    script = timeline_values(script, FILM)
     segments, cursor = [], 0
     for segment in script["segments"]:
         start = cursor
@@ -402,7 +405,8 @@ def main(argv: list[str] | None = None) -> None:
     if (options.place is None) != (options.language is None):
         parser.error("--place and --language go together")
     if options.place is not None:
-        timeline = repository.read(repository.ROOT / options.place)
+        # A timeline other code built takes what the engine derives for every timeline.
+        timeline = timeline_values(repository.read(repository.ROOT / options.place), FILM)
         try:
             place(timeline, options.language)
         except AnchorError as error:

@@ -119,6 +119,7 @@ def two_chapters(tmp_path, monkeypatch, performance):
         },
         "caption_timing": {"tail_seconds": 0.25, "short_cue_lead_seconds": 0.1},
         "release": release,
+        "chapters": [{"id": "a", "title": "A"}, {"id": "b", "title": "B"}],
         "segments": segments,
     }
     (tmp_path / edition.script).parent.mkdir(parents=True)

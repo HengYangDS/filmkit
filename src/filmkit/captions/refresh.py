@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 from filmkit.captions import CaptionError
 from filmkit.captions.documents import require_metadata_values, subtitle_files
 from filmkit.captions.timing import caption_receipt_fields, timed_caption_cues
+from filmkit.film import CHAPTER_VALUES
 from filmkit.narration import anchors
 from filmkit.production import ASSEMBLED
 from filmkit.repository import read, relative, sha, write
@@ -47,8 +48,8 @@ PRESENTATION_SCOPE = (
 
 def caption_source(timeline: dict) -> dict:
     """Project the source copy from an assembled timeline for caption-only edits: without what
-    the assembly writes (`production.ASSEMBLED`) and the caption timing, which a presentation
-    revision may change."""
+    the assembly writes (`production.ASSEMBLED`), the chapter values the engine derives
+    (`film.CHAPTER_VALUES`) and the caption timing, which a presentation revision may change."""
     return {
         **{
             key: value
@@ -59,7 +60,7 @@ def caption_source(timeline: dict) -> dict:
             {
                 key: value
                 for key, value in segment.items()
-                if key not in GENERATED_SEGMENT_FIELDS | {"caption_phrases"}
+                if key not in GENERATED_SEGMENT_FIELDS | {"caption_phrases", *CHAPTER_VALUES}
             }
             for segment in timeline["segments"]
         ],

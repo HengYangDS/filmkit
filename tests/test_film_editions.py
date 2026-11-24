@@ -311,3 +311,38 @@ def test_the_review_tables_readings_are_refused_beside_other_problems(declared):
     )
     # The key is set aside: pydantic names the file prefix alone, and not the withdrawn key.
     assert "\nslug\n" in other and "review.readings" not in other
+
+
+def test_the_timeline_values_of_the_sample_are_those_its_scripts_state():
+    for code in production.CODES:
+        script = repository.read(production.Edition(code).script)
+        assert film.timeline_values(script, film.FILM) == script
+    # A segment's chapter fields come from the chapter it names, whatever it states.
+    script = repository.read(production.Edition("en").script)
+    script["segments"][0] |= {"chapter": "check", "chapter_title": "Stated", "chapter_index": 7}
+    derived = film.timeline_values(script, film.FILM)["segments"][0]
+    assert (derived["chapter_index"], derived["chapter_title"]) == (
+        2,
+        script["chapters"][2]["title"],
+    )
+    script["segments"][0]["chapter"] = "nowhere"
+    with pytest.raises(ValueError, match="hold no chapter of segment 01$"):
+        film.timeline_values(script, film.FILM)
+
+
+def test_a_declaration_without_its_author_is_refused_naming_it(declared):
+    rewrite(declared, 'author = "Yang HENG"\n', "")
+    (problem,) = film.problems(declared)
+    assert "\nauthor\n  Field required" in problem
+
+
+def test_staging_and_the_refresh_read_no_chapter_value_a_script_states():
+    # Every comparison of a timeline with its script leaves out what the engine derives.
+    import filmkit.captions.refresh as refresh
+    import filmkit.picture.rendering as rendering
+
+    script = repository.read(production.Edition("en").script)
+    timeline = film.timeline_values(script, film.FILM)
+    script["segments"][0] |= {"chapter_title": "Stated", "chapter_index": 7}
+    assert rendering.follows_script(timeline, script)
+    assert refresh.narration_source(script) == refresh.narration_source(timeline)
