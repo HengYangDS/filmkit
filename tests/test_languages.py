@@ -150,6 +150,9 @@ def edges() -> list[tuple[str, str]]:
     point and the points just outside it, and each listed character with the point after it."""
     probes = []
     for name, entry in {**languages.classes()["scripts"], **languages.classes()["marks"]}.items():
+        if "of" in entry:
+            # A class of other classes holds their edges, which theirs probe.
+            continue
         if "ranges" in entry:
             for span in entry["ranges"]:
                 first, last = (int(point, 16) for point in span.split("-"))
@@ -214,7 +217,7 @@ def test_every_python_site_counts_a_character_of_extension_a_as_han():
     assert measurement.units(character, "zh") == [character]
     assert re.fullmatch(pronunciation.HAN, character)
     assert re.fullmatch(spotlight.HAN, character)
-    assert register._CHINESE.match(character)
+    assert register._WIDE.match(character)
     assert label_matches.words(f"{character}a") == [character, "a"]
 
 
@@ -227,3 +230,10 @@ def test_a_latin_word_is_an_embedded_name_where_the_language_reads_latin_as_anot
     monkeypatch.setitem(languages.LANGUAGES, "xd", xd)
     assert [languages.names_embedded(code) for code in ("zh", "en", "xd")] == [True, False, False]
     assert languages.written_in("API", "xd") is None
+
+
+def test_the_wide_class_is_its_three_classes_named_once():
+    # Han characters and CJK or full-width marks, which the register joins and the canvas sets
+    # a full size wide, are one class by that purpose (`scripts.json`, read in both runtimes).
+    assert languages.pattern("wide") == languages.pattern("han", "cjk-punctuation", "full-width")
+    assert languages.compiled("wide").fullmatch("。") and not languages.compiled("wide").match("a")

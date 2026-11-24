@@ -56,7 +56,7 @@ Name = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")]
 Floor = Annotated[int, Field(ge=0, le=100)]
 # An edition's code: a BCP 47 primary subtag, which the film's `[editions.<code>]` tables declare
 # and every exception and floor names (`Film.editions_declared`).
-Code = Annotated[str, StringConstraints(pattern=r"^[a-z]{2,3}$")]
+Code = languages.Code
 # A voice-clarity floor in dB of cepstral peak prominence, and one for each edition.
 ClarityFloor = Annotated[float, Field(gt=0, le=60)]
 ClarityFloors = Annotated[dict[Code, ClarityFloor], Field(min_length=1)]

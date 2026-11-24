@@ -14,11 +14,15 @@ test("every class of the data file is read, each holding its first member", () =
     ...Object.keys(DATA.scripts),
     ...Object.keys(DATA.marks),
   ]);
+  // A class of other classes holds the first member of the first it names.
+  const firstOf = (entry) =>
+    entry.of
+      ? firstOf(CLASSES[entry.of[0]])
+      : entry.ranges
+        ? String.fromCodePoint(Number.parseInt(entry.ranges[0].split("-")[0], 16))
+        : [...entry.characters][0];
   for (const [name, entry] of Object.entries(CLASSES)) {
-    const first = entry.ranges
-      ? String.fromCodePoint(Number.parseInt(entry.ranges[0].split("-")[0], 16))
-      : [...entry.characters][0];
-    assert.ok(classTest(name)(first), `${name} holds ${first}`);
+    assert.ok(classTest(name)(firstOf(entry)), `${name} holds ${firstOf(entry)}`);
   }
 });
 
@@ -70,4 +74,9 @@ test("the typography checks and the composition's estimate read the classes alik
     assert.ok(CLOSING.test(`甲${mark}`), `layout closes on ${mark}`);
     assert.ok(CLOSES.test(`${mark}乙`), `breaks opens on ${mark}`);
   }
+});
+
+test("the wide class is its three classes, named once", () => {
+  const three = ["han", "cjk-punctuation", "full-width"].map(characterClass).join("");
+  assert.equal(characterClass("wide"), three);
 });

@@ -226,6 +226,9 @@ def pattern(*names: str) -> str:
     body = []
     for name in names:
         entry = _entry(name)
+        if "of" in entry:
+            body.append(pattern(*entry["of"]))
+            continue
         if "characters" in entry:
             body += [re.escape(character) for character in entry["characters"]]
             continue

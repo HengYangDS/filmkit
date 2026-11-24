@@ -46,10 +46,7 @@ const fontFamily = (font) =>
 const spacingOf = (value) => Number(/(-?\d+(?:\.\d+)?)px/.exec(String(value))?.[1] ?? 0);
 /* The estimate's share of the size for one character: a CJK character as wide as the size, a capital 0.66 of it and
  * any other character 0.54. */
-const WIDE = new RegExp(
-  `[${characterClass("han")}${characterClass("cjk-punctuation")}${characterClass("full-width")}]`,
-  "u",
-);
+const WIDE = new RegExp(`[${characterClass("wide")}]`, "u");
 const estimated = (ch) => (WIDE.test(ch) ? 1 : /[A-Z]/.test(ch) ? 0.66 : 0.54);
 
 /** The advance widths of the film's declared faces (filmkit.picture.metrics), read from the file that

@@ -65,7 +65,7 @@ _RULES = tuple(f"R{number}" for number in range(1, 7))
 # The longest a Vale run may take, in seconds: a film's words take hundredths of one.
 _DEADLINE = 60
 # Han characters and CJK or full-width marks: a line break between two of them joins by nothing.
-_CHINESE = languages.compiled("han", "cjk-punctuation", "full-width")
+_WIDE = languages.compiled("wide")
 # Code points a viewer does not see, beside the format characters (category Cf): Unicode's
 # Variation_Selector and Other_Default_Ignorable_Code_Point, as PropList.txt of Unicode 16.0.0
 # lists them (https://www.unicode.org/Public/16.0.0/ucd/PropList.txt), each range first to last.
@@ -248,8 +248,8 @@ def _paragraph(text: str) -> str:
     seen = _UNSEEN_CODES.sub("", "".join(c for c in text if unicodedata.category(c) != "Cf"))
     joined = ""
     for line in filter(None, (line.strip() for line in seen.splitlines())):
-        chinese = joined and _CHINESE.match(joined[-1]) and _CHINESE.match(line[0])
-        joined += line if not joined or chinese else f" {line}"
+        wide = joined and _WIDE.match(joined[-1]) and _WIDE.match(line[0])
+        joined += line if not joined or wide else f" {line}"
     return joined
 
 

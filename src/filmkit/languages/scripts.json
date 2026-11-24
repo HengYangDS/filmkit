@@ -84,6 +84,10 @@
       "purpose": "half-width and full-width forms",
       "ranges": ["FF00-FFEF"]
     },
+    "wide": {
+      "purpose": "Han characters and CJK or full-width marks, which a canvas sets a full size wide and between two of which a line break joins by nothing",
+      "of": ["han", "cjk-punctuation", "full-width"]
+    },
     "line-closing": {
       "purpose": "marks that close what precedes them, which a line may not open on",
       "characters": "、，。；：！？）」』”》】’…"

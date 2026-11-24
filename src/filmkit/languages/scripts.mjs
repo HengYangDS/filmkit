@@ -18,6 +18,7 @@ const member = (range) => {
 export function characterClass(name) {
   const entry = CLASSES[name];
   if (!entry) throw new Error(`scripts.json holds no class ${name}`);
+  if (entry.of) return entry.of.map(characterClass).join("");
   if (entry.ranges) return entry.ranges.map(member).join("");
   return [...entry.characters].map((ch) => escaped(ch.codePointAt(0))).join("");
 }

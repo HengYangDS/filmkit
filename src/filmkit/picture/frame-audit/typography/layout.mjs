@@ -16,10 +16,7 @@ const SETTLED = 0.85;
 /* The frame audit's content band (composition.mjs): below the head band, above the caption band. */
 const BAND = [HEAD, 950];
 /* The characters the headless canvas sets a full size wide, and the ink of a line above and below its baseline. */
-export const CJK = new RegExp(
-  `[${characterClass("han")}${characterClass("cjk-punctuation")}${characterClass("full-width")}]`,
-  "u",
-);
+export const CJK = new RegExp(`[${characterClass("wide")}]`, "u");
 const INK = { cjk: [0.74, 0.18], latin: [0.72, 0.2] };
 /* Full-width punctuation sets its mark in one half of its em, so a CJK line that ends in a closing mark, or starts
  * with an opening one, may hang that half past its edge for its ink to line up. */
