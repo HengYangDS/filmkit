@@ -82,6 +82,20 @@ WITHDRAWN = (
         "remove it: the engine takes the SHA-256 of the cast's reference_text",
     ),
     Withdrawn("cast", "provider", "remove it: the engine narrates with its one provider, MLX"),
+    *(
+        Withdrawn("cast", key, f"remove it: every request takes the engine's {pin}")
+        for key, pin in (
+            ("model", "voice model (filmkit.narration.voice_model.MODEL)"),
+            ("revision", "model revision (filmkit.narration.voice_model.REVISION)"),
+            ("reference_mode", "one reference mode, ICL"),
+        )
+    ),
+    Withdrawn(
+        "cast",
+        "scope",
+        "move its text into the cast's derivation, as derivation.scope, which the engine keeps "
+        "unread",
+    ),
     Withdrawn(
         "script",
         "pronunciation_contract",

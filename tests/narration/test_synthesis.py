@@ -16,7 +16,7 @@ import filmkit.narration.group_generation as narration_group_generation
 import filmkit.narration.synthesis as narration_synthesis
 import filmkit.narration.thought_groups as narration_thought_groups
 import filmkit.repository as repository
-from filmkit.narration.voice_model import NATIVE_DECODER
+from filmkit.narration.voice_model import MODEL, NATIVE_DECODER, REVISION
 from filmkit.production import CODES, Edition
 
 RATE = 24000
@@ -258,7 +258,7 @@ def test_declared_penalty_and_thought_retakes_bind_through_reuse(tmp_path, voice
         ({"icl_repetition_penalty": 0.9}, ValueError, "ICL repetition penalty"),
         ({"icl_repetition_penalty": 1}, ValueError, "ICL repetition penalty"),
         ({"reference_sha256": "0" * 64}, RuntimeError, "Reference identity changed"),
-        ({"reference_mode": "x_vector"}, ValueError, "ICL mode"),
+        ({"reference_text": ""}, ValueError, "on its reference transcript"),
     ],
 )
 def test_a_cast_is_refused_before_any_effect(tmp_path, voice, cast_changes, error, message):
@@ -484,6 +484,11 @@ def planned(code: str) -> list[dict]:
 @pytest.mark.parametrize("code", CODES)
 def test_every_request_of_the_sample_keeps_its_speech_settings_and_fingerprint(code):
     assert planned(code) == SAMPLE_REQUESTS["editions"][code]
+    # Its model and revision are the engine's pins, which no cast restates, and its mode the
+    # engine's ICL, as every receipt records it.
+    assert {(r["speech"]["model"], r["speech"]["revision"]) for r in planned(code)} == {
+        (MODEL, REVISION)
+    }
     digest = repository.sha(Edition(code).places.pronunciation)
     speech = [request["speech"] for request in planned(code)]
     assert {settings["pronunciation_contract_sha256"] for settings in speech} == {digest}

@@ -232,7 +232,7 @@ def below_root(option: str, named: str, *, file: bool = False) -> Path:
 def _check_cast(cast: dict, reference: str) -> None:
     """Refuse a cast that does not condition the narrator on its exact reference: the recording
     at `reference` and the cast's transcript."""
-    if cast.get("reference_mode", "icl") != "icl" or not cast.get("reference_text"):
+    if not cast.get("reference_text"):
         msg = "A cast conditions the narrator in ICL mode on its reference transcript"
         raise ValueError(msg)
     if repository.sha(reference) != cast["reference_sha256"]:

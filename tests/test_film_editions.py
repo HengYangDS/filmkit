@@ -382,3 +382,25 @@ def test_a_value_every_timeline_derives_is_refused_where_a_script_states_it(decl
         where += f" segment {held['id']}"
     path.write_text(json.dumps(script, ensure_ascii=False))
     assert film.problems(declared) == [f"{where} declares {key}; {withdrawn.keys(kind)[key]}"]
+
+
+@pytest.mark.parametrize("key", ["model", "revision", "reference_mode", "scope"])
+def test_a_cast_that_restates_a_pin_of_the_engine_or_keeps_its_scope_is_refused(declared, key):
+    # The pins are removed; the scope, a record of how the reference recording was made, moves.
+    declare(declared / "content/zh" / film.CAST, **{key: "a value"})
+    (problem,) = film.problems(declared)
+    assert problem.startswith(f"content/zh/voice-reference.json declares {key}; ")
+    if key == "scope":
+        assert problem.endswith(
+            "move its text into the cast's derivation, as derivation.scope, "
+            "which the engine keeps unread"
+        )
+    else:
+        assert problem.split("; ", 1)[1].startswith("remove it: every request takes the engine's")
+
+
+def test_each_sample_cast_keeps_its_scope_in_its_derivation():
+    for code in production.CODES:
+        cast = repository.read(production.Edition(code).cast)
+        assert cast["derivation"]["scope"].startswith("The DDWG narrator's reference recording")
+        assert not {"model", "revision", "reference_mode", "scope"} & set(cast)
