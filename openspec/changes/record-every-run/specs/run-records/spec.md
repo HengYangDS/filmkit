@@ -110,7 +110,7 @@ The engine SHALL derive each edge from the paths and order the nodes with `graph
 
 ### Requirement: A file several runs write is bound by its latest declared writer, in order
 
-The latest standing record of a declared writer SHALL bind a path's current bytes. An earlier writer's binding, and the binding of a reader that a rewriter follows, SHALL hold only through a later run of a writer declared after it, which for a rewrite read the bytes so bound, or of a peer that replaces the file. A run of a writer SHALL make every writer declared after it stale until it runs again, whatever the bytes.
+The latest standing record of a declared writer SHALL bind a path's current bytes. An earlier writer's binding, and the binding of a reader that a rewriter follows, SHALL hold only through a later run of a writer declared after it, which for a rewrite read the bytes so bound, or of a peer that replaces the file, where that later run's binding holds in turn. A run of a writer SHALL make every writer declared after it stale until it runs again, whatever the bytes.
 
 #### Scenario: Both editions write the entry page
 
@@ -122,10 +122,24 @@ The latest standing record of a declared writer SHALL bind a path's current byte
 - **WHEN** `assemble` runs again after `refresh-captions` and writes the bytes it wrote before
 - **THEN** `refresh-captions` is stale as its output was replaced by an earlier writer's run, `check-sound` is behind and not ready, and `filmkit verify` lists both and exits 0
 
+#### Scenario: A rewriter replaced carries no reader's binding
+
+- **WHEN** `select` runs again after `refresh-captions` rewrote the selection that `assemble` read
+- **THEN** `assemble` is stale for the selection, and `refresh-captions` as its output was replaced by an earlier writer's run
+
 #### Scenario: A hand edit fails closed
 
 - **WHEN** the entry page is edited after both packages wrote it
 - **THEN** both `package-metadata` nodes are stale, naming the page as changed by no declared writer, and `filmkit verify` refuses
+
+### Requirement: Bytes a rewriter carried forward from no declared writer fail closed
+
+Bytes that a rewriter read after a run of a writer it follows, which no declared writer's run between the two wrote, SHALL be bytes that no declared writer accounts for, though the file equals the rewriter's record.
+
+#### Scenario: A hand edit that a rewriter carried forward fails closed
+
+- **WHEN** the timeline is edited by hand after `assemble` and before `refresh-captions` rewrites it
+- **THEN** `assemble` and `refresh-captions` are stale, naming the timeline as changed by no declared writer, and `filmkit verify` refuses
 
 ### Requirement: Freshness compares size and time first and hashes only on change
 

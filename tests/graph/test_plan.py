@@ -4,7 +4,7 @@ from its run records as decisions 5 and 6 of record-every-run say, and nothing w
 import os
 
 import pytest
-from stand_ins import CODES, chain, ran
+from stand_ins import CODES, chain, ran, selecting
 
 import filmkit.repository as repository
 from filmkit.graph import nodes, plan
@@ -99,6 +99,44 @@ def test_assemble_run_again_after_refresh_captions_leaves_it_stale_and_check_sou
         "its output timeline replaced by an earlier writer's run (assemble:zh)"
     ]
     assert (found["check-sound:zh"].state, found["check-sound:zh"].ready) == ("behind", False)
+
+
+def test_a_hand_edit_that_a_rewriter_carried_forward_is_changed_by_no_declared_writer(
+    stand_in_table,
+):
+    ran("assemble")
+    (repository.ROOT / "zh/timeline.json").write_text("HAND-EDITED timeline")
+    ran("refresh-captions")
+    ran("check-sound")
+    _, found = judged(stand_in_table, "check-sound:zh")
+    for key in ("assemble:zh", "refresh-captions:zh"):
+        assert [(r.kind, r.text) for r in found[key].reasons] == [
+            (
+                "unaccounted",
+                "zh/timeline.json changed by no declared writer before the run of "
+                "refresh-captions:zh",
+            )
+        ], key
+    assert found["check-sound:zh"].state == "behind"
+
+
+def test_a_reader_binding_holds_only_through_a_rewriter_whose_own_binding_holds(
+    stand_in_table, monkeypatch
+):
+    table = selecting(monkeypatch)
+    for name in ("select", "assemble", "refresh-captions"):
+        ran(name)
+    _, found = judged(table, "refresh-captions:zh")
+    assert {entry.state for entry in found.values()} == {"fresh"}
+    # The selection is made again from another script: the reader's binding of the old selection
+    # holds no longer, though the rewriter read the bytes the reader read.
+    (repository.ROOT / "zh/script.txt").write_text("the zh script, selected again")
+    ran("select")
+    _, found = judged(table, "refresh-captions:zh")
+    assert texts(found["assemble:zh"]) == ["input selected changed: zh/selected.txt"]
+    assert texts(found["refresh-captions:zh"]) == [
+        "its output selected replaced by an earlier writer's run (select:zh)"
+    ]
 
 
 def test_a_node_is_ready_only_when_every_node_upstream_passed_and_its_inputs_exist(stand_in_table):

@@ -80,6 +80,19 @@ def test_an_earlier_writer_run_again_and_an_edited_script_are_listed(stand_in_ta
     assert "assemble:zh: stale: input script changed: zh/script.txt" in lines
 
 
+def test_a_hand_edit_that_a_rewriter_carried_forward_is_refused(stand_in_table, capsys):
+    ran("assemble")
+    (repository.ROOT / "zh/timeline.json").write_text("HAND-EDITED timeline")
+    ran("refresh-captions")
+    ran("check-sound")
+    status, lines = verified(stand_in_table, capsys)
+    assert status == 1
+    assert (
+        "refused: zh/timeline.json: its bytes are accounted for by no record of a declared "
+        "writer; it is bound by assemble:zh, refresh-captions:zh"
+    ) in lines
+
+
 def test_a_hand_edit_of_the_entry_page_is_refused(stand_in_table, capsys):
     chain(*CODES)
     ran("package-metadata", "zh")

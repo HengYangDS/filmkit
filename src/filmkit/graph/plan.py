@@ -12,11 +12,13 @@ A path that several runs write is judged by decision 5: among the standing recor
 as an output, a partial record among them, the one whose run ended last binds the file, which is
 compared with that record alone. An earlier binding of the path holds through a later run of a
 rewriter that follows its node and read the path as it stated it, or of a `replaces` writer, with
-no order between the two; the input of a reader that a rewriter follows is such a binding. A
-writer's output that no later run carries is stale, replaced by an earlier writer's run. Bytes
-that the binding record does not state are bytes that no declared writer accounts for, and every
-node whose record binds the path through the writers is stale for them. A node whose partial
-record ended after its record is stale, changed by a partial run (decision 8).
+no order between the two, where that later binding holds itself: a chain of such runs reaches the
+latest record. The input of a reader that a rewriter follows is such a binding. A writer's output
+that no holding run carries is stale, replaced by an earlier writer's run. Bytes that the binding
+record does not state, and bytes that a rewriter read after an earlier writer's run that no
+declared writer's run between them wrote, are bytes that no declared writer accounts for, and
+every node whose record binds the path through the writers is stale for them. A node whose
+partial record ended after its record is stale, changed by a partial run (decision 8).
 
 Each reason has a kind. `unaccounted` (bytes no record of a declared writer accounts for) and
 `blind` (a file whose size and time held while its digest changed, which only `full` sees) are
@@ -218,6 +220,35 @@ def carried(earlier: Binding, by: Binding) -> bool:
     return by.kind == earlier.kind == nodes.REPLACES and earlier.side == "output"
 
 
+def holding(latest: Binding, binders: list[Binding], writers: list[Binding]) -> list[Binding]:
+    """The bindings of a path that hold: the latest writer's, and each that a holding binding
+    carries, so that a run whose own binding a later writer replaced carries nothing."""
+    held = [latest]
+    grew = True
+    while grew:
+        grew = False
+        for b in binders:
+            if all(b is not h for h in held) and any(carried(b, by) for by in held):
+                held.append(b)
+                grew = True
+    return held
+
+
+def unwritten(earlier: Binding, writers: list[Binding]) -> Binding | None:
+    """The later run of a rewriter that follows an earlier writer and read other bytes than it
+    wrote, where no declared writer's run between the two wrote the bytes the rewriter read: the
+    bytes it read were written by no declared writer. None where there is no such run."""
+    for by in writers:
+        if by.end <= earlier.end or by.kind != nodes.REWRITES or earlier.node not in by.after:
+            continue
+        if by.read is None or by.read[1].sha256 == earlier.state.sha256:
+            continue
+        read = by.read[1].sha256
+        if not any(earlier.end < c.end < by.end and c.state.sha256 == read for c in writers):
+            return by
+    return None
+
+
 def settle(paths: dict[Path, list[Binding]], full: bool) -> Settled:
     """Judge each path that several standing records bind by decision 5."""
     out = Settled()
@@ -232,17 +263,30 @@ def settle(paths: dict[Path, list[Binding]], full: bool) -> Settled:
             out.settled[b.key].add((b.side, b.name))
             if b.read is not None:
                 out.settled[b.key].add(("input", b.read[0]))
+        unaccounted = []
         if compared.result == "missing":
             out.reasons[latest.key].append(
                 Reason("missing", f"output {latest.name} missing: {relative}", relative)
             )
-        elif compared.result in ("changed", "blind"):
-            kind = "blind" if compared.result == "blind" else "unaccounted"
-            says = records.SAYS["blind"] if kind == "blind" else "changed by no declared writer"
+        elif compared.result == "blind":
+            says = f"{relative} {records.SAYS['blind']}"
             for key in {b.key for b in binders}:
-                out.reasons[key].append(Reason(kind, f"{relative} {says}", relative))
+                out.reasons[key].append(Reason("blind", says, relative))
+        elif compared.result == "changed":
+            unaccounted.append(f"{relative} changed by no declared writer")
+        before = {by.key for b in writers if (by := unwritten(b, writers)) is not None}
+        unaccounted += [
+            f"{relative} changed by no declared writer before the run of {key}"
+            for key in sorted(before)
+        ]
+        for text in unaccounted:
+            for key in {b.key for b in binders}:
+                out.reasons[key].append(Reason("unaccounted", text, relative))
+        if before:
+            continue
+        held = holding(latest, binders, writers)
         for b in binders:
-            if b is latest or any(carried(b, by) for by in writers):
+            if any(b is h for h in held):
                 continue
             if b.side == "input":
                 out.settled[b.key].discard((b.side, b.name))
