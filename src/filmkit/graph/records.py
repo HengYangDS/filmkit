@@ -34,6 +34,8 @@ FOLDER = Path("build/evidence/records/editions")
 Outcome = Literal["pass", "refuse", "error"]
 # A node's host class as host rule 3 measures it, and the plan's word for one never measured.
 HostClass = Literal["light", "heavy", "gpu"]
+# The fields a run record takes from its duration record, which the same `Run` measured.
+FROM_DURATION = ("started_at", "seconds", "load_1m", "phases", "settings")
 
 
 class Unreadable(ValueError):

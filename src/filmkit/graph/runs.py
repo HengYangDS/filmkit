@@ -1,0 +1,147 @@
+"""A node's run at the seam: opened by `filmkit.durations.run` when a command that names a node
+starts, closed when it ends (design decision 2 of record-every-run).
+
+The opening states the inputs of the run's way, each hashed only where its size or time differs
+from the node's last record, records the way among the run's settings where the node has
+several, starts the host measures (`filmkit.graph.host`) and names the node and edition in
+`FILMKIT_NODE`, which every child inherits (`filmkit.graph.opens`). The close states the outputs,
+takes the start, seconds, load, phases and settings from the duration record the same `Run` just
+gave, and writes the node's run record, or for a run that is not the node's whole run a partial
+record (design decision 8). The outcome is `pass` for a run that completed, `refuse` for one that
+left with a line (a `SystemExit`) or was told that it failed, and `error` for any other exception,
+each with the line it ended with.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import os
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+import filmkit.repository as repository
+from filmkit.graph import host, nodes, opens, records
+from filmkit.production import Edition
+
+if TYPE_CHECKING:
+    from filmkit.durations import Run
+
+
+def table() -> dict[str, nodes.Node]:
+    """The chain's nodes by name."""
+    return {node.name: node for node in nodes.TABLE}
+
+
+def pins(node: nodes.Node) -> dict[str, str]:
+    """The model snapshots a node declares, each repository with its revision: model work's."""
+    if not node.gpu:
+        return {}
+    from filmkit.narration import snapshots
+
+    found = (snapshots.VOICE, snapshots.RECOGNIZER, snapshots.ALIGNER)
+    return {snapshot.repo: snapshot.revision for snapshot in found}
+
+
+def previous(node: str, code: str) -> records.RunRecord | None:
+    """The node's last whole record, where one stands and can be read."""
+    with contextlib.suppress(FileNotFoundError, records.Unreadable):
+        found = records.read(records.place(node, code))
+        return found if isinstance(found, records.RunRecord) else None
+    return None
+
+
+def stated(places: nodes.Places, known: dict[str, records.State]) -> dict[str, records.State]:
+    """Each place that stands, by name, digests taken from `known` where they still hold."""
+    found = {}
+    for name, path in places.items():
+        where = Path(path.path if isinstance(path, records.Folder) else path)
+        if where.exists():
+            found[name] = records.stated(path, known.get(name))
+    return found
+
+
+def outcome(completed: bool, ended: BaseException | None) -> tuple[records.Outcome, str | None]:
+    """How a run ended, and the line it ended with."""
+    if completed:
+        return "pass", None
+    if isinstance(ended, SystemExit):
+        code = ended.code
+        return "refuse", code if isinstance(code, str) else f"exit status {code}"
+    if ended is None:
+        return "refuse", None
+    return "error", f"{type(ended).__name__}: {ended}".rstrip(": ")
+
+
+class NodeRun:
+    """One open run of a node of an edition."""
+
+    def __init__(self, node: nodes.Node, code: str, run: Run, *, whole: bool, way: str | None):
+        self.node, self.code, self.whole = node, code, whole
+        edition = Edition(code)
+        self.before = previous(node.name, code)
+        if len(node.ways) > 1:
+            run.settings["way"] = node.way(edition, way)
+        known = self.before.inputs if self.before else {}
+        chosen = run.settings.get("way")
+        self.inputs = stated(node.inputs(edition, chosen), known) if whole else {}
+        self.label, self.outer = nodes.key(node.name, code), os.environ.get(opens.NODE)
+        os.environ[opens.NODE] = self.label
+        self.meter = host.start()
+
+    def close(self, duration: dict, ended: BaseException | None) -> None:
+        """Write the node's record from the duration record of the same run."""
+        if self.outer is None:
+            os.environ.pop(opens.NODE, None)
+        else:
+            os.environ[opens.NODE] = self.outer
+        measures = self.meter.stop()
+        result, line = outcome(duration["completed"], ended)
+        previous_class = self.before.host_class if self.before else None
+        known = self.before.outputs if self.before else {}
+        common = {
+            "node": self.node.name,
+            "edition": self.code,
+            "engine": records.engine(pins(self.node)),
+            "outputs": stated(self.node.outputs(Edition(self.code)), known),
+            "outcome": result,
+            "refusal": line,
+            "measured": measures,
+            "class": host.host_class(measures, gpu=self.node.gpu, previous=previous_class),
+            **{key: duration[key] for key in records.FROM_DURATION},
+        }
+        if self.whole:
+            records.write(records.RunRecord(**common, inputs=self.inputs))
+        else:
+            records.write(records.PartialRecord(**common))
+
+
+def open_node(
+    code: str | None, command: str, run: Run, *, whole: bool = True, way: str | None = None
+) -> NodeRun | None:
+    """The run of the node a command names, opened; None for a command that names none."""
+    node = table().get(command)
+    if code is None or node is None:
+        return None
+    return NodeRun(node, code, run, whole=whole, way=way)
+
+
+def own_places(code: str, command: str, arguments: list[str]) -> bool:
+    """Whether every argument that names a place below the film's root lies in a place the node
+    declares, so that the run is the node's whole run; a command that names no node is."""
+    node = table().get(command)
+    if node is None:
+        return True
+    edition = Edition(code)
+    places = [*node.outputs(edition).values()]
+    places += [p for way in node.ways.values() for p in way(edition).values()]
+    declared = [nodes.place(p) for p in places]
+    root = repository.ROOT.resolve()
+    for argument in arguments:
+        named = Path(os.path.normpath(repository.ROOT / argument)).resolve()
+        if argument.startswith("-") or not ("/" in argument or named.exists()):
+            continue
+        if named == root or not named.is_relative_to(root):
+            continue
+        if not any(nodes.overlaps(named, place) for place in declared):
+            return False
+    return True

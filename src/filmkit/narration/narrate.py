@@ -183,7 +183,9 @@ def narrate(code: str, ids: str, scope: Scope) -> None:
         count = processes.count()
     except processes.ProcessesError as error:
         raise SystemExit(str(error)) from None
-    with durations.run(code, record_name(scope, ids)) as run:
+    # A narration of chosen segments or of its checks alone is a run of part of the node.
+    whole = scope is Scope.ALL and not ids
+    with durations.run(code, record_name(scope, ids), whole=whole, node="narrate") as run:
         if scope is Scope.ALL:
             run.settings["narration_processes"] = count
         run_steps(code, ids, scope)

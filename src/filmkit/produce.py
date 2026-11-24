@@ -208,17 +208,32 @@ def main(argv: list[str] | None = None) -> None:
         if getattr(options, option) is not None and options.action != action:
             parser.error(f"--{option} applies only to {action}")
     command = options.action + ("-uncaptioned" if options.uncaptioned else "")
-    try:
-        # A request to end while the action runs a renderer, or an interrupt anywhere, unwinds
-        # the action, which ends that renderer, and the command then leaves with one line.
-        with (
-            child_processes.ending(f"{options.action}: stopped by {{request}}"),
-            durations.run(options.language, command),
-        ):
+    # A request to end while the action runs a renderer, or an interrupt anywhere, unwinds
+    # the action, which ends that renderer, and the command then leaves with one line. A
+    # refusal leaves with its line inside the run, so that the node's record states it.
+    with (
+        child_processes.ending(f"{options.action}: stopped by {{request}}"),
+        durations.run(
+            options.language,
+            command,
+            whole=whole(options),
+            way="native" if options.native else None,
+        ),
+    ):
+        try:
             EDITION_ACTIONS[options.action](Edition(options.language), options)
-    except REFUSALS as error:
-        msg = f"{options.action}: {error}"
-        raise SystemExit(msg) from None
+        except REFUSALS as error:
+            msg = f"{options.action}: {error}"
+            raise SystemExit(msg) from None
+
+
+def whole(options: argparse.Namespace) -> bool:
+    """Whether a run is its node's whole run: a stage of another place, length, start or size
+    than the node's is not (design decision 8 of record-every-run)."""
+    if options.action != "stage-picture":
+        return True
+    own = (options.output, options.duration, options.start) == (None, None, 0)
+    return own and (options.width, options.height) == PICTURE_SIZE
 
 
 if __name__ == "__main__":

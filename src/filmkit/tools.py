@@ -93,15 +93,6 @@ class ToolError(RuntimeError):
     """The film's tools cannot run."""
 
 
-class ToolFailed(Exception):
-    """A tool exited with another status than 0, which its run's duration record states as not
-    completed and the command passes on."""
-
-    def __init__(self, status: int) -> None:
-        super().__init__(status)
-        self.status = status
-
-
 def stage_tools() -> Path:
     """Copy the engine's Node modules and the data they read into the film's tool cache and
     return the copies' folder.
@@ -205,17 +196,23 @@ def main(argv: list[str] | None = None) -> None:
     build_run = recorded(options.tool, options.arguments)
     # A run by hand names no edition, and is measured under none and recorded nowhere.
     code, name = build_run or (None, options.tool)
-    try:
-        # A check of an edition's build is recorded as a command of that build.
-        with durations.run(code, name, record=build_run is not None):
+    whole = True
+    if build_run is not None:
+        from filmkit.graph import runs
+
+        # Arguments that name other places than the node's make a run of part of it.
+        whole = runs.own_places(code, name, options.arguments)
+    # A check of an edition's build is recorded as a command of that build; it leaves with its
+    # status or its line inside the run, so that the node's record states how it ended.
+    part = {} if whole else {"whole": False}
+    with durations.run(code, name, record=build_run is not None, **part):
+        try:
             status = run(options.tool, options.arguments)
-            if status != 0:
-                raise ToolFailed(status)
-    except ToolFailed as failed:
-        raise SystemExit(failed.status) from None
-    except (PictureError, ToolError) as error:
-        msg = f"{options.tool}: {error}"
-        raise SystemExit(msg) from None
+        except (PictureError, ToolError) as error:
+            msg = f"{options.tool}: {error}"
+            raise SystemExit(msg) from None
+        if status != 0:
+            raise SystemExit(status)
     raise SystemExit(status)
 
 

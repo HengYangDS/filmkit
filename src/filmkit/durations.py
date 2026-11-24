@@ -151,24 +151,50 @@ def current() -> Run | None:
 
 
 @contextlib.contextmanager
-def run(code: str | None, command: str, *, record: bool = True) -> Iterator[Run]:
+def run(
+    code: str | None,
+    command: str,
+    *,
+    record: bool = True,
+    whole: bool = True,
+    node: str | None = None,
+    way: str | None = None,
+) -> Iterator[Run]:
     """Measure the block as one command's run on an edition and write its record at the end.
 
     The record says that the command completed only when the block ends without raising and
     without the run being told that it failed (`Run.fail`); the exception of one that raises
     propagates after the record is written. With `record` False
     the run is measured and nothing is written, for a command asked to write nothing.
+
+    A command of an edition that names a node of the build chain, `node` or else the command
+    itself, also opens that node's run and writes its run record from the same measurement
+    (`filmkit.graph.runs`), or a partial record where `whole` says the run is not the node's
+    whole run; `way` names the way of a node of several that the caller was asked to take. The
+    graph is imported here, when a run opens: the owners whose lists the node table reads
+    import this module.
     """
     opened = Run(code, command)
+    node_run = None
+    if record:
+        from filmkit.graph import runs
+
+        node_run = runs.open_node(code, node or command, opened, whole=whole, way=way)
     token = _RUN.set(opened)
-    completed = False
+    completed, ended = False, None
     try:
         yield opened
         completed = not opened.failed
+    except BaseException as error:
+        ended = error
+        raise
     finally:
         _RUN.reset(token)
         if record:
-            repository.write(opened.path, opened.record(completed=completed))
+            stated = opened.record(completed=completed)
+            repository.write(opened.path, stated)
+            if node_run is not None:
+                node_run.close(stated, ended)
 
 
 @contextlib.contextmanager
