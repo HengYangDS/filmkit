@@ -48,7 +48,12 @@ WITHDRAWN = (
         "author",
         f"remove it and state the films' author once, as author in {DECLARATION}",
     ),
-    Withdrawn("script", "fps", "remove it: the engine renders and encodes every film at 60 fps"),
+    Withdrawn(
+        "script",
+        "fps",
+        "remove it: the engine renders and encodes every film at its one frame rate "
+        "(filmkit.film.FPS)",
+    ),
     *(
         Withdrawn(
             "segment",
@@ -81,8 +86,8 @@ WITHDRAWN = (
     Withdrawn(
         "cast",
         "performance_recording",
-        "remove it: the edition's narration receipt and alignment stand in "
-        f"{EVIDENCE.as_posix()}/<code>/ear-first/, where the narration writes them",
+        "remove it: the edition's narration receipt and alignment stand where the narration "
+        f"writes them, below {EVIDENCE.as_posix()}/<code>/ (filmkit.production.Edition.ear_first)",
     ),
     Withdrawn(
         "cast",

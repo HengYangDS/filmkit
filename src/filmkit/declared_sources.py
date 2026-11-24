@@ -19,6 +19,7 @@ from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 import filmkit.withdrawn as withdrawn
+from filmkit.places import IDENTITY
 from filmkit.repository import ARTIFACTS, EVIDENCE
 
 if TYPE_CHECKING:
@@ -180,17 +181,15 @@ def withdrawn_problems(root: Path, declared: dict, withdraw: bool = False) -> li
     return found
 
 
-# The recording every edition's reference derives from, at the place the layout gives it.
-IDENTITY = "assets/audio/narrator-identity.wav"
 # A recording a cast's derivation cites, by its path below the film's root.
 RECORDING = re.compile(r"assets/audio/[\w./-]+?\.wav")
 # The files this release removes, each with what to do instead; and the narration's former copy,
 # which stood in an edition's folder.
 REMOVED = {
-    "content/voice-performance.json": "split it by edition into content/<code>/pronunciation.json"
-    " and the declaration's [pronunciation], then remove it",
+    "content/voice-performance.json": "split it by edition into "
+    f"{withdrawn.PLACE.pronunciation} and the declaration's [pronunciation], then remove it",
     "content/review/readings.json": "move each edition's analyst readings into "
-    "content/<code>/readings.json, then remove it",
+    f"{withdrawn.PLACE.readings}, then remove it",
 }
 NARRATION_COPY = "narration.md"
 

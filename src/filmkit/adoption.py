@@ -455,7 +455,8 @@ def vale(root: Path) -> list[str]:
 def former_paths(root: Path, declared: dict) -> tuple[dict[str, str], set[str]]:
     """Each former path of a file this release moves or removes, with what to write instead, and
     the sources the loader reads, whose findings are the `declaration` question's."""
-    from filmkit.declared_sources import IDENTITY, NARRATION_COPY, REMOVED, cited_recordings
+    from filmkit.declared_sources import NARRATION_COPY, REMOVED, cited_recordings
+    from filmkit.places import IDENTITY
 
     instead = {old: f"this release removes it; {text}" for old, text in REMOVED.items()}
     owned = {film.DECLARATION}

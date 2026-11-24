@@ -9,6 +9,8 @@ from typing import NamedTuple
 
 # The files every edition's folder holds: its script and its cast.
 SCRIPT, CAST = "film-script.json", "voice-reference.json"
+# The recording every edition's reference derives from, one for the film.
+IDENTITY = "assets/audio/narrator-identity.wav"
 
 
 class Places(NamedTuple):
