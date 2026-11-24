@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-11-24
+
 The engine treats languages as equals (OpenSpec Change `treat-languages-as-equals`, the derivation's R1). The three films pin `0.22.3` in their `uv.lock`; a film that adopts this release from there also takes what 0.23 to 0.30 ask, listed under each release below: 0.23.0 renames `documents_folder` to `delivery_folder` and the delivery module; 0.23.1 narrates with mlx-audio 0.6.6, so every take is narrated anew, with another waveform from the same seed; 0.24.0 draws on the native canvas, so the film installs the canvas package at the engine's version; 0.25.0 replaces `review.round prompts` and `bind` by `prepare` and drops `sync_audit --bind`; 0.26.0 asks `scan-film` after each `package-film`; 0.27.0 runs the register check before narration, with Vale pinned in the film's Mise configuration; 0.28.0 asks a term for each respelled Latin name; 0.29.0 lets the runtime follow the narration, with `credits_duration` once in the declaration and no `duration` in a script; 0.30.0 draws every edition's picture before narration.
 
 A film adopts in this order: it commits its trial edits; moves its files to their places in one `git mv` commit (below); runs `python -m filmkit.adoption` before it removes any withdrawn key, since the keys name the former paths that the question `editions` looks for; removes the withdrawn keys and edits what each finding names; loads its declaration until the engine refuses nothing and runs `filmkit.adoption` until it reports no finding; keeps one task line for each edition until it adopts R2b; runs `select`, not `narrate`, for the takes it keeps; and rebuilds and compares under its own reproduction standard. A film that only moves its files is expected to keep its delivered films' bytes. Records that change: every take's request fingerprint and recording file name, since a request binds its own edition's pronunciation; each new narration receipt's pronunciation file and digest; each timeline, which states `edition`, `author` and `fps` and no `language` or pronunciation contract, and so every stage digest and every receipt bound to a stage; each package record and viewing package, which bind the script and the cover; each readiness receipt, which binds the declaration; each listening plan; `content/release.json`'s source paths; and the entry page's bytes, by its root `lang`. The films' tests change: the narration-mirror test of `ethos-film` and `ddwg-essentials-film` (`tests/test_film.py:35-39`) is deleted, since `Edition.mirror` goes; the player-page test of all three, which reads `Edition.sources`, runs unchanged.
@@ -678,7 +680,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.30.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.31.0...HEAD
+[0.31.0]: https://github.com/HengYangDS/filmkit/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/HengYangDS/filmkit/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/HengYangDS/filmkit/compare/v0.28.0...v0.29.0
 [0.28.0]: https://github.com/HengYangDS/filmkit/compare/v0.27.0...v0.28.0
