@@ -721,6 +721,17 @@ def named_files(film: Film, *, editions: bool = True) -> list[tuple[str, str]]:
     return named
 
 
+def start_up_files(film: Film) -> list[str]:
+    """Every file below a film's root that an engine process may read as it starts, before a
+    command's run opens: the declaration, each file it names or its editions derive, each
+    edition's readings, which the loader reads where they stand (`declared_sources`), and the
+    scripts whose chapters `filmkit.specification` counts. The recorder of each run's opens
+    exempts a start-up read of these files alone (`filmkit.graph.opens`)."""
+    named = [path for _, path in named_files(film)]
+    readings = [places(code, film.slug).readings for code in film.editions]
+    return [DECLARATION, *named, *readings]
+
+
 def copied_players(root: Path, film: Film) -> str | None:
     """Why a film's sources may not hold player pages of their own, naming each one and the
     declarations that replace it, or None when they hold none."""

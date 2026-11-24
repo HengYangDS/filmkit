@@ -23,8 +23,9 @@ outside the root are judged by nothing.
 a node's run took, a probe of a path that the node would not declare were it to stand, and a
 write outside its outputs, names each node whose tools are seen only through their arguments,
 and reports each exemption with its reason and the nodes it covered. It fails closed: nothing
-below the root is let through without a declaration or a named exemption, and a read at start-up
-by another path than the two the recorder knows is judged as a read.
+below the root is let through without a declaration or a named exemption: a read at start-up is
+let through only for a file the engine reads as it starts (`filmkit.film.start_up_files`), and
+by another path than the two the recorder knows it is judged as a read.
 """
 
 from __future__ import annotations
@@ -350,6 +351,14 @@ def real(places: Iterable[object]) -> list[tuple[Path, str | None]]:
     ]
 
 
+def starting() -> set[Path]:
+    """The real paths of the files the engine reads as it starts (`film.start_up_files`)."""
+    import filmkit.repository as repository
+    from filmkit.film import FILM, start_up_files
+
+    return {Path(os.path.realpath(repository.ROOT / path)) for path in start_up_files(FILM)}
+
+
 def exemption(path: Path, kind: str, judged: _Judged, log: Path) -> str:
     """The exemption that a real path no declaration names falls under, `outside` for one
     outside the root, or nothing."""
@@ -416,7 +425,8 @@ def check(log: Path, table=None) -> Report:
             reason = f"aside: {chain.ASIDE[judging.node.name][0]}"
             report.exempted.setdefault(reason, set()).add(access.node)
             continue
-        reason = "start-up" if kind == "load" else exemption(path, kind, judging, log)
+        started = kind == "load" and path in starting()
+        reason = "start-up" if started else exemption(path, kind, judging, log)
         if reason == "outside":
             continue
         if reason:

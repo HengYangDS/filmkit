@@ -309,3 +309,23 @@ def test_a_tree_removed_is_one_removal_and_a_rename_s_source_is_judged(film):
     python_child(root, log, code)
     (finding,) = opens.check(log, table).findings
     assert "removed in.txt, which its outputs do not name" in finding
+
+
+@pytest.mark.ffmpeg
+def test_a_read_in_a_module_body_passes_only_for_a_file_the_engine_reads_at_start_up(
+    built, tmp_path, monkeypatch
+):
+    root, _ = built
+    monkeypatch.setattr(repository, "ROOT", root)
+    log = tmp_path / "opens.jsonl"
+    # Two reads from the body of an engine module, as a module imported during a run makes them:
+    # the review prompt, which the engine reads as it starts, and the composition, which it does
+    # not, and which check-sound does not declare.
+    code = "from filmkit.film import FILM\nbody = '''\n"
+    code += "(repository.ROOT / 'content/review/prompt.md').read_bytes()\n"
+    code += "(repository.ROOT / 'picture/film.js').read_bytes()\n'''\n"
+    module = "{'__name__': 'filmkit.probe', 'repository': repository}"
+    code += f"exec(compile(body, 'probe', 'exec'), {module})\n"
+    python_child(root, log, code, node="check-sound:zh")
+    (finding,) = opens.check(log).findings
+    assert "read picture/film.js, which its declaration does not name" in finding
