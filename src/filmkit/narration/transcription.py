@@ -31,14 +31,13 @@ import filmkit.repository as repository
 from filmkit.narration.receipts import bound_records
 from filmkit.narration.recognition import recognition_units, unit_distance
 from filmkit.narration.snapshots import RECOGNIZER
+from filmkit.narration.transcript_records import transcript_record
 
 # The libraries that run the recognizer, as a cached transcript records them, since another
 # version of either may hear a recording otherwise: the speech library, and the array library
 # that does its arithmetic, which the lock pins apart from it.
 LIBRARIES = {name: version(name) for name in ("mlx-audio", "mlx")}
 SCOPE = "Automatic transcription proxy; not pronunciation certification or listening."
-# The cached transcripts, below the film's root, in a folder for each language.
-CACHE = "build/evidence/transcript-records"
 
 
 def recognizer() -> dict:
@@ -56,13 +55,6 @@ def recognizer() -> dict:
         "weights_sha256": RECOGNIZER.weights["model.safetensors"],
         "libraries": dict(LIBRARIES),
     }
-
-
-def transcript_record(language: str, record_id: str, wav_sha256: str, identity: dict) -> Path:
-    """Where one recording's transcript by a recognizer of this identity is cached."""
-    key = repository.content_sha(json.dumps(identity, sort_keys=True))
-    name = f"{record_id}-{wav_sha256[:12]}-{key[:12]}.json"
-    return repository.ROOT / CACHE / language.lower() / name
 
 
 def cached_transcript(record: dict, language: str, identity: dict) -> str | None:

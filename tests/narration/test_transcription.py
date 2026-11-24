@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import filmkit.narration.transcript_records as transcript_records
 import filmkit.narration.transcription as narration_transcription
 import filmkit.repository as repository
 from filmkit.narration.snapshots import RECOGNIZER, Snapshot, SnapshotError
@@ -117,7 +118,7 @@ def test_the_recognizer_loads_from_its_checked_supplied_snapshot(tmp_path, monke
 
 
 def cache_files() -> list:
-    return sorted((repository.ROOT / narration_transcription.CACHE / "chinese").glob("*.json"))
+    return sorted((repository.ROOT / transcript_records.CACHE / "chinese").glob("*.json"))
 
 
 def test_a_cached_transcript_is_reused_without_loading_the_recognizer(receipt, monkeypatch):
