@@ -52,6 +52,7 @@ FITS, REFUSED, FAILED = soundtrack_fit.FITS, "refused", "failed"
 # What the record's fit states of a counted edition, as the dry run reports them.
 COUNTED = ("runtime_seconds", "free_seconds", "credits_free_seconds")
 UNSETTLED = "not asked: thoughts are unsettled"
+FOR_THE_EAR = "not asked: a thought waits for the owner's ear"
 NO_RECORDING = "not asked: the edition has no narration receipt with its alignment"
 NO_POLICY = "not asked: the script declares no pause policy (voice_performance)"
 # What reading the edition's files or decoding its recordings may fail with, beside the

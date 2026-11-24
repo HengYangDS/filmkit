@@ -372,3 +372,80 @@ def test_a_narration_ended_inside_a_thought_is_named_by_its_file_and_not_replaye
     final = record_of()
     assert (final["state"], final["unsettled"]) == ("ended", {})
     assert thought_of(2)["seed"] == bound
+
+
+def clarity_by_take(monkeypatch, values: dict) -> None:
+    """Declare an 18.0 dB floor and thought line, and read each take's clarity by its seed or
+    its thought's place, `values` mapping either to dB, 18.4 for any other."""
+    import filmkit.film as film
+    import filmkit.narration.judgment as narration_judgment
+
+    review = film.FILM.review.model_copy(
+        update={"clarity_minimum_db": {"zh": 18.0, "en": 18.0}, "clarity_thought_margin_db": 0}
+    )
+    monkeypatch.setattr(
+        narration_judgment, "FILM", narration_judgment.FILM.model_copy(update={"review": review})
+    )
+
+    def take_clarity(path, _floor):
+        fields = path.stem.split("-")
+        key = int(fields[-1]) if fields[0] == "26" else int(fields[0])
+        value = values.get(key, 18.4)
+        return {"cpp_db": value, "below_floor": value < 18.0}
+
+    monkeypatch.setattr(narration_judgment, "take_clarity", take_clarity)
+
+
+def test_a_thought_under_its_line_heard_by_no_one_gets_no_candidate_and_waits(
+    studio, voiced, monkeypatch, capsys
+):
+    studio.begin([voiced(), voiced()])
+    clarity_by_take(monkeypatch, {2: 17.4})
+
+    def generated(*_args, **_kwargs):
+        pytest.fail("A thought for the ear gets no candidate")
+
+    monkeypatch.setattr(narration_group_generation, "load_voice_model", generated)
+    with pytest.raises(SystemExit) as waiting:
+        narration_converge.main(["--language", "en", "--rounds", "2", "--takes", "3"])
+    record = record_of()
+    second = thought_of(2)
+    assert record["unsettled"] == {}
+    assert record["for_the_ear"] == {
+        "26.2": {
+            "path": second["path"],
+            "wav_sha256": second["wav_sha256"],
+            "cpp_db": 17.4,
+            "line_db": 18.0,
+        }
+    }
+    assert str(waiting.value).splitlines() == [
+        "en: 1 thoughts wait for the owner's ear",
+        f"  26.2: {second['path']} ({second['wav_sha256']}) reads 17.4 dB, under its line of "
+        "18.0 dB",
+    ]
+    said = counts(capsys)
+    assert (said["takes_generated"], said["for_the_ear"]) == (0, ["26.2"])
+    assert said["fit"] == "not asked: a thought waits for the owner's ear"
+    assert (duration_of()["completed"], studio.said) == (False, [])
+
+
+def test_a_thought_under_its_line_that_another_line_refuses_gets_candidates(
+    studio, voiced, monkeypatch, capsys
+):
+    studio.begin([voiced(), voiced(natural=False)])
+    # The first take of 26.2 ends abruptly and reads 17.4 dB: its ending refuses it. The three
+    # candidates end naturally; the second reads clearest, the third under the line.
+    seeds = {seed_of(11): 18.2, seed_of(12): 18.9, seed_of(13): 17.6}
+    clarity_by_take(monkeypatch, {2: 17.4, **seeds})
+    studio.sound = lambda _seed, _text: voiced()
+    with pytest.raises(SystemExit):
+        narration_converge.main(["--language", "en", "--rounds", "1", "--takes", "3"])
+    (entry,) = record_of()["thoughts"]
+    assert entry["first"]["failed"] == ["ending"]
+    # The convergence chooses by its margins as before: the clearest candidate is bound. Its
+    # narrated take stands at the thought's place, whose clarity the stand-in reads at 17.4 dB,
+    # so the thought then waits for the ear.
+    assert entry["chosen"] == [{"round": 1, "seed": seed_of(12), "kind": "plain"}]
+    assert [take["failed"] for take in entry["candidates"]] == [[], [], []]
+    assert list(record_of()["for_the_ear"]) == ["26.2"]

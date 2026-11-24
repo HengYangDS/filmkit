@@ -17,7 +17,13 @@ The command needs no targets file, no phrase and no seed from a person:
    round. It does so for --rounds rounds, or until none is refused.
 4. For what is still refused it tries one round of run-on takes: the thought narrated on into
    the thought that follows it and cut in the quiet between them (`narration.run_on`).
-5. When no thought is refused it counts the settled edition by the assembly's own count
+A thought whose take reads under its clarity line, with no hearing of that take that settles it,
+is for the owner's ear (`judgment.for_the_ear`): it is refused by no line, so it gets no candidate,
+and the convergence names it with its take's path, audio SHA-256, clarity and line, records it
+apart (`for_the_ear`) and exits 1 while it waits.
+
+5. When no thought is refused or waits for the ear it counts the settled edition by the assembly's
+   own count
    (`filmkit.narration.fitting`): it selects the recordings and counts them as `produce select`
    and `produce fit` do, replaces no take and changes no pause policy. An edition lasts as long
    as its narration, so the count states its runtime and never misses one.
@@ -315,6 +321,7 @@ def write_record(
         "bound": judge.bound(code),
         "thoughts": [found[name] for name in final if name in found],
         "unsettled": unsettled,
+        "for_the_ear": judgment.ear(rows),
         **({"fit": fit} if fit else {}),
     }
     repository.write(Edition(code).ear_first / RECORD, record)
@@ -408,6 +415,8 @@ def converge(code: str, former: dict, *, rounds: int = 2, takes: int = 3) -> dic
         settled[name] = sum(1 for row in state[1] if not row["failed"])
     if any(row["failed"] for row in state[1]):
         fit = fitting.not_asked(fitting.UNSETTLED)
+    elif judgment.ear(state[1]):
+        fit = fitting.not_asked(fitting.FOR_THE_EAR)
     else:
         try:
             with durations.phase("count"):
@@ -424,6 +433,7 @@ def converge(code: str, former: dict, *, rounds: int = 2, takes: int = 3) -> dic
         "takes_generated": session.generated,
         "takes_found": session.reused,
         "unsettled": {name: verdict["failed"] for name, verdict in record["unsettled"].items()},
+        "for_the_ear": list(record["for_the_ear"]),
         "fit": fitting.summary(fit),
         **{key: fit[key] for key in fitting.COUNTED if key in fit},
     }
@@ -450,6 +460,20 @@ def said(code: str, record: dict) -> str:
     return "\n".join(lines)
 
 
+def waiting(code: str, record: dict) -> str | None:
+    """What an edition waits for: each thought for the owner's ear, with its take, or None."""
+    ear = record["for_the_ear"]
+    if not ear:
+        return None
+    lines = [f"{code}: {len(ear)} thoughts wait for the owner's ear"]
+    lines += [
+        f"  {name}: {take['path']} ({take['wav_sha256']}) reads {take['cpp_db']} dB, under its "
+        f"line of {take['line_db']} dB"
+        for name, take in ear.items()
+    ]
+    return "\n".join(lines)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Narrate an edition until its takes are accepted.")
     parser.add_argument("--language", choices=CODES, required=True)
@@ -469,6 +493,7 @@ def main(argv: list[str] | None = None) -> None:
             record = converge(code, former, rounds=options.rounds, takes=options.takes)
             unsettled = record["unsettled"]
             refused = said(code, record) if unsettled else fitting.said(code, record["fit"])
+            refused = "\n".join(filter(None, [refused, waiting(code, record)]))
             if refused:
                 run.fail()
     if refused:

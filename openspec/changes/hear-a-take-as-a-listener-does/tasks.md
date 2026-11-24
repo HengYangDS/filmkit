@@ -99,7 +99,7 @@ Shown by `tests/test_film_hearings.py`, `tests/narration/test_units_line.py`, `t
       under the line, heard on this take" and "A thought under the line, heard on another take", and every scenario of
       "An edition's narration is judged as a whole" and "A thought for the ear waits for the owner's hearing"; and
       passes.
-- [ ] 3.5 Let `converge` generate no candidate for a thought that is only for the ear, choose among a thought's takes
+- [x] 3.5 Let `converge` generate no candidate for a thought that is only for the ear, choose among a thought's takes
       by their margins as before, and record and name each thought for the ear, exiting 1 while one waits. Done when
       `tests/narration/test_converge.py` holds the scenarios "A thought under the line, heard by no one" and "A
       thought under the line that another line refuses", with a stub generator that the first never calls; and passes.
