@@ -8,11 +8,13 @@ import subprocess
 import sys
 
 import pytest
+import sample_sound
 
 import filmkit.durations as durations
 import filmkit.narration.narrate as narrate
 import filmkit.produce as produce
 import filmkit.repository as repository
+import filmkit.soundtrack.gates as sound_gates
 from filmkit.graph import nodes, opens, records, runs
 from filmkit.production import Edition
 
@@ -171,3 +173,42 @@ def test_a_stage_written_elsewhere_writes_a_partial_record(root, monkeypatch):
     assert partial["partial"] is True
     assert "inputs" not in partial
     assert len(staged) == 2
+
+
+def below_root(places):
+    """Declared places by name, each as a record states its path."""
+    return {name: records.below_root(nodes.place(path)) for name, path in places.items()}
+
+
+@pytest.mark.ffmpeg
+def test_the_sample_s_sound_chain_records_each_node_as_its_table_entry_declares(sound_chain):
+    edition, table = Edition("zh"), runs.table()
+    found = {name: read(name) for name in sample_sound.SOUND}
+    for name, record in found.items():
+        assert record.outcome == "pass", name
+        assert {n: s.path for n, s in record.inputs.items()} == below_root(
+            table[name].inputs(edition)
+        )
+        assert {n: s.path for n, s in record.outputs.items()} == below_root(
+            table[name].outputs(edition)
+        )
+    # The sound gate's record is bound by its digest; none of its fields stands in a run record.
+    gate, checked = repository.read(edition.sound_gates), found["check-sound"]
+    assert checked.outputs["sound_gates"].sha256 == records.digest(edition.sound_gates)
+    for record in found.values():
+        text = record.model_dump_json(by_alias=True)
+        assert [key for key in gate if f'"{key}"' in text] == []
+    for key, path in sound_gates.bound_inputs(edition).items():
+        stated = checked.inputs[key.removesuffix("_sha256")]
+        assert (stated.path, stated.sha256) == (records.below_root(path), gate[key])
+    # What assemble wrote, and the selected narration it read, hold through refresh-captions'
+    # record, which read them as they stood and wrote them again.
+    assembled, refreshed = found["assemble"], found["refresh-captions"]
+    for name in ("timeline", "assembly"):
+        assert refreshed.inputs[name].sha256 == assembled.outputs[name].sha256
+        assert refreshed.outputs[name].sha256 == records.digest(
+            nodes.place(table["refresh-captions"].outputs(edition)[name])
+        )
+    selected = found["select"].outputs["narration_selected"].sha256
+    assert assembled.inputs["narration_selected"].sha256 == selected
+    assert refreshed.inputs["narration_selected"].sha256 == selected
