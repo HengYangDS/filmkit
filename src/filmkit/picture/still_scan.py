@@ -414,12 +414,17 @@ def whole(film: Path, record: dict, frames: list[int], place: Path) -> None:
         raise StillScanError(msg)
 
 
-def film_subjects(edition: Edition) -> dict[str, Path]:
+def subject_places(edition: Edition) -> dict[str, Path]:
     """The files an edition's film record binds, by the names it binds them under: its 1080p
-    captioned film, its timeline and the composition. Refused while one of them is missing."""
+    captioned film, its timeline and the composition."""
     paths = (edition.film(SCANNED_FILM), edition.timeline, repository.ROOT / COMPOSITION_SCRIPT)
-    subjects = dict(zip(SUBJECTS, paths, strict=True))
-    missing = [repository.relative(path) for path in paths if not path.is_file()]
+    return dict(zip(SUBJECTS, paths, strict=True))
+
+
+def film_subjects(edition: Edition) -> dict[str, Path]:
+    """The files of `subject_places`, refused while one of them is missing."""
+    subjects = subject_places(edition)
+    missing = [repository.relative(path) for path in subjects.values() if not path.is_file()]
     if missing:
         msg = f"The {edition.code} film's still scan needs {', '.join(missing)}"
         raise PictureError(msg)
