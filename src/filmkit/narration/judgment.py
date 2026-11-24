@@ -518,7 +518,8 @@ def judge(take: dict, segment: str, index: int, held: Held) -> dict:
 def for_the_ear(row: dict) -> bool:
     """Whether a judged take waits for the owner's ear: no line refuses it, and it reads under
     its clarity line with no hearing of it that settles its clarity."""
-    return not row["failed"] and row["lines"]["clarity"].get("ear") == FOR_THE_EAR
+    clear = row.get("lines", {}).get("clarity", {})
+    return not row["failed"] and clear.get("ear") == FOR_THE_EAR
 
 
 def ear(rows: list[dict]) -> dict[str, dict]:

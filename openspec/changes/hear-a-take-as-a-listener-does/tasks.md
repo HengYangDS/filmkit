@@ -103,7 +103,7 @@ Shown by `tests/test_film_hearings.py`, `tests/narration/test_units_line.py`, `t
       by their margins as before, and record and name each thought for the ear, exiting 1 while one waits. Done when
       `tests/narration/test_converge.py` holds the scenarios "A thought under the line, heard by no one" and "A
       thought under the line that another line refuses", with a stub generator that the first never calls; and passes.
-- [ ] 3.6 Let `audition.propose` put a take above its clarity line before one for the ear, and its proposals name a
+- [x] 3.6 Let `audition.propose` put a take above its clarity line before one for the ear, and its proposals name a
       take for the ear as such. Done when `tests/narration/test_audition.py` holds every scenario of "An audition
       qualifies a take by the judgment's lines" over stub takes, loading no model; and passes.
 - [ ] 3.7 Let `preflight.clarity` refuse nothing for a thought whose selected take the owner's hearing settles for its

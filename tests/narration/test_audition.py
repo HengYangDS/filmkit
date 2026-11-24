@@ -14,6 +14,7 @@ import filmkit.film as film
 import filmkit.narration.audition as narration_audition
 import filmkit.narration.cmudict as narration_cmudict
 import filmkit.narration.group_generation as narration_group_generation
+import filmkit.narration.judgment as narration_judgment
 import filmkit.narration.terms as narration_terms
 import filmkit.repository as repository
 from filmkit.narration.narrate import evidence_paths
@@ -53,6 +54,25 @@ def test_propose_ranks_only_the_takes_no_line_of_the_judgment_refuses():
     assert narration_audition.propose(takes, "brisker") == 6
     # A take that a line refuses is never proposed, whatever the others fail.
     assert narration_audition.propose([takes[0], takes[1], takes[4], takes[6]]) is None
+
+
+def ear_take(seed, **kept) -> dict:
+    """A take no line refuses that reads under its clarity line, for the owner's ear."""
+    return {**take(seed, **kept), "lines": {"clarity": {"ear": narration_judgment.FOR_THE_EAR}}}
+
+
+def test_an_audition_proposes_a_clearer_take_before_one_for_the_ear():
+    # The second holds the phrase and ends more quietly, but reads under its line.
+    clearer = take(1, heard=False, end_ratio=0.2)
+    for_ear = ear_take(2, end_ratio=0.01)
+    assert narration_audition.propose([for_ear, clearer]) == 1
+    # Alone among the takes no line refuses, it is proposed and named for the ear.
+    assert narration_audition.propose([for_ear, take(3, failed=["ending"])]) == 2
+    assert narration_audition.proposed_for_the_ear([for_ear, take(3, failed=["ending"])], 2)
+    assert not narration_audition.proposed_for_the_ear([for_ear, clearer], 1)
+    assert not narration_audition.proposed_for_the_ear([for_ear, clearer], None)
+    # Within each kind the phrase and the preference order the takes as before.
+    assert narration_audition.propose([ear_take(4, heard=False), ear_take(5)]) == 5
 
 
 def test_propose_puts_a_take_that_holds_the_required_phrase_before_one_that_does_not():

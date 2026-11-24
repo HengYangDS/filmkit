@@ -7,10 +7,13 @@ seed + k * 7919, through the narration's own native ICL path and sampling
 its length, its ending, its phrase ends, its opening where it opens its recording, its
 unmarked pauses, its declared terms, its units by reading and, where the film declares a line
 for a single thought, its clarity. That is the one definition of an acceptable take, which
-`filmkit.narration.judge` and `filmkit.narration.converge` hold too. Among qualified takes
-one whose transcript contains the target's required phrase is proposed before one that does
-not, and then the quietest ending or, with --prefer slower or brisker, the longest or the
-shortest take; these order the qualified takes and qualify none. A take records its
+`filmkit.narration.judge` and `filmkit.narration.converge` hold too. A take under its clarity
+line qualifies but is for the owner's ear (`judgment.for_the_ear`): a take above its line is
+proposed before it, and a proposal of such a take names it for the ear (`for_the_ear`), so a
+thought the owner rejects is not answered with a muddier take. Within each kind, a take whose
+transcript contains the target's required phrase is proposed before one that does not, and
+then the quietest ending or, with --prefer slower or brisker, the longest or the shortest take;
+these order the qualified takes and qualify none. A take records its
 differing units by unit beside those by reading. The
 receipt, by default the one the cast declares, must hold each thought's current text, so
 narrate edited segments first; its recordings, thoughts and narrator are checked before
@@ -75,8 +78,9 @@ def propose(takes: list[dict], prefer: str = "accurate") -> int | None:
     """The seed of the best qualified take, or None when no take qualifies.
 
     A take qualifies when no line of the judgment refuses it (`judgment.judge`). Among the
-    qualified, a take whose transcript holds the required phrase comes first, and then the
-    preference decides.
+    qualified, a take above its clarity line comes before one for the owner's ear; within each,
+    a take whose transcript holds the required phrase comes first, and then the preference
+    decides.
     """
     qualified = [take for take in takes if not take["failed"]]
     if not qualified:
@@ -86,7 +90,19 @@ def propose(takes: list[dict], prefer: str = "accurate") -> int | None:
         "slower": lambda take: -take["seconds"],
         "brisker": lambda take: take["seconds"],
     }[prefer]
-    return min(qualified, key=lambda take: (not take["required_heard"], tiebreak(take)))["seed"]
+    return min(
+        qualified,
+        key=lambda take: (
+            judgment.for_the_ear(take),
+            not take["required_heard"],
+            tiebreak(take),
+        ),
+    )["seed"]
+
+
+def proposed_for_the_ear(takes: list[dict], seed: int | None) -> bool:
+    """Whether the proposed take is one for the owner's ear."""
+    return any(take["seed"] == seed and judgment.for_the_ear(take) for take in takes)
 
 
 def audition(
@@ -161,6 +177,7 @@ def audition(
                 flush=True,
             )
         row["proposed_seed"] = propose(row["takes"], prefer)
+        row["for_the_ear"] = proposed_for_the_ear(row["takes"], row["proposed_seed"])
         if run_on is not None:
             row["proposed_run_on"] = next(
                 (take["run_on"] for take in row["takes"] if take["seed"] == row["proposed_seed"]),
@@ -169,12 +186,9 @@ def audition(
         rows.append(row)
     proposals.write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
     proposed = {f"{row['segment']}.{row['index']}": row["proposed_seed"] for row in rows}
-    print(
-        json.dumps(
-            {"proposals": str(proposals.relative_to(repository.ROOT)), "proposed": proposed}
-        ),
-        flush=True,
-    )
+    ear = [f"{row['segment']}.{row['index']}" for row in rows if row["for_the_ear"]]
+    said = {"proposals": str(proposals.relative_to(repository.ROOT)), "proposed": proposed}
+    print(json.dumps({**said, "for_the_ear": ear}), flush=True)
 
 
 def _targets(targets_file: str) -> dict[tuple[str, int], tuple[str, bool]]:
