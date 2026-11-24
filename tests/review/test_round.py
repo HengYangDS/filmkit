@@ -7,8 +7,10 @@ import subprocess
 import sys
 
 import pytest
+from preparing import ROUND, prepare, refusal
 
 import filmkit.delivery.verification as delivery_verification
+import filmkit.durations as durations
 import filmkit.film as film
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
@@ -16,6 +18,7 @@ import filmkit.review.files as review_files
 import filmkit.review.record as review_record
 import filmkit.review.round as review_round
 from filmkit.delivery.verification import VerificationError
+from filmkit.graph import verify
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
 
@@ -233,3 +236,39 @@ def test_a_declaration_s_accepted_severities_reach_the_record_through_the_loader
         "record: zh: the review's levels do not pass: no verdict for level 信; no verdict for "
         "level 达; no verdict for level 雅; finding R5-1 names no level",
     )
+
+
+# A round's preparation runs `filmkit verify` before it writes anything (record-every-run).
+
+
+def recorded(*runs):
+    """Record a run of each node of an edition that states its files as they stand."""
+    for name, code in runs:
+        with durations.run(code, name):
+            pass
+
+
+def test_a_preparation_is_refused_for_a_film_changed_by_no_declared_writer(put, ready):
+    recorded(*(("package-film", code) for code in CODES))
+    film = Edition("zh").film("1080p-captioned")
+    put(film, "a film changed by hand\n")
+    assert refusal() == (
+        f"prepare: filmkit verify refuses: {repository.relative(film)}: its bytes are "
+        "accounted for by no record of a declared writer; it is bound by package-film:zh"
+    )
+    assert not review_files.round_directory(ROUND).exists()
+    assert "prompts" not in [step for step, _ in ready]
+
+
+def test_a_preparation_after_a_repair_writes_the_round(ready):
+    recorded(("render-picture", "zh"), ("compare-pictures", "zh"))
+    edition = Edition("zh")
+    with durations.run("zh", "repair-pictures"):
+        with durations.node("zh", "render-picture"):
+            edition.rendered(True).file.write_bytes(b"the repaired picture")
+        with durations.node("zh", "compare-pictures"):
+            repository.write(edition.caption_equivalence, {"verdict": "pass", "findings": []})
+    recorded(("package-film", "zh"))
+    assert verify.verify().refusals == ()
+    prepare()
+    assert "prompts" in [step for step, _ in ready]

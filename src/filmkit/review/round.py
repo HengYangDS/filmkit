@@ -58,6 +58,7 @@ import filmkit.soundtrack.level as soundtrack_level
 import filmkit.sources as sources
 import filmkit.tools as tools
 from filmkit.film import MATERIAL
+from filmkit.graph import verify as graph_verify
 from filmkit.narration.spoken_units import AlignmentError
 from filmkit.picture.errors import PictureError
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
@@ -187,7 +188,9 @@ def prepare(
     """Prepare a round: write everything its reviewers read into its directory.
 
     What only reads comes first, so that a refusal there changes no file and leaves a round
-    without a directory as it was. A round's number is 0 or more (`round_directory`). The
+    without a directory as it was. First of all `filmkit verify` judges the build by its run
+    records (`filmkit.graph.verify`): a round binds no film whose bytes no declared writer
+    accounts for. A round's number is 0 or more (`round_directory`). The
     changes note and the dispositions are read, since either may be the round's own copy of an
     earlier preparation. Then everything the prompts read is read and checked
     (`filmkit.review.prompts.read_round`): the template's fields, each edition's passing still
@@ -209,6 +212,10 @@ def prepare(
     leaves nothing that can be taken for a round.
     """
     round_dir = round_directory(number)
+    try:
+        graph_verify.check()
+    except graph_verify.VerifyError as error:
+        raise ReviewError(str(error)) from None
     copies = {CHANGES: given(changes), DISPOSITIONS: given(dispositions)}
     round_prompts.read_round(previous, round_dir, changes, dispositions)
     words = register.check()

@@ -7,9 +7,12 @@ from pydantic import TypeAdapter
 from release_build import SOURCES, STATED, refused, uncaptioned_stage, unchanged_refusal
 
 import filmkit.delivery.folder as delivery_folder
+import filmkit.delivery.packaging as packaging
 import filmkit.delivery.release as release
 import filmkit.delivery.reproduction as reproduction
+import filmkit.durations as durations
 import filmkit.repository as repository
+from filmkit.graph import records
 from filmkit.production import CODES, STAGE_PAGE
 
 # The sample film declares review levels; these reviews keep the overall and dimension floors.
@@ -199,3 +202,34 @@ def test_a_link_that_leads_outside_the_films_root_is_no_source(built):
     (built.root / "content/linked.json").symlink_to(elsewhere)
     line = unchanged_refusal(built, ["--sources", "content/linked.json", *SOURCES])
     assert line == "A film-bound source leads outside the film's root: content/linked.json"
+
+
+# The record is written only after `filmkit verify` passes (record-every-run).
+
+
+def test_a_soundtrack_changed_by_no_declared_writer_refuses_the_release_and_its_dry_run(built):
+    with durations.run("zh", "assemble"):
+        pass
+    soundtrack = built.editions["zh"].edition.soundtrack
+    soundtrack.write_bytes(soundtrack.read_bytes() + b"changed by hand")
+    for arguments in (["--dry-run", *STATED], STATED):
+        assert unchanged_refusal(built, arguments) == (
+            f"filmkit verify refuses: {repository.relative(soundtrack)}: its bytes are "
+            "accounted for by no record of a declared writer; it is bound by assemble:zh"
+        )
+
+
+def test_a_release_is_recorded_after_both_editions_wrote_the_entry_page(built):
+    # One package writes the page first and the other replaces it whole, with the bytes the
+    # build holds, which the viewing packages bind.
+    page = repository.ROOT / packaging.LANGUAGE_INDEX
+    pages = (b"the entry page as the first package wrote it\n", page.read_bytes())
+    for code, written in zip(CODES, pages, strict=True):
+        with durations.run(code, "package-metadata"):
+            page.write_bytes(written)
+    bound = [
+        records.read(records.place("package-metadata", code)).outputs["entry"] for code in CODES
+    ]
+    assert bound[0].sha256 != bound[1].sha256 == records.digest(page)
+    release.main(STATED)
+    assert built.manifest.is_file()

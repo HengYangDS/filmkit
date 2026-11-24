@@ -7,6 +7,9 @@ in build/artifacts/release, where the comparison reads the published assets. It 
 of the module that owns it, in this order, and the first refusal stops it in one line, before
 any file is written:
 
+- the build as its run records bind it, of `filmkit verify` (`filmkit.graph.verify`), which
+  refuses bytes that no declared writer accounts for and a change that kept a file's size and
+  time;
 - each edition's bound inputs, of the film verifier, which decodes no film for them; then its
   uncaptioned stage, of the staging, since the record states that stage's digest and the receipt
   of a derived uncaptioned picture binds no stage; then its recorded review, of the verifier.
@@ -97,6 +100,7 @@ from filmkit.delivery.reproduction import (
     Release,
     ReproductionError,
 )
+from filmkit.graph import verify as graph_verify
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -419,12 +423,16 @@ def stage(written: Release) -> None:
 
 
 def write(stated: list[str], *, replace: bool, dry_run: bool) -> None:
-    """Record the release: ask, build the record and hold it to the manifest's rules, refuse a
-    release or sibling path that is no folder of the command's own, refuse a release folder
-    that holds other bytes unless `replace` says to replace it, print what the record
-    replaces, what its sources change of the replaced list and each film's floor, then stage
-    the assets and write the manifest last.
+    """Record the release: verify the build by its run records (`filmkit.graph.verify`), ask,
+    build the record and hold it to the manifest's rules, refuse a release or sibling path that
+    is no folder of the command's own, refuse a release folder that holds other bytes unless
+    `replace` says to replace it, print what the record replaces, what its sources change of
+    the replaced list and each film's floor, then stage the assets and write the manifest last.
     With `dry_run` the record is printed and no file changes."""
+    try:
+        graph_verify.check()
+    except graph_verify.VerifyError as error:
+        raise ReproductionError(str(error)) from None
     written, replaced = record(stated)
     reproduction.check(written)
     require_own_folders()
