@@ -8,7 +8,8 @@ repository at its commit, checked for its size and SHA-256 and only then moved i
 huggingface_hub downloads each pinned model snapshot, from the mirror that HF_ENDPOINT names when it
 is set. Each is checked against its pinned digests, so the build that follows reads only checked
 inputs and runs offline. Installing again keeps what is already in place: a dictionary whose bytes
-hold the pin is not downloaded again.
+hold the pin is not downloaded again, wherever it came from. A download that fails is refused in
+one line, which names the file and its place.
 
 Usage: python -m filmkit.supply
 """
@@ -75,7 +76,14 @@ def supply_dictionary() -> dict:
     place.parent.mkdir(parents=True, exist_ok=True)
     partial = place.with_name(f".{place.name}.{os.getpid()}.partial")
     try:
-        fetch(cmudict.URL, partial, deadline=DEADLINE)
+        try:
+            fetch(cmudict.URL, partial, deadline=DEADLINE)
+        except OSError as error:
+            msg = (
+                f"The CMUdict could not be downloaded from {cmudict.URL} to {cmudict.PLACE}: "
+                + " ".join(str(error).split())
+            )
+            raise SupplyError(msg) from None
         if partial.stat().st_size != cmudict.BYTES or repository.sha(partial) != cmudict.SHA256:
             msg = f"The CMUdict downloaded from {cmudict.URL} differs from the pinned SHA-256"
             raise SupplyError(msg)

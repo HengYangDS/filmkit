@@ -131,3 +131,18 @@ def test_a_browser_build_of_other_bytes_is_refused(monkeypatch):
     monkeypatch.setattr(picture_browser, "BROWSER_SHA256", "0" * 64)
     with pytest.raises(SupplyError, match="browser build differs from the pinned SHA-256"):
         supply.main([])
+
+
+def test_a_download_that_fails_is_refused_in_one_line_that_names_the_file(root, monkeypatch):
+    folder, calls, _ = root
+
+    def unreachable(url, place, *, deadline):
+        raise OSError("[Errno 8] nodename nor servname provided, or not known")
+
+    monkeypatch.setattr(supply, "fetch", unreachable)
+    with pytest.raises(SupplyError) as refusal:
+        supply.main([])
+    said = str(refusal.value)
+    assert "\n" not in said and cmudict.URL in said and cmudict.PLACE in said
+    assert said.endswith("nodename nor servname provided, or not known")
+    assert not list((folder / cmudict.PLACE).parent.iterdir())
