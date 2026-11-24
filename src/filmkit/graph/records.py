@@ -16,15 +16,21 @@ build/evidence/records/editions/<code>/<node>.json, a partial one beside it as
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import hashlib
 import json
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import TYPE_CHECKING, Literal, NamedTuple
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 import filmkit.released as released
 import filmkit.repository as repository
+
+if TYPE_CHECKING:
+    import os
+    from collections.abc import Iterator
 
 # The schema this engine writes and reads; a record of any other is unreadable.
 SCHEMA = 1
@@ -140,6 +146,33 @@ def digest(path: Path) -> str:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+# The digests taken while `once` holds, by path, size and time.
+_TAKEN: contextvars.ContextVar[dict | None] = contextvars.ContextVar("digests", default=None)
+
+
+@contextlib.contextmanager
+def once() -> Iterator[dict]:
+    """Hash each file once while the block runs, at the size and time it then had, though
+    several records state it; the digests taken, by path, size and time."""
+    taken: dict = {}
+    token = _TAKEN.set(taken)
+    try:
+        yield taken
+    finally:
+        _TAKEN.reset(token)
+
+
+def taken(path: Path, found: os.stat_result) -> str:
+    """A file's digest: hashed, or within `once` as it was first hashed at this size and time."""
+    held = _TAKEN.get()
+    if held is None:
+        return digest(path)
+    named = (str(path), found.st_size, found.st_mtime_ns)
+    if named not in held:
+        held[named] = digest(path)
+    return held[named]
+
+
 def below_root(path: Path) -> str:
     """A path as a record states it: below the film's root, both sides resolved, or absolute."""
     real, root = Path(path).resolve(), Path(repository.ROOT).resolve()
@@ -155,7 +188,7 @@ def state(path: Path, known: FileState | Member | None = None) -> FileState:
         path=below_root(path),
         size=found.st_size,
         mtime_ns=found.st_mtime_ns,
-        sha256=known.sha256 if same and known else digest(path),
+        sha256=known.sha256 if same and known else taken(path, found),
     )
 
 
@@ -238,10 +271,11 @@ class Compared(NamedTuple):
 
 class Judgment(NamedTuple):
     """A record judged against the files as they stand: each reason it is stale, none for a
-    fresh record, and each file it states as compared."""
+    fresh record, each file it states as compared, and the reasons that concern no one file."""
 
     reasons: tuple[str, ...]
     files: tuple[Compared, ...]
+    own: tuple[str, ...] = ()
 
 
 # What a reason says of a file of each result that makes its record stale.
@@ -309,6 +343,7 @@ def judge(
     declared: dict[str, str] | None,
     running: Engine,
     full: bool = False,
+    settled: frozenset[tuple[str, str]] = frozenset(),
 ) -> Judgment:
     """A record against the files as they stand (design decision 6 of record-every-run).
 
@@ -317,12 +352,14 @@ def judge(
     (`declared`, each name's path below the root) are not the ones it recorded, or an input or
     output is missing or changed. Each file is compared by size and time and hashed only where
     they differ, unless `full` asks for every file to be hashed, which alone sees a change that
-    kept both. A partial record states no inputs, and its inputs are not compared.
+    kept both. A partial record states no inputs, and its inputs are not compared. A file that
+    `settled` names by its side and name is left to the caller, which judges it otherwise.
     """
     if record is None:
-        return Judgment(("no record",), ())
+        return Judgment(("no record",), (), ("no record",))
     if isinstance(record, Unreadable):
-        return Judgment((f"unreadable record: {record}",), ())
+        unread = (f"unreadable record: {record}",)
+        return Judgment(unread, (), unread)
     reasons = (
         [] if record.outcome == "pass" else [f"its run ended with the outcome {record.outcome}"]
     )
@@ -335,7 +372,13 @@ def judge(
             reasons.append(
                 f"the inputs its way declares differ from those it recorded: {', '.join(names)}"
             )
-    files = [compare("input", name, state, full=full) for name, state in inputs.items()]
-    files += [compare("output", name, state, full=full) for name, state in record.outputs.items()]
+    stated = [("input", n, s) for n, s in inputs.items()]
+    stated += [("output", n, s) for n, s in record.outputs.items()]
+    files = [
+        compare(side, name, state, full=full)
+        for side, name, state in stated
+        if (side, name) not in settled
+    ]
+    own = tuple(reasons)
     reasons += [f"{f.side} {f.name} {SAYS[f.result]}: {f.path}" for f in files if f.result in SAYS]
-    return Judgment(tuple(reasons), tuple(files))
+    return Judgment(tuple(reasons), tuple(files), own)
