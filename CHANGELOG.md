@@ -4,6 +4,18 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- Every command of an edition's build chain records its run (OpenSpec Change `record-every-run`, the derivation's R2a): `build/evidence/records/editions/<code>/<node>.json`, of schema 1, states each input and output by its path, size, time and SHA-256, the engine, its `released.json` digest and the node's model pins, the outcome and the line the run ended with, the start, seconds, load, phases and settings its duration record states, and the host class measured by host rule 3. A run of part of a node, `narrate --ids` or `stage-picture --output`, writes `<node>.partial.json` instead. A render or comparison that `repair-pictures` runs, and the selection a convergence runs, write the record of the node they do again. The duration records stay as they are.
+- The `filmkit` console command. `filmkit plan [TARGET...] [--json]` states, for the nodes a target names and every node upstream, each node's state (`fresh`, `stale` with its reasons, `behind`), its class as measured and as expected, its last seconds and whether it is ready, and writes nothing. `filmkit verify` hashes every file a run record states.
+- `FILMKIT_OPENS`, off by default, names a file to which every engine process and every Node process the engine starts append what each node's run opens; the engine's tests and acceptance check it against the node table.
+
+### Changed
+
+- **One new refusal: a review round's preparation and a release's record, its dry run too, run `filmkit verify` first** and refuse with its lines, before they write anything, where a file's bytes are accounted for by no record of a declared writer or a file changed while keeping its size and time. A node that is only stale is listed and refuses nothing, and a build without records verifies as before.
+- The sound gate's record binds the assembly record and the declaration, and the picture gate's record binds the declaration, as their runs read them: each record's bytes change once, and the pre-render check refuses a gate record that predates an edit of the declaration.
+- A film does nothing: nothing it declares, runs, commits or receives changes. Its next build writes the run records beside its other records, and `filmkit verify` passes on a build its own chain made, repairs and both ways of the uncaptioned picture included. To roll back, a film pins 0.31.0; the records then stand unread.
+
 ## [0.31.0] - 2026-11-24
 
 ### Added
