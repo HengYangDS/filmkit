@@ -6,7 +6,7 @@ input that remains.
 
 ## 1. The base
 
-- [ ] 1.1 Read every site again on the base, `v0.31.0`: `recognition.Names`, `Read`, `read_units`, `alike`, `_ways`
+- [x] 1.1 Read every site again on the base, `v0.31.0`: `recognition.Names`, `Read`, `read_units`, `alike`, `_ways`
       and `compared`, and every caller of `compared` and `reading_distance`; the judgment's `studio`, `bench`, `Held`,
       `held`, `judge` and `choose`, and `judge.py`'s record and exit; `converge`'s rounds, record and exit;
       `audition.propose` and its record; `selection.select`; `preflight.clarity`; `check-sound`'s clarity; the
