@@ -28,6 +28,7 @@ from pydantic import (
 
 import filmkit.declared_sources as declared_sources
 import filmkit.languages as languages
+import filmkit.narration.hearings as hearings
 import filmkit.repository as repository
 from filmkit.places import CAST, SCRIPT, places
 
@@ -474,11 +475,27 @@ class NarrationTerm(Declared):
     reference: dict[Code, TermReference] = Field(default_factory=dict)
 
 
+class Heard(Declared):
+    """The owner's hearing of one take of a thought, which settles the lines it names for that
+    take alone (`filmkit.narration.hearings`): the take by its audio's SHA-256, the lines among
+    `units` and `clarity`, the listener, the film's author, the date and a note."""
+
+    edition: Code
+    thought: ThoughtName
+    take: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+    lines: tuple[Literal["units", "clarity"], ...] = Field(min_length=1)
+    listener: Stated
+    date: Stated
+    note: Stated
+
+
 class Narration(Declared):
-    """How the narration must flow and say its terms (`narration.flow`, `narration.terms`)."""
+    """How the narration must flow and say its terms (`narration.flow`, `narration.terms`), and
+    the owner's hearings of its takes (`narration.heard`, refused by `hearings.refusals`)."""
 
     flow: Flow = Field(default_factory=Flow)
     terms: tuple[NarrationTerm, ...] = ()
+    heard: tuple[Heard, ...] = ()
 
     @field_validator("terms")
     @classmethod
@@ -646,8 +663,9 @@ class Film(Declared):
 
     @model_validator(mode="after")
     def editions_declared(self) -> Film:
-        """Refuse an exception, a floor or a term reference that names an edition the film does
-        not declare, and clarity floors without one for each declared edition."""
+        """Refuse an exception, a floor, a term reference or a record of hearing that names an
+        edition the film does not declare, a record of hearing whose listener is not the film's
+        author, and clarity floors without one for each declared edition."""
         named = {
             "picture.wrapping.exceptions": [e.edition for e in self.picture.wrapping.exceptions],
             "picture.motion.exceptions": [e.edition for e in self.picture.motion.exceptions],
@@ -659,6 +677,7 @@ class Film(Declared):
             "review.clarity_minimum_db": list(self.review.clarity_minimum_db or {}),
             "narration.flow.exceptions": [e.edition for e in self.narration.flow.exceptions],
             "narration.terms": [code for t in self.narration.terms for code in t.reference],
+            "narration.heard": [record.edition for record in self.narration.heard],
             "captions.rate_exceptions": [e.edition for e in self.captions.rate_exceptions],
         }
         declared = ", ".join(self.editions)
@@ -669,6 +688,7 @@ class Film(Declared):
             for code in dict.fromkeys(codes)
             if code not in self.editions
         ]
+        problems += hearings.refusals(self.narration.heard, self.author)
         floors = self.review.clarity_minimum_db
         problems += [
             f"review.clarity_minimum_db states no floor for {code}"

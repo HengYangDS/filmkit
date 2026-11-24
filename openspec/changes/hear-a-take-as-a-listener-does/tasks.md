@@ -78,7 +78,7 @@ Shown by `tests/test_film_hearings.py`, `tests/narration/test_units_line.py`, `t
 `tests/narration/test_converge.py`, `tests/narration/test_audition.py`, `tests/test_preflight.py` and
 `tests/soundtrack/test_sound_gates.py`. Tasks 3.4 to 3.7 carry design decision 6.
 
-- [ ] 3.1 Add `Narration.heard` to `film.py`: records of `edition`, `thought`, `take`, `lines` (one or both of
+- [x] 3.1 Add `Narration.heard` to `film.py`: records of `edition`, `thought`, `take`, `lines` (one or both of
       `units` and `clarity`), `listener`, `date` and `note`, refusing an edition the film does not declare, a take that
       is not 64 lowercase hexadecimal digits, lines that are empty, repeated or name another line, a listener other
       than the film's `author`, a missing or empty field and a second record of one take. Done when a new
