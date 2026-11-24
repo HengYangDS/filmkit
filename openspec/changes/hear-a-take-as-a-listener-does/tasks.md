@@ -55,7 +55,7 @@ Shown by `tests/test_languages.py`, `tests/narration/test_cmudict.py`, `tests/te
       the `film-engine` scenario "How a language hears a transcript's Latin-script words"; every test of the file at
       the base passes unchanged, as does `tests/narration/test_terms.py`, whose `respelling_failures` reads no
       pronunciations.
-- [ ] 2.5 Let `judgment.studio` read the dictionary before any model loads for an edition whose language declares
+- [x] 2.5 Let `judgment.studio` read the dictionary before any model loads for an edition whose language declares
       `cmudict-pronunciations`, and the readings its pronunciation declares (letter names, and every `arpabet` of a
       target), refusing nothing it would not refuse today; let `bench` pass both in the edition's names, and the
       judgment's record name the dictionary's URL and SHA-256 and bind the pronunciation by its SHA-256. Done when a

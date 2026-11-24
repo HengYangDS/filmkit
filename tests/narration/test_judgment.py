@@ -5,6 +5,7 @@ import json
 import wave
 
 import numpy as np
+import pronounced
 import pytest
 
 import filmkit.film as film
@@ -238,6 +239,7 @@ def test_a_chinese_take_is_compared_by_the_readings_the_film_declares(monkeypatc
     repository.write(Edition("zh").places.pronunciation, part)
     repository.write(Edition("zh").script, {"segments": []})
     monkeypatch.setattr(narration_judgment, "standards", lambda *_: [])
+    pronounced.supplied(monkeypatch)
     bench = narration_judgment.bench("zh", [], asr=None, aligner={})
     assert [word.term for word in bench.words] == ["重来", "去重"]
     assert bench.words == narration_readings.compared_words(part)
@@ -295,15 +297,17 @@ def test_a_chinese_bench_reads_the_editions_other_latin_units_from_its_script(
         repository.write(Edition(code).places.pronunciation, {"normalization": [rule]})
         repository.write(Edition(code).script, {"segments": [segment]})
     monkeypatch.setattr(narration_judgment, "standards", lambda *_: [])
+    pronounced.supplied(monkeypatch)
     declared = narration_judgment.FILM.model_copy(
         update={"narration": film.Narration(terms=(NAME,))}
     )
     # The script's Latin units by their letters, less the term's: `Node.js` is two units.
     zh = narration_judgment.bench("zh", [], asr=None, aligner={}, film=declared)
     assert zh.names == Names((NAME,), embedded=True, others=frozenset({"agent", "node", "js"}))
-    # The English bench has no rule of other letters, under which any word would pass.
+    # The English bench has no rule of other letters, under which any word would pass; it hears
+    # its Latin units by their pronunciations, as English declares.
     en = narration_judgment.bench("en", [], asr=None, aligner={}, film=declared)
-    assert en.names == Names((NAME,))
+    assert en.names == Names((NAME,), heard=en.names.heard) and en.names.heard is not None
     # A Chinese edition without its pronunciation has no bench: its units are unknown.
     (tmp_path / Edition("zh").places.pronunciation).unlink()
     with pytest.raises(PronunciationError, match="content/zh/pronunciation.json does not exist"):
@@ -488,6 +492,7 @@ def test_a_test_languages_bench_takes_its_sources_reading_check(monkeypatch, tmp
         repository.write(Edition(code).places.pronunciation, {"normalization": [rule]})
         repository.write(Edition(code).script, {"segments": [segment]})
     monkeypatch.setattr(narration_judgment, "standards", lambda *_: [])
+    pronounced.supplied(monkeypatch)
     declared = narration_judgment.FILM.model_copy(
         update={"narration": film.Narration(terms=(NAME,))}
     )

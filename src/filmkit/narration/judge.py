@@ -8,7 +8,9 @@ selection's gates about each segment as they will measure it, and a thought they
 refused here (`gate-pause`, `gate-terms`). It generates nothing and changes no input. Its
 record, judgment.json beside the receipt, holds every thought's measures, its verdict on each
 line and the lines it fails, states the clarity lines the film declares, and binds the receipt,
-the script and the cast it was made from by their digests; judging unchanged takes again writes
+the script and the cast it was made from by their digests; for an edition whose language hears its
+Latin-script words by CMUdict's pronunciations, it names the dictionary's URL and SHA-256 and binds
+the edition's pronunciation by its SHA-256 (`pronunciations`). Judging unchanged takes again writes
 the same record.
 
 A thought is refused when a line fails. The command then exits 1 and names every refused
@@ -92,6 +94,7 @@ def judged(code: str, records: list[dict], bench, held) -> dict:
             "kept": sorted(held.kept),
         },
         "unit_limit": judgment.UNIT_LIMIT,
+        **({"pronunciations": bench.pronounced.record} if bench.pronounced else {}),
         "gates": "asked" if gate is not None else judgment.GATE_NOT_ASKED,
         "thoughts": rows,
         "refused": {row["thought"]: row["failed"] for row in rows if row["failed"]},

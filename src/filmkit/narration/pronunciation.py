@@ -14,6 +14,7 @@ import json
 import re
 
 import filmkit.languages as languages
+import filmkit.narration.cmudict as cmudict
 import filmkit.repository as repository
 from filmkit.narration.thought_groups import authored_groups
 
@@ -128,6 +129,39 @@ def _check_arpabet(value: dict, term: str) -> None:
     ):
         msg = f"Contradictory lexical stress phones for {term}"
         raise PronunciationError(msg)
+
+
+def declared_readings(part: dict) -> dict[str, tuple[tuple[str, ...], ...]]:
+    """The readings an edition's pronunciation declares by word, lowercased, as a transcript's
+    word is heard against them (`filmkit.narration.recognition`): every ARPAbet its target states
+    under `lexical_stress`, one reading or one per part of speech, read as CMUdict's are
+    (`cmudict.phones`), in the order the target states them; and none, (), for a word it declares
+    by its letter names. A target that states no phones declares no reading."""
+    found = {}
+    for target in part.get("targets", []):
+        word = target["term"].lower()
+        if target.get("kind") == "letter-name":
+            found[word] = ()
+            continue
+        stated = tuple(dict.fromkeys(_arpabets(target.get("lexical_stress", {}))))
+        if stated:
+            found[word] = stated
+    return found
+
+
+def _arpabets(value: object):
+    """Each pronunciation a stress target states: one target, its variants or its senses."""
+    if isinstance(value, list):
+        for member in value:
+            yield from _arpabets(member)
+        return
+    if not isinstance(value, dict):
+        return
+    if "arpabet" in value:
+        yield cmudict.phones(" ".join(value["arpabet"]))
+    for key, member in value.items():
+        if key != "arpabet":
+            yield from _arpabets(member)
 
 
 def pronunciation_text(section: dict, contract: dict) -> str:

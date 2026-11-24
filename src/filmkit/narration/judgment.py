@@ -57,6 +57,7 @@ from mlx_audio.audio_io import write
 from mlx_audio.stt.utils import load_model
 
 import filmkit.languages as languages
+import filmkit.narration.cmudict as cmudict
 import filmkit.narration.flow as flow
 import filmkit.narration.readings as readings
 import filmkit.narration.selection as selection
@@ -67,12 +68,14 @@ from filmkit.film import FILM
 from filmkit.narration.alignment import verify_aligner
 from filmkit.narration.group_generation import too_short
 from filmkit.narration.narrate import ALIGNER
-from filmkit.narration.pronunciation import pronunciation
+from filmkit.narration.pronunciation import declared_readings, pronunciation
 from filmkit.narration.recognition import (
     NO_NAMES,
+    Heard,
     Names,
     compared,
     edition_names,
+    hearing,
     recognition_units,
     unit_distance,
 )
@@ -127,12 +130,22 @@ NO_THOUGHT_LINE = clarity.NO_THOUGHT_LINE
 
 
 @dataclasses.dataclass(frozen=True)
+class Pronounced:
+    """What an edition hears its Latin units by (`recognition.Heard`), and what its judgment's
+    record names of it: the dictionary's URL and SHA-256 and the pronunciation's SHA-256."""
+
+    heard: Heard
+    record: dict
+
+
+@dataclasses.dataclass(frozen=True)
 class Bench:
     """What every take of an edition is measured with.
 
     The recognizer, the pinned aligner with its identity, each declared term's reference vowel,
     the Chinese words a transcript is compared by (`readings.compared_words`), the film's flow
-    limits, and the names a transcript's Latin units are read by (`recognition.Names`).
+    limits, the names a transcript's Latin units are read by (`recognition.Names`), and the
+    pronunciations they are heard by, or None (`pronunciations`).
     """
 
     code: str
@@ -143,6 +156,7 @@ class Bench:
     words: tuple = ()
     flow: object = None
     names: Names = NO_NAMES
+    pronounced: Pronounced | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -169,9 +183,27 @@ def load_aligner() -> dict:
     return {"identity": verify_aligner(folder), "model": load_model(str(folder))}
 
 
-def bench(code: str, references: list, *, asr, aligner: dict, film=None) -> Bench:
-    """The edition's bench, its term standards measured on the receipt's reference takes."""
+def pronunciations(code: str) -> Pronounced | None:
+    """The pronunciations an edition hears its Latin units by, where its language declares them
+    (`recognition.hearing`): the pinned CMUdict the supply step placed and the readings its
+    pronunciation declares. A dictionary missing or of other bytes stops the command in one line
+    that names the supply step; a caller asks this before any model loads."""
+    contract, digest = pronunciation(code)
+    try:
+        heard = hearing(code, cmudict.supplied, declared_readings(contract))
+    except cmudict.DictionaryError as error:
+        raise SystemExit(f"{code}: {error}") from None
+    if heard is None:
+        return None
+    named = {"dictionary": cmudict.URL, "dictionary_sha256": cmudict.SHA256}
+    return Pronounced(heard, {**named, "pronunciation_sha256": digest})
+
+
+def bench(code: str, references: list, *, asr, aligner: dict, film=None, pronounced=None) -> Bench:
+    """The edition's bench, its term standards measured on the receipt's reference takes, and
+    its Latin units heard by `pronounced`, which `pronunciations` reads where it is not given."""
     film = film or FILM
+    pronounced = pronounced or pronunciations(code)
     edition = Edition(code)
     script = repository.read(edition.script)
     # An edition that reads its Han characters by their pinyin compares its words' readings; one
@@ -184,9 +216,11 @@ def bench(code: str, references: list, *, asr, aligner: dict, film=None) -> Benc
         texts = [thought.text for thought in readings.edition_thoughts(script, contract)]
         words = readings.compared_words(contract) if pinyin else ()
     measured_standards = standards(code, references, aligner, edition.language)
-    names = edition_names(film.narration.terms, texts, embedded=embeds)
+    heard = pronounced.heard if pronounced else None
+    names = edition_names(film.narration.terms, texts, embedded=embeds, heard=heard)
+    flows = film.narration.flow
     return Bench(
-        code, edition.language, asr, aligner, measured_standards, words, film.narration.flow, names
+        code, edition.language, asr, aligner, measured_standards, words, flows, names, pronounced
     )
 
 
@@ -223,17 +257,22 @@ def studio(
 ) -> tuple[Bench, Held]:
     """The bench and the held lines of an edition whose receipt holds `records`.
 
-    The receipt's term references, and the terms its respelled names need (`require_terms`),
-    are read before any model loads; `models`, a recognizer and an aligner already loaded, are
-    used in place of loading them again.
+    The receipt's term references, the terms its respelled names need (`require_terms`) and the
+    pronunciations its Latin units are heard by (`pronunciations`) are read before any model
+    loads; `models`, a recognizer and an aligner already loaded, are used in place of loading
+    them again.
     """
     film = film or FILM
     references = terms.receipt_references(code, film.narration.terms, records)
     script = repository.read(Edition(code).script)
     require_terms(code, records, film)
+    pronounced = pronunciations(code)
     lines = held(code, script, film)
     asr, aligner = models or (load_asr(), load_aligner())
-    return bench(code, references, asr=asr, aligner=aligner, film=film), lines
+    measured_on = bench(
+        code, references, asr=asr, aligner=aligner, film=film, pronounced=pronounced
+    )
+    return measured_on, lines
 
 
 def thoughts(records: list[dict]) -> Iterator[tuple[dict, dict]]:

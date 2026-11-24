@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 import fit_bench
 import numpy as np
+import pronounced
 import pytest
 
 import filmkit.film as film
@@ -144,12 +145,14 @@ def stand_ins(monkeypatch):
 def narrated(retained_records, declared, stand_ins, tmp_path, monkeypatch):
     """An English edition whose receipt a test narrates from the PCM of its two thoughts.
 
-    The film declares no clarity floor, and the recognizer and the aligner are stand-ins:
-    `narrated.recognizer` and `narrated.aligner`.
+    The film declares no clarity floor, the recognizer and the aligner are stand-ins,
+    `narrated.recognizer` and `narrated.aligner`, and the fixture lines of CMUdict
+    (`pronounced`) stand where the supply step places the pinned file.
     """
     from filmkit.narration.narrate import evidence_paths
 
     monkeypatch.setattr(repository, "ROOT", tmp_path)
+    pronounced.supplied(monkeypatch)
     declared(clarity_minimum_db=None)
     edition = Edition("en")
     repository.write(edition.places.pronunciation, {"normalization": []})
@@ -252,7 +255,8 @@ def engine(stand_ins, declared, voiced, monkeypatch, tmp_path):
     cast, so its plan, its requests, its retained recordings and its receipt are the engine's;
     the two checks' outputs are written as of that receipt. `engine.sound(seed, text)` gives
     the PCM the voice says, and `engine.stop_at`, a seed and a text, has the voice take a
-    request to end when it is asked for that take.
+    request to end when it is asked for that take. The fixture lines of CMUdict stand in for the
+    supplied dictionary (`pronounced`).
     """
     import converging
 
@@ -262,6 +266,7 @@ def engine(stand_ins, declared, voiced, monkeypatch, tmp_path):
     import filmkit.narration.synthesis as narration_synthesis
 
     monkeypatch.setattr(repository, "ROOT", tmp_path)
+    pronounced.supplied(monkeypatch)
     declared(clarity_minimum_db=None)
     state = SimpleNamespace(seed=None, said=[], narrations=0, stop_at=None)
     state.sound = lambda _seed, _text: voiced()

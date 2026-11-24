@@ -116,10 +116,13 @@ def audition(
     }
     references = terms.receipt_references(code, FILM.narration.terms, records)
     judgment.require_terms(code, records, FILM)
+    pronounced = judgment.pronunciations(code)
     model = group_generation.load_voice_model()
     asr = load_asr()
     aligner = load_aligner()
-    bench = judgment.bench(code, references, asr=asr, aligner=aligner, film=FILM)
+    bench = judgment.bench(
+        code, references, asr=asr, aligner=aligner, film=FILM, pronounced=pronounced
+    )
     held = judgment.held(code, script)
     folder.mkdir(parents=True, exist_ok=True)
     rows = []

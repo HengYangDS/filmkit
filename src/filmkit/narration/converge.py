@@ -362,13 +362,15 @@ def begin(code: str, asked: dict, former: dict) -> None:
 def admitted(code: str) -> dict:
     """What refuses a run before its first effect, each in its own words; then what a run takes
     from these checks: the record that a former run left. The script's pause policy can be
-    read (`fitting.declared`), no narration left a request started, and the former record can
-    be read (`left`).
+    read (`fitting.declared`), the pronunciations the edition's Latin units are heard by are in
+    place (`judgment.pronunciations`), no narration left a request started, and the former
+    record can be read (`left`).
 
     The command asks this before it opens its run (`main`), so that such a refusal writes no
     duration record and leaves the record of the convergence that narrated the standing build.
     """
     fitting.declared(code)
+    judgment.pronunciations(code)
     started = leftovers(code)
     if started:
         files = "\n".join(f"  {file}" for file in started)

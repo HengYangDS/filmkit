@@ -63,9 +63,13 @@ def parse(raw: bytes) -> Dictionary:
     }
 
 
+# The file read once a process, by its SHA-256: a convergence judges its edition in every round.
+_READ: dict[str, Dictionary] = {}
+
+
 def supplied() -> Dictionary:
     """The dictionary the supply step placed, refused in one line where it is missing or differs
-    from its pinned SHA-256."""
+    from its pinned SHA-256. Its bytes are checked at every call and parsed once a process."""
     path = repository.ROOT / PLACE
     if not path.is_file():
         msg = f"The pinned CMUdict is missing at {PLACE}; run {SUPPLY}"
@@ -74,4 +78,6 @@ def supplied() -> Dictionary:
     if len(raw) != BYTES or repository.content_sha(raw) != SHA256:
         msg = f"The CMUdict at {PLACE} differs from the pinned SHA-256 {SHA256}; run {SUPPLY}"
         raise DictionaryError(msg)
-    return parse(raw)
+    if SHA256 not in _READ:
+        _READ[SHA256] = parse(raw)
+    return _READ[SHA256]

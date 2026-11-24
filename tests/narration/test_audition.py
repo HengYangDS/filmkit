@@ -7,10 +7,12 @@ import wave
 from types import SimpleNamespace
 
 import numpy as np
+import pronounced
 import pytest
 
 import filmkit.film as film
 import filmkit.narration.audition as narration_audition
+import filmkit.narration.cmudict as narration_cmudict
 import filmkit.narration.group_generation as narration_group_generation
 import filmkit.narration.terms as narration_terms
 import filmkit.repository as repository
@@ -137,10 +139,12 @@ def test_apply_dry_run_leaves_the_cast_unchanged(tmp_path, cast, capsys):
 def auditioned(retained_group_record, declared, monkeypatch):
     """An English edition whose declared receipt holds one grouped, bound recording.
 
-    The film declares no clarity floor, so no take is decoded for its clarity.
+    The film declares no clarity floor, so no take is decoded for its clarity, and the fixture
+    lines of CMUdict stand in for the supplied dictionary (`pronounced`).
     """
     root, record, plans, settings = retained_group_record
     monkeypatch.setattr(repository, "ROOT", root)
+    pronounced.supplied(monkeypatch)
     declared(clarity_minimum_db=None)
     record = {**record, "text_sha256": sha256(record["text"])}
     edition = Edition("en")
@@ -233,6 +237,12 @@ def test_audition_refuses_before_loading_any_model(auditioned, tamper, error, me
     with pytest.raises(error, match=message):
         narration_audition.audition("en", "targets.json")
     assert not (auditioned["root"] / narration_audition.AUDITIONS).exists()
+
+
+def test_an_audition_without_the_dictionary_stops_before_any_model_loads(auditioned):
+    (auditioned["root"] / narration_cmudict.PLACE).unlink()
+    with pytest.raises(SystemExit, match="^en: The pinned CMUdict is missing .* filmkit.supply$"):
+        narration_audition.audition("en", "targets.json")
 
 
 def test_audition_preserves_existing_proposals(auditioned):
