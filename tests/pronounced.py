@@ -4,9 +4,9 @@ pronunciations (`filmkit.narration.cmudict`).
 They hold the words of the Change's scenarios. Where the Change's readings read a word in the
 pinned file (labelled, tiers, tears, their, an, and, or, are, a, ai, catalogue, to and its
 homophones), its lines state what they read; the others are written for the tests. The test over
-the pinned file itself is marked `cmudict` (`test_cmudict.py`). A test that stands the lines in
-for the supplied file writes them where the supply step places it and pins their own SHA-256 and
-size (`supplied`).
+the pinned file itself is marked `cmudict` (`tests/narration/test_cmudict.py`). A test that
+stands the lines in for the supplied file writes them where the supply step places it and pins
+their own SHA-256 and size (`supplied`).
 """
 
 import hashlib

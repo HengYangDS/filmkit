@@ -1,10 +1,14 @@
-"""Install the browser build and the speech models the engine pins, below the tool cache.
+"""Install the browser build, the dictionary and the speech models the engine pins, below the
+tool cache.
 
 The supply is the only build step that reaches the network. The locked @puppeteer/browsers installs
-the browser build that the picture's and the players' checks run, and huggingface_hub downloads each
-pinned model snapshot, from the mirror that HF_ENDPOINT names when it is set. Each is then checked
-against its pinned digests, so the build that follows reads only checked inputs and runs offline.
-Installing again keeps what is already in place.
+the browser build that the picture's and the players' checks run; the pinned CMUdict, which a
+judgment of an English edition reads (`filmkit.narration.cmudict`), is downloaded from its
+repository at its commit, checked for its size and SHA-256 and only then moved into its place; and
+huggingface_hub downloads each pinned model snapshot, from the mirror that HF_ENDPOINT names when it
+is set. Each is checked against its pinned digests, so the build that follows reads only checked
+inputs and runs offline. Installing again keeps what is already in place: a dictionary whose bytes
+hold the pin is not downloaded again.
 
 Usage: python -m filmkit.supply
 """
@@ -13,10 +17,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import shutil
+import urllib.request
 from pathlib import Path
 
 from huggingface_hub import snapshot_download
 
+import filmkit.narration.cmudict as cmudict
 import filmkit.picture.browser as picture_browser
 import filmkit.repository as repository
 from filmkit.narration.snapshots import ALIGNER, RECOGNIZER, VOICE, SnapshotError
@@ -50,6 +58,33 @@ def supply_browser() -> dict:
     return {"build": f"{product}@{version}", "executable": repository.relative(executable)}
 
 
+def fetch(url: str, place: Path, *, deadline: int) -> None:
+    """Download a URL's bytes into a file."""
+    with urllib.request.urlopen(url, timeout=deadline) as response, place.open("wb") as stream:
+        shutil.copyfileobj(response, stream)
+
+
+def supply_dictionary() -> dict:
+    """Place the pinned CMUdict, downloaded and checked beside its place and moved there only
+    once its size and SHA-256 are the pin's; a file in place that holds the pin is kept."""
+    place = repository.ROOT / cmudict.PLACE
+    said = {"url": cmudict.URL, "file": cmudict.PLACE, "bytes": cmudict.BYTES}
+    said["sha256"] = cmudict.SHA256
+    if place.is_file() and repository.sha(place) == cmudict.SHA256:
+        return {**said, "kept": True}
+    place.parent.mkdir(parents=True, exist_ok=True)
+    partial = place.with_name(f".{place.name}.{os.getpid()}.partial")
+    try:
+        fetch(cmudict.URL, partial, deadline=DEADLINE)
+        if partial.stat().st_size != cmudict.BYTES or repository.sha(partial) != cmudict.SHA256:
+            msg = f"The CMUdict downloaded from {cmudict.URL} differs from the pinned SHA-256"
+            raise SupplyError(msg)
+        partial.replace(place)
+    finally:
+        partial.unlink(missing_ok=True)
+    return {**said, "kept": False}
+
+
 def supply_models() -> list[dict]:
     """Download each pinned model snapshot into its folder and check its weights."""
     models = []
@@ -72,7 +107,8 @@ def supply_models() -> list[dict]:
 
 def main(argv: list[str] | None = None) -> None:
     argparse.ArgumentParser(description=__doc__.splitlines()[0]).parse_args(argv)
-    report = {"browser": supply_browser(), "models": supply_models()}
+    report = {"browser": supply_browser(), "dictionary": supply_dictionary()}
+    report["models"] = supply_models()
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 

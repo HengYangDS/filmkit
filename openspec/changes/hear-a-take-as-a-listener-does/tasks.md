@@ -38,7 +38,7 @@ Shown by `tests/test_languages.py`, `tests/narration/test_cmudict.py`, `tests/te
       `python -m filmkit.supply`. Done when a new `tests/narration/test_cmudict.py` reads a fixture of CMUdict lines
       with a comment, a numbered variant, `tears`, `catalogue` and `catalog`, and holds the first pronunciation kept
       first, `catalogue`'s equal to `catalog`'s, and both refusals; and passes.
-- [ ] 2.3 Let `filmkit.supply` download the pinned file into its place before the models, check its size and SHA-256,
+- [x] 2.3 Let `filmkit.supply` download the pinned file into its place before the models, check its size and SHA-256,
       move it into its place only once checked, and keep a file in place whose SHA-256 is the pin's; its report names
       the file. Done when `tests/test_supply.py` holds, with the download stubbed, a checked file in its place, a
       download of other bytes refused with nothing left in the place, and a file in place kept without a download; and

@@ -2,8 +2,10 @@
 
 import json
 
+import pronounced
 import pytest
 
+import filmkit.narration.cmudict as cmudict
 import filmkit.picture.browser as picture_browser
 import filmkit.repository as repository
 import filmkit.supply as supply
@@ -50,11 +52,20 @@ def root(tmp_path, monkeypatch):
         for name in ("voice", "recognizer")
     )
     monkeypatch.setattr(supply, "SNAPSHOTS", snapshots)
-    return tmp_path, calls
+    served = {"bytes": pronounced.RAW}
+
+    def fetch(url, place, *, deadline):
+        calls.append(("dictionary", url, deadline))
+        place.write_bytes(served["bytes"])
+
+    monkeypatch.setattr(supply, "fetch", fetch)
+    monkeypatch.setattr(cmudict, "SHA256", repository.content_sha(pronounced.RAW))
+    monkeypatch.setattr(cmudict, "BYTES", len(pronounced.RAW))
+    return tmp_path, calls, served
 
 
 def test_the_supply_installs_and_checks_the_browser_and_every_model(root, capsys):
-    folder, calls = root
+    folder, calls, _ = root
     supply.main([])
     product, version = picture_browser.BROWSER
     install = calls[0][1]
@@ -65,13 +76,54 @@ def test_the_supply_installs_and_checks_the_browser_and_every_model(root, capsys
         "--path",
         str(folder / "build/runtime/tool-cache/browsers"),
     ]
-    assert [call[1:4] for call in calls[1:]] == [
+    # The dictionary is placed before the models.
+    assert calls[1] == ("dictionary", cmudict.URL, supply.DEADLINE)
+    assert [call[1:4] for call in calls[2:]] == [
         ("org/voice", "c" * 40, ["*.safetensors"]),
         ("org/recognizer", "c" * 40, ["*.safetensors"]),
     ]
     report = json.loads(capsys.readouterr().out)
     assert report["browser"]["build"] == f"{product}@{version}"
+    assert report["dictionary"] == {
+        "url": cmudict.URL,
+        "file": cmudict.PLACE,
+        "bytes": len(pronounced.RAW),
+        "sha256": cmudict.SHA256,
+        "kept": False,
+    }
     assert [model["repo"] for model in report["models"]] == ["org/voice", "org/recognizer"]
+    assert (folder / cmudict.PLACE).read_bytes() == pronounced.RAW
+
+
+def test_a_download_of_other_bytes_is_refused_and_leaves_nothing_in_the_place(root):
+    folder, calls, served = root
+    served["bytes"] = pronounced.RAW + b"zebra Z IY1 B R AH0\n"
+    with pytest.raises(SupplyError, match="differs from the pinned SHA-256"):
+        supply.main([])
+    assert not (folder / cmudict.PLACE).exists()
+    assert list((folder / cmudict.PLACE).parent.iterdir()) == []
+    # Nothing after the dictionary is supplied.
+    assert [call[0] for call in calls] == ["install", "dictionary"]
+
+
+def test_a_file_in_place_that_holds_the_pin_is_kept_without_a_download(root, capsys):
+    folder, calls, _ = root
+    place = folder / cmudict.PLACE
+    place.parent.mkdir(parents=True)
+    place.write_bytes(pronounced.RAW)
+    supply.main([])
+    assert "dictionary" not in [call[0] for call in calls]
+    assert json.loads(capsys.readouterr().out)["dictionary"]["kept"] is True
+
+
+def test_a_file_in_place_of_other_bytes_is_replaced_by_the_pinned_one(root):
+    folder, calls, _ = root
+    place = folder / cmudict.PLACE
+    place.parent.mkdir(parents=True)
+    place.write_bytes(b"an older file\n")
+    supply.main([])
+    assert "dictionary" in [call[0] for call in calls]
+    assert place.read_bytes() == pronounced.RAW
 
 
 @pytest.mark.usefixtures("root")
