@@ -240,9 +240,11 @@ def heard(**readings) -> narration_recognition.Names:
         ("A tier.", "Uh tier.", 1, 1),
         # A word the dictionary does not hold is compared by its letters.
         ("The delivery's end.", "The delivery end.", 1, 1),
-        # Each spelling whose first pronunciation is the text word's.
+        # Each spelling whose first pronunciation is the text word's; "tew" says T UW1 only as
+        # its second, so it differs.
         ("To go.", "Two go.", 1, 0),
         ("Too late.", "To late.", 1, 0),
+        ("To go.", "Tew go.", 1, 1),
     ],
 )
 def test_english_words_are_also_compared_by_their_pronunciation(
@@ -272,6 +274,10 @@ def test_a_word_declared_by_letter_names_is_compared_by_its_letters():
     assert narration_recognition.reading_distance("AI helps.", "A I helps.", (), letters) == 0
     # Declared so, it gives no pronunciation on the transcript's side either.
     assert narration_recognition.reading_distance("Eye helps.", "AI helps.", (), letters) == 1
+    # Its possessive and plural are the declared word's too, though CMUdict holds them as words.
+    assert narration_recognition.reading_distance("AI's aim.", "Eyes aim.", (), heard()) == 0
+    for text in ("AI's aim.", "AIs aim."):
+        assert narration_recognition.reading_distance(text, "Eyes aim.", (), letters) == 1
 
 
 def test_a_declared_term_is_held_to_its_form_and_not_to_its_pronunciation():

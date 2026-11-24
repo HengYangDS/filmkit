@@ -130,9 +130,12 @@ def test_a_gated_finding_is_recorded_and_refused(measured):
     assert len(record["gated_findings"]) == 1
 
 
-def test_a_segment_whose_thoughts_were_heard_clear_is_still_refused_under_the_floor(monkeypatch):
+def test_a_segment_whose_thoughts_were_heard_clear_is_still_refused_under_the_floor(
+    measured, monkeypatch
+):
     import filmkit.film as film
 
+    edition, measures = measured
     # The owner heard every take of segment 08 clear; the gate reads no record of hearing.
     heard = tuple(
         film.Heard(
@@ -147,13 +150,16 @@ def test_a_segment_whose_thoughts_were_heard_clear_is_still_refused_under_the_fl
         for index in (1, 2)
     )
     narration = film.FILM.narration.model_copy(update={"heard": heard})
-    monkeypatch.setattr(film, "FILM", film.FILM.model_copy(update={"narration": narration}))
-    clarity = {
+    declared = film.FILM.model_copy(update={"narration": narration})
+    for module in (film, sound_gates.clarity):
+        monkeypatch.setattr(module, "FILM", declared)
+    measures["clarity"] = {
         "floor_db": 18.0,
         "soundtrack": {"cpp_db": 18.3, "frames": 9000, "below_floor": False},
         "segments": [{"id": "08", "cpp_db": 17.6, "frames": 400, "below_floor": True}],
         "segments_below_floor": ["08"],
     }
-    assert sound_gates.sound_findings(clarity, NATURAL) == [
-        "segment 08's clarity is 17.6 dB, below the declared 18.0 dB"
-    ]
+    message = "segment 08's clarity is 17.6 dB, below the declared 18.0 dB"
+    with pytest.raises(AssemblyError, match=message):
+        sound_gates.check_sound(edition)
+    assert repository.read(edition.sound_gates)["verdict"] == "refuse"

@@ -104,10 +104,11 @@ class Heard(NamedTuple):
 
     def of(self, unit: str) -> tuple[tuple[tuple[str, ...], ...], tuple[str, ...] | None]:
         """A Latin unit's readings as a text's unit and its first pronunciation as a
-        transcript's, each looked up as written and then by its letters."""
+        transcript's, each looked up as written and then by its letters. A word declared by its
+        letter names gives none, nor do its possessive and plural ("AI's", "AIs")."""
         letters = unit.replace("'", "")
         declared = self.declared.get(unit, self.declared.get(letters))
-        if declared == ():
+        if declared == () or self.declared.get(letters.removesuffix("s")) == ():
             return (), None
         found = self.said.get(unit) or self.said.get(letters)
         first = found[0] if found else None

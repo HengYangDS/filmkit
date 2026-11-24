@@ -20,6 +20,8 @@ a(2) EY1
 ahn AA1 N
 ai AY1
 ai(2) EY1 AY1
+ai's AY1 Z
+ais AY1 Z
 an AE1 N
 an(2) AH0 N
 and AH0 N D
@@ -33,6 +35,7 @@ catalogue K AE1 T AH0 L AO2 G
 d'artagnan D AH0 R T AE1 NG Y AH0 N # foreign french
 delivery D IH0 L IH1 V ER0 IY0
 eye AY1
+eyes AY1 Z
 get G EH1 T
 get(2) G IH1 T
 git G IH1 T

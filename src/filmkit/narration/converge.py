@@ -17,16 +17,15 @@ The command needs no targets file, no phrase and no seed from a person:
    round. It does so for --rounds rounds, or until none is refused.
 4. For what is still refused it tries one round of run-on takes: the thought narrated on into
    the thought that follows it and cut in the quiet between them (`narration.run_on`).
+5. When no thought is refused or waits for the ear it counts the settled edition by the
+   assembly's own count (`filmkit.narration.fitting`): it selects the recordings and counts them
+   as `produce select` and `produce fit` do, replaces no take and changes no pause policy. An
+   edition lasts as long as its narration, so the count states its runtime and never misses one.
+
 A thought whose take reads under its clarity line, with no hearing of that take that settles it,
 is for the owner's ear (`judgment.for_the_ear`): it is refused by no line, so it gets no candidate,
-and the convergence names it with its take's path, audio SHA-256, clarity and line, records it
-apart (`for_the_ear`) and exits 1 while it waits.
-
-5. When no thought is refused or waits for the ear it counts the settled edition by the assembly's
-   own count
-   (`filmkit.narration.fitting`): it selects the recordings and counts them as `produce select`
-   and `produce fit` do, replaces no take and changes no pause policy. An edition lasts as long
-   as its narration, so the count states its runtime and never misses one.
+and it is not settled; the convergence names it with its take's path, audio SHA-256, clarity and
+line, records it apart (`for_the_ear`) and exits 1 while it waits.
 
 The record, convergence.json beside the receipt, binds the receipt, the script and the cast it
 was made from and states the rounds and takes asked for. It holds for each thought that was
@@ -218,6 +217,11 @@ class Session:
         return row
 
 
+def settled(row: dict) -> bool:
+    """Whether a judged thought is settled: no line refuses it and it waits for no ear."""
+    return not row["failed"] and not judgment.for_the_ear(row)
+
+
 def entries(former: dict, rows: list[dict]) -> dict[str, dict]:
     """The entries of the record that a former run left (`left`, its one reader) for thoughts
     whose spoken text still stands. An entry that lacks its thought or its spoken text, or
@@ -307,7 +311,7 @@ def write_record(
             continue
         entry = entry_of(found, row)
         entry["final"] = {"seed": row["seed"], "failed": row["failed"]}
-        entry["settled"] = not row["failed"]
+        entry["settled"] = settled(row)
         if row["failed"] and ended:
             tried = entry["candidates"] or "no_run_on" in entry
             unsettled[name] = {
@@ -395,7 +399,7 @@ def converge(code: str, former: dict, *, rounds: int = 2, takes: int = 3) -> dic
     session = Session(code)
     state = session.judge()
     found = entries(former, state[1])
-    settled = {"first take": sum(1 for row in state[1] if not row["failed"])}
+    counted = {"first take": sum(1 for row in state[1] if settled(row))}
     for number in [*range(1, rounds + 1), RUN_ON]:
         if not any(row["failed"] for row in state[1]):
             break
@@ -412,7 +416,7 @@ def converge(code: str, former: dict, *, rounds: int = 2, takes: int = 3) -> dic
             narrate(code)
             state = session.judge()
         name = RUN_ON if number == RUN_ON else f"round {number}"
-        settled[name] = sum(1 for row in state[1] if not row["failed"])
+        counted[name] = sum(1 for row in state[1] if settled(row))
     if any(row["failed"] for row in state[1]):
         fit = fitting.not_asked(fitting.UNSETTLED)
     elif judgment.ear(state[1]):
@@ -429,7 +433,7 @@ def converge(code: str, former: dict, *, rounds: int = 2, takes: int = 3) -> dic
     record = write_record(code, found, state[1], asked, ended=True, fit=fit)
     counts = {
         "thoughts": len(state[1]),
-        "settled_after": settled,
+        "settled_after": counted,
         "takes_generated": session.generated,
         "takes_found": session.reused,
         "unsettled": {name: verdict["failed"] for name, verdict in record["unsettled"].items()},
@@ -466,12 +470,7 @@ def waiting(code: str, record: dict) -> str | None:
     if not ear:
         return None
     lines = [f"{code}: {len(ear)} thoughts wait for the owner's ear"]
-    lines += [
-        f"  {name}: {take['path']} ({take['wav_sha256']}) reads {take['cpp_db']} dB, under its "
-        f"line of {take['line_db']} dB"
-        for name, take in ear.items()
-    ]
-    return "\n".join(lines)
+    return "\n".join([*lines, *judgment.waiting_lines(ear)])
 
 
 def main(argv: list[str] | None = None) -> None:

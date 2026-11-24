@@ -537,11 +537,16 @@ def ear(rows: list[dict]) -> dict[str, dict]:
 
 
 def waiting(rows: list[dict]) -> list[str]:
+    """One line for each thought for the ear among judged rows (`waiting_lines`)."""
+    return waiting_lines(ear(rows))
+
+
+def waiting_lines(ear: dict[str, dict]) -> list[str]:
     """One line for each thought for the ear, naming its take's path and audio SHA-256."""
     return [
         f"  {name}: {take['path']} ({take['wav_sha256']}) reads {take['cpp_db']} dB, under its "
         f"line of {take['line_db']} dB"
-        for name, take in ear(rows).items()
+        for name, take in ear.items()
     ]
 
 

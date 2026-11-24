@@ -449,3 +449,6 @@ def test_a_thought_under_its_line_that_another_line_refuses_gets_candidates(
     assert entry["chosen"] == [{"round": 1, "seed": seed_of(12), "kind": "plain"}]
     assert [take["failed"] for take in entry["candidates"]] == [[], [], []]
     assert list(record_of()["for_the_ear"]) == ["26.2"]
+    # A thought that waits for the ear is not settled, in the record or in the counts.
+    assert entry["settled"] is False
+    assert counts(capsys)["settled_after"] == {"first take": 1, "round 1": 1}
