@@ -376,7 +376,7 @@ def identities() -> set[str]:
     names |= {source, source.rstrip("/").rsplit("/", 1)[-1]}
     for code in CODES:
         script = repository.read(Edition(code).script)
-        names |= {script["title"], *script["title"].split(" · "), script["author"]}
+        names |= {script["title"], *script["title"].split(" · "), film.FILM.author}
         names |= {chapter["title"] for chapter in script["chapters"]}
     return names
 

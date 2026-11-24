@@ -66,11 +66,8 @@ def test_assembly_refuses_a_recording_whose_waveform_differs(edition):
 
 @pytest.mark.ffmpeg
 def test_assembly_lays_out_each_recording_with_its_own_level_and_exact_samples(two_chapters):
-    # A segment that states another chapter title than its chapter's is laid out with its
-    # chapter's, and the timeline states the film's author and the engine's frame rate.
-    script = json.loads((repository.ROOT / two_chapters.script).read_text())
-    script["segments"][0]["chapter_title"] = "Not the chapter's"
-    (repository.ROOT / two_chapters.script).write_text(json.dumps(script, ensure_ascii=False))
+    # Each segment is laid out with its chapter's index and title, and the timeline states the
+    # film's author and the engine's frame rate, none of which the script states.
     soundtrack_assembly.assemble(two_chapters)
     receipt = json.loads(two_chapters.audio_assembly.read_text())
     timeline = json.loads(two_chapters.timeline.read_text())
@@ -259,16 +256,10 @@ def test_assembly_refuses_a_value_the_chapter_metadata_cannot_hold_before_it_dec
 ):
     # A chapter title that ends in a backslash cannot be kept in chapters.ffmeta: the assembly
     # refuses it before a recording is decoded and before anything is written. It checks the
-    # title of the segment's chapter, not one the segment states, which nothing reads.
+    # title of the segment's chapter, from the script's chapters.
     script = repository.ROOT / two_chapters.script
     declared = json.loads(script.read_text())
-    declared["segments"][1]["chapter_title"] = "B\\"
-    script.write_text(json.dumps(declared, ensure_ascii=False))
     monkeypatch.setattr(soundtrack_assembly, "_decode", decoding)
-    with pytest.raises(Decoded):
-        soundtrack_assembly.assemble(two_chapters)
-    # That run made the edition's folder and wrote nothing in it.
-    two_chapters.artifacts.rmdir()
     declared["chapters"][1]["title"] = "B\\"
     script.write_text(json.dumps(declared, ensure_ascii=False))
     with pytest.raises(CaptionError) as refusal:
@@ -286,7 +277,7 @@ def test_segments_of_one_chapter_are_leveled_within_the_declared_tolerance(two_c
     # Without the declaration the two recordings stand as far apart as they were recorded.
     script = json.loads((repository.ROOT / two_chapters.script).read_text())
     for segment in script["segments"]:
-        segment["chapter"], segment["chapter_title"] = "a", "A"
+        segment["chapter"] = "a"
     (repository.ROOT / two_chapters.script).write_text(json.dumps(script, ensure_ascii=False))
     soundtrack_assembly.assemble(two_chapters)
     undeclared = two_chapters.soundtrack.read_bytes()

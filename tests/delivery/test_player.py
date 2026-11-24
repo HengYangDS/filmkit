@@ -16,7 +16,7 @@ import filmkit.delivery.player as delivery_player
 import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.specification as specification
-from filmkit.film import FILM
+from filmkit.film import FILM, timeline_values
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
 
 
@@ -370,9 +370,10 @@ def test_packaging_writes_the_engines_player_and_records_what_it_shows(tmp_path,
     for path in (*sources, delivery_packaging.INDEX, COMPOSITION_SCRIPT):
         (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(sample / path, tmp_path / path)
-    # A timeline as assembly writes it: each scene's times beside its script fields.
+    # A timeline as assembly writes it: each scene's times beside its script fields and the
+    # chapter values the engine derives.
     segments = []
-    for index, scene in enumerate(script["segments"]):
+    for index, scene in enumerate(timeline_values(script, FILM)["segments"]):
         start = 12.0 * index
         voice = {"voice_start": start + 2, "voice_end": start + 10, "gap_kind": "thought"}
         segments.append({**scene, "start": start, "end": start + 12, **voice})

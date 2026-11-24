@@ -1,6 +1,5 @@
 {
   "title": "Sample Reel · From Sources to Film",
-  "author": "Yang HENG",
   "release": {
     "year": 2026,
     "collection": "Sample Reel · From Sources to Film",
@@ -20,7 +19,6 @@
       "narration": "English narration"
     }
   },
-  "fps": 60,
   "source": "content/source-manifest.json",
   "chapters": [
     {
@@ -94,8 +92,6 @@
     {
       "id": "01",
       "chapter": "sources",
-      "chapter_index": 0,
-      "chapter_title": "Where a film begins",
       "title": "Three kinds of source",
       "source_sections": [
         "README:Layout"
@@ -117,8 +113,6 @@
     {
       "id": "02",
       "chapter": "build",
-      "chapter_index": 1,
-      "chapter_title": "One offline build",
       "title": "Narration, soundtrack and captions",
       "source_sections": [
         "README:Rebuilding the films"
@@ -139,8 +133,6 @@
     {
       "id": "03",
       "chapter": "build",
-      "chapter_index": 1,
-      "chapter_title": "One offline build",
       "title": "Picture and films",
       "source_sections": [
         "README:Rebuilding the films"
@@ -162,8 +154,6 @@
     {
       "id": "04",
       "chapter": "check",
-      "chapter_index": 2,
-      "chapter_title": "Checked against its sources",
       "title": "Checking the films",
       "source_sections": [
         "README:Rebuilding the films"

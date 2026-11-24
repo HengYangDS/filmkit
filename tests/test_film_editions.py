@@ -313,10 +313,25 @@ def test_the_review_tables_readings_are_refused_beside_other_problems(declared):
     assert "\nslug\n" in other and "review.readings" not in other
 
 
-def test_the_timeline_values_of_the_sample_are_those_its_scripts_state():
+# The chapter of each of the sample's segments, by its index and title, which its scripts stated
+# until the engine derived them.
+SAMPLE_CHAPTERS = {
+    "zh": [(0, "从源文件开始"), (1, "一次离线构建"), (1, "一次离线构建"), (2, "逐项核对")],
+    "en": [
+        (0, "Where a film begins"),
+        (1, "One offline build"),
+        (1, "One offline build"),
+        (2, "Checked against its sources"),
+    ],
+}
+
+
+def test_the_timeline_values_of_the_sample_are_those_its_scripts_stated():
     for code in production.CODES:
-        script = repository.read(production.Edition(code).script)
-        assert film.timeline_values(script, film.FILM) == script
+        derived = film.timeline_values(repository.read(production.Edition(code).script), film.FILM)
+        assert (derived["author"], derived["fps"]) == ("Yang HENG", 60)
+        chapters = [(s["chapter_index"], s["chapter_title"]) for s in derived["segments"]]
+        assert chapters == SAMPLE_CHAPTERS[code]
     # A segment's chapter fields come from the chapter it names, whatever it states.
     script = repository.read(production.Edition("en").script)
     script["segments"][0] |= {"chapter": "check", "chapter_title": "Stated", "chapter_index": 7}
@@ -346,3 +361,24 @@ def test_staging_and_the_refresh_read_no_chapter_value_a_script_states():
     script["segments"][0] |= {"chapter_title": "Stated", "chapter_index": 7}
     assert rendering.follows_script(timeline, script)
     assert refresh.narration_source(script) == refresh.narration_source(timeline)
+
+
+@pytest.mark.parametrize(
+    ("kind", "key"),
+    [
+        ("script", "author"),
+        ("script", "fps"),
+        ("segment", "chapter_index"),
+        ("segment", "chapter_title"),
+    ],
+)
+def test_a_value_every_timeline_derives_is_refused_where_a_script_states_it(declared, kind, key):
+    path = declared / "content/en" / film.SCRIPT
+    script = json.loads(path.read_text())
+    where = "content/en/film-script.json"
+    held = script["segments"][0] if kind == "segment" else script
+    held[key] = 1
+    if kind == "segment":
+        where += f" segment {held['id']}"
+    path.write_text(json.dumps(script, ensure_ascii=False))
+    assert film.problems(declared) == [f"{where} declares {key}; {withdrawn.keys(kind)[key]}"]

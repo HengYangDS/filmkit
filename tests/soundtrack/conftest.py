@@ -76,7 +76,6 @@ def two_chapters(tmp_path, monkeypatch, performance):
             {
                 "id": segment_id,
                 "chapter": chapter,
-                "chapter_title": chapter.upper(),
                 "title": f"Scene {segment_id}",
                 "utterance_groups": ["甲乙。", "丙丁。"],
                 "text": text,

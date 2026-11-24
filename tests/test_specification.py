@@ -19,13 +19,13 @@ declared, rewrite = test_film.declared, test_film.rewrite
 
 def test_scripts_that_disagree_refuse(tmp_path, monkeypatch):
     monkeypatch.setattr(repository, "ROOT", tmp_path)
-    for code, author in zip(CODES, ("One Author", "Another Author"), strict=True):
+    for code, title in zip(CODES, ("One Title", "Another Title"), strict=True):
         script = tmp_path / Edition(code).script
         script.parent.mkdir(parents=True, exist_ok=True)
-        script.write_text(json.dumps({"author": author, "chapters": [{}, {}]}))
+        script.write_text(json.dumps({"title": title, "chapters": [{}, {}]}))
     assert specification.declared("chapters", len) == 2
-    with pytest.raises(ValueError, match="different author values"):
-        specification.declared("author", str)
+    with pytest.raises(ValueError, match="different title values"):
+        specification.declared("title", str)
 
 
 def test_the_frame_rate_is_the_engines_and_the_author_the_declarations():

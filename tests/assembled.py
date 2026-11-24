@@ -35,7 +35,6 @@ def stage(tmp_path, monkeypatch, code, groups, words, captions=()):
     segment = {
         "id": "01",
         "chapter": "a",
-        "chapter_title": "A",
         "title": "Scene 01",
         "utterance_groups": list(groups),
         "text": text,

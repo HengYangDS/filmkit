@@ -39,6 +39,21 @@ WITHDRAWN = (
         f"state the credits' length once, as credits_duration in {DECLARATION}",
     ),
     Withdrawn("script", "language", BY_CODE),
+    Withdrawn(
+        "script",
+        "author",
+        f"remove it and state the films' author once, as author in {DECLARATION}",
+    ),
+    Withdrawn("script", "fps", "remove it: the engine renders and encodes every film at 60 fps"),
+    *(
+        Withdrawn(
+            "segment",
+            key,
+            "remove it: the engine takes a segment's chapter index and title from the script's "
+            "chapters, through the segment's chapter",
+        )
+        for key in ("chapter_index", "chapter_title")
+    ),
     Withdrawn("segment", "language", BY_CODE),
     Withdrawn(
         "cast",

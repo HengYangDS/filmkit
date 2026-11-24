@@ -1,6 +1,5 @@
 {
   "title": "示例影片 · 从源文件到成片",
-  "author": "Yang HENG",
   "release": {
     "year": 2026,
     "collection": "示例影片 · 从源文件到成片",
@@ -20,7 +19,6 @@
       "narration": "中文旁白"
     }
   },
-  "fps": 60,
   "source": "content/source-manifest.json",
   "chapters": [
     {
@@ -100,8 +98,6 @@
     {
       "id": "01",
       "chapter": "sources",
-      "chapter_index": 0,
-      "chapter_title": "从源文件开始",
       "title": "三类源文件",
       "source_sections": [
         "README:Layout"
@@ -123,8 +119,6 @@
     {
       "id": "02",
       "chapter": "build",
-      "chapter_index": 1,
-      "chapter_title": "一次离线构建",
       "title": "旁白、音轨和字幕",
       "source_sections": [
         "README:Rebuilding the films"
@@ -145,8 +139,6 @@
     {
       "id": "03",
       "chapter": "build",
-      "chapter_index": 1,
-      "chapter_title": "一次离线构建",
       "title": "画面与成片",
       "source_sections": [
         "README:Rebuilding the films"
@@ -168,8 +160,6 @@
     {
       "id": "04",
       "chapter": "check",
-      "chapter_index": 2,
-      "chapter_title": "逐项核对",
       "title": "核对成片",
       "source_sections": [
         "README:Rebuilding the films"

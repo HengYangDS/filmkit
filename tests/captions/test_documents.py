@@ -321,10 +321,10 @@ def test_a_test_language_is_bylined_by_its_declared_name_and_byline(code, byline
 
 def test_the_metadata_check_reads_a_scripts_derived_chapter_title(tmp_path, monkeypatch):
     # The assembly checks a script with what the engine derives for its timeline: the title of
-    # each segment's chapter from the script's chapters, not one the segment states.
+    # each segment's chapter from the script's chapters, which a segment does not state.
     timeline, edition = marked(tmp_path, monkeypatch)
-    stated = {**timeline["segments"][0], "chapter_title": "Ends \\"}
-    script = {**timeline, "chapters": [{"id": "one", "title": "One"}], "segments": [stated]}
+    segment = {k: v for k, v in timeline["segments"][0].items() if k != "chapter_title"}
+    script = {**timeline, "chapters": [{"id": "one", "title": "One"}], "segments": [segment]}
     captions_documents.require_metadata_values(timeline_values(script, FILM), SCRIPT, edition)
     script["chapters"][0]["title"] = "Ends \\"
     with pytest.raises(CaptionError) as refusal:
