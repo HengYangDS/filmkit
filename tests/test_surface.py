@@ -5,6 +5,7 @@ so that no task or gate passes by doing nothing; and the two commands moved out 
 production command name their options."""
 
 import ast
+import runpy
 import subprocess
 import sys
 from pathlib import Path
@@ -73,6 +74,14 @@ def test_every_retired_module_command_refuses_naming_its_verb():
         )
         assert (done.returncode, done.stdout) == (1, ""), module
         assert done.stderr.splitlines() == [f"python -m {module} is retired: run {verb}"]
+
+
+def test_the_register_command_refuses_in_the_suite_s_own_process():
+    # Its refusal is its package's `__main__.py`, which no import runs: the child processes above
+    # run it where the coverage that the proof's behaviour gate reads does not see it.
+    with pytest.raises(SystemExit) as ended:
+        runpy.run_module("filmkit.register", run_name="__main__")
+    assert str(ended.value) == "python -m filmkit.register is retired: run filmkit check"
 
 
 @pytest.mark.parametrize(
