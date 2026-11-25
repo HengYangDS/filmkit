@@ -33,8 +33,8 @@ import { seekPoints } from "./player-verdict.mjs";
 export { decodePng, digestFile, seekPoints };
 
 const USAGE =
-  "Usage: python -m filmkit.tools player-check players <binding.json> <receipt.json>\n" +
-  "       python -m filmkit.tools player-check cover <stage-dir> <cover.png> <output.png>";
+  "Usage: node player-check.mjs players <binding.json> <receipt.json>\n" +
+  "       node player-check.mjs cover <stage-dir> <cover.png> <output.png>";
 /* A film's file prefix: lowercase words joined by hyphens. */
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const DEADLINE = 300000;

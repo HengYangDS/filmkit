@@ -9,8 +9,8 @@ import filmkit.narration.cmudict as cmudict
 import filmkit.picture.browser as picture_browser
 import filmkit.repository as repository
 import filmkit.supply as supply
+from filmkit.graph import cli
 from filmkit.narration.snapshots import DOWNLOAD_RECORDS, Snapshot
-from filmkit.supply import SupplyError
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ def root(tmp_path, monkeypatch):
 
 def test_the_supply_installs_and_checks_the_browser_and_every_model(root, capsys):
     folder, calls, _ = root
-    supply.main([])
+    cli.main(["supply"])
     product, version = picture_browser.BROWSER
     install = calls[0][1]
     assert install[0] == str(folder / "node_modules/.bin/browsers")
@@ -98,8 +98,8 @@ def test_the_supply_installs_and_checks_the_browser_and_every_model(root, capsys
 def test_a_download_of_other_bytes_is_refused_and_leaves_nothing_in_the_place(root):
     folder, calls, served = root
     served["bytes"] = pronounced.RAW + b"zebra Z IY1 B R AH0\n"
-    with pytest.raises(SupplyError, match="differs from the pinned SHA-256"):
-        supply.main([])
+    with pytest.raises(SystemExit, match="differs from the pinned SHA-256"):
+        cli.main(["supply"])
     assert not (folder / cmudict.PLACE).exists()
     assert list((folder / cmudict.PLACE).parent.iterdir()) == []
     # Nothing after the dictionary is supplied.
@@ -111,7 +111,7 @@ def test_a_file_in_place_that_holds_the_pin_is_kept_without_a_download(root, cap
     place = folder / cmudict.PLACE
     place.parent.mkdir(parents=True)
     place.write_bytes(pronounced.RAW)
-    supply.main([])
+    cli.main(["supply"])
     assert "dictionary" not in [call[0] for call in calls]
     assert json.loads(capsys.readouterr().out)["dictionary"]["kept"] is True
 
@@ -121,7 +121,7 @@ def test_a_file_in_place_of_other_bytes_is_replaced_by_the_pinned_one(root):
     place = folder / cmudict.PLACE
     place.parent.mkdir(parents=True)
     place.write_bytes(b"an older file\n")
-    supply.main([])
+    cli.main(["supply"])
     assert "dictionary" in [call[0] for call in calls]
     assert place.read_bytes() == pronounced.RAW
 
@@ -129,8 +129,8 @@ def test_a_file_in_place_of_other_bytes_is_replaced_by_the_pinned_one(root):
 @pytest.mark.usefixtures("root")
 def test_a_browser_build_of_other_bytes_is_refused(monkeypatch):
     monkeypatch.setattr(picture_browser, "BROWSER_SHA256", "0" * 64)
-    with pytest.raises(SupplyError, match="browser build differs from the pinned SHA-256"):
-        supply.main([])
+    with pytest.raises(SystemExit, match="browser build differs from the pinned SHA-256"):
+        cli.main(["supply"])
 
 
 def test_a_download_that_fails_is_refused_in_one_line_that_names_the_file(root, monkeypatch):
@@ -140,8 +140,8 @@ def test_a_download_that_fails_is_refused_in_one_line_that_names_the_file(root, 
         raise OSError("[Errno 8] nodename nor servname provided, or not known")
 
     monkeypatch.setattr(supply, "fetch", unreachable)
-    with pytest.raises(SupplyError) as refusal:
-        supply.main([])
+    with pytest.raises(SystemExit) as refusal:
+        cli.main(["supply"])
     said = str(refusal.value)
     assert "\n" not in said and cmudict.URL in said and cmudict.PLACE in said
     assert said.endswith("nodename nor servname provided, or not known")

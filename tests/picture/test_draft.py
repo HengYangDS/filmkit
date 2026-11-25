@@ -16,7 +16,6 @@ import filmkit.picture.encoding as encoding
 import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.picture.still_scan as still_scan
-import filmkit.preflight as preflight
 import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
@@ -134,16 +133,8 @@ def test_the_draft_scan_lands_where_preflight_reads_it(film_root, tmp_path):
     composition = repository.sha(repository.ROOT / picture_rendering.COMPOSITION_SCRIPT)
     assert record["composition"]["sha256"] == composition
     assert (record["frames"], record["over_limit"]) == (whole, [])
-    # The record names what drew the draft, as the draft's receipt does, and admits a render
-    # only by that renderer: a record of a browser's draft, which names none, does not.
+    # The record names what drew the draft, as the draft's receipt does.
     assert record["drawn_by"] == DREW
-    assert preflight.draft(edition) is None
-    for other in (None, {**DREW, "text_renderer": "portable"}, {**DREW, "version": "1.0.0"}):
-        repository.write(edition.draft_stills, {**record, "drawn_by": other})
-        assert preflight.draft(edition) == (
-            "build/evidence/editions/zh/draft-stills.json scanned a draft that another "
-            "renderer drew; render the draft again"
-        )
 
 
 @pytest.mark.parametrize(
@@ -178,7 +169,6 @@ def earlier(edition):
     receipt."""
     repository.write(edition.draft_stills, still_records.draft_stills(edition))
     repository.write(places(edition.code)[2], {"picture": "draft", "exit": 0})
-    assert preflight.draft(edition) is None
 
 
 def test_a_draft_refused_before_it_renders_leaves_no_earlier_record(film_root):
@@ -190,9 +180,6 @@ def test_a_draft_refused_before_it_renders_leaves_no_earlier_record(film_root):
         picture_draft.render_draft(edition, 60)
     assert not edition.draft_stills.exists()
     assert not places()[2].exists()
-    assert preflight.draft(edition) == (
-        "no still scan of the 10 fps draft at build/evidence/editions/zh/draft-stills.json"
-    )
 
 
 def test_a_draft_with_a_still_picture_is_recorded_and_refused(film_root, monkeypatch):
@@ -208,25 +195,16 @@ def test_a_draft_with_a_still_picture_is_recorded_and_refused(film_root, monkeyp
         picture_draft.render_draft(edition, 60)
     record = repository.read(edition.draft_stills)
     assert record["over_limit"] == [{"start": 0.9, "end": 5.9, "speech": 4.0}]
-    assert preflight.draft(edition) == (
-        "build/evidence/editions/zh/draft-stills.json finds 1 still pictures with 3.5 s of speech "
-        "or more"
-    )
 
 
-def test_the_limit_has_one_wording_which_the_draft_the_pre_render_check_and_the_scan_ask(
-    film_root, monkeypatch
-):
+def test_the_limit_has_one_wording_which_the_draft_and_the_scan_ask(film_root, monkeypatch):
     edition = Edition("zh")
     film_root.timeline(edition, words=[{"text": "先看数据", "start": 1.0, "end": 5.0}])
     scanning(monkeypatch, 10, 50)
     # Worded otherwise in its one place (`still_scan.limit_words`), the limit reads so in the
-    # draft's refusal, in the pre-render check's answer and in the scan's own refusal.
+    # draft's refusal and in the scan's own refusal.
     monkeypatch.setattr(still_scan, "limit_words", lambda limit=None: f"<{limit}>")
     with pytest.raises(PictureError, match="^The zh draft holds a still picture with <3.5>: "):
         picture_draft.render_draft(edition, 60)
-    assert preflight.draft(edition) == (
-        "build/evidence/editions/zh/draft-stills.json finds 1 still pictures with <None>"
-    )
     with pytest.raises(PictureError, match="^The zh film holds a still picture with <None>: "):
         still_scan.refuse_still_pictures(edition, repository.read(edition.draft_stills))

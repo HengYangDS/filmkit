@@ -18,7 +18,7 @@ import { motionReport, round } from "./motion-audit/report.mjs";
 import { inkLevel } from "./rules/ink.mjs";
 
 const USAGE =
-  "Usage: python -m filmkit.tools motion-audit <timeline.json> [fps] [--from s] [--to s] [--out report.json]";
+  "Usage: node motion-audit.mjs <timeline.json> [fps] [--from s] [--to s] [--out report.json]";
 /* A malformed invocation stops before any frame is exercised, so it can never read as a clean report. */
 function refuse(problem) {
   console.error(`${problem}\n${USAGE}`);

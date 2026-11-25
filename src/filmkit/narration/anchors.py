@@ -66,7 +66,7 @@ ID = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 # cannot be told from a read of the object's own member, so no anchor takes it.
 INHERITED = frozenset({"constructor"})
 # The way to change an anchored segment's words, which the refusal of a hand edit names.
-SCRIPT_EDITS = "python -m filmkit.narration.script_edits"
+SCRIPT_EDITS = "filmkit edit"
 # The derived timeline's words: a Han character, or a run of Latin letters and digits; and its
 # times in milliseconds: each word, the pause between thoughts and the gap before each segment.
 WORD = re.compile(f"[{HAN}]|[{LATIN}]+")

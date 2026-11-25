@@ -1,5 +1,6 @@
 """Caption refresh keeps the assembled waveform and rebinds the cues to the current script."""
 
+import importlib
 import json
 import re
 
@@ -8,11 +9,9 @@ from assembled import sha256, stage, write_json
 
 import filmkit.captions.documents as captions_documents
 import filmkit.captions.refresh as captions_refresh
-import filmkit.produce as produce
 import filmkit.repository as repository
-import filmkit.review.round as review_round
 from filmkit.captions import CaptionError
-from filmkit.graph import chain
+from filmkit.graph import chain, cli
 from filmkit.review import ReviewError
 
 WORDS = (("甲", 2.0, 2.4), ("乙", 2.4, 2.8), ("丙", 3.4, 3.8), ("丁", 3.8, 4.2))
@@ -20,7 +19,10 @@ WORDS = (("甲", 2.0, 2.4), ("乙", 2.4, 2.8), ("丙", 3.4, 3.8), ("丁", 3.8, 4
 
 @pytest.fixture
 def edition(tmp_path, monkeypatch):
-    """An assembled Chinese edition of two thoughts."""
+    """An assembled Chinese edition of two thoughts. The review's prompts read the sample's
+    prompt template as they load, so they load before the root moves below the test's folder,
+    which holds none: a test that sets a round aside needs them, whichever test ran first."""
+    importlib.import_module("filmkit.review.prompts")
     return stage(tmp_path, monkeypatch, "zh", ["甲乙。", "丙丁。"], WORDS)
 
 
@@ -199,18 +201,17 @@ def test_a_refresh_over_a_reviewed_build_waits_for_its_set_aside(edition):
     named = "".join(f"- {item['path']} (SHA-256 {item['sha256']})\n" for item in media)
     (folder / "prompt-zh.md").write_text(named)
     written = {path: path.read_bytes() for path in (edition.timeline, edition.audio_assembly)}
-    refusal = "refresh-captions: the current zh films are bound by the prompts of review round 7"
-    with pytest.raises(SystemExit, match=re.escape(refusal)):
-        produce.main(["refresh-captions", "--language", "zh"])
-    # The node's own run is refused alike, naming the verb that sets the round's films aside.
+    # The node's run is refused, naming the round and the verb that sets its films aside.
     node = {node.name: node for node in chain.TABLE}["refresh-captions"]
-    with pytest.raises(ReviewError, match="first run filmkit review set-aside --round 7 "):
+    refusal = "the current zh films are bound by the prompts of review round 7"
+    with pytest.raises(ReviewError, match=re.escape(refusal)) as refused:
         node.run(edition)
+    assert "first run filmkit review set-aside --round 7 " in str(refused.value)
     assert {path: path.read_bytes() for path in written} == written
-    review_round.main(
-        ["set-aside", "--round", "7", "--purpose", "caption repairs", "--language", "zh"]
+    cli.main(
+        ["review", "set-aside", "--round", "7", "--purpose", "caption repairs", "--language", "zh"]
     )
-    produce.main(["refresh-captions", "--language", "zh"])
+    node.run(edition)
     assert [cue["text"] for cue in read(edition.timeline)["captions"]] == ["甲乙。", "丙丁。"]
 
 

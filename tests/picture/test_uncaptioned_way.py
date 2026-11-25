@@ -9,9 +9,9 @@ import filmkit.picture.equivalence as equivalence
 import filmkit.picture.faults as faults
 import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
-import filmkit.produce as produce
 import filmkit.repository as repository
 from filmkit.film import FILM
+from filmkit.graph import bindings, chain
 from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
 from filmkit.specification import FPS
@@ -21,6 +21,12 @@ def declaring(monkeypatch, capture: str) -> None:
     """Declare the film's capture as `[picture] capture` would."""
     picture = FILM.picture.model_copy(update={"capture": capture})
     monkeypatch.setattr(picture_rendering, "FILM", FILM.model_copy(update={"picture": picture}))
+
+
+def declared_native(film, code: str):
+    """The film with the edition's uncaptioned picture declared native."""
+    picture = film.picture.model_copy(update={"native_uncaptioned": (code,)})
+    return film.model_copy(update={"picture": picture})
 
 
 @pytest.fixture
@@ -40,8 +46,9 @@ def edition(film_root, monkeypatch):
     return edition, film_root, derived
 
 
-def uncaptioned(code="zh", *flags):
-    produce.main(["render-picture", "--language", code, "--uncaptioned", *flags])
+def uncaptioned(code="zh"):
+    """Run the node that makes the edition's uncaptioned picture, as a build runs it."""
+    chain.render_uncaptioned(Edition(code))
 
 
 @pytest.mark.parametrize("capture", ["fast", "screenshot"])
@@ -72,7 +79,9 @@ def test_a_film_of_software_capture_derives_and_native_still_renders(edition, mo
     uncaptioned()
     assert derived == [(edition, derivation.DEADLINE)]
     assert film_root.runs() == []
-    uncaptioned("zh", "--native")
+    # The film declares the edition's uncaptioned picture native (`[picture] native_uncaptioned`).
+    monkeypatch.setattr(bindings, "FILM", declared_native(bindings.FILM, "zh"))
+    uncaptioned()
     assert len(derived) == 1
     (run,) = film_root.runs()
     assert run["argv"][1] == str(edition.rendered(False).stage)

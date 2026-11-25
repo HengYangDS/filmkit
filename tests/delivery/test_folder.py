@@ -12,8 +12,12 @@ import filmkit.delivery.folder as delivery_folder
 import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
 from filmkit.delivery.folder import DeliveryRefusedError
+from filmkit.graph import cli
 from filmkit.picture.errors import PictureError
 from filmkit.production import CODES
+
+# The build verifies: the delivery is asked of the folder alone (`delivered`).
+pytestmark = pytest.mark.usefixtures("verified_build")
 
 
 def sha(text: str) -> str:
@@ -159,7 +163,7 @@ def test_an_edition_without_a_timeline_is_refused_in_one_line_before_rsync(film,
     monkeypatch.setattr(delivery_folder, "rsync_version", lambda: delivery_folder.RSYNC_3 + "4.1")
     monkeypatch.setattr(delivery_folder, "run", lambda *_: pytest.fail("the delivery ran rsync"))
     with pytest.raises(SystemExit) as refused:
-        delivery_folder.main(["--destination", str(destination)])
+        cli.main(["deliver", "--to", str(destination)])
     assert str(refused.value) == (
         "The en edition has no timeline at build/artifacts/film/en/timeline.json, so no runtime: "
         "run filmkit build assemble:en"
@@ -243,21 +247,21 @@ def test_an_rsync_other_than_rsync_3_is_refused(film, monkeypatch):
 @pytest.mark.rsync
 def test_the_command_reports_the_readback_summary(film, monkeypatch, capsys):
     monkeypatch.setattr(repository, "ROOT", film.root)
-    delivery_folder.main(["--destination", str(film.destination)])
+    cli.main(["deliver", "--to", str(film.destination)])
     assert json.loads(capsys.readouterr().out) == {
         "members": 25,
         "destination": str(film.destination.resolve()),
-        "destination_rule": "--destination",
+        "destination_rule": "--to",
         "all_match": True,
         "predecessors": None,
     }
     film.write(film.root / "build/artifacts/film/index.html", "edited\n")
-    delivery_folder.main(["--destination", str(film.destination)])
+    cli.main(["deliver", "--to", str(film.destination)])
     summary = json.loads(capsys.readouterr().out)
     assert summary["predecessors"].startswith(str(delivery_folder.PREDECESSORS))
     (film.root / "build/artifacts/film/en/index.html").unlink()
     with pytest.raises(SystemExit, match="Missing delivery sources"):
-        delivery_folder.main(["--destination", str(film.destination)])
+        cli.main(["deliver", "--to", str(film.destination)])
 
 
 def test_a_player_that_fails_its_readback_refuses_delivery_before_any_change(film, monkeypatch):
@@ -316,7 +320,7 @@ def test_a_dry_run_reads_no_player(film, monkeypatch):
     completed = delivery_folder.subprocess.CompletedProcess
     monkeypatch.setattr(delivery_folder, "run", lambda command, cwd: completed(command, 0, "", ""))
     report = delivery_folder.deliver(root, destination, dry_run=True)
-    place = {"destination": str(destination), "destination_rule": "--destination"}
+    place = {"destination": str(destination), "destination_rule": "--to"}
     assert report == {**place, "changes": [], "dry_run": True}
 
 

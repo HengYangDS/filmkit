@@ -53,7 +53,7 @@ test("the headless audits refuse a malformed invocation", async () => {
   const folder = await scratchFolder(),
     path = join(folder, "timeline.json");
   await writeFile(path, JSON.stringify(await authoredTimeline("zh")));
-  const frames = "Usage: python -m filmkit.tools frame-audit";
+  const frames = "Usage: node frame-audit.mjs";
   for (const args of [
     [],
     [path, "0"],
@@ -67,7 +67,7 @@ test("the headless audits refuse a malformed invocation", async () => {
     [path, "--at", "11", "--from", "10"],
   ])
     assertRefused(AUDIT_FRAMES, args, frames);
-  const motion = "Usage: python -m filmkit.tools motion-audit";
+  const motion = "Usage: node motion-audit.mjs";
   for (const args of [
     [],
     [path, "0"],
@@ -81,7 +81,7 @@ test("the headless audits refuse a malformed invocation", async () => {
 });
 
 test("the geometry check refuses a malformed invocation before opening a browser", () => {
-  const usage = "Usage: python -m filmkit.tools geometry-check";
+  const usage = "Usage: node geometry-check.mjs";
   for (const args of [
     [],
     ["stage"],

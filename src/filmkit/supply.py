@@ -11,13 +11,11 @@ inputs and runs offline. Installing again keeps what is already in place: a dict
 hold the pin is not downloaded again, wherever it came from. A download that fails is refused in
 one line, which names the file and its place.
 
-Usage: python -m filmkit.supply
+Run by `filmkit supply` (`supply`).
 """
 
 from __future__ import annotations
 
-import argparse
-import json
 import os
 import shutil
 import urllib.request
@@ -119,12 +117,3 @@ def supply() -> dict:
     report = {"browser": supply_browser(), "dictionary": supply_dictionary()}
     report["models"] = supply_models()
     return report
-
-
-def main(argv: list[str] | None = None) -> None:
-    argparse.ArgumentParser(description=__doc__.splitlines()[0]).parse_args(argv)
-    print(json.dumps(supply(), ensure_ascii=False, indent=2))
-
-
-if __name__ == "__main__":
-    main()

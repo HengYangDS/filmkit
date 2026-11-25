@@ -43,10 +43,12 @@ OPTIONS = {
 
 
 def ended(capsys, *argv: str) -> tuple[int | str | None, str]:
-    """The command's exit status or refusal, and what it printed."""
-    with pytest.raises(SystemExit) as stopped:
+    """The command's exit status or refusal, and what it printed: 0 where it returned."""
+    try:
         cli.main(list(argv))
-    return stopped.value.code, capsys.readouterr().out
+    except SystemExit as stopped:
+        return stopped.code, capsys.readouterr().out
+    return 0, capsys.readouterr().out
 
 
 def test_the_help_lists_its_ten_verbs(capsys):

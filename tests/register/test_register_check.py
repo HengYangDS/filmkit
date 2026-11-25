@@ -3,7 +3,6 @@ film's words."""
 
 import json
 import re
-import runpy
 import shutil
 from pathlib import Path
 
@@ -323,35 +322,6 @@ def test_an_exception_answers_errors_only_and_any_letter_case(monkeypatch):
     report = register.check()
     assert report["excused"] == [kept]
     assert [warning["form"] for warning in report["warnings"]] == ["我们"]
-
-
-def test_the_cli_prints_the_report_and_refuses_with_every_failure(monkeypatch, capsys):
-    monkeypatch.setattr(register, "check", lambda: {"warnings": []})
-    register.main()
-    assert json.loads(capsys.readouterr().out) == {"warnings": []}
-
-    def refuse():
-        message = "zh 01.1: one\nen 01.1: two"
-        raise RegisterError(message)
-
-    monkeypatch.setattr(register, "check", refuse)
-    with pytest.raises(SystemExit, match=re.escape("register: zh 01.1: one\nen 01.1: two")):
-        register.main()
-
-
-def test_running_the_package_as_a_module_runs_the_cli(monkeypatch, capsys):
-    # Run here as `python -m filmkit.register` runs it.
-    monkeypatch.setattr(register, "check", lambda: {"warnings": []})
-    runpy.run_module("filmkit.register", run_name="__main__")
-    assert json.loads(capsys.readouterr().out) == {"warnings": []}
-
-    def refuse():
-        message = "zh 01.1: one"
-        raise RegisterError(message)
-
-    monkeypatch.setattr(register, "check", refuse)
-    with pytest.raises(SystemExit, match=re.escape("register: zh 01.1: one")):
-        runpy.run_module("filmkit.register", run_name="__main__")
 
 
 @pytest.mark.parametrize(

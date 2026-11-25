@@ -1,5 +1,6 @@
 """The node table: the chain's commands as data, the edges derived from paths, and its refusals."""
 
+import ast
 import importlib
 import tomllib
 from pathlib import Path
@@ -9,7 +10,6 @@ import sample_sound
 
 import filmkit.film as film
 import filmkit.picture.derivation as derivation
-import filmkit.produce as produce
 import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.graph import bindings, chain, nodes, opens, plan, runs
@@ -147,16 +147,33 @@ def test_a_rewriter_follows_the_writers_it_names():
     assert nodes.load(rewritten, shared, ("zh",)).order == ("a:zh", "b:zh")
 
 
+def measured() -> set[str]:
+    """Every command the engine's source measures as a run by name (`runs.run(code, "<name>")`,
+    the convergence's by its constant); a build measures each node by its own name."""
+    found = set()
+    for path in SOURCE.rglob("*.py"):
+        for call in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if (
+                isinstance(call, ast.Call)
+                and isinstance(call.func, ast.Attribute)
+                and call.func.attr == "run"
+                and getattr(call.func.value, "id", None) in ("seam", "runs")
+                and len(call.args) == 2
+            ):
+                named = call.args[1]
+                if isinstance(named, ast.Constant):
+                    found.add(named.value)
+                elif isinstance(named, ast.Name) and named.id == "COMMAND":
+                    found.add(converge.COMMAND)
+    return found
+
+
+SOURCE = Path(chain.__file__).resolve().parents[1]
+
+
 def test_every_command_the_seam_measures_is_a_node_or_named_with_its_reason(table):
-    commands = {
-        *produce.EDITION_ACTIONS,
-        *(f"{action}-uncaptioned" for action in produce.PICTURE_ACTIONS),
-        *tools.BUILD_RUNS.values(),
-        "narrate",
-        converge.COMMAND,
-        "verify",
-        "reproduce",
-    }
+    commands = measured()
+    assert {"check", "narrate", "fit", "repair-pictures", converge.COMMAND} <= commands
     unnamed = commands - set(table.nodes) - set(chain.NOT_NODES)
     assert unnamed == set()
     assert set(table.nodes).isdisjoint(chain.NOT_NODES)

@@ -1,17 +1,23 @@
 """What a film states of the runtime and the credits that this release removes or moves: a
-withdrawn key of a script or a cast, which the loader refuses and the adoption command's
+withdrawn key of a script or a cast, which the loader refuses and `filmkit check`'s
 `declaration` question names, and a line of the review prompt that ties the runtime to no one
 edition, which its `runtime` question names, read as text."""
 
 import json
 
-import test_adoption as base
+import test_check_tracked as base
 
+import filmkit.check as check
 import filmkit.film as film
 import filmkit.withdrawn as withdrawn
 
-# A film that holds what the release asks, its findings, and the rewriting of one of its files.
-project, found, rewrite = base.project, base.found, base.rewrite
+# A film that holds what the release asks, and the rewriting of one of its files.
+project, rewrite = base.project, base.rewrite
+
+
+def found(root) -> dict[str, list[str]]:
+    """The declaration's problems and the questions of the tracked files, at a root."""
+    return {"declaration": check.loaded(root), **check.tracked(root, [])}
 
 
 def declare(path, **fields) -> None:

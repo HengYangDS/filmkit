@@ -58,12 +58,12 @@ of the runtime as phases, and that it completed only where the edition ends sett
 refused. A run that is refused before its first effect writes nothing (`admitted`). Each
 narration it starts writes the narration's own run record.
 
-Usage: python -m filmkit.narration.converge --language <code> [--rounds 2] [--takes 3]
+Run by `filmkit narrate [--edition CODE|all] [--rounds 2] [--takes 3]`, one edition after the
+other (`converged`).
 """
 
 from __future__ import annotations
 
-import argparse
 import gc
 import json
 import sys
@@ -81,7 +81,7 @@ import filmkit.repository as repository
 from filmkit.narration.candidates import FIRST, STRIDE, bind
 from filmkit.narration.narrate import evidence_paths
 from filmkit.narration.run_on import following_spoken_text
-from filmkit.production import CODES, Edition
+from filmkit.production import Edition
 
 WORK = "build/runtime/work/convergence"
 RECORD = "convergence.json"
@@ -98,7 +98,7 @@ UNRESOLVED = (
     "and remove what it left, then run the command again:\n{files}"
 )
 
-__all__ = ["FIRST", "STRIDE", "converge", "main"]
+__all__ = ["FIRST", "STRIDE", "converge", "converged"]
 
 
 def narration_due(code: str) -> bool:
@@ -381,7 +381,7 @@ def admitted(code: str) -> dict:
     place (`judgment.pronunciations`), no narration left a request started, and the former
     record can be read (`left`).
 
-    The command asks this before it opens its run (`main`), so that such a refusal writes
+    The command asks this before it opens its run (`converged`), so that such a refusal writes
     nothing and leaves the record of the convergence that narrated the standing build.
     """
     fitting.declared(code)
@@ -476,20 +476,6 @@ def stamp(code: str, record: dict, measured: dict) -> None:
     repository.write(Edition(code).ear_first / RECORD, record)
 
 
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Narrate an edition until its takes are accepted.")
-    parser.add_argument("--language", choices=CODES, required=True)
-    parser.add_argument("--rounds", type=int, default=2, help="Rounds of candidates")
-    parser.add_argument("--takes", type=int, default=3, help="Candidates a refused thought a round")
-    options = parser.parse_args(argv)
-    if options.rounds < 0 or options.takes < 1:
-        parser.error("--rounds is 0 or more and --takes is 1 or more")
-    with child_processes.ending(STOPPED):
-        refused = converged(options.language, rounds=options.rounds, takes=options.takes)
-    if refused:
-        raise SystemExit(refused)
-
-
 # What a command that converges says when a request ends it.
 STOPPED = "The convergence was stopped by {request}; what it was running was ended with it"
 
@@ -515,7 +501,3 @@ def converged(code: str, *, rounds: int = 2, takes: int = 3) -> str:
             run.fail()
         stamp(code, record, run.measured(completed=not refused))
     return refused
-
-
-if __name__ == "__main__":
-    main()

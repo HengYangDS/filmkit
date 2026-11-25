@@ -8,8 +8,12 @@ import pytest
 import filmkit.delivery.folder as delivery_folder
 import filmkit.repository as repository
 from filmkit.film import FILM
+from filmkit.graph import cli
 
 NAME = FILM.delivery_folder
+
+# The build verifies: the delivery is asked of the folder alone (`delivered`).
+pytestmark = pytest.mark.usefixtures("verified_build")
 
 
 @pytest.fixture
@@ -27,7 +31,7 @@ def home(tmp_path, monkeypatch):
 def test_a_named_folder_is_the_destination_itself(home, tmp_path, monkeypatch):
     monkeypatch.setenv(delivery_folder.ROOT_VARIABLE, str(tmp_path / "films"))
     named = tmp_path / "anywhere" / "at all"
-    assert delivery_folder.delivery_destination(named) == (named.resolve(), "--destination")
+    assert delivery_folder.delivery_destination(named) == (named.resolve(), "--to")
 
 
 def test_the_hosts_delivery_root_holds_the_films_declared_folder(home, tmp_path, monkeypatch):
@@ -160,7 +164,7 @@ def test_a_delivery_records_its_destination_and_the_rule_that_gave_it(
 ):
     monkeypatch.setattr(repository, "ROOT", film.root)
     # Without a named folder and with no root of the host's: the user's videos folder.
-    delivery_folder.main([])
+    cli.main(["deliver"])
     videos = (home / "Movies" / NAME).resolve()
     summary = json.loads(capsys.readouterr().out)
     assert (summary["destination"], summary["destination_rule"]) == (
@@ -175,14 +179,14 @@ def test_a_delivery_records_its_destination_and_the_rule_that_gave_it(
     )
     # A host's root, in a dry run, which writes nothing there.
     monkeypatch.setenv(delivery_folder.ROOT_VARIABLE, str(film.root.parent / "films"))
-    delivery_folder.main(["--dry-run"])
+    cli.main(["deliver", "--dry-run"])
     planned = json.loads(capsys.readouterr().out)
     assert planned["destination"] == str((film.root.parent / "films" / NAME).resolve())
     assert (planned["destination_rule"], planned["dry_run"]) == ("FILMKIT_DELIVERY_ROOT", True)
     assert not (film.root.parent / "films").exists()
     # A folder named by the caller.
-    delivery_folder.main(["--destination", str(film.destination)])
-    assert json.loads(capsys.readouterr().out)["destination_rule"] == "--destination"
+    cli.main(["deliver", "--to", str(film.destination)])
+    assert json.loads(capsys.readouterr().out)["destination_rule"] == "--to"
     assert repository.read(film.root / delivery_folder.READBACK)["destination"] == str(
         film.destination.resolve()
     )

@@ -140,9 +140,7 @@ def listing(root) -> dict[str, bytes]:
 
 def test_a_read_only_check_writes_no_file_whether_it_passes_or_refuses(copied, capsys):
     before = listing(copied)
-    with pytest.raises(SystemExit) as passed:
-        cli.main(["check", "--read-only"])
-    assert passed.value.code == 0
+    cli.main(["check", "--read-only"])
     assert "filmkit check passes" in capsys.readouterr().out
     assert listing(copied) == before
     (copied / "picture/index.html").unlink()

@@ -93,9 +93,8 @@ def compute(root: Path) -> dict:
 def pinned_vale(tools: dict) -> object:
     """What the `[tools]` table of a Mise configuration states as the version of the Vale the
     engine pins: the value of that tool's entry, or of the entry's `version` where it is a
-    table; None where the table holds no such entry or the entry no version. The engine's own
-    configuration and a film's (`filmkit.adoption`) are read alike. A pin of Vale under another
-    tool name is not this tool's and is not read."""
+    table; None where the table holds no such entry or the entry no version. A pin of Vale under
+    another tool name is not this tool's and is not read."""
     pin = tools.get(VALE)
     return pin.get("version") if isinstance(pin, dict) else pin
 

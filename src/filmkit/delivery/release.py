@@ -71,12 +71,11 @@ Stopped after the rename and before the manifest was written, the folder holds t
 assets beside the old manifest, a pair the comparison refuses: the next run finds the folder
 whole and writes the manifest.
 
-Usage: python -m filmkit.delivery.release [--replace] [--dry-run]
+Run by `filmkit release [--replace] [--dry-run]` (`filmkit.graph.cli`).
 """
 
 from __future__ import annotations
 
-import argparse
 import json
 import shutil
 import subprocess
@@ -482,22 +481,3 @@ def write(*, replace: bool, dry_run: bool) -> None:
     repository.write_text(MANIFEST, serialized(written))
     kept = "already held" if whole else "now holds"
     print(f"{RELEASE} {kept} the record's {len(written.assets)} assets. Wrote {MANIFEST}.")
-
-
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "--replace",
-        action="store_true",
-        help="replace a release folder that holds other bytes than the record's",
-    )
-    parser.add_argument("--dry-run", action="store_true", help="print the record only")
-    options = parser.parse_args(argv)
-    try:
-        write(replace=options.replace, dry_run=options.dry_run)
-    except ReproductionError as error:
-        raise SystemExit(str(error)) from None
-
-
-if __name__ == "__main__":
-    main()

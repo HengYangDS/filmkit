@@ -12,6 +12,7 @@ import filmkit.narration.converge as narration_converge
 import filmkit.narration.judge as narration_judge
 import filmkit.narration.judgment as narration_judgment
 import filmkit.repository as repository
+from filmkit.graph import cli
 from filmkit.production import Edition
 
 LETTER_NAMES = {"term": "AI", "kind": "letter-name", "lexical_stress": {}}
@@ -78,15 +79,15 @@ def test_a_dictionary_not_in_place_stops_the_judgment_before_any_model_loads(
         narration_judge.main(["--language", "en"])
     said_once = str(refusal.value)
     assert "\n" not in said_once and said_once.startswith("en: ")
-    assert "python -m filmkit.supply" in said_once
+    assert "filmkit supply" in said_once
     assert not (Edition("en").ear_first / narration_judge.RECORD).exists()
 
 
 def test_a_convergence_stops_before_its_first_effect_without_the_dictionary(narrated, voiced):
     said(narrated, voiced, "It is labelled.", "It is labeled.")
     (repository.ROOT / narration_cmudict.PLACE).unlink()
-    with pytest.raises(SystemExit, match="python -m filmkit.supply"):
-        narration_converge.main(["--language", "en"])
+    with pytest.raises(SystemExit, match="filmkit supply"):
+        cli.main(["narrate", "--edition", "en"])
     assert not (Edition("en").ear_first / narration_converge.RECORD).exists()
 
 

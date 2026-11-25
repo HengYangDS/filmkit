@@ -368,7 +368,10 @@ def main(argv: list[str] | None = None) -> None:
         "release": lambda: released(options.replace, options.dry_run),
     }.get(verb)
     if done is not None:
-        sys.exit(done())
+        status = done()
+        if status:
+            sys.exit(status)
+        return
     from filmkit.graph import plan
 
     try:
@@ -382,7 +385,3 @@ def main(argv: list[str] | None = None) -> None:
     for entry in planned.entries:
         print(line(entry))
     print("\n".join(filter(None, [timed(planned.entries), f"{planned.hashed} files hashed"])))
-
-
-if __name__ == "__main__":
-    main()

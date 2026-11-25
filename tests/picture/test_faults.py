@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 
 import filmkit.picture.equivalence as equivalence
-import filmkit.produce as produce
 import filmkit.repository as repository
+from filmkit.graph import chain
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, PictureError
 from filmkit.production import Edition
 
@@ -231,9 +231,9 @@ def test_a_fault_in_the_uncaptioned_picture_names_its_render_command(edition):
     )
     faults = record["encoded"]["every_frame"]["faults"]
     assert [(fault["frame"], fault["picture"]) for fault in faults] == [(77, "uncaptioned")]
-    # The production command takes the command the refusal names.
-    options = produce.arguments().parse_args(command.split()[3:])
-    assert (options.action, options.language, options.uncaptioned) == ("render-picture", "zh", True)
+    # The verb the refusal names builds a node of the engine's table.
+    node, named = chain.table().node(command.split()[2])
+    assert (node.name, named.code) == ("render-picture-uncaptioned", "zh")
 
 
 @pytest.mark.ffmpeg

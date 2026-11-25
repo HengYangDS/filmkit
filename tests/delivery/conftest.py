@@ -418,6 +418,17 @@ def editions(inputs, monkeypatch) -> dict[str, Inputs]:
 
 
 @pytest.fixture
+def verified_build(monkeypatch):
+    """A build whose run records, films and reviews verify, so that `filmkit deliver` asks the
+    delivery alone: the records' check and the verifier stand in, passing."""
+    import filmkit.delivery.verification as delivery_verification
+    from filmkit.graph import verify
+
+    monkeypatch.setattr(verify, "check", lambda table=None: None)
+    monkeypatch.setattr(delivery_verification, "qualified", lambda *, technical_only: iter(()))
+
+
+@pytest.fixture
 def built(editions, tmp_path_factory, monkeypatch, table_of) -> Built:
     """A reviewed, delivered build. The staging's check of a stage is a stand-in that records
     what it was asked and refuses, in the staging's words, a document other than the one the
@@ -523,11 +534,13 @@ def released(table_of, capsys):
 
     def verb() -> tuple[int | str, list[str]]:
         table_of()
-        with pytest.raises(SystemExit) as stopped:
+        try:
             cli.main(["verify", "--release"])
-        if stopped.value.code not in (0, 1):
-            raise stopped.value
-        return stopped.value.code, capsys.readouterr().out.splitlines()
+        except SystemExit as stopped:
+            if stopped.code != 1:
+                raise
+            return stopped.code, capsys.readouterr().out.splitlines()
+        return 0, capsys.readouterr().out.splitlines()
 
     return verb
 

@@ -5,7 +5,7 @@ its refusal.
 """
 
 # The field of a review prompt's template that each edition's prompt fills with that edition's own
-# runtime (`filmkit.review.prompts`), which a film's adoption reads (`filmkit.adoption`).
+# runtime (`filmkit.review.prompts`), which the source check reads (`filmkit.check`).
 RUNTIME_FIELD = "duration"
 
 

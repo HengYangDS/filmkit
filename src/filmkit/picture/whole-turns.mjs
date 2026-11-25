@@ -12,7 +12,7 @@ import { parseArgs } from "node:util";
 
 import { launchBrowser } from "./headless-browser.mjs";
 
-const USAGE = "Usage: python -m filmkit.tools whole-turns <turns.json>";
+const USAGE = "Usage: node whole-turns.mjs <turns.json>";
 /* A turn paints when it holds this share of a circle's ink: those that failed in the measurements held none of it,
  * and the others all of it. */
 export const PAINTED = 0.6;

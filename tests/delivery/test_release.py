@@ -9,10 +9,9 @@ from release_build import DECLARED, SOURCES, refused, uncaptioned_stage, unchang
 
 import filmkit.delivery.folder as delivery_folder
 import filmkit.delivery.packaging as packaging
-import filmkit.delivery.release as release
 import filmkit.delivery.reproduction as reproduction
 import filmkit.repository as repository
-from filmkit.graph import records, runs
+from filmkit.graph import cli, records, runs
 from filmkit.production import CODES, STAGE_PAGE
 
 # The sample film declares review levels; these reviews keep the overall and dimension floors.
@@ -24,7 +23,7 @@ pytestmark = pytest.mark.usefixtures("unleveled")
 
 def test_a_build_that_the_films_folder_below_a_host_root_holds_passes_every_check(built):
     before = built.tree()
-    release.main(["--dry-run"])
+    cli.main(["release", "--dry-run"])
     # The staging was asked for each edition's uncaptioned stage, which a derived picture's
     # receipt does not bind.
     assert built.asked == [(code, uncaptioned_stage(code), False) for code in CODES]
@@ -236,7 +235,7 @@ def test_a_release_is_recorded_after_both_editions_wrote_the_entry_page(built, t
         records.read(records.place("package-metadata", code)).outputs["entry"] for code in CODES
     ]
     assert bound[0].sha256 != bound[1].sha256 == records.digest(page)
-    release.main([])
+    cli.main(["release"])
     assert built.manifest.is_file()
 
 
@@ -246,7 +245,7 @@ def test_a_release_is_recorded_after_both_editions_wrote_the_entry_page(built, t
 
 def test_a_release_is_written_at_the_films_root_from_the_declared_sources(built):
     built.declare(SOURCES[:2])
-    release.main([])
+    cli.main(["release"])
     written = json.loads((built.root / "release.json").read_text())
     assert written["sources"] == {path: repository.sha(path) for path in SOURCES[:2]}
     assert not (built.root / "content/release.json").exists()

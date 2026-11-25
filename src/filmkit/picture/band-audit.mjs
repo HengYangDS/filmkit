@@ -19,7 +19,7 @@ import { parseArgs } from "node:util";
 import { isCaptionPaint, screenBox } from "./caption-equivalence.mjs";
 import { openComposition, readTextMetrics, readTimeline } from "./headless-composition.mjs";
 
-const USAGE = "Usage: python -m filmkit.tools band-audit <timeline.json> <top> <bottom> [<fps>]";
+const USAGE = "Usage: node band-audit.mjs <timeline.json> <top> <bottom> [<fps>]";
 /* How many escapes and intrusions the report holds in full; it counts them all. */
 const FINDINGS = 20;
 /* The instants a second holds unless the caller names another count. */

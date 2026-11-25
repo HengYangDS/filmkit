@@ -1,7 +1,7 @@
 """Every key a film may no longer declare, in one table, each with what to do instead.
 
 The loader refuses each where it finds it, all at once and beside the declaration's other
-problems (`filmkit.declared_sources.withdrawn_problems`), and the adoption command's
+problems (`filmkit.declared_sources.withdrawn_problems`), and `filmkit check`'s
 `declaration` question names them so. A key leaves when the engine derives its value from one
 source, as decision 10 of treat-languages-as-equals lists: an edition's code, the layout, the
 engine's own pins, or the declaration.

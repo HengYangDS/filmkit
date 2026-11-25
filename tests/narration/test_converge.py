@@ -26,6 +26,8 @@ from filmkit.production import Edition
 
 # The convergence's own narration, which runs a child and which the bench replaces (`studio`).
 NARRATE = narration_converge.narrate
+# The plan's own question whether a narration is ready, which the narration's fixtures answer.
+UNREADY = cli.unready
 
 
 def test_a_convergence_of_two_narrations_records_its_seconds_with_its_phases(
@@ -48,7 +50,7 @@ def test_a_convergence_of_two_narrations_records_its_seconds_with_its_phases(
     monkeypatch.setattr(narration_converge, "narration_due", lambda _code: next(due, False))
     monkeypatch.setattr(narration_converge, "narrate", NARRATE)
     monkeypatch.setattr(child_processes, "run", child)
-    narration_converge.main(["--language", "en", "--rounds", "1", "--takes", "1"])
+    cli.main(["narrate", "--edition", "en", "--rounds", "1", "--takes", "1"])
     assert (ran, studio.narrations) == (["filmkit.narration.narrate"] * 2, 1)
     record = measured_of()
     assert record["completed"] is True
@@ -58,9 +60,12 @@ def test_a_convergence_of_two_narrations_records_its_seconds_with_its_phases(
     assert (record["phases"]["narration"], record["seconds"]) == (40.0, 40.0)
 
 
-def test_filmkit_narrate_is_refused_before_any_model_loads_while_the_plan_holds_it(studio, voiced):
+def test_filmkit_narrate_is_refused_before_any_model_loads_while_the_plan_holds_it(
+    studio, voiced, monkeypatch
+):
     # Below the studio's root the source check has no record, so the plan calls the narration,
     # which waits for the check, not ready.
+    monkeypatch.setattr(cli, "unready", UNREADY)
     studio.begin([voiced(), voiced(natural=False)])
     with pytest.raises(SystemExit) as refused:
         cli.main(["narrate", "--edition", "en"])
@@ -71,18 +76,13 @@ def test_filmkit_narrate_is_refused_before_any_model_loads_while_the_plan_holds_
     assert not (repository.ROOT / Edition("en").ear_first / narration_converge.RECORD).exists()
 
 
-def test_filmkit_narrate_converges_a_settled_narration_once_and_leaves_its_cast(
-    count, studio, monkeypatch
-):
+def test_filmkit_narrate_converges_a_settled_narration_once_and_leaves_its_cast(count, studio):
     # The stand-in edition was narrated once from its settled cast (`count`): its receipt holds
     # every take the cast asks for, so the verb narrates nothing again, judges and counts.
-    monkeypatch.setattr(cli, "unready", lambda _codes: [])
     edition = Edition("en")
     sources = [repository.ROOT / edition.cast, repository.ROOT / edition.script]
     held = [path.read_bytes() for path in sources]
-    with pytest.raises(SystemExit) as ended:
-        cli.main(["narrate", "--edition", "en"])
-    assert ended.value.code == 0
+    cli.main(["narrate", "--edition", "en"])
     assert (studio.loads, studio.narrations) == (0, 0)
     assert [path.read_bytes() for path in sources] == held
     # The convergence's record states the run's seconds and phases.
@@ -95,7 +95,7 @@ def test_an_edition_left_unsettled_records_that_its_convergence_did_not_complete
     studio.begin([voiced(), voiced(natural=False)])
     studio.sound = lambda _seed, _text: voiced(natural=False)
     with pytest.raises(SystemExit, match="en: 1 thoughts are unsettled"):
-        narration_converge.main(["--language", "en", "--rounds", "1", "--takes", "1"])
+        cli.main(["narrate", "--edition", "en", "--rounds", "1", "--takes", "1"])
     record = measured_of()
     # Nothing was bound, so nothing was narrated, and an unsettled edition is not counted.
     assert (record["completed"], [*record["phases"]]) == (False, ["judgment", "candidates"])
@@ -104,7 +104,7 @@ def test_an_edition_left_unsettled_records_that_its_convergence_did_not_complete
 def test_a_refused_thought_gets_candidates_and_the_chosen_seed_is_bound(studio, voiced, capsys):
     studio.begin([voiced(), voiced(natural=False)])
     studio.sound = lambda seed, _text: voiced(natural=seed == seed_of(12))
-    narration_converge.main(["--language", "en", "--rounds", "2", "--takes", "3"])
+    cli.main(["narrate", "--edition", "en", "--rounds", "2", "--takes", "3"])
     # One round: three candidates of the refused thought at the audition's seeds, one narration.
     assert studio.said == [(seed_of(k), " Second thought.") for k in (11, 12, 13)]
     assert studio.narrations == 1
@@ -139,7 +139,7 @@ def test_a_refused_thought_gets_candidates_and_the_chosen_seed_is_bound(studio, 
     # but the measurement of its run.
     kept = [unmeasured(record_of())]
     kept.append((repository.ROOT / Edition("en").cast).read_bytes())
-    narration_converge.main(["--language", "en", "--rounds", "2", "--takes", "3"])
+    cli.main(["narrate", "--edition", "en", "--rounds", "2", "--takes", "3"])
     assert (len(studio.said), studio.narrations) == (3, 1)
     assert kept[0] == unmeasured(record_of())
     assert kept[1] == (repository.ROOT / Edition("en").cast).read_bytes()
@@ -152,7 +152,7 @@ def test_a_thought_no_candidate_settles_is_named_as_not_narratable_as_written(
     studio.begin([voiced(), voiced(natural=False)])
     studio.sound = lambda _seed, _text: voiced(natural=False)
     with pytest.raises(SystemExit) as refused:
-        narration_converge.main(["--language", "en", "--rounds", "2", "--takes", "2"])
+        cli.main(["narrate", "--edition", "en", "--rounds", "2", "--takes", "2"])
     lines = str(refused.value).splitlines()
     assert lines[:2] == [
         "en: 1 thoughts are unsettled",
@@ -175,7 +175,7 @@ def test_a_thought_no_candidate_settles_is_named_as_not_narratable_as_written(
     assert counts(capsys)["takes_generated"] == 4
     # Asked again, it judges the candidates it left and generates none.
     with pytest.raises(SystemExit):
-        narration_converge.main(["--language", "en", "--rounds", "2", "--takes", "2"])
+        cli.main(["narrate", "--edition", "en", "--rounds", "2", "--takes", "2"])
     said = counts(capsys)
     assert (said["takes_generated"], said["takes_found"], len(studio.said)) == (0, 4, 4)
     assert unmeasured(record_of()) == unmeasured(record)
@@ -195,7 +195,7 @@ def test_a_run_on_take_settles_a_thought_whose_plain_candidates_end_abruptly(
         ("Second", 1.2, 1.6),
         ("thought", 1.6, 1.9),
     ]
-    narration_converge.main(["--language", "en", "--rounds", "1", "--takes", "2"])
+    cli.main(["narrate", "--edition", "en", "--rounds", "1", "--takes", "2"])
     (entry,) = record_of()["thoughts"]
     assert [(take["kind"], take["k"], take["failed"]) for take in entry["candidates"]] == [
         ("plain", 11, ["ending"]),
@@ -260,7 +260,7 @@ def test_a_run_on_take_without_a_cut_is_refused_and_judged_again_from_its_whole_
     studio.sound = lambda _seed, _text: voiced(natural=False, seconds=3.0)
     for generated, found in ((2, 0), (0, 2)):
         with pytest.raises(SystemExit, match="26.1: not narratable as written; its take fails"):
-            narration_converge.main(["--language", "en", "--rounds", "0", "--takes", "2"])
+            cli.main(["narrate", "--edition", "en", "--rounds", "0", "--takes", "2"])
         said = counts(capsys)
         assert (said["takes_generated"], said["takes_found"]) == (generated, found)
     (entry,) = record_of()["thoughts"]
@@ -282,7 +282,7 @@ def test_a_convergence_asked_to_end_while_it_narrates_says_so_and_binds_nothing_
 
     monkeypatch.setattr(narration_converge, "narrate", asked)
     with pytest.raises(SystemExit) as left:
-        narration_converge.main(["--language", "en", "--rounds", "1", "--takes", "1"])
+        cli.main(["narrate", "--edition", "en", "--rounds", "1", "--takes", "1"])
     # One line, and the status a shell gives a command that SIGTERM ended.
     assert left.value.code == 143
     assert capsys.readouterr().err == (
@@ -304,7 +304,7 @@ def test_rounds_count_their_seeds_on_and_settle_each_thought_where_a_take_is_acc
     studio.begin([voiced(natural=False), voiced(natural=False)])
     accepted = {("First thought.", seed_of(11)), (" Second thought.", seed_of(15))}
     studio.sound = lambda seed, text: voiced(natural=(text, seed) in accepted)
-    narration_converge.main(["--language", "en", "--rounds", "2", "--takes", "3"])
+    cli.main(["narrate", "--edition", "en", "--rounds", "2", "--takes", "3"])
     # Round 1 tries both thoughts at k = 11 to 13 and settles the first; round 2 tries the
     # second alone at k = 14 to 16.
     assert [(text, seed) for seed, text in studio.said] == [
@@ -340,7 +340,7 @@ def test_the_engines_own_narration_says_the_candidate_it_was_bound_to(engine, vo
     engine.wanted = segment_seed + 12 * narration_converge.STRIDE
     engine.said.clear()
     engine.narrations = 0
-    narration_converge.main(["--language", "en", "--rounds", "1", "--takes", "2"])
+    cli.main(["narrate", "--edition", "en", "--rounds", "1", "--takes", "2"])
     # Two candidates of the refused thought, then one narration of its segment from the cast:
     # the first thought again at its own seed, the second at the seed that was bound.
     said = [(text, seed) for seed, text in engine.said]
@@ -361,7 +361,7 @@ def test_the_engines_own_narration_says_the_candidate_it_was_bound_to(engine, vo
     # The receipt now holds what the cast asks for, with both checks of it: nothing is due,
     # and a second run narrates and generates nothing.
     assert narration_converge.narration_due("en") is False
-    narration_converge.main(["--language", "en", "--rounds", "1", "--takes", "2"])
+    cli.main(["narrate", "--edition", "en", "--rounds", "1", "--takes", "2"])
     assert (engine.narrations, len(engine.said)) == (1, 4)
     assert counts(capsys)["settled_after"] == {"first take": 2}
 
@@ -388,7 +388,7 @@ def test_a_narration_ended_inside_a_thought_is_named_by_its_file_and_not_replaye
     patch.setattr(narration_group_generation, "synthesize", stopping)
     try:
         with pytest.raises(SystemExit) as left:
-            narration_converge.main(["--language", "en", "--rounds", "1", "--takes", "1"])
+            cli.main(["narrate", "--edition", "en", "--rounds", "1", "--takes", "1"])
     finally:
         patch.undo()
     assert left.value.code == 143
@@ -403,7 +403,7 @@ def test_a_narration_ended_inside_a_thought_is_named_by_its_file_and_not_replaye
     assert left_file.endswith(".request.json")
     engine.narrations = 0
     with pytest.raises(SystemExit) as refused:
-        narration_converge.main(["--language", "en", "--rounds", "1", "--takes", "1"])
+        cli.main(["narrate", "--edition", "en", "--rounds", "1", "--takes", "1"])
     message = str(refused.value)
     assert "Unresolved native utterance; inspect before replay" in message
     assert message.splitlines()[-1] == f"  {left_file}"
@@ -411,7 +411,7 @@ def test_a_narration_ended_inside_a_thought_is_named_by_its_file_and_not_replaye
     # Once the leftover is inspected and removed, the run narrates what the cast holds and
     # goes on: the bound seed gives the accepted take.
     (repository.ROOT / left_file).unlink()
-    narration_converge.main(["--language", "en", "--rounds", "1", "--takes", "1"])
+    cli.main(["narrate", "--edition", "en", "--rounds", "1", "--takes", "1"])
     final = record_of()
     assert (final["state"], final["unsettled"]) == ("ended", {})
     assert thought_of(2)["seed"] == bound
@@ -450,7 +450,7 @@ def test_a_thought_under_its_line_heard_by_no_one_gets_no_candidate_and_waits(
 
     monkeypatch.setattr(narration_group_generation, "load_voice_model", generated)
     with pytest.raises(SystemExit) as waiting:
-        narration_converge.main(["--language", "en", "--rounds", "2", "--takes", "3"])
+        cli.main(["narrate", "--edition", "en", "--rounds", "2", "--takes", "3"])
     record = record_of()
     second = thought_of(2)
     assert record["unsettled"] == {}
@@ -483,7 +483,7 @@ def test_a_thought_under_its_line_that_another_line_refuses_gets_candidates(
     clarity_by_take(monkeypatch, {2: 17.4, **seeds})
     studio.sound = lambda _seed, _text: voiced()
     with pytest.raises(SystemExit):
-        narration_converge.main(["--language", "en", "--rounds", "1", "--takes", "3"])
+        cli.main(["narrate", "--edition", "en", "--rounds", "1", "--takes", "3"])
     (entry,) = record_of()["thoughts"]
     assert entry["first"]["failed"] == ["ending"]
     # The convergence chooses by its margins as before: the clearest candidate is bound. Its

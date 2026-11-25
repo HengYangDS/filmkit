@@ -24,12 +24,11 @@ number word, or a numeral with its classifier before the word, other than a lone
 The contract's optional [number] table declares more number words and reasoned exceptions, each
 a thought and term; an exception that excuses nothing is stale.
 
-Usage: python -m filmkit.concepts
+`filmkit check` asks it among the film's sources (`filmkit.check`).
 """
 
 from __future__ import annotations
 
-import json
 import os
 import re
 import subprocess
@@ -545,16 +544,3 @@ def check() -> dict:
         ),
         "number_exceptions": len(contract.number.exceptions),
     }
-
-
-def main() -> None:
-    try:
-        report = check()
-    except ConceptError as error:
-        message = f"concepts: {error}"
-        raise SystemExit(message) from None
-    print(json.dumps(report, ensure_ascii=False))
-
-
-if __name__ == "__main__":
-    main()

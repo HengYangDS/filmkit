@@ -12,8 +12,6 @@ from filmkit.production import Edition
 from filmkit.review import set_aside
 
 SOURCE = Path(chain.__file__).resolve().parents[1]
-# The modules that retire with the commands they are (task 7.3).
-RETIRING = {"produce.py", "preflight.py", "adoption.py"}
 
 
 def texts() -> list[tuple[str, str]]:
@@ -21,8 +19,6 @@ def texts() -> list[tuple[str, str]]:
     literal parts of f-strings."""
     found = []
     for path in sorted(SOURCE.rglob("*.py")):
-        if path.name in RETIRING:
-            continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and isinstance(node.value, str):
@@ -45,6 +41,6 @@ def test_no_string_of_the_engine_names_a_node_to_run_without_its_verb_or_names_p
     found = [
         (path, text)
         for path, text in texts()
-        if bare.search(text) or "filmkit.produce" in text or re.search(r"\bproduce [a-z]", text)
+        if bare.search(text) or re.search(r"\bproduce\b", text)
     ]
     assert found == []

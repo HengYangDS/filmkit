@@ -3,7 +3,6 @@ records, a node's work done again by another command recorded as that node's run
 decisions 2, 5 and 8 of record-every-run). What a run's record states of its measurement is
 `test_runs.py`'s."""
 
-import json
 import os
 import signal
 import subprocess
@@ -17,7 +16,6 @@ import stand_ins
 import filmkit.narration.fitting as fitting
 import filmkit.narration.narrate as narrate
 import filmkit.picture.repair as picture_repair
-import filmkit.produce as produce
 import filmkit.repository as repository
 import filmkit.soundtrack.gates as sound_gates
 from filmkit.graph import nodes, opens, plan, records, runs
@@ -102,22 +100,6 @@ def test_a_retake_writes_narrate_s_partial_record_and_leaves_its_record(root, mo
     assert isinstance(read("narrate", partial=True), records.PartialRecord)
 
 
-def test_a_stage_written_elsewhere_writes_a_partial_record(root, monkeypatch):
-    staged = []
-    monkeypatch.setitem(
-        produce.EDITION_ACTIONS, "stage-picture", lambda edition, options: staged.append(options)
-    )
-    produce.main(["stage-picture", "--language", "zh"])
-    whole = records.place("stage-picture", "zh").read_bytes()
-    trial = ["--output", "build/runtime/work/trial"]
-    produce.main(["stage-picture", "--language", "zh", *trial])
-    assert records.place("stage-picture", "zh").read_bytes() == whole
-    partial = json.loads(records.place("stage-picture", "zh", partial=True).read_text())
-    assert partial["partial"] is True
-    assert "inputs" not in partial
-    assert len(staged) == 2
-
-
 @pytest.fixture
 def repairable(root, monkeypatch):
     """The Chinese edition's two pictures, their receipts and a refused comparison of them, with
@@ -153,7 +135,7 @@ def repairable(root, monkeypatch):
 
 def test_a_repair_writes_the_records_of_the_renders_and_the_comparison_it_runs(repairable):
     edition = repairable
-    produce.main(["repair-pictures", "--language", "zh"])
+    picture_repair.main(["--language", "zh"])
     captioned, uncaptioned = read("render-picture"), read("render-picture-uncaptioned")
     compared = read("compare-pictures")
     for record, captions in ((captioned, True), (uncaptioned, False)):

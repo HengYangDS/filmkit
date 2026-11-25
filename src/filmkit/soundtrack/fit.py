@@ -22,7 +22,8 @@ policy does not read is refused. The fit judges no take: abrupt endings, pauses 
 with `assemble`.
 
 `asked` gives the same reports and refusals without printing or refusing, for a caller that
-decides by them.
+decides by them. The command runs `fit` for one edition, measured as a run named `fit` that is no
+node, and refuses in one line, "fit: <reason>".
 
 Usage: python -m filmkit.soundtrack.fit --language <code> [--variants <file>]
 """
@@ -216,3 +217,35 @@ def fit(edition: Edition, variants: dict[str, dict] | None = None) -> list[dict]
     if found[0][1] is not None:
         raise found[0][1]
     return [line for line, _ in found]
+
+
+def main(argv: list[str] | None = None) -> None:
+    import argparse
+    from pathlib import Path
+
+    import filmkit.child_processes as child_processes
+    import filmkit.graph.runs as seam
+    from filmkit.production import CODES, Edition, UnassembledError
+
+    parser = argparse.ArgumentParser(
+        prog="python -m filmkit.soundtrack.fit", description=__doc__.splitlines()[0]
+    )
+    parser.add_argument("--language", choices=CODES, required=True)
+    parser.add_argument(
+        "--variants",
+        type=Path,
+        metavar="FILE",
+        help="a JSON file of pause-policy variants, below the film's root or absolute",
+    )
+    options = parser.parse_args(argv)
+    with child_processes.ending("fit: stopped by {request}"), seam.run(options.language, "fit"):
+        try:
+            variants = read_variants(options.variants) if options.variants else {}
+            fit(Edition(options.language), variants)
+        except (*REFUSALS, VariantsError, UnassembledError) as error:
+            msg = f"fit: {error}"
+            raise SystemExit(msg) from None
+
+
+if __name__ == "__main__":
+    main()

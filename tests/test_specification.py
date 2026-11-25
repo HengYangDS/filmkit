@@ -70,7 +70,7 @@ def test_a_refusal_at_load_ends_what_a_command_prints_in_its_one_line(declared, 
     # the import, and its last line is the refusal's one line. It writes nothing.
     change, line = LOAD_REFUSALS[case]
     change(declared)
-    command = [sys.executable, "-I", "-B", "-m", "filmkit.produce", "select", "--language", "zh"]
+    command = [sys.executable, "-I", "-B", "-m", "filmkit.soundtrack.fit", "--language", "zh"]
     environment = {**os.environ, "FILMKIT_ROOT": str(declared)}
     ran = subprocess.run(
         command,

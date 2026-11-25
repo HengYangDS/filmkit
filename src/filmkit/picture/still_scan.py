@@ -34,9 +34,8 @@ A draft's scan is an early warning and settles nothing about the film. A draft i
 the size the film's picture is drawn at, and text is set on whole pixels of the size it is drawn
 at, so a label can step by one pixel in a draft where the film holds it still, and the draft
 then ends a still run that the film holds whole. With --language the timeline is the edition's
-and the record is its draft's (`Edition.draft_stills`), for which every render waits, of a
-film that declares drafts (`draft_record`: the same reader, for the timeline
-and the composition as they stand); `record_draft` writes it, for this command and for
+and the record is its draft's (`Edition.draft_stills`) of a film that declares drafts, whose
+node every render waits for; `record_draft` writes it, for this command and for
 `filmkit.picture.draft`, of a draft that decodes to its timeline's seconds.
 
 What the scan cannot read is its command's refusal, in one line, and no error of its own.
@@ -458,15 +457,6 @@ def film_record(edition: Edition) -> dict:
         )
     except NoAnswerError as error:
         raise NoAnswerError(f"'s still scan record {error}") from error
-
-
-def draft_record(edition: Edition) -> dict:
-    """The edition's draft record, where it answers for the timeline and the composition as they
-    stand, by the reader of the film's record (`still_record.answer`): a draft binds no engine
-    and its own file is not kept as an input. `NoAnswerError` says why it does not."""
-    paths = (edition.timeline, repository.ROOT / COMPOSITION_SCRIPT)
-    subjects = dict(zip(SUBJECTS[1:], paths, strict=True))
-    return still_record.answer(edition.draft_stills, subjects, rules(), film_frames(edition))
 
 
 def refuse_still_pictures(edition: Edition, record: dict) -> None:

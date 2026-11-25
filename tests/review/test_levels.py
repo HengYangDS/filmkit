@@ -127,7 +127,7 @@ def test_record_and_the_verifier_accept_a_review_level_by_level(root, review, pu
     ):
         review_round.review_records(folder)
     review(folder, "en", findings=findings, **passing(levels=levels))
-    review_round.main(["record", "--round-dir", str(folder)])
+    review_round.run(["record", "--round-dir", str(folder)])
     capsys.readouterr()
     record = json.loads(Edition("zh").production_review.read_text())
     assert record["levels"] == levels

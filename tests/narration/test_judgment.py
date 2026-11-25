@@ -14,7 +14,6 @@ import filmkit.narration.judge as narration_judge
 import filmkit.narration.judgment as narration_judgment
 import filmkit.narration.readings as narration_readings
 import filmkit.narration.terms as narration_terms
-import filmkit.preflight as preflight
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as soundtrack_assembly
 import filmkit.soundtrack.gates as sound_gates
@@ -140,14 +139,13 @@ def test_clarity_is_judged_only_where_the_film_declares_a_line_for_a_single_thou
     declared(clarity_minimum_db=None)
     film_declared = narration_judgment.FILM
     assert narration_judgment.held("en", script, film_declared) == narration_judgment.Held({})
-    # The film declares a floor and no line for a single thought: recorded, as preflight words it.
+    # The film declares a floor and no line for a single thought: recorded, with its words.
     floors = {"zh": 18.0, "en": 17.0}
     declared(clarity_minimum_db=floors)
     held = narration_judgment.held("en", script, narration_judgment.FILM)
     assert (held.floor, held.line, held.kept) == (17.0, None, frozenset())
-    assert narration_judgment.NO_THOUGHT_LINE is preflight.NO_THOUGHT_LINE
     line = narration_judgment.clarity_line({"cpp_db": 15.0}, "26.2", held)
-    assert line == {"passes": None, "why": preflight.NO_THOUGHT_LINE, "floor_db": 17.0}
+    assert line == {"passes": None, "why": narration_judgment.NO_THOUGHT_LINE, "floor_db": 17.0}
     # With a margin a thought is held to the floor, and a thought the film keeps to the floor
     # less the margin.
     kept = film.ClarityException(edition="en", thought="26.2", reason="a short thought")
@@ -176,7 +174,7 @@ def test_clarity_is_judged_only_where_the_film_declares_a_line_for_a_single_thou
     assert (kept_take["failed"], kept_take["lines"]["clarity"]["line_db"]) == ([], 16.0)
 
 
-def test_preflight_and_the_judgment_refuse_the_same_thoughts_for_their_clarity(
+def test_the_sound_gate_and_the_judgment_refuse_the_same_thoughts_for_their_clarity(
     monkeypatch, declared, tmp_path
 ):
     # One sound gate record: four thoughts under the floor of 17, one of them kept by the film.
@@ -188,15 +186,13 @@ def test_preflight_and_the_judgment_refuse_the_same_thoughts_for_their_clarity(
         clarity_thought_margin_db=1.0,
         clarity_exceptions=(kept,),
     )
-    monkeypatch.setattr(preflight, "FILM", narration_judgment.FILM)
     monkeypatch.setattr(sound_gates, "FILM", narration_judgment.FILM)
     rows = [
         {"id": name, "cpp_db": value, "below_floor": value is not None and value < 17.0}
         for name, value in values.items()
     ]
-    edition = Edition("en")
-    repository.write(edition.sound_gates, {"clarity": {"floor_db": 17.0, "thoughts": rows}})
-    said = preflight.clarity(edition)
+    measured = {"floor_db": 17.0, "thoughts": rows}
+    said = "; ".join(sound_gates.thought_findings(Edition("en"), measured))
     held = narration_judgment.held("en", {"segments": []}, narration_judgment.FILM)
     for name, value in values.items():
         line = narration_judgment.clarity_line({"cpp_db": value}, name, held)

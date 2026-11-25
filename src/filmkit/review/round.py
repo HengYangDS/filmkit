@@ -26,14 +26,14 @@ a preview the owner watched, with --unreviewed by the consumer folder that holds
 the round's label or one given with --label. --language limits a set-aside to one edition, and
 --without-picture leaves the rendered pictures in place, for the editions it names or for both.
 
-Usage: python -m filmkit.review.round set-aside --round <n> --purpose <text>
+Usage: filmkit review set-aside --round <n> --purpose <text>
            [--review-dir <dir>] [--language <code>] [--without-picture [<code> ...]] [--dry-run]
-       python -m filmkit.review.round set-aside --unreviewed --consumer <dir>
+       filmkit review set-aside --unreviewed --consumer <dir>
            (--round <n> | --label <label>) --purpose <text>
            [--language <code>] [--without-picture [<code> ...]] [--dry-run]
-       python -m filmkit.review.round prepare --round <n>
+       filmkit review prepare --round <n>
            [--previous <dir> --dispositions <file>] [--changes <file>]
-       python -m filmkit.review.round record --round-dir <dir> [--dry-run]
+       filmkit review record --round-dir <dir> [--dry-run]
 """
 
 from __future__ import annotations
@@ -489,11 +489,3 @@ def run(argv: list[str] | None = None, prog: str | None = None) -> None:
         msg = f"{options.command}: {error}"
         raise SystemExit(msg) from None
     print(json.dumps(result, ensure_ascii=False))
-
-
-def main(argv: list[str] | None = None) -> None:
-    run(argv)
-
-
-if __name__ == "__main__":
-    main()

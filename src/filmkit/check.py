@@ -314,6 +314,26 @@ def words(write: bool) -> tuple[dict[str, list[str]], object]:
     return found, reads
 
 
+def tracked(root: Path, not_read: list[str]) -> dict[str, list[str]]:
+    """The questions of the film's tracked files that no loaded declaration answers, each with
+    its findings: the npm packages, the Python lock and the engine's pin, the picture template
+    and the runtime's citation in the review prompt. A file that cannot be read as what it is,
+    is its question's finding; what was not compared is added to `not_read`."""
+    others = {
+        "npm_packages": lambda: npm_packages(root),
+        "python_lock": lambda: python_lock(root, not_read),
+        "template": lambda: picture_template(root),
+        "runtime": lambda: runtime(root),
+    }
+    found = {}
+    for name, ask in others.items():
+        try:
+            found[name] = ask()
+        except UnreadableError as error:
+            found[name] = [str(error)]
+    return found
+
+
 def asked(root: Path, *, write: bool = True) -> dict:
     """Every question asked of the film at a root: the verdict, its outcome `pass` or `refuse`,
     each question's findings and what the picture reads judged. With `write` each edition's
@@ -326,17 +346,7 @@ def asked(root: Path, *, write: bool = True) -> dict:
         found |= more
     else:
         found |= dict.fromkeys(QUESTIONS[1:6], [NOT_LOADED])
-    others = {
-        "npm_packages": lambda: npm_packages(root),
-        "python_lock": lambda: python_lock(root, not_read),
-        "template": lambda: picture_template(root),
-        "runtime": lambda: runtime(root),
-    }
-    for name, ask in others.items():
-        try:
-            found[name] = ask()
-        except UnreadableError as error:
-            found[name] = [str(error)]
+    found |= tracked(root, not_read)
     refused = any(found[name] for name in QUESTIONS)
     return {
         "outcome": "refuse" if refused else "pass",

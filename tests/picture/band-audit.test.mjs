@@ -144,6 +144,6 @@ test("the tool prints its report, exits 1 on a refusal and 2 on a malformed invo
   ]) {
     const malformed = await run(composition(), ...args);
     assert.equal(malformed.status, 2);
-    assert.match(malformed.stderr, /Usage: python -m filmkit.tools band-audit/);
+    assert.match(malformed.stderr, /Usage: node band-audit.mjs/);
   }
 });

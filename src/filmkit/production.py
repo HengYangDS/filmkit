@@ -392,12 +392,6 @@ class Edition:
         return self.evidence / "picture-gates.json"
 
     @property
-    def readiness(self) -> Path:
-        """The receipt the pre-render check wrote, which no node reads (it leaves with the
-        `produce` command)."""
-        return self.evidence / "readiness.json"
-
-    @property
     def draft_stills(self) -> Path:
         """The still scan of the edition's 10 fps draft, bound to its timeline and composition."""
         return self.evidence / "draft-stills.json"

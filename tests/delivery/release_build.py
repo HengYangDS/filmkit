@@ -13,11 +13,11 @@ from pathlib import Path
 import pytest
 
 import filmkit.delivery.folder as delivery_folder
-import filmkit.delivery.release as release
 import filmkit.delivery.reproduction as reproduction
 import filmkit.film as film
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
+from filmkit.graph import cli
 from filmkit.production import CODES, Edition
 
 # The film-bound sources a test states: both editions' scripts and the composition's script.
@@ -117,7 +117,7 @@ class Built:
 def refused(arguments: list[str]) -> str:
     """The one line the command refuses with."""
     with pytest.raises(SystemExit) as refusal:
-        release.main(arguments)
+        cli.main(["release", *arguments])
     line = str(refusal.value)
     assert line
     assert "\n" not in line

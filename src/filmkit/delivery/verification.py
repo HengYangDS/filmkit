@@ -7,20 +7,15 @@ the films and pages name, complete media decoding of all four films, the keyword
 Spotlight imports from each film where the host has `mdimport`, and the recorded review
 thresholds.
 Aesthetic judgment belongs to the review record; human listening stays separate.
-The verifier reads and decodes, and prints each edition's report, which states the seconds each
-film's media took. Up to four films' media are verified at the same time. It writes nothing;
---read-only, which the films' gate passes, is accepted and changes nothing. `filmkit verify
---technical-only` runs the technical checks of each edition's current films after the records
-(`verify_editions`).
-
-Usage: python -m filmkit.delivery.verification [--technical-only] --language <code>|all
-           [<films>]
-Without films, each selected edition's current delivered films are verified.
+The verifier reads and decodes each edition's current delivered films and writes nothing. Each
+edition's report states the seconds each film's media took. Up to four films' media are verified
+at the same time. `filmkit verify --technical-only` prints the technical reports after the run
+records (`verify_editions`); `filmkit deliver` asks every report, the review's included, before
+it copies (`qualified`).
 """
 
 from __future__ import annotations
 
-import argparse
 import json
 import time
 import wave
@@ -61,23 +56,6 @@ class VerificationError(ValueError):
 # few of the host's cores.
 MEDIA_POOL = 4
 FPS, RATE = specification.FPS, specification.RATE
-
-
-def edition_inputs(files: list[Path]) -> dict[str, list[Path]]:
-    """Require every declared edition's films, each under its edition's current folder, and no
-    other file, naming each edition whose films are missing (a bridge until R2b's `filmkit
-    verify`, which replaces this command's loop over the editions)."""
-    groups = {code: production.Edition(code).films for code in production.CODES}
-    expected = {path for films in groups.values() for path in films}
-    if len(files) != len(expected) or set(files) != expected:
-        missing = [code for code, films in groups.items() if not set(films) <= set(files)]
-        others = sorted(path.name for path in set(files) - expected)
-        named = [f"the {code} edition's current films are missing" for code in missing]
-        named += [f"{', '.join(others)} belong to no edition's current films"] if others else []
-        named += ["a film is named twice"] if len(files) != len(set(files)) else []
-        msg = "Acceptance of every edition requires each one's current films: " + "; ".join(named)
-        raise VerificationError(msg)
-    return groups
 
 
 def verify_sources() -> dict:
@@ -550,47 +528,22 @@ REFUSALS = (
 )
 
 
-def qualified(
-    groups: dict[str, list[Path]] | None = None, *, technical_only: bool = True
-) -> Iterator[dict]:
-    """Qualify each edition as its films, each declared edition's current delivered films where
-    `groups` names none, giving each edition's report as its run ends. An owner's refusal stops
-    at that edition in one line, "<language>: <reason>"; nothing is written."""
-    groups = groups or {code: production.Edition(code).films for code in production.CODES}
-    for language, members in groups.items():
+def qualified(*, technical_only: bool = True) -> Iterator[dict]:
+    """Qualify each declared edition as its current delivered films, giving each edition's report
+    as its run ends. An owner's refusal stops at that edition in one line, "<language>:
+    <reason>"; nothing is written."""
+    for language in production.CODES:
+        edition = production.Edition(language)
         try:
             with seam.run(language, "verify"):
-                edition = production.Edition(language)
-                report = qualify(edition, members, technical_only=technical_only)
+                report = qualify(edition, edition.films, technical_only=technical_only)
         except REFUSALS as error:
             msg = f"{language}: {error}"
             raise SystemExit(msg) from None
         yield report
 
 
-def verify_editions(
-    groups: dict[str, list[Path]] | None = None, *, technical_only: bool = True
-) -> None:
+def verify_editions(*, technical_only: bool = True) -> None:
     """Qualify each edition (`qualified`), printing each edition's report as its run ends."""
-    for report in qualified(groups, technical_only=technical_only):
+    for report in qualified(technical_only=technical_only):
         print(json.dumps(report, ensure_ascii=False), flush=True)
-
-
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("files", nargs="*", type=Path)
-    # The film-media gate passes this flag; the verifier writes nothing either way.
-    parser.add_argument("--read-only", action="store_true", help="accepted; nothing is written")
-    parser.add_argument("--technical-only", action="store_true")
-    parser.add_argument("--language", choices=(*production.CODES, "all"), required=True)
-    options = parser.parse_args(argv)
-    codes = production.CODES if options.language == "all" else (options.language,)
-    files = [path.resolve() for path in options.files] or [
-        film for code in codes for film in production.Edition(code).films
-    ]
-    groups = edition_inputs(files) if options.language == "all" else {options.language: files}
-    verify_editions(groups, technical_only=options.technical_only)
-
-
-if __name__ == "__main__":
-    main()

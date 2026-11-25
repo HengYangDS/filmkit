@@ -55,7 +55,7 @@ def test_a_missing_or_altered_file_is_refused_in_one_line_that_names_the_supply(
     with pytest.raises(cmudict.DictionaryError) as refusal:
         cmudict.supplied()
     said = str(refusal.value)
-    assert "\n" not in said and "python -m filmkit.supply" in said
+    assert "\n" not in said and "filmkit supply" in said
     assert cmudict.PLACE in said
     assert ("is missing" if bytes_in_place is None else "differs from the pinned SHA-256") in said
 

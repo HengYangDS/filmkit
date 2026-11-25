@@ -36,7 +36,7 @@ def tree(folder):
 
 def prepare(*options):
     """Run `prepare` for round 19 and return the round's directory."""
-    review_round.main(["prepare", "--round", str(ROUND), *map(str, options)])
+    review_round.run(["prepare", "--round", str(ROUND), *map(str, options)])
     return review_files.round_directory(ROUND)
 
 

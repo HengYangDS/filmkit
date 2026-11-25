@@ -56,7 +56,7 @@ def test_a_round_whose_films_were_set_aside_is_refused_naming_the_next(root, put
 
     def rebuilt(*label):
         """Set the build aside under a label, and build it again."""
-        review_round.main([*aside, *label])
+        review_round.run([*aside, *label])
         for path, body in built.items():
             put(path, body)
 

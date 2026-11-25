@@ -12,6 +12,7 @@ import pytest
 
 import filmkit.narration.converge as narration_converge
 import filmkit.repository as repository
+from filmkit.graph import cli
 from filmkit.production import Edition
 
 RATE = 24000
@@ -81,7 +82,7 @@ def thought_of(index: int) -> dict:
 
 
 def converge(*options: str) -> None:
-    narration_converge.main(["--language", "en", *options])
+    cli.main(["narrate", "--edition", "en", *options])
 
 
 def refused(*options: str) -> str:

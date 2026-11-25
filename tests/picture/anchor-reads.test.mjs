@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { scratchFolder } from "./sample-film.mjs";
 
 const TOOL = fileURLToPath(new URL("../../src/filmkit/picture/anchor-reads.mjs", import.meta.url));
-const USAGE = "Usage: python -m filmkit.tools anchor-reads <timeline.json> <step-seconds>";
+const USAGE = "Usage: node anchor-reads.mjs <timeline.json> <step-seconds>";
 
 /* A composition that draws one scene a segment: 03 reads `order`, which it requires to stand at the segment's voice,
  * then `kept`; in 05 the composition throws outside any scene, as while it times a stage; 04 reads `law`, then throws

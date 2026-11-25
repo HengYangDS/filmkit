@@ -19,7 +19,7 @@ import { isDeepStrictEqual, parseArgs } from "node:util";
 
 import { openComposition, readTextMetrics, readTimeline } from "./headless-composition.mjs";
 
-const USAGE = "Usage: python -m filmkit.tools caption-equivalence <timeline.json> [<step>]";
+const USAGE = "Usage: node caption-equivalence.mjs <timeline.json> [<step>]";
 /* How many findings the report holds in full; it counts them all. */
 const FINDINGS = 20;
 

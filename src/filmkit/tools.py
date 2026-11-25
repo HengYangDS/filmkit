@@ -19,23 +19,16 @@ tool is asked to end (SIGTERM) and waited for, so that it ends what it started i
 that drives a browser closes it, and it is killed only when it has not ended after
 `STOP_SECONDS` (`filmkit.child_processes.stop`).
 
-A refusal exits with status 1 and "<tool>: <reason>" on standard error; otherwise the command
-exits with the tool's own status. The two checks that a film's build runs from the command line,
-the geometry check and the cover check (`BUILD_RUNS`), are runs of their nodes
-(`filmkit.graph.runs`) for the edition of this film that their arguments name, by its stage or
-its folder of evidence or artifacts, and write the node's run record. No other run writes one:
-an audit run by hand for a diagnosis is no command of a build.
-
-Usage: python -m filmkit.tools <tool> [arguments]
+The nodes that run a tool, the geometry check and the cover check, call `run` with the arguments
+their edition derives (`filmkit.graph.chain`); the engine's other modules call it as they need.
+The module has no command line.
 """
 
 from __future__ import annotations
 
-import argparse
 import contextlib
 import contextvars
 import os
-import re
 import shutil
 import signal
 import subprocess
@@ -43,15 +36,12 @@ import tempfile
 from pathlib import Path
 
 import filmkit.child_processes as child_processes
-import filmkit.graph.runs as seam
 import filmkit.picture.browser as picture_browser
 import filmkit.picture.renderer as picture_renderer
 import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.graph import opens
 from filmkit.picture import metrics
-from filmkit.picture.errors import PictureError
-from filmkit.production import CODES, STAGE
 
 # The engine's Node modules, which the package carries below this module's folder, and the data
 # they read beside themselves: the classes of characters (`filmkit.languages`).
@@ -72,21 +62,6 @@ TOOLS = {
 }
 # The copies, below the film's root, in a folder for each engine version.
 CACHE = picture_browser.TOOL_CACHE / released.ENGINE
-# The runs a film's build makes from the command line, which alone write a run record: the tool
-# with the words its arguments begin with, and the node's name. Every other run, of another tool
-# or of the player check in another mode, is taken for a run by hand.
-BUILD_RUNS = {
-    ("geometry-check",): "geometry-check",
-    ("player-check", "cover"): "player-check-cover",
-}
-# Where a tool's argument names an edition: its stage, by the name `production.STAGE` gives it,
-# or its folder of evidence or artifacts, by the last name `repository` gives each.
-EDITION = "|".join(CODES)
-_STAGED = f"(?P<stage>{EDITION})".join(map(re.escape, STAGE.format(code="\0").split("\0")))
-_FOLDERS = "|".join(re.escape(place.name) for place in (repository.EVIDENCE, repository.ARTIFACTS))
-EDITION_PLACE = re.compile(
-    rf"(?:^|/)(?:{_STAGED}[^/]*|(?:{_FOLDERS})/(?P<folder>{EDITION}))(?=/|$)"
-)
 # Seconds a tool has to end, once the command's wait for it was cut short and it was asked to,
 # before it is killed.
 STOP_SECONDS = 20
@@ -185,59 +160,3 @@ def run(
             if tool_process is not None:
                 child_processes.stop([tool_process], signal.SIGTERM, seconds=STOP_SECONDS)
             raise
-
-
-def edition_of(arguments: list[str]) -> str | None:
-    """The edition of this film a tool's arguments name: the one whose stage, evidence or
-    artifacts folder their paths lie in, or None when they name none or both. A path is read
-    from the film's root, where the tools run; one that leaves the root names no edition."""
-    named = set()
-    for argument in arguments:
-        place = Path(os.path.normpath(repository.ROOT / argument))
-        if place.is_relative_to(repository.ROOT):
-            found = EDITION_PLACE.finditer(place.relative_to(repository.ROOT).as_posix())
-            named |= {match["stage"] or match["folder"] for match in found}
-    return named.pop() if len(named) == 1 else None
-
-
-def recorded(tool: str, arguments: list[str]) -> tuple[str, str] | None:
-    """The edition and the node a run is a run of: for a run of `BUILD_RUNS` whose arguments
-    name one edition of this film, and None for every other run."""
-    words = (tool, *arguments)
-    name = next((BUILD_RUNS[run] for run in BUILD_RUNS if words[: len(run)] == run), None)
-    code = edition_of(arguments) if name else None
-    return (code, name) if code and name else None
-
-
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(
-        prog="python -m filmkit.tools", description=__doc__.splitlines()[0]
-    )
-    parser.add_argument("tool", choices=sorted(TOOLS))
-    parser.add_argument("arguments", nargs=argparse.REMAINDER, help="the tool's own arguments")
-    options = parser.parse_args(argv)
-    build_run = recorded(options.tool, options.arguments)
-    # A run by hand names no edition, and is measured under none and recorded nowhere.
-    code, name = build_run or (None, options.tool)
-    whole = True
-    if build_run is not None:
-        from filmkit.graph import runs
-
-        # Arguments that name other places than the node's make a run of part of it.
-        whole = runs.own_places(code, name, options.arguments)
-    # A check of an edition's build is recorded as a command of that build; it leaves with its
-    # status or its line inside the run, so that the node's record states how it ended.
-    part = {} if whole else {"whole": False}
-    with seam.run(code, name, record=build_run is not None, **part):
-        try:
-            status = run(options.tool, options.arguments)
-        except (PictureError, ToolError) as error:
-            msg = f"{options.tool}: {error}"
-            raise SystemExit(msg) from None
-        if status != 0:
-            raise SystemExit(status)
-    raise SystemExit(status)
-
-
-if __name__ == "__main__":
-    main()

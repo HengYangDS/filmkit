@@ -296,19 +296,6 @@ def test_a_counterexample_in_the_player_or_the_synopsis_refuses(tmp_path, monkey
     assert failures[1] == "en release synopsis at 7: 'remake', a counterexample of rebuild"
 
 
-def test_the_cli_prints_the_report_and_refuses_with_every_failure(monkeypatch, capsys):
-    concepts.main()
-    assert json.loads(capsys.readouterr().out)["concepts"] == 2
-
-    def refuse():
-        message = "one\ntwo"
-        raise ConceptError(message)
-
-    monkeypatch.setattr(concepts, "check", refuse)
-    with pytest.raises(SystemExit, match="concepts: one\ntwo"):
-        concepts.main()
-
-
 def test_the_check_refuses_a_counterexample_in_the_sample_film(tmp_path, monkeypatch):
     shutil.copytree(repository.ROOT / "content", tmp_path / "content")
     monkeypatch.setattr(repository, "ROOT", tmp_path)

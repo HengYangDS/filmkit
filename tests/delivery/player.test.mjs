@@ -364,10 +364,7 @@ test("the player check refuses a malformed invocation before opening a browser",
     const result = spawnSync(process.execPath, [tool, ...args], { encoding: "utf8" });
     assert.equal(result.status, 2, args.join(" "));
     assert.equal(result.stdout, "", args.join(" "));
-    assert.ok(
-      result.stderr.includes("Usage: python -m filmkit.tools player-check"),
-      args.join(" "),
-    );
+    assert.ok(result.stderr.includes("Usage: node player-check.mjs"), args.join(" "));
   }
 });
 

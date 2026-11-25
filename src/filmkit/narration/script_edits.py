@@ -32,16 +32,14 @@ retakes and, for a segment that marks anchors, each anchor marked, restated, rem
 moved, moved by rank and moved to another thought, each kind apart; a move by rank into another
 thought is named among both.
 
-Usage: python -m filmkit.narration.script_edits --edits FILE [--dry-run]
+Run by `filmkit edit --edits FILE [--dry-run]` (`apply_edits`).
 An edits file: {"replace": {"en": [["13.5", "proves no", "does not prove"]]},
     "split": {"en": [["07.2", "the evidence."]]}, "rewrite": {"zh": [["03", ["…", "…"]]]},
     "anchor": {"zh": [["03.2", [4, 7], "order", "有先后"]]}, "unanchor": {"zh": [["03", "law"]]}}
 Paths are relative to the repository root.
 """
 
-import argparse
 import copy
-import json
 from dataclasses import replace as replaced
 
 import filmkit.languages as languages
@@ -377,15 +375,6 @@ def _change_report(
     }
 
 
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Apply exact edits to the scripts.")
-    parser.add_argument("--edits", required=True, help="Edits JSON file")
-    parser.add_argument("--dry-run", action="store_true", help="Report the edits without writing")
-    options = parser.parse_args(argv)
-    report = apply_edits(repository.read(options.edits), dry_run=options.dry_run)
-    print(json.dumps(report, ensure_ascii=False, indent=1))
-
-
 def apply_edits(edits: dict, *, dry_run: bool = False) -> dict:
     """Apply an edits file's edits to every edition's script and cast, or with `dry_run` only
     report them (`filmkit edit`): the report of each edition's changed segments. Nothing is
@@ -415,7 +404,3 @@ def _write(edition: Edition, script: dict, cast: dict) -> None:
     """Write an edition's edited script and cast, the one copy of its narration."""
     repository.write(edition.script, script)
     repository.write(edition.cast, cast)
-
-
-if __name__ == "__main__":
-    main()

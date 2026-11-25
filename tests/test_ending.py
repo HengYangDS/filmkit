@@ -70,8 +70,8 @@ narrate.repository.ROOT = pathlib.Path(sys.argv[1])
 narrate.steps = lambda code, ids, scope: [("narration", [sys.executable, "-B", *sys.argv[2:]])]
 narrate.main(["--language", "zh"])
 """
-# What a production action does with a request to end, around the engine's own run of a
-# stand-in renderer; `produce.main` is this around its action (PRODUCE).
+# What a node's run does with a request to end, around the engine's own run of a stand-in
+# renderer; `filmkit build` is this around the node's run (BUILD).
 RENDER = """
 import pathlib, sys
 import filmkit.child_processes as child_processes
@@ -85,25 +85,44 @@ if __name__ == "__main__":
     with child_processes.ending("render-picture: stopped by {request}"):
         render()
 """
-# The production command itself, its render the same run.
-PRODUCE = """
-import render
-import filmkit.produce as produce
-produce.EDITION_ACTIONS["render-picture"] = render.render
-produce.main(["render-picture", "--language", "zh"])
+# `filmkit build` itself, the engine's table held to one node whose run is `run` and which
+# reads nothing (the prelude of BUILD and CHECKING).
+HOLD = """
+import dataclasses
+from filmkit.graph import chain, cli, nodes, runs
+def hold(name, run):
+    named = next(node for node in chain.TABLE if node.name == name)
+    reads = {"default": lambda edition: nodes.Places({})}
+    held = dataclasses.replace(named, ways=reads, waits=(), run=run)
+    table = nodes.load([held], {}, ("zh",))
+    chain.table = lambda: table
+    runs.table = lambda: {held.name: held}
 """
-# The production command itself in an action that holds no child, as a check that runs tools.
-CHECKING = """
+# `filmkit build` itself, its one node the render, the same run.
+BUILD = (
+    HOLD
+    + """
+import render
+hold("render-picture", render.render)
+cli.main(["build", "render-picture:zh"])
+"""
+)
+# `filmkit build` itself running a node that holds no child, as a check that runs tools.
+CHECKING = (
+    HOLD
+    + """
 import pathlib, sys, time
-import filmkit.produce as produce
 import filmkit.repository as repository
 repository.ROOT = pathlib.Path(sys.argv[1])
-def checking(edition, options):
+def checking(edition):
     note("checking")
     time.sleep(30)
-produce.EDITION_ACTIONS["check-picture"] = checking
-produce.main(["check-picture", "--language", "zh"])
+hold("check-picture", checking)
+cli.main(["build", "check-picture:zh"])
 """
+)
+# What the build says when a request ends it.
+BUILT = "The build was stopped by {request}; the node it was running was ended with it"
 # A command that holds no child while it runs: it takes no request.
 IDLE = """
 import time
@@ -269,7 +288,8 @@ def test_an_action_that_a_signal_ends_where_it_holds_no_child_writes_no_run_reco
     command = processes.python(script, str(processes.folder))
     processes.noted("checking")
     command.send_signal(signal.SIGINT)
-    assert ended(processes, command) == (-signal.SIGINT, ["check-picture: stopped by an interrupt"])
+    stopped = BUILT.format(request="an interrupt")
+    assert ended(processes, command) == (-signal.SIGINT, [stopped])
     earlier = record.read_bytes()
     assert json.loads(earlier)["outcome"] != "pass"
     # SIGTERM ends the command where it stands: no record is written, and the earlier one stands.
@@ -569,9 +589,9 @@ def test_a_request_to_the_narrations_group_which_the_narration_relays_leaves_no_
 
 
 def render(processes, command="render"):
-    """The render, or the production command over it, with the stand-in renderer running."""
+    """The render, or the build over it, with the stand-in renderer running."""
     standin = processes.script("standin", STANDIN)
-    for name, text in (("render", RENDER), ("produce", PRODUCE)):
+    for name, text in (("render", RENDER), ("build", BUILD)):
         processes.script(name, text)
     script = processes.folder / f"{command}.py"
     started = processes.python(script, str(processes.folder), str(standin))
@@ -580,10 +600,10 @@ def render(processes, command="render"):
 
 @pytest.mark.parametrize("number", list(REQUESTS))
 def test_a_request_to_end_ends_the_renderer_and_the_render_with_one_line(processes, number):
-    command, renderer = render(processes, "produce")
+    command, renderer = render(processes, "build")
     command.send_signal(number)
     status, said = ended(processes, command)
-    assert said == [f"render-picture: stopped by {REQUESTS[number]}"]
+    assert said == [BUILT.format(request=REQUESTS[number])]
     assert status == exit_of(number)
     assert gone([renderer])
     record = processes.folder / "build/evidence/records/editions/zh/render-picture.json"

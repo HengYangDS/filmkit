@@ -448,8 +448,6 @@ def aside(name: str, edition: Edition) -> Places:
 # of record-every-run).
 NOT_NODES = {
     "fit": "it reports pause-policy variants and derives nothing a later step reads",
-    "admitted": "it reads the readiness receipts and derives nothing",
-    "preflight": "the waits and the plan's readiness replace it; it leaves with produce",
     "repair-pictures": "it redoes the renders and comparisons of other nodes and runs as them",
     "converge": "a search that writes the cast, a tracked source; its narrations are whole runs",
     "verify": "it judges the whole build and derives nothing a later step reads",

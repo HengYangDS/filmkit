@@ -28,7 +28,7 @@ SHA256 = "81917843c7f44ce2b094ac63873c2c7a4cf802040792c455ba3ca406891c3d22"
 BYTES = 3_618_488
 # Where the supply step places it, below the film's root.
 PLACE = "build/runtime/tool-cache/cmudict/cmudict.dict"
-SUPPLY = "python -m filmkit.supply"
+SUPPLY = "filmkit supply"
 VARIANT = re.compile(r"\(\d+\)$")
 
 # Each headword's pronunciations, each a tuple of ARPAbet phones.

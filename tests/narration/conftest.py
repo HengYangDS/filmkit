@@ -22,6 +22,15 @@ import filmkit.repository as repository
 from filmkit.production import Edition
 
 
+@pytest.fixture(autouse=True)
+def narration_ready(monkeypatch):
+    """The plan calls every narration ready, so that `filmkit narrate` converges the stand-in
+    edition as asked; its refusal while one is not has its own test (`test_converge.py`)."""
+    from filmkit.graph import cli
+
+    monkeypatch.setattr(cli, "unready", lambda _codes: [])
+
+
 @pytest.fixture
 def write_edition(tmp_path, monkeypatch):
     """Write tiny editions under a temporary root.

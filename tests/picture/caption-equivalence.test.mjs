@@ -196,9 +196,6 @@ test("the tool prints its report for a timeline and refuses a malformed invocati
     const refused = run(args);
     assert.equal(refused.status, 2, args.join(" "));
     assert.equal(refused.stdout, "", args.join(" "));
-    assert.ok(
-      refused.stderr.includes("Usage: python -m filmkit.tools caption-equivalence"),
-      args.join(" "),
-    );
+    assert.ok(refused.stderr.includes("Usage: node caption-equivalence.mjs"), args.join(" "));
   }
 });

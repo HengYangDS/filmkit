@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 from preparing import ROUND, prepare, refusal
@@ -30,7 +31,7 @@ def test_the_command_reports_only_its_own_refusals(put):
     # A malformed review is a fault to see in full, not a refusal to report.
     put(review_files.round_directory(3) / "review-zh.json", "{")
     with pytest.raises(json.JSONDecodeError):
-        review_round.main(["set-aside", "--round", "3", "--purpose", PURPOSE, "--dry-run"])
+        review_round.run(["set-aside", "--round", "3", "--purpose", PURPOSE, "--dry-run"])
 
 
 @pytest.mark.usefixtures("unleveled")
@@ -50,11 +51,11 @@ def test_record_writes_reviews_that_verify_film_accepts(root, review, put, capsy
     with pytest.raises(ReviewError, match="zh: reviewed media differ"):
         review_round.review_records(folder)
     review(folder, "zh", findings=[{"id": "R5-1", "severity": "minor"}])
-    review_round.main(["record", "--round-dir", str(folder), "--dry-run"])
+    review_round.run(["record", "--round-dir", str(folder), "--dry-run"])
     assert json.loads(capsys.readouterr().out)["dry_run"] is True
     assert not (root / "evidence").exists()
 
-    review_round.main(["record", "--round-dir", str(folder)])
+    review_round.run(["record", "--round-dir", str(folder)])
     assert json.loads(capsys.readouterr().out) == {
         "dry_run": False,
         "editions": [
@@ -159,7 +160,7 @@ def test_a_film_that_declares_no_severities_records_a_material_finding_the_verif
     folder = reviewed_build(root, put)
     review(folder, "zh", findings=[{"id": "R5-1", "severity": "material"}])
     review(folder, "en")
-    review_round.main(["record", "--round-dir", str(folder)])
+    review_round.run(["record", "--round-dir", str(folder)])
     assert [edition["material"] for edition in json.loads(capsys.readouterr().out)["editions"]] == [
         1,
         0,
@@ -183,7 +184,7 @@ def test_twelve_scores_with_the_mean_99_25_are_recorded_with_the_overall_99_2(
     folder = reviewed_build(root, put)
     for code in CODES:
         review(folder, code, scores=scores, overall=99.3)
-    review_round.main(["record", "--round-dir", str(folder)])
+    review_round.run(["record", "--round-dir", str(folder)])
     printed = json.loads(capsys.readouterr().out)["editions"]
     assert [edition["overall"] for edition in printed] == [99.2, 99.2]
     for code in CODES:
@@ -211,7 +212,14 @@ def test_a_declaration_s_accepted_severities_reach_the_record_through_the_loader
 
     def recorded(declaration):
         put(tmp_path / film.DECLARATION, declaration)
-        command = [sys.executable, "-m", "filmkit.review.round", "record", "--round-dir", folder]
+        # The console command, as a film's terminal runs it.
+        command = [
+            Path(sys.executable).with_name("filmkit"),
+            "review",
+            "record",
+            "--round-dir",
+            folder,
+        ]
         environment = os.environ | {"FILMKIT_ROOT": str(tmp_path)}
         ended = subprocess.run(
             command,

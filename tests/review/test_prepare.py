@@ -290,7 +290,7 @@ def test_a_preparation_that_stops_while_it_derives_refuses_in_one_line_and_leave
 def test_the_commands_prompts_and_bind_are_gone(capsys):
     for removed in (["prompts", "--round", "1"], ["bind", "--out", "binding.json"]):
         with pytest.raises(SystemExit) as stopped:
-            review_round.main(removed)
+            review_round.run(removed)
         assert stopped.value.code == 2
         assert f"invalid choice: '{removed[0]}'" in capsys.readouterr().err
     assert not hasattr(review_round, "bind")
@@ -466,7 +466,7 @@ def test_a_fault_while_a_round_is_derived_keeps_its_traceback(ready, monkeypatch
 
 def test_a_round_s_number_is_not_negative(root, ready):
     with pytest.raises(SystemExit) as stopped:
-        review_round.main(["prepare", "--round", "-1"])
+        review_round.run(["prepare", "--round", "-1"])
     assert str(stopped.value) == "prepare: a round's number is 0 or more, not -1"
     assert ready == []
     assert not (root / "build/evidence/reviews/round--1").exists()

@@ -96,17 +96,6 @@ def test_a_faithful_rebuild_passes_and_reports_every_layer(release):
 
 
 @pytest.mark.usefixtures("unleveled")
-def test_the_report_is_written_unless_read_only(release, capsys):
-    reproduction.main([])
-    written = json.loads((release.root / reproduction.REPORT).read_text())
-    assert written["verdict"] == "pass"
-    (release.root / reproduction.REPORT).unlink()
-    reproduction.main(["--read-only"])
-    assert not (release.root / reproduction.REPORT).exists()
-    assert "pass" in capsys.readouterr().out
-
-
-@pytest.mark.usefixtures("unleveled")
 def test_filmkit_verify_release_compares_only_after_the_records_and_writes_nothing(
     release, decodes, released, capsys
 ):

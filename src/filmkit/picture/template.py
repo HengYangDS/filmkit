@@ -3,7 +3,7 @@
 Staging derives a picture's document from `picture/index.html` by replacing each anchor below,
 which the template holds exactly as often as stated, and by inlining the film's one stylesheet
 and one script (`filmkit.picture.rendering`). This module reads no declaration, so a template
-can be asked before its film's declaration loads (`filmkit.adoption`).
+can be asked before its film's declaration loads (`filmkit.check`).
 """
 
 from __future__ import annotations

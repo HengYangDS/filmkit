@@ -257,16 +257,24 @@ def narrate(code: str) -> None:
     repository.write(paths["asr"], {"records": heard})
 
 
+# A node's run in a process of its own, as `filmkit build` runs it once its plan holds it stale
+# (`build.run_node`): the run's refusal or failure is its one line and exit status 1.
+RUN_NODE = (
+    "import sys; from filmkit.graph import build, chain; "
+    "sys.exit(build.run_node(chain.table(), sys.argv[1]))"
+)
+
+
 def run(root: Path, command: str, code: str, log: Path | None = None) -> str:
-    """Run a command of the film's chain on an edition, in its own process with `root` as the
-    film's root, as the film's task runs it; its output. A failure names its lines, and so does
+    """Run a node of the film's chain on an edition, in its own process with `root` as the
+    film's root, as `filmkit build` runs it; its output. A failure names its lines, and so does
     a run that `REFUSED` names and that passed."""
     environment = {**os.environ, repository.ROOT_VARIABLE: str(root)}
     environment.pop(opens.NODE, None)
     if log is not None:
         environment[opens.VARIABLE] = str(log)
     done = subprocess.run(
-        [sys.executable, "-I", "-B", "-m", "filmkit.produce", command, "--language", code],
+        [sys.executable, "-I", "-B", "-c", RUN_NODE, f"{command}:{code}"],
         env=environment,
         cwd=root,
         capture_output=True,

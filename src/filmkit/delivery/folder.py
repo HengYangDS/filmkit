@@ -1,9 +1,9 @@
 """Deliver every edition to the film's delivery folder with rsync, then read them back with shasum.
 
-The engine names no folder of a host. The destination is, in this order: the folder
-`--destination` names; the film's declared folder name (`delivery_folder`) below the root that
-`FILMKIT_DELIVERY_ROOT` names, a host's setting; or that name below the user's videos folder as
-the platform defines it, which on macOS is ~/Movies and elsewhere the XDG videos directory:
+The engine names no folder of a host. The destination is, in this order: the folder that
+`filmkit deliver --to` names; the film's declared folder name (`delivery_folder`) below the root
+that `FILMKIT_DELIVERY_ROOT` names, a host's setting; or that name below the user's videos folder
+as the platform defines it, which on macOS is ~/Movies and elsewhere the XDG videos directory:
 `XDG_VIDEOS_DIR` in the environment, else its line in ${XDG_CONFIG_HOME:-~/.config}/user-dirs.dirs,
 else ~/Videos; a value there that is no absolute path is passed over. Films are videos, and that
 folder is the user's place for them. The readback records the folder and which of these rules
@@ -32,7 +32,7 @@ members into its own directory (`bind_players`, `read_bound_players`), with no d
 
 A delivery empties its destination of whatever is no member, so it refuses, before anything is
 read back or changed and in a dry run too, a destination it must not fill (`refuse_unfit`): an
-empty `--destination`, which an unset variable in a script leaves; the film's root, a folder
+empty `--to`, which an unset variable in a script leaves; the film's root, a folder
 that holds it or one inside it, whichever rule gave the folder and however its path is spelled,
 since the folders are compared by what they are (`same_folder`); one that is no folder; and a
 folder that holds entries and no entry page of an earlier delivery. A `FILMKIT_DELIVERY_ROOT`
@@ -42,19 +42,18 @@ working directory.
 The release's writer asks whether the film's own folder holds the build's members now
 (`differing_members`), which reads the folder and delivers nothing.
 
-The film verifier binds every member to its package records; the delivery task runs it first.
+The film verifier binds every member to its package records; `filmkit deliver` asks it first,
+after the run records.
 Of the films it copies, delivery itself asks one thing, in a dry run too: each edition's passing
 still scan (`filmkit.picture.still_scan.require_film_scan`), so that no order of commands
 delivers a film the scan has not passed.
-A refusal before rsync leaves the destination unchanged and exits with status 1.
+A refusal before rsync leaves the destination unchanged.
 
-Usage: python -m filmkit.delivery.folder [--destination DIR] [--dry-run]
+Run by `filmkit deliver [--to DIR] [--dry-run]` (`filmkit.graph.cli`).
 """
 
 from __future__ import annotations
 
-import argparse
-import json
 import os
 import re
 import subprocess
@@ -68,7 +67,7 @@ import filmkit.tools as tools
 from filmkit.delivery.packaging import LANGUAGE_INDEX, viewing_members
 from filmkit.film import FILM
 from filmkit.picture.rendering import PictureError
-from filmkit.production import CODES, Edition, UnassembledError
+from filmkit.production import CODES, Edition
 
 # The variable by which a host names the folder below which its films' delivery folders lie.
 ROOT_VARIABLE = "FILMKIT_DELIVERY_ROOT"
@@ -161,11 +160,11 @@ def delivery_destination(named: str | Path | None = None) -> tuple[Path, str]:
     if named is not None:
         if not str(named).strip():
             msg = (
-                "--destination names no folder: its value is empty, as an unset variable in a "
+                "--to names no folder: its value is empty, as an unset variable in a "
                 "script leaves it, and nothing is delivered"
             )
             raise DeliveryRefusedError(msg)
-        return Path(named).expanduser().resolve(), "--destination"
+        return Path(named).expanduser().resolve(), "--to"
     name = FILM.delivery_folder
     named_root = os.environ.get(ROOT_VARIABLE)
     if named_root:
@@ -430,9 +429,7 @@ def read_players(root: Path, members: list[tuple[Path, str]]) -> dict:
     return read_bound_players(root, bind_players(root, members))
 
 
-def deliver(
-    root: Path, destination: Path, *, dry_run: bool = False, rule: str = "--destination"
-) -> dict:
+def deliver(root: Path, destination: Path, *, dry_run: bool = False, rule: str = "--to") -> dict:
     """Replace the destination's delivery with the current members and read it back. The report
     states the destination and the rule that gave it, which is the caller's naming of the folder
     unless `rule` says otherwise. A destination that must not be filled is refused first, in a
@@ -497,29 +494,3 @@ def deliver(
     report["changes"] = changes
     repository.write(root / READBACK, report)
     return report
-
-
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "--destination",
-        help=f"the folder to fill; otherwise the film's folder below {ROOT_VARIABLE} or below "
-        "the user's videos folder",
-    )
-    parser.add_argument("--dry-run", action="store_true")
-    options = parser.parse_args(argv)
-    try:
-        folder, rule = delivery_destination(options.destination)
-        report = deliver(repository.ROOT, folder, dry_run=options.dry_run, rule=rule)
-    except (DeliveryRefusedError, UnassembledError) as error:
-        raise SystemExit(str(error)) from None
-    if options.dry_run:
-        print(json.dumps(report, ensure_ascii=False))
-        return
-    summary = {key: report[key] for key in ("destination", "destination_rule")}
-    summary |= {key: report[key] for key in ("all_match", "predecessors")}
-    print(json.dumps({"members": len(report["members"]), **summary}, ensure_ascii=False))
-
-
-if __name__ == "__main__":
-    main()

@@ -9,7 +9,6 @@ import filmkit.picture.still_scan as picture_still_scan
 import filmkit.production as production
 import filmkit.repository as repository
 from filmkit.delivery.verification import VerificationError
-from filmkit.film import FILM
 from filmkit.graph import cli
 
 
@@ -40,18 +39,16 @@ def qualified(checked, monkeypatch):
 
 
 @pytest.mark.usefixtures("checked")
-@pytest.mark.parametrize("scope", [["--technical-only"], []])
-def test_an_edition_without_its_film_s_still_scan_is_refused_in_either_scope(scope, capsys):
-    # The root holds no record, so the scan's own requirement refuses, and the command reports
-    # it as it reports every owner's refusal.
-    films = [str(film) for film in production.Edition("en").films]
+@pytest.mark.parametrize("technical_only", [True, False])
+def test_an_edition_without_its_film_s_still_scan_is_refused_in_either_scope(technical_only):
+    # The root holds no record, so the scan's own requirement refuses, and the verifier reports
+    # it as it reports every owner's refusal, naming the first edition.
     with pytest.raises(SystemExit) as stopped:
-        delivery_verification.main(["--read-only", *scope, "--language", "en", *films])
+        list(delivery_verification.qualified(technical_only=technical_only))
     assert (
         stopped.value.code
-        == "en: The en film has no still scan record; run filmkit build scan-film:en"
+        == "zh: The zh film has no still scan record; run filmkit build scan-film:zh"
     )
-    assert capsys.readouterr().out == ""
 
 
 @pytest.mark.usefixtures("qualified")
@@ -152,38 +149,32 @@ def test_the_verifier_reports_the_bound_inputs_where_it_reported_them(monkeypatc
 
 
 @pytest.mark.usefixtures("qualified")
-def test_the_command_prints_each_editions_report_and_writes_nothing(tmp_path, capsys):
-    films = [str(film) for code in production.CODES for film in production.Edition(code).films]
-    delivery_verification.main(["--read-only", "--technical-only", "--language", "all", *films])
+def test_each_editions_report_is_given_in_either_scope_and_nothing_is_written(tmp_path, capsys):
+    # Each edition's current delivered films are verified, and their reports printed.
+    delivery_verification.verify_editions(technical_only=True)
     reports = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     assert [(report["language"], report["scope"]) for report in reports] == [
         ("zh", "technical"),
         ("en", "technical"),
     ]
-    delivery_verification.main(["--language", "en", *films[4:]])
-    (report,) = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
-    assert (report["language"], report["scope"]) == ("en", "acceptance")
-    # Nothing was written, with --read-only or without it.
-    assert sorted(tmp_path.rglob("*.*")) == []
-    # Without named films, each selected edition's current delivered films are verified.
-    delivery_verification.main(["--technical-only", "--language", "all"])
-    reports = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
-    assert [report["language"] for report in reports] == ["zh", "en"]
-    delivery_verification.main(["--technical-only", "--language", "en"])
-    (report,) = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     english = sorted(film.name for film in production.Edition("en").films)
-    assert [name for name, _size in report["media"]] == english
-    with pytest.raises(VerificationError, match="requires each one's current films"):
-        delivery_verification.main(["--language", "all", *films[1:]])
-    with pytest.raises(SystemExit):
-        delivery_verification.main(["--language", "fr", *films])
+    assert [name for name, _size in reports[1]["media"]] == english
+    accepted = list(delivery_verification.qualified(technical_only=False))
+    assert [(report["language"], report["scope"]) for report in accepted] == [
+        ("zh", "acceptance"),
+        ("en", "acceptance"),
+    ]
+    assert sorted(tmp_path.rglob("*.*")) == []
 
 
 def verb(capsys, *arguments: str) -> tuple[int | str, list[str]]:
-    """`filmkit verify` with the arguments: its exit status or refusal, and its printed lines."""
-    with pytest.raises(SystemExit) as stopped:
+    """`filmkit verify` with the arguments: its exit status or refusal, 0 where it returned, and
+    its printed lines."""
+    try:
         cli.main(["verify", *arguments])
-    return stopped.value.code, capsys.readouterr().out.splitlines()
+    except SystemExit as stopped:
+        return stopped.code, capsys.readouterr().out.splitlines()
+    return 0, capsys.readouterr().out.splitlines()
 
 
 @pytest.mark.usefixtures("checked")
@@ -229,19 +220,3 @@ def test_captions_end_where_the_timeline_s_credits_begin():
         delivery_verification.verify_captions(timeline(1472.45), "zh")
     with pytest.raises(VerificationError, match="states no credits within its runtime"):
         delivery_verification.verify_captions({**timeline(1472.0), "credits_duration": None}, "zh")
-
-
-@pytest.mark.usefixtures("test_languages")
-def test_acceptance_of_a_film_of_three_editions_names_the_edition_whose_films_are_missing(
-    tmp_path, monkeypatch
-):
-    monkeypatch.setattr(repository, "ROOT", tmp_path)
-    monkeypatch.setitem(FILM.editions, "xb", FILM.editions["en"])
-    monkeypatch.setattr(production, "CODES", ("zh", "en", "xb"))
-    films = [film for code in ("zh", "en") for film in production.Edition(code).films]
-    with pytest.raises(VerificationError) as refusal:
-        delivery_verification.edition_inputs(films)
-    assert str(refusal.value) == (
-        "Acceptance of every edition requires each one's current films: the xb edition's current "
-        "films are missing"
-    )

@@ -11,8 +11,12 @@ import filmkit.delivery.folder as delivery_folder
 import filmkit.repository as repository
 from filmkit.delivery.folder import DeliveryRefusedError
 from filmkit.film import FILM
+from filmkit.graph import cli
 
 NAME = FILM.delivery_folder
+
+# The build verifies: the delivery is asked of the folder alone (`delivered`).
+pytestmark = pytest.mark.usefixtures("verified_build")
 
 
 def tree(folder: Path) -> dict[str, str]:
@@ -175,7 +179,7 @@ def test_a_hosts_root_that_is_no_absolute_path_is_refused_by_its_name(
     monkeypatch.setenv(delivery_folder.ROOT_VARIABLE, named)
     before = tree(tmp_path)
     with pytest.raises(SystemExit) as refused:
-        delivery_folder.main(arguments)
+        cli.main(["deliver", *arguments])
     assert str(refused.value).startswith(
         f"FILMKIT_DELIVERY_ROOT names no absolute path ({named!r}): "
     )
@@ -202,8 +206,8 @@ def test_an_empty_destination_is_refused_and_is_not_the_working_directory(
     root = placed(tmp_path / "films/film")
     monkeypatch.chdir(root)
     before = tree(tmp_path)
-    with pytest.raises(SystemExit, match="--destination names no folder: its value is empty"):
-        delivery_folder.main(["--destination", empty, *arguments])
+    with pytest.raises(SystemExit, match="--to names no folder: its value is empty"):
+        cli.main(["deliver", "--to", empty, *arguments])
     assert tree(tmp_path) == before
 
 
@@ -215,13 +219,13 @@ def test_each_rule_that_gives_the_films_root_is_refused_by_its_name(
     root = placed(tmp_path / "checkouts" / NAME)
     monkeypatch.chdir(root)
     before = tree(tmp_path)
-    with pytest.raises(SystemExit, match="which --destination gave, is refused: it is the film"):
-        delivery_folder.main(["--destination", ".", *arguments])
+    with pytest.raises(SystemExit, match="which --to gave, is refused: it is the film"):
+        cli.main(["deliver", "--to", ".", *arguments])
     # The host's delivery root is the folder of checkouts, and the film's checkout has the name
     # of its delivery folder.
     monkeypatch.setenv(delivery_folder.ROOT_VARIABLE, str(tmp_path / "checkouts"))
     with pytest.raises(SystemExit, match="which FILMKIT_DELIVERY_ROOT gave, is refused: it is"):
-        delivery_folder.main(arguments)
+        cli.main(["deliver", *arguments])
     assert tree(tmp_path) == before
     # The film is built inside its own delivery folder below the videos folder.
     monkeypatch.delenv(delivery_folder.ROOT_VARIABLE)
@@ -229,7 +233,7 @@ def test_each_rule_that_gives_the_films_root_is_refused_by_its_name(
     before = tree(tmp_path)
     videos = r"which the macOS videos folder ~/Movies gave, is refused: it holds the film's root"
     with pytest.raises(SystemExit, match=videos):
-        delivery_folder.main(arguments)
+        cli.main(["deliver", *arguments])
     assert tree(tmp_path) == before
     assert inside.is_dir()
 
@@ -242,9 +246,9 @@ def test_a_populated_folder_that_no_delivery_filled_is_not_emptied(placed, tmp_p
         (destination / name).write_text(f"the user's {name}\n")
     before = tree(tmp_path)
     with pytest.raises(DeliveryRefusedError) as refused:
-        delivery_folder.deliver(root, destination, dry_run=dry_run, rule="--destination")
+        delivery_folder.deliver(root, destination, dry_run=dry_run, rule="--to")
     assert str(refused.value) == (
-        f"The destination {destination}, which --destination gave, is refused: it holds 3 "
+        f"The destination {destination}, which --to gave, is refused: it holds 3 "
         "entries (2019, notes.txt, zh) and no index.html of an earlier delivery. A delivery "
         "moves every entry of its destination that is no member into the predecessors, so "
         "nothing is delivered"

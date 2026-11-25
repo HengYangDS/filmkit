@@ -328,7 +328,7 @@ export function judged(report, gateRowGaps) {
 
 if (import.meta.main) {
   const USAGE =
-    "Usage: python -m filmkit.tools geometry-check <workspace> <receipt.json> [step-frames] [--gate-row-gaps]\n" +
+    "Usage: node geometry-check.mjs <workspace> <receipt.json> [step-frames] [--gate-row-gaps]\n" +
     "<workspace> is a stage that stage-picture wrote: its page and its record, stage.json, which states the frame";
   // A malformed invocation stops before the browser opens, so it can never write a passing receipt.
   const refuse = (problem) => {

@@ -208,6 +208,6 @@ test("a browser that cannot draw the turns still closes, and the tool refuses a 
     const result = spawnSync(process.execPath, [tool, ...args], { encoding: "utf8" });
     assert.equal(result.status, 2, args.join(" "));
     assert.equal(result.stdout, "");
-    assert.ok(result.stderr.includes("Usage: python -m filmkit.tools whole-turns <turns.json>"));
+    assert.ok(result.stderr.includes("Usage: node whole-turns.mjs <turns.json>"));
   }
 });

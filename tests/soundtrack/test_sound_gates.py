@@ -4,7 +4,6 @@ import json
 
 import pytest
 
-import filmkit.preflight as preflight
 import filmkit.repository as repository
 import filmkit.soundtrack.gates as sound_gates
 from filmkit.production import Edition
@@ -106,16 +105,12 @@ def test_a_passing_check_writes_a_record_bound_to_the_soundtrack_and_timeline(me
     assert json.loads(capsys.readouterr().out) == {"verdict": "pass", "gated_findings": 0}
 
 
-def test_a_record_is_refused_by_the_pre_render_check_after_an_edit_of_the_declaration(measured):
+def test_a_record_binds_the_assembly_and_the_declaration_it_was_measured_on(measured):
     edition, _ = measured
     record = sound_gates.check_sound(edition)
     assert record["assembly_sha256"] == repository.sha(edition.audio_assembly)
-    assert preflight.sound(edition) is None
-    (repository.ROOT / repository.DECLARATION).write_text('slug = "edited"\n')
-    assert preflight.sound(edition) == (
-        f"{repository.relative(edition.sound_gates)} binds another declaration_sha256; "
-        "run check-sound"
-    )
+    declaration = repository.sha(repository.ROOT / repository.DECLARATION)
+    assert record["declaration_sha256"] == declaration
 
 
 def test_a_gated_finding_is_recorded_and_refused(measured):

@@ -9,7 +9,7 @@
 import { openComposition, readTimeline } from "./headless-composition.mjs";
 
 /* The step is the caller's (filmkit.picture.anchor_reads.STEP); the tool keeps no default of its own. */
-const USAGE = "Usage: python -m filmkit.tools anchor-reads <timeline.json> <step-seconds>";
+const USAGE = "Usage: node anchor-reads.mjs <timeline.json> <step-seconds>";
 const [path, written, ...rest] = process.argv.slice(2);
 const step = Number(written);
 if (!path || rest.length || !(step > 0)) {

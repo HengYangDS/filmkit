@@ -31,7 +31,7 @@ the one it documents is a refusal too, so the check never passes on a run it can
 prompt (`filmkit.review.prompts`), which restates none of them; `WARNINGS` and `EXCUSED` are the
 names of the report's two parts that the prompt tells its reader of.
 
-Usage: python -m filmkit.register
+`filmkit check` asks it among the film's sources (`filmkit.check`).
 """
 
 from __future__ import annotations
@@ -426,12 +426,3 @@ def check() -> dict:
         ],
         EXCUSED: [e.model_dump() for e in exceptions if applied[id(e)]],
     }
-
-
-def main() -> None:
-    try:
-        report = check()
-    except RegisterError as error:
-        message = f"register: {error}"
-        raise SystemExit(message) from None
-    print(json.dumps(report, ensure_ascii=False))

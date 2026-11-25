@@ -15,7 +15,6 @@ import filmkit.narration.script_edits as script_edits
 import filmkit.picture.gates as gates
 import filmkit.picture.renderer as renderer
 import filmkit.picture.rendering as rendering
-import filmkit.preflight as preflight
 import filmkit.register as register
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as assembly
@@ -127,7 +126,7 @@ def test_plain_thoughts_edited_by_hand_are_refused_with_the_way_to_change_words(
     assert message.startswith("The en script's anchors break their rules:")
     assert "en 07: its utterance_groups and text are not its anchored_groups" in message
     assert "filled from its anchored ones" in message
-    assert "python -m filmkit.narration.script_edits" in message
+    assert "filmkit edit" in message
 
 
 def test_every_broken_rule_is_named_at_once():
@@ -183,8 +182,7 @@ def broken(tmp_path, monkeypatch):
         lambda zh: refresh.refresh_captions(zh),
         lambda zh: rendering.stage_picture(zh, None, 9, 3840, 2160),
         lambda zh: gates.check_picture(zh),
-        lambda zh: preflight.preflight(zh),
-        lambda zh: script_edits.main(["--edits", "edits.json"]),
+        lambda zh: script_edits.apply_edits(repository.read("edits.json")),
         lambda zh: anchors.main(["--timeline", "build/derived"]),
     ],
     ids=[
@@ -192,7 +190,6 @@ def broken(tmp_path, monkeypatch):
         "refresh-captions",
         "stage-picture",
         "check-picture",
-        "preflight",
         "script_edits",
         "report",
     ],

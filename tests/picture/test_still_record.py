@@ -13,13 +13,11 @@ import pytest
 
 import filmkit.picture.renderer as renderer
 import filmkit.picture.still_scan as still_scan
-import filmkit.preflight as preflight
 import filmkit.repository as repository
 from filmkit.picture.errors import PictureError
 from filmkit.production import Edition
 
 UNREADABLE = "The zh film's still scan record cannot be read; run filmkit build scan-film:zh"
-DRAFT = "build/evidence/editions/zh/draft-stills.json"
 
 
 def timeline(*spans, **stated):
@@ -354,76 +352,11 @@ def test_a_limit_finer_than_hundredths_is_refused(packaged, limit, capsys):
     assert repository.read(packaged.edition.draft_stills)["limit_seconds"] == 3.45
 
 
-def drafted(packaged):
-    """Scan the edition's draft into its record, which then admits a render."""
-    still_scan.main(["draft.mp4", "--language", "zh"])
-    assert preflight.draft(packaged.edition) is None
-    return packaged.edition.draft_stills
-
-
-@pytest.mark.parametrize(
-    ("damage", "said"),
-    [
-        (lambda path: path.write_text(path.read_text()[:200]), "cannot be read"),
-        (lambda path: path.write_text(""), "cannot be read"),
-        (lambda path: path.write_text("[]"), "cannot be read"),
-        (lambda path: path.write_text("null"), "cannot be read"),
-        (lambda path: rewrite(path, timeline=None), "cannot be read"),
-        (lambda path: rewrite(path, coarse=None), "cannot be read"),
-        (
-            lambda path: rewrite(path, over_limit=[{"start": 0.9, "end": 5.9, "speech": 3.9}]),
-            "cannot be trusted, as it contradicts itself in its runs at the limit",
-        ),
-        (
-            lambda path: rewrite(path, limit_seconds=99),
-            "cannot be trusted, as it contradicts itself in its limit",
-        ),
-        (
-            lambda path: rewrite(path, rules={**still_scan.rules(), "limit_seconds": 99}),
-            "states other rules than the engine's: a limit of 99 s where the engine's is 3.5 s",
-        ),
-        (
-            lambda path: rewrite(path, phase_frames=[35, 35], frames=35),
-            "cannot be trusted, as it contradicts itself in the frames it read",
-        ),
-    ],
-)
-def test_a_draft_record_is_read_as_a_film_s_is(packaged, damage, said):
-    # The draft's record goes through the reader of the film's: no body of it ends the
-    # pre-render check with an error, and one statement of its verdict is not taken alone.
-    path = drafted(packaged)
-    damage(path)
-    assert preflight.draft(packaged.edition) == f"{DRAFT} {said}; scan a new draft"
-
-
-def test_a_draft_scanned_under_another_limit_or_by_another_engine_s_rules_admits_no_render(
-    packaged, monkeypatch
-):
-    still_scan.main(["draft.mp4", "--language", "zh", "--limit", "9.5"])
-    assert preflight.draft(packaged.edition) == (
-        f"{DRAFT} states other rules than the engine's: a limit of 9.5 s where the engine's is "
-        "3.5 s; scan a new draft"
-    )
-    drafted(packaged)
-    monkeypatch.setattr(still_scan, "FINE_RULE", "at most 8 band pixels change")
-    assert preflight.draft(packaged.edition) == (
-        f"{DRAFT} states other rules than the engine's; scan a new draft"
-    )
-
-
-def test_a_draft_binds_no_engine_and_another_composition_is_named(packaged):
-    path = drafted(packaged)
-    assert "engine_version" not in repository.read(path)
-    (repository.ROOT / "picture/film.js").write_text("scenes = {1: 2};\n")
-    assert preflight.draft(packaged.edition) == (
-        f"{DRAFT} binds another composition; scan a new draft"
-    )
-
-
 def test_a_draft_whose_decode_ends_early_is_refused_and_leaves_no_record(packaged):
     # A decode that ends with exit 0 after part of the draft would be reported as a shorter
     # film: the draft's timeline is the edition's, so its frames are known.
-    path = drafted(packaged)
+    still_scan.main(["draft.mp4", "--language", "zh"])
+    path = packaged.edition.draft_stills
     packaged.frames = frames(35, 0)
     with pytest.raises(SystemExit) as refused:
         still_scan.main(["draft.mp4", "--language", "zh"])

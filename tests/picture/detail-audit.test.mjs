@@ -188,7 +188,7 @@ test("the detail audit refuses a malformed invocation", async () => {
   const folder = await scratchFolder(),
     path = join(folder, "timeline.json");
   await writeFile(path, JSON.stringify(await authoredTimeline("zh")));
-  const usage = "Usage: python -m filmkit.tools detail-audit";
+  const usage = "Usage: node detail-audit.mjs";
   for (const args of [
     [],
     [path, "abc"],

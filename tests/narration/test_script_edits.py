@@ -8,6 +8,7 @@ import pytest
 
 import filmkit.narration.script_edits as narration_script_edits
 import filmkit.repository as repository
+from filmkit.graph import cli
 
 OPEN_SPEC = {"display": "OpenSpec", "spoken": "Open Spec", "kind": "english-name"}
 
@@ -36,11 +37,11 @@ def test_edit_script_replaces_and_splits_thoughts_and_rebinds_retakes(
         {"replace": {"zh": [["01.1", "第一", "首"]]}, "split": {"zh": [["02.1", "甲句。"]]}},
     )
     before = {name: path.read_bytes() for name, path in paths.items()}
-    narration_script_edits.main(["--edits", "edits.json", "--dry-run"])
+    cli.main(["edit", "--edits", "edits.json", "--dry-run"])
     planned = json.loads(capsys.readouterr().out)
     assert {name: path.read_bytes() for name, path in paths.items()} == before
 
-    narration_script_edits.main(["--edits", "edits.json"])
+    cli.main(["edit", "--edits", "edits.json"])
     report = json.loads(capsys.readouterr().out)
     assert report["dry_run"] is False
     assert report["editions"] == planned["editions"]
@@ -89,7 +90,7 @@ def test_edit_script_replaces_and_splits_thoughts_and_rebinds_retakes(
 def test_an_edited_segment_speaks_through_the_pronunciation_contract(tmp_path, write_edition):
     paths = write_edition("zh", SCRIPT, RETAKES, normalization=[OPEN_SPEC])
     write_edits(tmp_path, {"replace": {"zh": [["01.1", "第一", "OpenSpec "]]}})
-    narration_script_edits.main(["--edits", "edits.json"])
+    cli.main(["edit", "--edits", "edits.json"])
     segment = repository.read(paths["script"])["segments"][0]
     assert segment["text"] == "OpenSpec 句。第二句。"
     assert segment["spoken_text"] == "Open Spec 句。第二句。"
@@ -116,8 +117,8 @@ def test_edit_script_refuses_without_writing_either_edition(
     ]
     write_edits(tmp_path, edits)
     before = [path.read_bytes() for path in paths]
-    with pytest.raises(ValueError, match=refusal):
-        narration_script_edits.main(["--edits", "edits.json"])
+    with pytest.raises(SystemExit, match=refusal):
+        cli.main(["edit", "--edits", "edits.json"])
     assert [path.read_bytes() for path in paths] == before
 
 
@@ -161,7 +162,7 @@ def test_an_edit_returns_new_documents_and_leaves_its_inputs_unchanged():
 def apply(tmp_path, capsys, edits: dict) -> dict:
     """Apply an edits file and return its report of the Chinese edition."""
     write_edits(tmp_path, edits)
-    narration_script_edits.main(["--edits", "edits.json"])
+    cli.main(["edit", "--edits", "edits.json"])
     return json.loads(capsys.readouterr().out)["editions"]
 
 
@@ -173,8 +174,8 @@ def refused(tmp_path, paths, edits: dict, named: str) -> None:
     """An edits file refused by name, which writes no script or cast."""
     write_edits(tmp_path, edits)
     before = [path.read_bytes() for path in paths.values()]
-    with pytest.raises(ValueError, match=named):
-        narration_script_edits.main(["--edits", "edits.json"])
+    with pytest.raises(SystemExit, match=named):
+        cli.main(["edit", "--edits", "edits.json"])
     assert [path.read_bytes() for path in paths.values()] == before
 
 

@@ -27,7 +27,7 @@ import { inkLevel, readingLoad } from "./rules/ink.mjs";
 import { faintLabels, listTracker, nameRules } from "./rules/names.mjs";
 
 const USAGE =
-  "Usage: python -m filmkit.tools frame-audit <timeline.json> [step-seconds] [--from s] [--to s] [--at s]";
+  "Usage: node frame-audit.mjs <timeline.json> [step-seconds] [--from s] [--to s] [--at s]";
 /* A malformed invocation stops before any frame is exercised, so it can never read as a clean report. */
 function refuse(problem) {
   console.error(`${problem}\n${USAGE}`);

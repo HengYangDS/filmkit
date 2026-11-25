@@ -31,18 +31,14 @@ uncaptioned films as unpublished and compares the rest.
 holds a manifest to are also asked of a record that is not yet written (`check`), so that the
 writer asks them before it changes a file.
 
-The report goes to build/evidence/reproduction/report.json unless --read-only is given; each
-edition's comparison is measured as a run (`filmkit.graph.runs`), which writes nothing of its
-own. A comparison that does not pass exits with "<edition>: <asset>: <layer>" for each failing
-layer. `filmkit verify --release` compares after the records and writes no report (`compared`,
-`judge`).
-
-Usage: python -m filmkit.delivery.reproduction [--read-only]
+`filmkit verify --release` compares after the records and writes nothing (`compared`, `judge`);
+each edition's comparison is measured as a run (`filmkit.graph.runs`), which writes nothing of
+its own. A comparison that does not pass refuses with "<edition>: <asset>: <layer>" for each
+failing layer.
 """
 
 from __future__ import annotations
 
-import argparse
 import json
 import math
 import time
@@ -64,7 +60,6 @@ from filmkit.film import Declared
 
 MANIFEST = Path(repository.RELEASE_RECORD)
 RELEASE = Path("build/artifacts/release")
-REPORT = Path("build/evidence/reproduction/report.json")
 CHECKSUMS = "SHA256SUMS"
 # Seconds one decode of a film pair may take.
 DECODE_DEADLINE = 7200
@@ -679,17 +674,3 @@ def judge(report: dict) -> None:
         raise SystemExit(msg)
     if report["verdict"] != "pass":
         raise SystemExit("\n".join(failures(report)))
-
-
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--read-only", action="store_true", help="print the report only")
-    options = parser.parse_args(argv)
-    report = compared()
-    if not options.read_only:
-        repository.write(REPORT, report)
-    judge(report)
-
-
-if __name__ == "__main__":
-    main()

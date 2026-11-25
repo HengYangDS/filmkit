@@ -26,12 +26,12 @@ Usage: python -m filmkit.picture.repair --language <code> [--attempts <n>]
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import shutil
 import signal
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import filmkit.child_processes as child_processes
 import filmkit.graph.runs as seam
@@ -44,10 +44,8 @@ from filmkit.graph import target
 from filmkit.media import MediaError
 from filmkit.picture import renderer
 from filmkit.picture.errors import PictureError
+from filmkit.production import CODES, Edition, UnassembledError
 from filmkit.tools import ToolError
-
-if TYPE_CHECKING:
-    from filmkit.production import Edition
 
 # The attempts of one run, unless it is given another number, and the command that compares the
 # two pictures again once an attempt stopped.
@@ -236,3 +234,27 @@ def repair_pictures(
             )
             raise PictureError(msg)
     return record
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        prog="python -m filmkit.picture.repair", description=__doc__.splitlines()[0]
+    )
+    parser.add_argument("--language", choices=CODES, required=True)
+    parser.add_argument(
+        "--attempts", type=int, default=ATTEMPTS, metavar="N", help="at most this many attempts"
+    )
+    options = parser.parse_args(argv)
+    with (
+        child_processes.ending("repair-pictures: stopped by {request}"),
+        seam.run(options.language, "repair-pictures"),
+    ):
+        try:
+            repair_pictures(Edition(options.language), options.attempts)
+        except (*REFUSALS, UnassembledError) as error:
+            msg = f"repair-pictures: {error}"
+            raise SystemExit(msg) from None
+
+
+if __name__ == "__main__":
+    main()

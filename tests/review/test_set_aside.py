@@ -98,7 +98,7 @@ def test_set_aside_records_its_members_before_the_first_move(root, review, monke
 def test_cli_defaults_the_round_directory_and_reports_refusals(root, review, capsys):
     review(review_files.round_directory(3), "zh")
     review(review_files.round_directory(3), "en")
-    review_round.main(["set-aside", "--round", "3", "--purpose", "superseded", "--dry-run"])
+    review_round.run(["set-aside", "--round", "3", "--purpose", "superseded", "--dry-run"])
     printed = json.loads(capsys.readouterr().out)
     assert printed == {
         "dry_run": True,
@@ -116,8 +116,8 @@ def test_cli_defaults_the_round_directory_and_reports_refusals(root, review, cap
     }
     assert not (root / "build/artifacts/film/superseded").exists()
     with pytest.raises(SystemExit, match="set-aside: missing build/evidence/reviews/round-4"):
-        review_round.main(["set-aside", "--round", "4", "--purpose", "superseded"])
-    review_round.main(["set-aside", "--round", "3", "--purpose", "superseded"])
+        review_round.run(["set-aside", "--round", "4", "--purpose", "superseded"])
+    review_round.run(["set-aside", "--round", "3", "--purpose", "superseded"])
     assert json.loads(capsys.readouterr().out)["dry_run"] is False
     assert (root / "build/artifacts/film/superseded/round-3/en/manifest.json").is_file()
 
@@ -175,16 +175,16 @@ def test_the_command_sets_aside_one_edition_of_an_unreviewed_build_and_keeps_its
 ):
     consumer = preview_copies(tmp_path / "preview", codes=("en",))
     with pytest.raises(SystemExit, match="an unreviewed set-aside names its --consumer"):
-        review_round.main(["set-aside", "--unreviewed", "--round", "5", "--purpose", PURPOSE])
+        review_round.run(["set-aside", "--unreviewed", "--round", "5", "--purpose", PURPOSE])
     with pytest.raises(SystemExit, match="a reviewed set-aside names its --round"):
-        review_round.main(["set-aside", "--label", "preview-5", "--purpose", PURPOSE])
+        review_round.run(["set-aside", "--label", "preview-5", "--purpose", PURPOSE])
     with pytest.raises(SystemExit, match="zh: .*/preview/zh/sample-reel-zh-uhd.mp4 does not hold"):
-        review_round.main(
+        review_round.run(
             ["set-aside", "--unreviewed", "--consumer", str(consumer), "--round", "5"]
             + ["--purpose", PURPOSE, "--dry-run"]
         )
     capsys.readouterr()
-    review_round.main(
+    review_round.run(
         ["set-aside", "--unreviewed", "--consumer", str(consumer), "--round", "5"]
         + ["--purpose", PURPOSE, "--language", "en", "--without-picture", "en"]
     )
@@ -216,7 +216,7 @@ def test_a_reviewed_set_aside_keeps_the_pictures_it_is_told_to(root, review, cap
     assert moved["zh"][-2:] == list(PICTURES)
     assert not set(PICTURES) & set(moved["en"])
     # Named without an edition, --without-picture keeps every edition's picture.
-    review_round.main(
+    review_round.run(
         ["set-aside", "--round", "3", "--purpose", PURPOSE, "--without-picture", "--dry-run"]
     )
     printed = json.loads(capsys.readouterr().out)["editions"]
