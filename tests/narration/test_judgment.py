@@ -17,6 +17,7 @@ import filmkit.narration.terms as narration_terms
 import filmkit.preflight as preflight
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as soundtrack_assembly
+import filmkit.soundtrack.gates as sound_gates
 from filmkit.narration.pronunciation import PronunciationError
 from filmkit.narration.recognition import Names
 from filmkit.production import Edition
@@ -188,6 +189,7 @@ def test_preflight_and_the_judgment_refuse_the_same_thoughts_for_their_clarity(
         clarity_exceptions=(kept,),
     )
     monkeypatch.setattr(preflight, "FILM", narration_judgment.FILM)
+    monkeypatch.setattr(sound_gates, "FILM", narration_judgment.FILM)
     rows = [
         {"id": name, "cpp_db": value, "below_floor": value is not None and value < 17.0}
         for name, value in values.items()

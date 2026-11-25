@@ -282,13 +282,13 @@ def test_the_narration_s_caches_are_outputs_of_narrate(tmp_path, monkeypatch):
     assert opens.check(log).findings == []
 
 
-def test_preflight_declares_the_selection_its_clarity_reads(tmp_path, monkeypatch):
+def test_the_sound_gate_declares_the_selection_its_thought_line_reads(tmp_path, monkeypatch):
     root = fresh_copy(tmp_path)
     monkeypatch.setattr(repository, "ROOT", root)
     log = tmp_path / "opens.jsonl"
-    # Preflight reads each thought's selected take from the selection, to know whether the owner
-    # heard it, and the assembly record, to know whether the soundtrack holds it
-    # (`preflight.selected_takes`).
+    # The sound gate reads each thought's selected take from the selection, to know whether the
+    # owner heard it, and the assembly record, to know whether the soundtrack holds it
+    # (`soundtrack.gates.selected_takes`).
     evidence = root / "build/evidence/editions/zh"
     evidence.mkdir(parents=True)
     take = {"index": 1, "wav_sha256": "a" * 64}
@@ -296,11 +296,12 @@ def test_preflight_declares_the_selection_its_clarity_reads(tmp_path, monkeypatc
     (evidence / "narration-selected.json").write_text(json.dumps({"records": [record]}))
     assembled = {"records": [{"id": "01", "source_sha256": "b" * 64}]}
     (evidence / "audio-assembly.json").write_text(json.dumps(assembled))
-    code = "import filmkit.preflight as preflight\nfrom filmkit.production import Edition\n"
+    code = "import filmkit.soundtrack.gates as gates\nfrom filmkit.production import Edition\n"
     code += "takes = ({'01.1': 'a' * 64}, {'01.1'})\n"
-    code += "assert preflight.selected_takes(Edition('zh')) == takes\n"
-    python_child(root, log, code, node="preflight:zh")
-    assert opens.check(log).findings == []
+    code += "assert gates.selected_takes(Edition('zh')) == takes\n"
+    python_child(root, log, code, node="check-sound:zh")
+    report = opens.check(log)
+    assert (report.findings, report.unjudged, report.seen) == ([], set(), {"check-sound:zh"})
 
 
 def test_a_virtual_environment_named_whole_is_an_environment(film):

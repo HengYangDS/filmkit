@@ -414,6 +414,7 @@ TABLE = (
                 declared(e)
                 | named(sound_gates.bound_inputs(e))
                 | {k: v for k, v in narration(e).items() if k in ("recordings", "receipt")}
+                | {"narration_selected": e.narration_selected}
             )
         },
         only("sound_gates", lambda e: e.sound_gates),

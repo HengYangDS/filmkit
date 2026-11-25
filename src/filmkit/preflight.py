@@ -59,7 +59,6 @@ from typing import TYPE_CHECKING
 import filmkit.concepts as concepts
 import filmkit.delivery.packaging as packaging
 import filmkit.delivery.verification as verification
-import filmkit.narration.hearings as hearings
 import filmkit.picture.renderer as renderer
 import filmkit.picture.rendering as rendering
 import filmkit.picture.still_scan as still_scan
@@ -70,7 +69,6 @@ import filmkit.review.clarity as review_clarity
 import filmkit.soundtrack.gates as sound_gates
 import filmkit.sources as sources
 import filmkit.tools as tools
-from filmkit.captions.timing import captions_above_rate, reading_rate
 from filmkit.film import FILM
 from filmkit.narration import anchors
 from filmkit.production import CODES, Edition
@@ -218,106 +216,24 @@ def sound(edition: Edition) -> str | None:
 
 
 def clarity(edition: Edition) -> str | None:
-    """Whether each thought under the clarity floor is one the film declares, above its line.
-
-    The sound gate holds the floor for the soundtrack and its segments and records the thoughts.
-    A film that declares `review.clarity_thought_margin_db` holds every thought to the floor less
-    that margin and names each thought between the two lines; one that declares none is not
-    judged here. With a margin of zero the line is the floor: every thought under it is refused
-    and none is between the two.
-    """
-    margin = FILM.review.clarity_thought_margin_db
-    if margin is None:
+    """Whether each thought under the clarity floor is one the film declares, above its line, or
+    one the owner heard clear (`sound_gates.thought_findings`, which the sound gate asks)."""
+    if FILM.review.clarity_thought_margin_db is None:
         return NO_THOUGHT_LINE
     if not edition.sound_gates.is_file():
         return "not judged: no sound gate record"
     measured = repository.read(edition.sound_gates)["clarity"]
-    lines = review_clarity.thought_lines(edition.code, floor=measured["floor_db"], film=FILM)
-    line, declared = lines.line, lines.kept
-    below = {row["id"]: row["cpp_db"] for row in measured["thoughts"] if row["below_floor"]}
-    takes, assembled = selected_takes(edition)
-    heard = [record for record in FILM.narration.heard if record.edition == edition.code]
-    under = {
-        name: value
-        for name, value in below.items()
-        if review_clarity.under_its_line(value, name, lines)
-    }
-    clear = {
-        name
-        for name in under
-        if name in takes and hearings.settling(heard, name, takes[name]).get("clarity")
-    }
-    # A take the owner heard counts only where the soundtrack the gate measured holds it.
-    unassembled = [
-        f"thought {name} reads {under[name]} dB: the owner heard its selected take, but the "
-        f"soundtrack was assembled from another selection of segment {name.rsplit('.', 1)[0]};"
-        " run assemble"
-        for name in sorted(clear - assembled)
-    ]
-    refused = {name: value for name, value in under.items() if name not in clear}
-    held = f"the thought line of {line} dB"
-    if not margin:
-        held = f"the floor of {line} dB, to which the film holds every thought"
-    ear = {
-        name: f": for the owner's ear, its selected take {takes[name]}" if name in takes else ""
-        for name in refused
-    }
-    found = [
-        f"thought {name} reads {value} dB, under {held}{ear[name]}"
-        for name, value in refused.items()
-        if value < line
-    ]
-    found += [
-        f"thought {name} reads {value} dB, under the floor of {measured['floor_db']} dB, and is"
-        f" not declared in review.clarity_exceptions{ear[name]}"
-        for name, value in refused.items()
-        if value >= line
-    ]
-    found += [
-        f"the declared thought {name} is stale: it does not read under the floor"
-        for name in sorted(declared - set(below))
-    ]
-    return "; ".join(unassembled + found) or None
-
-
-def selected_takes(edition: Edition) -> tuple[dict[str, str], set[str]]:
-    """Each thought's selected take by its audio SHA-256, as the selection bound it, and the
-    thoughts whose segment's selected recording is the one the assembly record names as its
-    source (`source_sha256`): those the assembled soundtrack holds. None where the edition has
-    no selected narration; no thought is assembled where it has no assembly record."""
-    path = repository.ROOT / edition.narration_selected
-    if not path.is_file():
-        return {}, set()
-    records = repository.read(path)["records"]
-    assembly = edition.audio_assembly
-    sources = {}
-    if assembly.is_file():
-        sources = {r["id"]: r.get("source_sha256") for r in repository.read(assembly)["records"]}
-    takes = hearings.selected_takes(records)
-    held = {r["id"] for r in records if sources.get(r["id"]) == r.get("wav_sha256")}
-    return takes, {name for name in takes if name.rsplit(".", 1)[0] in held}
+    return "; ".join(sound_gates.thought_findings(edition, measured)) or None
 
 
 def caption_rate(edition: Edition) -> str | None:
-    """Whether each cue above the edition's reading rate is one the film declares by its text."""
-    rate = reading_rate(edition.code)
+    """Whether each cue above the edition's reading rate is one the film declares by its text
+    (`sound_gates.rate_findings`, which the sound gate asks)."""
     try:
         cues = repository.read(edition.timeline)["captions"]
     except FileNotFoundError as error:
         return missing(error)
-    fast = {cue["text"]: cue["characters_per_second"] for cue in captions_above_rate(cues, rate)}
-    declared = {e.text for e in FILM.captions.rate_exceptions if e.edition == edition.code}
-    found = [
-        f"the cue {text!r} reads at {speed} characters per second, above {rate}, and is not"
-        " declared in captions.rate_exceptions"
-        for text, speed in fast.items()
-        if text not in declared
-    ]
-    found += [
-        f"the declared cue {text!r} is stale: no cue with that text reads above the rate"
-        for text in sorted(declared - set(fast))
-    ]
-    return "; ".join(found) or None
+    return "; ".join(sound_gates.rate_findings(edition, cues)) or None
 
 
 def geometry(edition: Edition) -> str | None:
