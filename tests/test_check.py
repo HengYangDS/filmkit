@@ -3,6 +3,7 @@ the occurrence plans it writes (design decision 6 of build-a-film-by-its-verbs).
 
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -14,7 +15,7 @@ import filmkit.film as film
 import filmkit.register as register
 import filmkit.released as released
 import filmkit.repository as repository
-from filmkit.graph import cli
+from filmkit.graph import bindings, cli, nodes, opens, plan, records
 from filmkit.narration import anchors, readings
 from filmkit.picture import anchor_reads
 from filmkit.production import Edition
@@ -175,3 +176,49 @@ def test_a_reading_the_edition_does_not_declare_is_named_with_its_edition(copied
         "zh: zh 04.2 at 9: 重 in “代码和日期去重。” has no declared reading",
         "en: en 04.2 at 9: 重 in “代码和日期去重。” has no declared reading",
     ]
+
+
+# The engine's pins and locks, which the sample's check asks above the sample.
+PINS = ("package.json", "package-lock.json", "pyproject.toml", "uv.lock")
+
+
+def test_the_check_s_record_names_every_source_it_read_and_what_it_wrote(tmp_path):
+    # The sample copied below a folder that holds the engine's pins and stands for its repository,
+    # as the sample stands in the engine's; `filmkit check` runs there in a process of its own,
+    # recorded.
+    root, log = (tmp_path / "film").resolve(), tmp_path / "opens.jsonl"
+    root.mkdir()
+    (tmp_path / ".git").mkdir()
+    for name in SOURCES:
+        (shutil.copytree if (SAMPLE / name).is_dir() else shutil.copy2)(SAMPLE / name, root / name)
+    for name in PINS:
+        shutil.copy2(SAMPLE.parents[1] / name, tmp_path / name)
+    (root / "node_modules").symlink_to(repository.node_modules())
+    environment = {**os.environ, repository.ROOT_VARIABLE: str(root), opens.VARIABLE: str(log)}
+    environment.pop(opens.NODE, None)
+    ran = subprocess.run(
+        [sys.executable, "-I", "-B", "-c", "from filmkit.graph import cli; cli.main(['check'])"],
+        env=environment,
+        cwd=root,
+        capture_output=True,
+        text=True,
+        timeout=110,
+        check=False,
+    )
+    assert ran.returncode == 0, ran.stderr[-3000:]
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(repository, "ROOT", root)
+        report = opens.check(log)
+        record = records.read(records.place("check", None))
+        bound = (("in", bindings.checked(None)), ("out", bindings.check_outputs(None)))
+        declared = {
+            side: {name: records.below_root(nodes.place(path)) for name, path in places.items()}
+            for side, places in bound
+        }
+        (entry,) = [e for e in plan.plan(targets=["check"]).entries if e.key == "check"]
+    # It read nothing below the root that its inputs do not name, and wrote only its outputs.
+    assert (report.findings, report.seen) == ([], {"check"})
+    assert record.outcome == "pass"
+    assert {name: state.path for name, state in record.inputs.items()} == declared["in"]
+    assert {name: state.path for name, state in record.outputs.items()} == declared["out"]
+    assert entry.state == "fresh"
