@@ -8,6 +8,7 @@ import pytest
 import filmkit.narration.narrate as narration_narrate
 import filmkit.repository as repository
 from filmkit.concepts import Place
+from filmkit.graph import records
 
 # The register check itself, kept before a fixture stands in for it.
 REGISTER_CHECK = narration_narrate.register.check
@@ -177,38 +178,34 @@ def test_a_refused_gate_stops_narration_before_any_step(commands, monkeypatch):
     assert commands == []
 
 
-def test_a_run_records_its_duration_with_each_step_as_a_phase(commands):
+def test_a_retake_is_recorded_as_a_partial_run_with_each_step_as_a_phase(commands):
     narration_narrate.main(["--language", "zh", "--ids", "06,07"])
-    record = repository.read("build/evidence/editions/zh/durations/narrate-06-07.json")
-    assert (record["command"], record["completed"]) == ("narrate-06-07", True)
-    assert [*record["phases"]] == ["narration", "alignment", "transcription"]
+    record = records.read(records.place("narrate", "zh", partial=True))
+    assert record.outcome == "pass"
+    assert [*record.phases] == ["narration", "alignment", "transcription"]
+    assert not records.place("narrate", "zh").exists()
     assert len(commands) == 3
 
 
-def test_a_check_only_run_is_recorded_as_such_and_leaves_the_narrations_record(commands):
-    durations = repository.ROOT / "build/evidence/editions/zh/durations"
+def test_a_check_only_run_is_recorded_as_a_partial_run_and_leaves_the_narrations_record(
+    commands,
+):
     narration_narrate.main(["--language", "zh"])
-    narrated = (durations / "narrate.json").read_bytes()
+    narrated = records.place("narrate", "zh").read_bytes()
     # The checks alone, as a film runs them after narrating chosen segments by hand.
     narration_narrate.main(["--language", "zh", "--skip-generation"])
-    assert (durations / "narrate.json").read_bytes() == narrated
-    record = repository.read(durations / "narrate-checks.json")
-    assert (record["command"], record["completed"]) == ("narrate-checks", True)
-    assert [*record["phases"]] == ["alignment", "transcription"]
-    narration_narrate.main(["--language", "zh", "--skip-generation", "--ids", "06,07"])
-    assert repository.read(durations / "narrate-checks-06-07.json")["command"] == (
-        "narrate-checks-06-07"
-    )
-    assert sorted(path.name for path in durations.iterdir()) == [
-        "narrate-checks-06-07.json",
-        "narrate-checks.json",
+    assert records.place("narrate", "zh").read_bytes() == narrated
+    record = records.read(records.place("narrate", "zh", partial=True))
+    assert (record.outcome, [*record.phases]) == ("pass", ["alignment", "transcription"])
+    assert sorted(path.name for path in records.place("narrate", "zh").parent.iterdir()) == [
         "narrate.json",
+        "narrate.partial.json",
     ]
 
 
-def test_a_dry_run_writes_no_duration_record(commands):
+def test_a_dry_run_writes_no_record(commands):
     narration_narrate.main(["--language", "zh", "--dry-run"])
-    assert not (repository.ROOT / "build/evidence/editions/zh/durations").exists()
+    assert not (repository.ROOT / "build/evidence").exists()
     assert len(commands) == 1
 
 

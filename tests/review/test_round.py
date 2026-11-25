@@ -10,7 +10,6 @@ import pytest
 from preparing import ROUND, prepare, refusal
 
 import filmkit.delivery.verification as delivery_verification
-import filmkit.durations as durations
 import filmkit.film as film
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
@@ -18,7 +17,7 @@ import filmkit.review.files as review_files
 import filmkit.review.record as review_record
 import filmkit.review.round as review_round
 from filmkit.delivery.verification import VerificationError
-from filmkit.graph import verify
+from filmkit.graph import runs, verify
 from filmkit.production import CODES, Edition
 from filmkit.review import ReviewError
 
@@ -241,10 +240,10 @@ def test_a_declaration_s_accepted_severities_reach_the_record_through_the_loader
 # A round's preparation runs `filmkit verify` before it writes anything (record-every-run).
 
 
-def recorded(*runs):
+def recorded(*named):
     """Record a run of each node of an edition that states its files as they stand."""
-    for name, code in runs:
-        with durations.run(code, name):
+    for name, code in named:
+        with runs.run(code, name):
             pass
 
 
@@ -263,10 +262,10 @@ def test_a_preparation_is_refused_for_a_film_changed_by_no_declared_writer(put, 
 def test_a_preparation_after_a_repair_writes_the_round(ready):
     recorded(("render-picture", "zh"), ("compare-pictures", "zh"))
     edition = Edition("zh")
-    with durations.run("zh", "repair-pictures"):
-        with durations.node("zh", "render-picture"):
+    with runs.run("zh", "repair-pictures"):
+        with runs.node("zh", "render-picture"):
             edition.rendered(True).file.write_bytes(b"the repaired picture")
-        with durations.node("zh", "compare-pictures"):
+        with runs.node("zh", "compare-pictures"):
             repository.write(edition.caption_equivalence, {"verdict": "pass", "findings": []})
     recorded(("package-film", "zh"))
     assert verify.verify().refusals == ()

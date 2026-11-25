@@ -4,9 +4,9 @@ import threading
 
 import pytest
 
-import filmkit.durations as durations
 import filmkit.picture.gates as gates
 import filmkit.repository as repository
+from filmkit.graph import runs
 from filmkit.picture.rendering import PictureError
 
 
@@ -26,10 +26,9 @@ def test_the_audits_run_at_the_same_time_and_each_is_a_phase_of_the_run(root, mo
 
     monkeypatch.setattr(gates.tools, "run", run)
     audits = [(tool, [], root / f"{tool}.json", None) for tool in ("frame", "motion", "detail")]
-    with durations.run("zh", "check-picture"):
+    with runs.run("zh", "check-picture", record=False) as measured:
         gates.run_audits(audits)
-    record = repository.read("build/evidence/editions/zh/durations/check-picture.json")
-    assert sorted(record["phases"]) == ["detail", "frame", "motion"]
+    assert sorted(measured.phases) == ["detail", "frame", "motion"]
 
 
 def test_the_first_failed_audit_in_the_order_given_refuses_once_all_have_ended(root, monkeypatch):

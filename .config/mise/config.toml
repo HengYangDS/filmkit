@@ -43,8 +43,8 @@ run = [
 
 # The sample film's pipeline, run in its folder, where the engine finds the film; its npm packages
 # are this repository's. Only sample:supply reaches the network; HF_ENDPOINT names a Hugging Face
-# mirror where the hub is unreachable. sample:build runs every stage in order, and
-# sample:durations prints what each command took.
+# mirror where the hub is unreachable. sample:build runs every stage in order, and `filmkit plan`
+# prints what each node took.
 [tasks."sample:supply"]
 description = "Install the pinned browser build, CMUdict and speech models below the sample film's tool cache"
 dir = "{{config_root}}/examples/sample-film"
@@ -121,11 +121,6 @@ run = [
 description = "Verify both sample editions' films and every input they bind; a rebuild carries no review"
 dir = "{{config_root}}/examples/sample-film"
 run = "uv run --python 3.12 --frozen --offline python -m filmkit.delivery.verification --technical-only --language all"
-
-[tasks."sample:durations"]
-description = "Print how long each command of the sample film's build took, edition by edition, with the sum"
-dir = "{{config_root}}/examples/sample-film"
-run = "uv run --python 3.12 --frozen --offline python -m filmkit.durations"
 
 [tasks."sample:build"]
 description = "Build and verify both sample editions from their sources and the supplied inputs"

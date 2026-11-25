@@ -51,7 +51,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import filmkit.durations as durations
+import filmkit.graph.runs as seam
 import filmkit.languages as languages
 import filmkit.released as released
 import filmkit.repository as repository
@@ -436,7 +436,7 @@ def run_audits(audits: list[tuple[str, list[str], Path, dict | None]]) -> None:
 
 def run_audit(tool: str, arguments: list[str], out: Path, environment: dict | None = None) -> None:
     """Run one of the engine's Node audits, its standard output written to `out`."""
-    with durations.phase(tool):
+    with seam.phase(tool):
         status = tools.run(tool, arguments, environment=environment, stdout=out)
     if status != 0:
         msg = f"The {tool} exited with status {status}; its report is {repository.relative(out)}"

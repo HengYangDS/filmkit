@@ -121,13 +121,12 @@ def test_a_rewriter_follows_the_writers_it_names():
     assert nodes.load(rewritten, shared, ("zh",)).order == ("a:zh", "b:zh")
 
 
-def test_every_command_with_a_duration_record_is_a_node_or_named_with_its_reason(table):
+def test_every_command_the_seam_measures_is_a_node_or_named_with_its_reason(table):
     commands = {
         *produce.EDITION_ACTIONS,
         *(f"{action}-uncaptioned" for action in produce.PICTURE_ACTIONS),
         *tools.BUILD_RUNS.values(),
         "narrate",
-        "narrate-checks",
         converge.COMMAND,
         "verify",
         "reproduce",

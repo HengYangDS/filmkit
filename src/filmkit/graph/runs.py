@@ -1,40 +1,200 @@
-"""A node's run at the seam: opened by `filmkit.durations.run` when a command that names a node
-starts, closed when it ends (design decision 2 of record-every-run).
+"""The seam: a command's run measured, and a node's run recorded (design decisions 2 and 10 of
+build-a-film-by-its-verbs, 2 of record-every-run).
 
-The opening states the inputs of the run's way, each hashed only where its size or time differs
-from the node's last record, records the way among the run's settings where the node has
-several, starts the host measures (`filmkit.graph.host`) and names the node and edition in
-`FILMKIT_NODE`, which every child inherits (`filmkit.graph.opens`). The close states the outputs,
-takes the start, seconds, load, phases and settings from the duration record the same `Run` just
-gave, and writes the node's run record, or for a run that is not the node's whole run a partial
-record (design decision 8). The outcome is `pass` for a run that completed, `refuse` for one that
-left with a line (a `SystemExit`) or was told that it failed, and `error` for any other exception,
-each with the line it ended with. A command that does a node's work again opens that node's run
-inside its own (`filmkit.durations.node`), where a refusal of the owner it names is `refuse`.
+A run measures one command on one edition (`Run`): when it started, the host's 1-minute load at
+its start and at its end (`host_load`), its seconds, whether it completed, the seconds of each
+phase and any setting its owner names as bearing on its time, such as the count of narration
+processes. `run` opens it; the code that does the work names a phase with `phase`, wherever it
+runs, and outside a run a phase measures nothing. Work on another thread adds its seconds to the
+run it was given (`current`, `Run.add`). A run writes nothing of its own: its measurement is
+stated in the run record of the node it is, and a command that is no node, such as the verifier
+or the reproduction, prints its seconds where it states them.
+
+A run of a command that names a node of the table opens that node's run. The opening states the
+inputs of the run's way, each hashed only where its size or time differs from the node's last
+record, records the way among the run's settings where the node has several, starts the host
+measures (`filmkit.graph.host`) and names the node and edition in `FILMKIT_NODE`, which every
+child inherits (`filmkit.graph.opens`). The close states the outputs, takes the start, seconds,
+load, phases and settings from the same `Run`, and writes the node's run record, or for a run
+that is not the node's whole run a partial record (design decision 8 of record-every-run). The
+outcome is `pass` for a run that completed, `refuse` for one that left with a line (a
+`SystemExit`) or was told that it failed, and `error` for any other exception, each with the
+line it ended with. A command that does a node's work again opens that node's run inside its own
+(`node`), where a refusal of the owner it names is `refuse`.
 
 Opening or closing a node's run never stops or changes the command: a failure of either is named
 in one line on standard error and the node's last record stands, which the outputs this run
 writes then contradict, so the plan finds the node stale and `filmkit verify` refuses its bytes.
+The node table is imported when a node's run opens, not with this module: the owners whose lists
+the table reads import this module for its phases.
 """
 
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import os
 import sys
+import threading
+import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import filmkit.repository as repository
-from filmkit.graph import chain, host, nodes, opens, records
+from filmkit.graph import host, nodes, opens, records
 from filmkit.production import CODES, Edition
 
 if TYPE_CHECKING:
-    from filmkit.durations import Run
+    from collections.abc import Iterator
+
+# The key of the host's 1-minute load average at a command's two ends.
+LOAD, ENDS = "load_1m", ("start", "end")
+
+
+def host_load() -> float | None:
+    """The host's 1-minute load average to two decimals, or None on a host that states none:
+    one without `os.getloadavg`, or one whose load average cannot be read."""
+    try:
+        return round(os.getloadavg()[0], 2)
+    except (AttributeError, OSError):
+        return None
+
+
+class Run:
+    """One command's run on one edition: when it started, the host's load then, the seconds of
+    its phases, and the settings its owner names as bearing on its time."""
+
+    def __init__(self, code: str | None, command: str) -> None:
+        self.code, self.command = code, command
+        self.started_at = datetime.now(UTC)
+        self.load_at_start = host_load()
+        self.phases: dict[str, float] = {}
+        self.settings: dict[str, object] = {}
+        self.failed = False
+        self._started = time.monotonic()
+        self._lock = threading.Lock()
+
+    def add(self, name: str, seconds: float) -> None:
+        """Add seconds to a phase; a phase named again holds the sum."""
+        with self._lock:
+            self.phases[name] = self.phases.get(name, 0.0) + seconds
+
+    def fail(self) -> None:
+        """Say that the command did not complete, for one whose block ends without raising and
+        whose verdict is still no pass, such as a comparison that reports before it refuses."""
+        self.failed = True
+
+    @contextlib.contextmanager
+    def phase(self, name: str) -> Iterator[None]:
+        """Measure the block as one phase, also when it raises."""
+        started = time.monotonic()
+        try:
+            yield
+        finally:
+            self.add(name, time.monotonic() - started)
+
+    def measured(self, *, completed: bool) -> dict:
+        """The run as its node's record states it, its start and its seconds to the millisecond,
+        with the host's load at its start and at this moment, its end."""
+        return {
+            "command": self.command,
+            "edition": self.code,
+            "started_at": self.started_at.isoformat(timespec="milliseconds"),
+            "seconds": round(time.monotonic() - self._started, 3),
+            LOAD: dict(zip(ENDS, (self.load_at_start, host_load()), strict=True)),
+            "completed": completed,
+            "phases": {name: round(seconds, 3) for name, seconds in self.phases.items()},
+            "settings": dict(self.settings),
+        }
+
+
+_RUN: contextvars.ContextVar[Run | None] = contextvars.ContextVar("filmkit_run", default=None)
+
+
+def current() -> Run | None:
+    """The run the calling code works in, or None outside any."""
+    return _RUN.get()
+
+
+@contextlib.contextmanager
+def run(
+    code: str | None,
+    command: str,
+    *,
+    record: bool = True,
+    whole: bool = True,
+    node: str | None = None,
+    way: str | None = None,
+) -> Iterator[Run]:
+    """Measure the block as one command's run on an edition.
+
+    The run completed only when the block ends without raising and without the run being told
+    that it failed (`Run.fail`); the exception of one that raises propagates after the node's
+    record is written. A command of an edition that names a node of the table, `node` or else
+    the command itself, opens that node's run and writes its run record from this measurement,
+    or a partial record where `whole` says the run is not the node's whole run; `way` names the
+    way of a node of several that the caller was asked to take. With `record` False the run is
+    measured and nothing is written, for a command asked to write nothing.
+    """
+    opened = Run(code, command)
+    node_run = open_node(code, node or command, opened, whole=whole, way=way) if record else None
+    token = _RUN.set(opened)
+    completed, ended = False, None
+    try:
+        yield opened
+        completed = not opened.failed
+    except BaseException as error:
+        ended = error
+        raise
+    finally:
+        _RUN.reset(token)
+        if node_run is not None:
+            node_run.close(opened.measured(completed=completed), ended)
+
+
+@contextlib.contextmanager
+def node(
+    code: str,
+    name: str,
+    *,
+    way: str | None = None,
+    refusals: tuple[type[BaseException], ...] = (),
+) -> Iterator[None]:
+    """Open the run of a node whose work another command does again, nested in that command's
+    run, and write the node's run record when the block ends (design decision 5 of
+    record-every-run). The node's run measures its own seconds and load; the phases and settings
+    the work names stay with the command's run. A refusal of the owner, an exception of
+    `refusals`, is the node's outcome `refuse`, as the command's line would be."""
+    measured = Run(code, name)
+    node_run = open_node(code, name, measured, way=way)
+    completed, ended = False, None
+    try:
+        yield
+        completed = True
+    except BaseException as error:
+        ended = error
+        raise
+    finally:
+        if node_run is not None:
+            node_run.close(measured.measured(completed=completed), ended, refusals)
+
+
+@contextlib.contextmanager
+def phase(name: str) -> Iterator[None]:
+    """Measure the block as a phase of the current run; outside a run, measure nothing."""
+    opened = _RUN.get()
+    if opened is None:
+        yield
+        return
+    with opened.phase(name):
+        yield
 
 
 def table() -> dict[str, nodes.Node]:
     """The chain's nodes by name."""
+    from filmkit.graph import chain
+
     return {node.name: node for node in chain.TABLE}
 
 
@@ -129,32 +289,32 @@ class NodeRun:
 
     def close(
         self,
-        duration: dict,
+        measured: dict,
         ended: BaseException | None,
         refusals: tuple[type[BaseException], ...] = (),
     ) -> None:
-        """Write the node's record from the duration record of the same run, or for a node run
-        inside another command from its own measurement (`filmkit.durations.node`)."""
+        """Write the node's record from the measurement of the same run, or for a node run
+        inside another command from its own (`node`)."""
         if self.outer is None:
             os.environ.pop(opens.NODE, None)
         else:
             os.environ[opens.NODE] = self.outer
         try:
             with opens.quiet():
-                self.write(duration, ended, refusals)
+                self.write(measured, ended, refusals)
         except Exception as error:
             # A failure of the seam is never the command's.
             unwritten(self.label, error)
 
     def write(
         self,
-        duration: dict,
+        measured: dict,
         ended: BaseException | None,
         refusals: tuple[type[BaseException], ...],
     ) -> None:
         """State the outputs and write the record."""
         measures = self.meter.stop()
-        result, line = outcome(duration["completed"], ended, refusals)
+        result, line = outcome(measured["completed"], ended, refusals)
         previous_class = self.before.host_class if self.before else None
         known = self.before.outputs if self.before else {}
         common = {
@@ -166,7 +326,7 @@ class NodeRun:
             "refusal": line,
             "measured": measures,
             "class": host.host_class(measures, gpu=self.node.gpu, previous=previous_class),
-            **{key: duration[key] for key in records.FROM_DURATION},
+            **{key: measured[key] for key in records.MEASURED},
         }
         if self.whole:
             records.write(records.RunRecord(**common, inputs=self.inputs, carried=self.carried))
@@ -186,8 +346,8 @@ def open_node(
     code: str | None, command: str, run: Run, *, whole: bool = True, way: str | None = None
 ) -> NodeRun | None:
     """The run of the node a command names, opened; None for a command that names none or an
-    edition the node does not apply to, which writes its duration record alone, and for one
-    whose opening failed, which is named (`unwritten`)."""
+    edition the node does not apply to, which is measured and writes nothing, and for one whose
+    opening failed, which is named (`unwritten`)."""
     node = table().get(command)
     if code is None or node is None or code not in node.codes(CODES):
         return None

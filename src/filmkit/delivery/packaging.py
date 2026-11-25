@@ -42,7 +42,7 @@ from typing import TYPE_CHECKING
 
 from PIL import Image
 
-import filmkit.durations as durations
+import filmkit.graph.runs as seam
 import filmkit.media as media
 import filmkit.repository as repository
 from filmkit.captions.timing import typeset
@@ -656,7 +656,7 @@ def package_film(edition: Edition) -> None:
                 raise PackagingError(msg)
             print(json.dumps({"film": target.name, "reused_verified_member": True}), flush=True)
             continue
-        with durations.phase(kind):
+        with seam.phase(kind):
             member = package_rendition(edition, package, rendition, target, created_at)
         package["editions"].append(member)
         write(edition.film_package, package)

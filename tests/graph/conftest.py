@@ -4,7 +4,6 @@ import pytest
 import sample_sound
 import stand_ins
 
-import filmkit.durations as durations
 import filmkit.repository as repository
 from filmkit.graph import opens, runs
 
@@ -20,7 +19,7 @@ def built(tmp_path_factory):
         patch.setattr(repository, "ROOT", root)
         for code in sample_sound.NARRATED:
             # The stand-in narration runs through the seam, as `narrate` does, and is recorded.
-            with durations.run(code, "narrate"):
+            with runs.run(code, "narrate"):
                 sample_sound.narrate(code)
     for command, code in sample_sound.CHAIN:
         sample_sound.run(root, command, code, log)
@@ -43,3 +42,17 @@ def stand_in_table(tmp_path, monkeypatch):
     monkeypatch.setattr(runs, "table", lambda: {node.name: node for node in stand_ins.TABLE})
     monkeypatch.delenv(opens.NODE, raising=False)
     return stand_ins.scratch(root)
+
+
+@pytest.fixture
+def one_node(tmp_path, monkeypatch):
+    """A scratch film root whose table is the engine's with one stand-in node, `stand`, which
+    reads in.txt and writes out.txt (`stand_ins.run_stand`); the root."""
+    root = tmp_path.resolve()
+    monkeypatch.setattr(repository, "ROOT", root)
+    (root / "in.txt").write_text("in")
+    table = {"stand": stand_ins.stand_in("stand", {"in": "in.txt"}, {"out": "out.txt"})}
+    table |= {name: node for name, node in runs.table().items() if name != "stand"}
+    monkeypatch.setattr(runs, "table", lambda: table)
+    monkeypatch.delenv(opens.NODE, raising=False)
+    return root

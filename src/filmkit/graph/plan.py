@@ -68,6 +68,8 @@ class Entry:
     expected: str
     seconds: float | None
     ready: bool
+    # When the node's last whole run started and ended, where one is recorded.
+    span: tuple[datetime, datetime] | None = None
 
     def stated(self) -> dict:
         """The entry as `filmkit plan --json` prints it."""
@@ -402,6 +404,7 @@ def judge_all(table: nodes.Table, keys: set[str], full: bool) -> list[Entry]:
                 s.node.expected,
                 whole.seconds if whole else None,
                 ready,
+                (datetime.fromisoformat(whole.started_at), ended(whole)) if whole else None,
             )
         )
     return entries

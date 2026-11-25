@@ -260,10 +260,10 @@ def test_where_a_command_holds_no_child_a_request_to_end_has_its_usual_effect(pr
     assert ended(processes, command) == (-number, [])
 
 
-def test_an_action_that_a_signal_ends_where_it_holds_no_child_writes_no_duration_record(
+def test_an_action_that_a_signal_ends_where_it_holds_no_child_writes_no_run_record(
     processes,
 ):
-    record = processes.folder / "build/evidence/editions/zh/durations/check-picture.json"
+    record = processes.folder / "build/evidence/records/editions/zh/check-picture.json"
     script = processes.script("checking", CHECKING)
     # An interrupt unwinds the action: its record is written and says it did not complete.
     command = processes.python(script, str(processes.folder))
@@ -271,7 +271,7 @@ def test_an_action_that_a_signal_ends_where_it_holds_no_child_writes_no_duration
     command.send_signal(signal.SIGINT)
     assert ended(processes, command) == (-signal.SIGINT, ["check-picture: stopped by an interrupt"])
     earlier = record.read_bytes()
-    assert json.loads(earlier)["completed"] is False
+    assert json.loads(earlier)["outcome"] != "pass"
     # SIGTERM ends the command where it stands: no record is written, and the earlier one stands.
     command = processes.python(script, str(processes.folder))
     processes.noted("checking")
@@ -564,8 +564,8 @@ def test_a_request_to_the_narrations_group_which_the_narration_relays_leaves_no_
         if left or status != 143 or said != expected:
             failed.append({"trial": trial, "status": status, "left": left, "said": said})
     assert failed == []
-    record = processes.folder / "build/evidence/editions/zh/durations/narrate.json"
-    assert json.loads(record.read_text())["completed"] is False
+    record = processes.folder / "build/evidence/records/editions/zh/narrate.json"
+    assert json.loads(record.read_text())["outcome"] != "pass"
 
 
 def render(processes, command="render"):
@@ -586,8 +586,8 @@ def test_a_request_to_end_ends_the_renderer_and_the_render_with_one_line(process
     assert said == [f"render-picture: stopped by {REQUESTS[number]}"]
     assert status == exit_of(number)
     assert gone([renderer])
-    record = processes.folder / "build/evidence/editions/zh/durations/render-picture.json"
-    assert json.loads(record.read_text())["completed"] is False
+    record = processes.folder / "build/evidence/records/editions/zh/render-picture.json"
+    assert json.loads(record.read_text())["outcome"] != "pass"
 
 
 @pytest.mark.deadline(240)

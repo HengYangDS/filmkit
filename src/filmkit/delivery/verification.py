@@ -8,10 +8,8 @@ Spotlight imports from each film where the host has `mdimport`, and the recorded
 thresholds.
 Aesthetic judgment belongs to the review record; human listening stays separate.
 The verifier reads and decodes, and prints each edition's report, which states the seconds each
-film's media took. Up to four films' media are verified at the same time. The one file it writes
-is each edition's duration record of the run (`filmkit.durations`), which says how long the
-verification took and nothing about the films: no check reads it, and with --read-only the
-verifier writes nothing at all.
+film's media took. Up to four films' media are verified at the same time. It writes nothing;
+--read-only, which the films' gate passes, is accepted and changes nothing.
 
 Usage: python -m filmkit.delivery.verification [--technical-only] --language <code>|all
            [<films>]
@@ -31,7 +29,7 @@ import filmkit.captions.timing as captions_timing
 import filmkit.delivery.packaging as packaging
 import filmkit.delivery.player as player
 import filmkit.delivery.spotlight as spotlight
-import filmkit.durations as durations
+import filmkit.graph.runs as seam
 import filmkit.languages as languages
 import filmkit.media as media
 import filmkit.narration.selection as narration_selection
@@ -499,11 +497,11 @@ def qualify(
         "scope": "technical" if technical_only else "acceptance",
         "language": edition.code,
     }
-    with durations.phase("bindings"):
+    with seam.phase("bindings"):
         report |= verify_bindings(edition)
-    with durations.phase("media"):
+    with seam.phase("media"):
         report |= verify_films(edition, sorted(files), renditions)
-    with durations.phase("spotlight"):
+    with seam.phase("spotlight"):
         report["spotlight"] = verify_spotlight(edition, sorted(files))
     report["review"] = (
         {"verdict": "not_reviewed"} if technical_only else verify_review(edition, sorted(files))
@@ -532,9 +530,8 @@ REFUSALS = (
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("files", nargs="*", type=Path)
-    # The film-media gate passes this flag. Without it the one file the verifier writes is the
-    # duration record of its run.
-    parser.add_argument("--read-only", action="store_true", help="write no duration record")
+    # The film-media gate passes this flag; the verifier writes nothing either way.
+    parser.add_argument("--read-only", action="store_true", help="accepted; nothing is written")
     parser.add_argument("--technical-only", action="store_true")
     parser.add_argument("--language", choices=(*production.CODES, "all"), required=True)
     options = parser.parse_args(argv)
@@ -545,7 +542,7 @@ def main(argv: list[str] | None = None) -> None:
     groups = edition_inputs(files) if options.language == "all" else {options.language: files}
     for language, members in groups.items():
         try:
-            with durations.run(language, "verify", record=not options.read_only):
+            with seam.run(language, "verify"):
                 report = qualify(
                     production.Edition(language), members, technical_only=options.technical_only
                 )

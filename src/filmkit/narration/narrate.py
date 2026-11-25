@@ -15,13 +15,12 @@ Usage: python -m filmkit.narration.narrate
 --dry-run prints the narration plan without writing; --skip-generation aligns and
 transcribes the existing receipt. Each step runs under this tool's interpreter, and none
 outlives a narration that is interrupted, asked to end (SIGTERM) or hung up on. A run that is
-not a dry run writes its duration record, each step a phase (`filmkit.durations`). A run that
-narrates is recorded as `narrate`, the record an edition's build starts from, and one that only
-checks, with --skip-generation, as `narrate-checks`, so that it neither replaces the narration's
-record nor moves the build's start; with --ids either name ends with the segments, as the
-receipt's does. The record of a run that narrates states how many processes the synthesis may
-use (`filmkit.narration.processes`), which `FILMKIT_NARRATION_PROCESSES` names; a value that is
-no count is refused before any step.
+not a dry run is a run of the node `narrate`, each step a phase (`filmkit.graph.runs`): one that
+narrates the whole edition writes the node's run record, and one of chosen segments (--ids) or
+of its checks alone (--skip-generation) a partial record, which never makes the node fresh. The
+record of a run that narrates states how many processes the synthesis may use
+(`filmkit.narration.processes`), which `FILMKIT_NARRATION_PROCESSES` names; a value that is no
+count is refused before any step.
 """
 
 import argparse
@@ -32,7 +31,7 @@ import time
 
 import filmkit.child_processes as child_processes
 import filmkit.concepts as concepts
-import filmkit.durations as durations
+import filmkit.graph.runs as seam
 import filmkit.register as register
 import filmkit.repository as repository
 from filmkit.narration import anchors, processes, readings
@@ -175,7 +174,8 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def narrate(code: str, ids: str, scope: Scope) -> None:
-    """Run the scope's steps; a run that is not a dry run writes its duration record."""
+    """Run the scope's steps; a run that is not a dry run writes the node's run record or its
+    partial record."""
     if scope is Scope.PLAN:
         run_steps(code, ids, scope)
         return
@@ -185,17 +185,10 @@ def narrate(code: str, ids: str, scope: Scope) -> None:
         raise SystemExit(str(error)) from None
     # A narration of chosen segments or of its checks alone is a run of part of the node.
     whole = scope is Scope.ALL and not ids
-    with durations.run(code, record_name(scope, ids), whole=whole, node="narrate") as run:
+    with seam.run(code, "narrate", whole=whole) as run:
         if scope is Scope.ALL:
             run.settings["narration_processes"] = count
         run_steps(code, ids, scope)
-
-
-def record_name(scope: Scope, ids: str = "") -> str:
-    """The name of a run's duration record: `narrate` for a run that narrates, `narrate-checks`
-    for one that only aligns and transcribes, and after either the segments --ids names."""
-    name = "narrate-checks" if scope is Scope.CHECKS else durations.BUILD_START
-    return name + (f"-{ids.replace(',', '-')}" if ids else "")
 
 
 def run_steps(code: str, ids: str, scope: Scope) -> None:
@@ -204,7 +197,7 @@ def run_steps(code: str, ids: str, scope: Scope) -> None:
     step first (`filmkit.child_processes.run`), and the synthesis in turn its own children."""
     for name, command in steps(code, ids, scope):
         started = time.monotonic()
-        with durations.phase(name):
+        with seam.phase(name):
             child_processes.run(command, cwd=repository.ROOT)
         seconds = round(time.monotonic() - started, 1)
         print(json.dumps({"edition": code, "step": name, "seconds": seconds}), flush=True)

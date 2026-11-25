@@ -23,8 +23,9 @@ still pictures under speech and writes the record that the delivery's verificati
 review round's preparation require (`filmkit.picture.still_scan`). Assembling a soundtrack and
 refreshing captions first refuse while a review round binds the edition's films and has not set
 them aside (`filmkit.review.set_aside.require_set_aside`).
-Every action writes a duration record for its edition when it ends, named after the action and,
-for the uncaptioned picture, with `-uncaptioned` after it (`filmkit.durations`).
+Every action is measured as a run of its edition, named after the action and, for the
+uncaptioned picture, with `-uncaptioned` after it, which writes the run record of the node it
+names (`filmkit.graph.runs`).
 The command owns no goal, approval, repository lifecycle, service or task state.
 
 Usage: python -m filmkit.produce <edition action> --language <code> [--uncaptioned [--native]]
@@ -38,7 +39,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import filmkit.child_processes as child_processes
-import filmkit.durations as durations
+import filmkit.graph.runs as seam
 import filmkit.picture.derivation as derivation
 import filmkit.picture.draft as draft
 import filmkit.picture.renderer as renderer
@@ -213,7 +214,7 @@ def main(argv: list[str] | None = None) -> None:
     # refusal leaves with its line inside the run, so that the node's record states it.
     with (
         child_processes.ending(f"{options.action}: stopped by {{request}}"),
-        durations.run(
+        seam.run(
             options.language,
             command,
             whole=whole(options),

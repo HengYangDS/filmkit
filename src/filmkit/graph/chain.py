@@ -488,8 +488,8 @@ def aside(name: str, edition: Edition) -> Places:
     return ASIDE[name][1](edition) if name in ASIDE else {}
 
 
-# The commands that write a duration record and are no node, each with its reason (design
-# decisions 1 and 8).
+# The commands the seam measures that are no node, each with its reason (design decisions 1 and 8
+# of record-every-run).
 NOT_NODES = {
     "fit": "it reports pause-policy variants and derives nothing a later step reads",
     "admitted": "it reads the readiness receipts and derives nothing",
@@ -497,7 +497,6 @@ NOT_NODES = {
     "converge": "a search that writes the cast, a tracked source; its narrations are whole runs",
     "verify": "it judges the whole build and derives nothing a later step reads",
     "reproduce": "it judges a rebuild against the release record and derives nothing",
-    "narrate-checks": "a run of part of narrate, which writes narrate's partial record",
 }
 
 

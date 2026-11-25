@@ -10,10 +10,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-import filmkit.durations as durations
 import filmkit.picture.still_scan as still_scan
 import filmkit.released as released
 import filmkit.repository as repository
+from filmkit.graph import runs
 from filmkit.picture.errors import PictureError
 from filmkit.production import Edition
 
@@ -336,16 +336,13 @@ def test_a_second_scan_of_an_unchanged_film_decodes_nothing(packaged, capsys):
     assert {**second, "scanned": True} == first
 
 
-def test_the_duration_record_says_whether_the_film_was_decoded(packaged):
-    path = "build/evidence/editions/zh/durations/scan-film.json"
-    with durations.run("zh", "scan-film"):
+def test_the_run_s_measurement_says_whether_the_film_was_decoded(packaged):
+    with runs.run("zh", "scan-film", record=False) as first:
         still_scan.scan_film(packaged.edition)
-    first = repository.read(path)
-    assert ([*first["phases"]], first["settings"]) == (["scan"], {"scanned": True})
-    with durations.run("zh", "scan-film"):
+    assert ([*first.phases], first.settings) == (["scan"], {"scanned": True})
+    with runs.run("zh", "scan-film", record=False) as second:
         still_scan.scan_film(packaged.edition)
-    second = repository.read(path)
-    assert (second["phases"], second["settings"]) == ({}, {"scanned": False})
+    assert (second.phases, second.settings) == ({}, {"scanned": False})
 
 
 def test_a_second_scan_of_a_refused_film_refuses_again_from_its_record(packaged):

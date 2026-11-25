@@ -14,6 +14,7 @@ import filmkit.picture.renderer as picture_renderer
 import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.film import FILM
+from filmkit.graph import records
 from filmkit.picture.metrics import TABLE, VARIABLE
 from filmkit.picture.rendering import STYLE, PictureError
 from filmkit.tools import ToolError
@@ -185,9 +186,97 @@ def test_a_run_that_names_no_edition_is_measured_under_none(monkeypatch):
         runs.append((code, name, record))
         yield
 
-    monkeypatch.setattr(tools.durations, "run", measured)
+    monkeypatch.setattr(tools.seam, "run", measured)
     monkeypatch.setattr(tools, "run", lambda tool, arguments: 0)
     with pytest.raises(SystemExit) as ended:
         tools.main(["frame-audit", "timeline.json"])
     assert ended.value.code == 0
     assert runs == [(None, "frame-audit", False)]
+
+
+@pytest.fixture
+def root(tmp_path, monkeypatch):
+    monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
+    return tmp_path.resolve()
+
+
+@pytest.mark.parametrize(
+    ("arguments", "code"),
+    [
+        (["build/runtime/work/final-delivery-zh-uhd", "build/evidence/x.json", "2"], "zh"),
+        (["cover", "build/runtime/work/final-delivery-en-uhd", "assets/cover.png", "c.png"], "en"),
+        (["build/artifacts/film/en/timeline.json", "0.5"], "en"),
+        (["{root}/build/evidence/editions/zh/picture-geometry.json"], "zh"),
+        # Another film's stage is no edition of this film.
+        (["/elsewhere/build/evidence/editions/zh/picture-geometry.json"], None),
+        (["../other-film/build/runtime/work/final-delivery-zh-uhd"], None),
+        (["players", "binding.json", "receipt.json"], None),
+        (["build/runtime/work/final-delivery-zh-uhd", "build/evidence/editions/en/x.json"], None),
+    ],
+)
+def test_a_tools_edition_is_read_from_its_arguments_when_they_name_one(root, arguments, code):
+    named = [argument.format(root=root) for argument in arguments]
+    assert tools.edition_of(named) == code
+
+
+STAGE = "build/runtime/work/final-delivery-zh-uhd"
+GEOMETRY = "build/evidence/editions/zh/picture-geometry.json"
+
+
+def recorded(root) -> list[str]:
+    """The nodes whose run records stand below the root."""
+    return sorted(path.stem for path in (root / records.FOLDER).rglob("*.json"))
+
+
+@pytest.mark.parametrize(
+    ("command", "record"),
+    [
+        (["geometry-check", STAGE, GEOMETRY, "2"], "geometry-check"),
+        (["player-check", "cover", STAGE, "cover.png", "painting.png"], "player-check-cover"),
+        # Any other tool, and the player check in another mode, is a run by hand.
+        (["frame-audit", "build/artifacts/film/zh/timeline.json", "0.0333333"], None),
+        (["caption-equivalence", "build/artifacts/film/zh/timeline.json", "0.5"], None),
+        (["band-audit", "build/artifacts/film/zh/timeline.json", "936", "1024", "30"], None),
+        (["player-check", "players", "build/evidence/editions/zh/binding.json", "r.json"], None),
+        # The two checks of a build, for no single edition of this film.
+        (["geometry-check", "/elsewhere/" + STAGE, "/elsewhere/" + GEOMETRY], None),
+    ],
+)
+def test_only_the_checks_a_build_runs_from_the_command_line_write_a_run_record(
+    root, monkeypatch, command, record
+):
+    monkeypatch.setattr(tools, "run", lambda tool, arguments: 0)
+    with pytest.raises(SystemExit) as ended:
+        tools.main(command)
+    assert ended.value.code == 0
+    assert recorded(root) == ([] if record is None else [record])
+    assert tools.recorded(command[0], command[1:]) == (None if record is None else ("zh", record))
+
+
+def test_a_check_of_a_build_is_recorded_whether_it_passes_or_fails(root, monkeypatch):
+    ran = []
+    monkeypatch.setattr(tools, "run", lambda tool, arguments: ran.append(tool) or 0)
+    with pytest.raises(SystemExit) as ended:
+        tools.main(["geometry-check", STAGE, GEOMETRY])
+    assert ended.value.code == 0
+    assert records.read(records.place("geometry-check", "zh")).outcome == "pass"
+    # A failing check's run is recorded as refused, and the command exits with its status.
+    monkeypatch.setattr(tools, "run", lambda tool, arguments: ran.append(tool) or 1)
+    with pytest.raises(SystemExit) as ended:
+        tools.main(["player-check", "cover", STAGE, "cover.png", "painting.png"])
+    assert ended.value.code == 1
+    written = records.read(records.place("player-check-cover", "zh"))
+    assert (written.outcome, written.refusal) == ("refuse", "exit status 1")
+    # A run that is no check of a build leaves both records byte for byte and adds none.
+    folder = root / records.FOLDER
+    before = {path.name: path.read_bytes() for path in folder.rglob("*.json")}
+    for command in (
+        ["player-check", "players", GEOMETRY, "receipt.json"],
+        ["frame-audit", "build/artifacts/film/zh/timeline.json", "0.0333333"],
+        ["geometry-check", "binding.json", "receipt.json"],
+    ):
+        with pytest.raises(SystemExit):
+            tools.main(command)
+    assert {path.name: path.read_bytes() for path in folder.rglob("*.json")} == before
+    assert sorted(before) == ["geometry-check.json", "player-check-cover.json"]
+    assert ran[2:] == ["player-check", "frame-audit", "geometry-check"]

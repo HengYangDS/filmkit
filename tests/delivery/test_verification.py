@@ -135,20 +135,20 @@ def test_the_verifier_reports_the_bound_inputs_where_it_reported_them(monkeypatc
     monkeypatch.setattr(
         delivery_verification, "verify_bindings", lambda _edition: {"bound": phases[-1]}
     )
-    phase = delivery_verification.durations.phase
+    phase = delivery_verification.seam.phase
 
     def named(name):
         phases.append(name)
         return phase(name)
 
-    monkeypatch.setattr(delivery_verification.durations, "phase", named)
+    monkeypatch.setattr(delivery_verification.seam, "phase", named)
     report = delivery_verification.qualify(edition, edition.films, technical_only=True)
     assert report["bound"] == "bindings"
     assert phases == ["bindings", "media", "spotlight"]
 
 
 @pytest.mark.usefixtures("qualified")
-def test_the_command_prints_each_editions_report_and_writes_only_its_duration(tmp_path, capsys):
+def test_the_command_prints_each_editions_report_and_writes_nothing(tmp_path, capsys):
     films = [str(film) for code in production.CODES for film in production.Edition(code).films]
     delivery_verification.main(["--read-only", "--technical-only", "--language", "all", *films])
     reports = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
@@ -159,9 +159,8 @@ def test_the_command_prints_each_editions_report_and_writes_only_its_duration(tm
     delivery_verification.main(["--language", "en", *films[4:]])
     (report,) = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     assert (report["language"], report["scope"]) == ("en", "acceptance")
-    # With --read-only nothing was written; without it, the edition's duration record alone.
-    written = sorted(str(path.relative_to(tmp_path)) for path in tmp_path.rglob("*.*"))
-    assert written == ["build/evidence/editions/en/durations/verify.json"]
+    # Nothing was written, with --read-only or without it.
+    assert sorted(tmp_path.rglob("*.*")) == []
     # Without named films, each selected edition's current delivered films are verified.
     delivery_verification.main(["--technical-only", "--language", "all"])
     reports = [json.loads(line) for line in capsys.readouterr().out.splitlines()]

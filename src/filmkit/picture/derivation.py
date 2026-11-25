@@ -57,7 +57,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import filmkit.durations as durations
+import filmkit.graph.runs as seam
 import filmkit.media as media
 import filmkit.picture.equivalence as equivalence
 import filmkit.picture.faults as faults
@@ -281,15 +281,15 @@ def derive(
     partial, stats = work / "derived.mp4", work / "band-stats.txt"
     for earlier in (partial, stats, edge_stats(stats)):
         earlier.unlink(missing_ok=True)
-    with durations.phase("ground"):
+    with seam.phase("ground"):
         ground = ground_rows.read_ground(source, rows, size, frames[0][0])
     relative = Path(repository.relative(stats))
     command = derive_command(source, partial, size, rows, ground, frames, relative, edges)
     count = int(media.video_stream(media.probe(source))["nb_frames"])
-    scan, run = ground_rows.BandScan(size, rows), durations.current()
+    scan, run = ground_rows.BandScan(size, rows), seam.current()
     started = time.monotonic()
     try:
-        with durations.phase("encode"):
+        with seam.phase("encode"):
             failed = "The derivation's encode failed after {read} of {count} frames"
             log = work / "derive.log"
             faults.decode(command, scan.length, log, count, scan.add, deadline, failed)
@@ -302,7 +302,7 @@ def derive(
             found = "; ".join(ground_rows.band_findings(scanned, code))
             msg = f"The captioned picture's caption band changes for one frame: {found}"
             raise BandFault(msg)
-        with durations.phase("ground-check"):
+        with seam.phase("ground-check"):
             check = ground_rows.ground_check(stats, frames, ground)
             edge = (
                 ground_rows.edge_check(edge_stats(stats), ground, ground_rows.GROUND_TOLERANCE, FPS)
@@ -336,7 +336,7 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
     if way["way"] != "derived":
         msg = f"The {edition.code} uncaptioned picture is not derived: {way['reason']}"
         raise PictureError(msg)
-    with durations.phase("validation"):
+    with seam.phase("validation"):
         validate_picture(edition)
     captioned, rendered = edition.rendered(True), edition.rendered(False)
     for earlier in (rendered.file, rendered.receipt):
@@ -344,7 +344,7 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
     bound = source_bindings(edition)
     work = repository.ROOT / WORK / edition.code
     work.mkdir(parents=True, exist_ok=True)
-    with durations.phase("composition"):
+    with seam.phase("composition"):
         composition = equivalence.composition_report(edition, work)
     native = NATIVE.format(code=edition.code)
     if composition["differing_instants"] or composition["band"] is None:
@@ -356,7 +356,7 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
         msg = f"The {edition.code} composition {why}; render the uncaptioned picture with {native}"
         raise PictureError(msg)
     rows = equivalence.excluded_rows(composition["band"], PICTURE_SIZE[1])
-    with durations.phase("band-audit"):
+    with seam.phase("band-audit"):
         audit = band_audit(edition, rows, work)
     frames = ground_rows.free_frames(audit["free"])
     scale = PICTURE_SIZE[1] / equivalence.COMPOSITION_HEIGHT
@@ -391,7 +391,7 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
         msg = f"{error}; render the uncaptioned picture with {native}"
         raise PictureError(msg) from error
     try:
-        with durations.phase("media"):
+        with seam.phase("media"):
             require_derived_media(rendered.file, edition.runtime)
         if made["edge_check"]["frames"] != edition.runtime * FPS:
             msg = f"The edge rows were measured at {made['edge_check']['frames']} frames"
@@ -518,7 +518,7 @@ def compare_derived(edition: Edition, receipt: dict) -> dict:
     work = repository.ROOT / equivalence.WORK / edition.code
     work.mkdir(parents=True, exist_ok=True)
     bound = equivalence.current_bindings(edition)
-    with durations.phase("composition"):
+    with seam.phase("composition"):
         composition = equivalence.composition_report(edition, work)
     derived = receipt["derived"]
     findings = equivalence.findings_of(composition, None, edition.code)

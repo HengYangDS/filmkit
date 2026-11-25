@@ -230,7 +230,7 @@ def test_the_comparison_names_its_pass_over_every_frame_as_a_phase(renders, monk
         phases.append(name)
         yield
 
-    monkeypatch.setattr(equivalence.durations, "phase", phase)
+    monkeypatch.setattr(equivalence.seam, "phase", phase)
     equivalence.compare_renders(first, second, work)
     assert phases == ["sampled-frames", "every-frame-scan", "every-frame-psnr"]
     # Nothing hashes every frame of each render any more.

@@ -17,10 +17,10 @@ that drives a browser closes it, and it is killed only when it has not ended aft
 
 A refusal exits with status 1 and "<tool>: <reason>" on standard error; otherwise the command
 exits with the tool's own status. The two checks that a film's build runs from the command line,
-the geometry check and the cover check (`BUILD_RUNS`), write a duration record
-(`filmkit.durations`) for the edition of this film that their arguments name, by its stage or
-its folder of evidence or artifacts, so that they count in its build's time. No other run
-writes one: an audit run by hand for a diagnosis is no command of a build.
+the geometry check and the cover check (`BUILD_RUNS`), are runs of their nodes
+(`filmkit.graph.runs`) for the edition of this film that their arguments name, by its stage or
+its folder of evidence or artifacts, and write the node's run record. No other run writes one:
+an audit run by hand for a diagnosis is no command of a build.
 
 Usage: python -m filmkit.tools <tool> [arguments]
 """
@@ -38,7 +38,7 @@ import tempfile
 from pathlib import Path
 
 import filmkit.child_processes as child_processes
-import filmkit.durations as durations
+import filmkit.graph.runs as seam
 import filmkit.picture.browser as picture_browser
 import filmkit.picture.renderer as picture_renderer
 import filmkit.released as released
@@ -67,9 +67,9 @@ TOOLS = {
 }
 # The copies, below the film's root, in a folder for each engine version.
 CACHE = picture_browser.TOOL_CACHE / released.ENGINE
-# The runs a film's build makes from the command line, which alone write a duration record: the
-# tool with the words its arguments begin with, and the record's name. Every other run, of
-# another tool or of the player check in another mode, is taken for a run by hand.
+# The runs a film's build makes from the command line, which alone write a run record: the tool
+# with the words its arguments begin with, and the node's name. Every other run, of another tool
+# or of the player check in another mode, is taken for a run by hand.
 BUILD_RUNS = {
     ("geometry-check",): "geometry-check",
     ("player-check", "cover"): "player-check-cover",
@@ -178,8 +178,8 @@ def edition_of(arguments: list[str]) -> str | None:
 
 
 def recorded(tool: str, arguments: list[str]) -> tuple[str, str] | None:
-    """The edition and the name of the duration record a run writes: for a run of `BUILD_RUNS`
-    whose arguments name one edition of this film, and None for every other run."""
+    """The edition and the node a run is a run of: for a run of `BUILD_RUNS` whose arguments
+    name one edition of this film, and None for every other run."""
     words = (tool, *arguments)
     name = next((BUILD_RUNS[run] for run in BUILD_RUNS if words[: len(run)] == run), None)
     code = edition_of(arguments) if name else None
@@ -205,7 +205,7 @@ def main(argv: list[str] | None = None) -> None:
     # A check of an edition's build is recorded as a command of that build; it leaves with its
     # status or its line inside the run, so that the node's record states how it ended.
     part = {} if whole else {"whole": False}
-    with durations.run(code, name, record=build_run is not None, **part):
+    with seam.run(code, name, record=build_run is not None, **part):
         try:
             status = run(options.tool, options.arguments)
         except (PictureError, ToolError) as error:

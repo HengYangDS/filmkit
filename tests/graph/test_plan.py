@@ -8,7 +8,6 @@ import pytest
 import stand_ins
 from stand_ins import CODES, chain, ran, selecting
 
-import filmkit.durations as durations
 import filmkit.repository as repository
 from filmkit.graph import nodes, plan, records, runs, verify
 
@@ -196,10 +195,10 @@ def test_a_node_of_one_edition_is_asked_of_that_edition_alone(stand_in_table, mo
     assert nodes.key("qualify", "en") not in table.edges
     for code in CODES:
         ran("stage", code)
-    with durations.run("zh", "qualify"):
+    with runs.run("zh", "qualify"):
         (repository.ROOT / "zh/q.json").write_text("qualified")
     # A run of it for another edition writes its duration record and no run record.
-    with durations.run("en", "qualify"):
+    with runs.run("en", "qualify"):
         pass
     assert not records.place("qualify", "en").exists()
     _, found = judged(table, "qualify:all", "stage:all")

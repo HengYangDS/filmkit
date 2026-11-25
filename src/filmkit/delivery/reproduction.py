@@ -23,9 +23,10 @@ uncaptioned films as unpublished and compares the rest.
 holds a manifest to are also asked of a record that is not yet written (`check`), so that the
 writer asks them before it changes a file.
 
-The report goes to build/evidence/reproduction/report.json, and each edition's duration record
-of the comparison beside its evidence (`filmkit.durations`), unless --read-only is given; a
-comparison that does not pass exits with "<edition>: <asset>: <layer>" for each failing layer.
+The report goes to build/evidence/reproduction/report.json unless --read-only is given; each
+edition's comparison is measured as a run (`filmkit.graph.runs`), which writes nothing of its
+own. A comparison that does not pass exits with "<edition>: <asset>: <layer>" for each failing
+layer.
 
 Usage: python -m filmkit.delivery.reproduction [--read-only]
 """
@@ -44,7 +45,7 @@ from pydantic import Field, NonNegativeInt, PositiveFloat, StringConstraints, Va
 
 import filmkit.delivery.packaging as packaging
 import filmkit.delivery.verification as verification
-import filmkit.durations as durations
+import filmkit.graph.runs as seam
 import filmkit.media as media
 import filmkit.production as production
 import filmkit.repository as repository
@@ -469,14 +470,13 @@ def passed(code: str, compared: dict) -> bool:
     return not calibrating and not failures({"editions": {code: compared}})
 
 
-def compare_editions(records: dict, assets: dict, listed: dict, *, record: bool) -> dict:
-    """Each edition's comparison in the editions' order, as a run of its own whose duration is
-    recorded when `record` says so (`filmkit.durations`). The comparison reports every layer
-    before the command refuses, so an edition that did not pass says so to its run, and its
-    record states that it did not complete."""
+def compare_editions(records: dict, assets: dict, listed: dict) -> dict:
+    """Each edition's comparison in the editions' order, as a run of its own. The comparison
+    reports every layer before the command refuses, so an edition that did not pass says so to
+    its run, which then did not complete."""
     compared = {}
     for code in production.CODES:
-        with durations.run(code, "reproduce", record=record) as run:
+        with seam.run(code, "reproduce") as run:
             edition = production.Edition(code)
             compared[code] = compare_edition(edition, records[code], assets, listed)
             if not passed(code, compared[code]):
@@ -484,9 +484,8 @@ def compare_editions(records: dict, assets: dict, listed: dict, *, record: bool)
     return compared
 
 
-def compare(*, record: bool = False) -> dict:
-    """The comparison of the rebuild with the published release, every layer reported; with
-    `record` each edition's duration record is written."""
+def compare() -> dict:
+    """The comparison of the rebuild with the published release, every layer reported."""
     release = load()
     changed = changed_sources(release)
     if changed:
@@ -497,7 +496,7 @@ def compare(*, record: bool = False) -> dict:
     report = {
         "release": release.version,
         "ffmpeg": repository.run(["ffmpeg", "-version"]).stdout.decode().splitlines()[0],
-        "editions": compare_editions(release.editions, assets, listed, record=record),
+        "editions": compare_editions(release.editions, assets, listed),
     }
     verdicts = [
         result["verdict"] for edition in report["editions"].values() for result in edition["films"]
@@ -513,7 +512,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--read-only", action="store_true", help="print the report only")
     options = parser.parse_args(argv)
     try:
-        report = compare(record=not options.read_only)
+        report = compare()
     except ReproductionError as error:
         raise SystemExit(str(error)) from None
     if not options.read_only:

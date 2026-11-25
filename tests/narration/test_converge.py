@@ -5,27 +5,36 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
-from converging import SEED, THOUGHTS, counts, duration_of, record_of, seed_of, thought_of
+from converging import (
+    SEED,
+    THOUGHTS,
+    counts,
+    measured_of,
+    record_of,
+    seed_of,
+    thought_of,
+    unmeasured,
+)
 
 import filmkit.child_processes as child_processes
-import filmkit.durations as durations
 import filmkit.narration.converge as narration_converge
 import filmkit.narration.group_generation as narration_group_generation
 import filmkit.narration.synthesis as narration_synthesis
 import filmkit.repository as repository
+from filmkit.graph import runs
 from filmkit.production import Edition
 
 # The convergence's own narration, which runs a child and which the bench replaces (`studio`).
 NARRATE = narration_converge.narrate
 
 
-def test_a_convergence_of_two_narrations_writes_its_duration_record_with_its_phases(
+def test_a_convergence_of_two_narrations_records_its_seconds_with_its_phases(
     studio, voiced, monkeypatch
 ):
     studio.begin([voiced(), voiced(natural=False)])
     studio.sound = lambda _seed, _text: voiced()
     # A narration is due at first. Each narration runs where the convergence runs its child
-    # and takes 20 s by the clock that the durations read; the first has nothing to write
+    # and takes 20 s by the clock that the seam reads; the first has nothing to write
     # here, since the bench's receipt holds the first takes, and the second is the bench's.
     clock, due, ran, narrated = [100.0], iter([True]), [], narration_converge.narrate
 
@@ -35,14 +44,14 @@ def test_a_convergence_of_two_narrations_writes_its_duration_record_with_its_pha
         if len(ran) > 1:
             narrated("en")
 
-    monkeypatch.setattr(durations, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    monkeypatch.setattr(runs, "time", SimpleNamespace(monotonic=lambda: clock[0]))
     monkeypatch.setattr(narration_converge, "narration_due", lambda _code: next(due, False))
     monkeypatch.setattr(narration_converge, "narrate", NARRATE)
     monkeypatch.setattr(child_processes, "run", child)
     narration_converge.main(["--language", "en", "--rounds", "1", "--takes", "1"])
     assert (ran, studio.narrations) == (["filmkit.narration.narrate"] * 2, 1)
-    record = duration_of()
-    assert (record["command"], record["edition"], record["completed"]) == ("converge", "en", True)
+    record = measured_of()
+    assert record["completed"] is True
     # Both narrations are one phase; the judgments, the round of candidates and the count of
     # the runtime are the others, in the order each first ran.
     assert [*record["phases"]] == ["narration", "judgment", "candidates", "count"]
@@ -54,7 +63,7 @@ def test_an_edition_left_unsettled_records_that_its_convergence_did_not_complete
     studio.sound = lambda _seed, _text: voiced(natural=False)
     with pytest.raises(SystemExit, match="en: 1 thoughts are unsettled"):
         narration_converge.main(["--language", "en", "--rounds", "1", "--takes", "1"])
-    record = duration_of()
+    record = measured_of()
     # Nothing was bound, so nothing was narrated, and an unsettled edition is not counted.
     assert (record["completed"], [*record["phases"]]) == (False, ["judgment", "candidates"])
 
@@ -93,12 +102,13 @@ def test_a_refused_thought_gets_candidates_and_the_chosen_seed_is_bound(studio, 
     said = counts(capsys)
     assert said["settled_after"] == {"first take": 1, "round 1": 2}
     assert (said["takes_generated"], said["takes_found"], said["unsettled"]) == (3, 0, {})
-    # A second run changes nothing: no take, no narration, the same cast and the same record.
-    kept = [(Edition("en").ear_first / narration_converge.RECORD).read_bytes()]
+    # A second run changes nothing: no take, no narration, the same cast and the same record
+    # but the measurement of its run.
+    kept = [unmeasured(record_of())]
     kept.append((repository.ROOT / Edition("en").cast).read_bytes())
     narration_converge.main(["--language", "en", "--rounds", "2", "--takes", "3"])
     assert (len(studio.said), studio.narrations) == (3, 1)
-    assert kept[0] == (Edition("en").ear_first / narration_converge.RECORD).read_bytes()
+    assert kept[0] == unmeasured(record_of())
     assert kept[1] == (repository.ROOT / Edition("en").cast).read_bytes()
     assert counts(capsys)["settled_after"] == {"first take": 2}
 
@@ -135,7 +145,7 @@ def test_a_thought_no_candidate_settles_is_named_as_not_narratable_as_written(
         narration_converge.main(["--language", "en", "--rounds", "2", "--takes", "2"])
     said = counts(capsys)
     assert (said["takes_generated"], said["takes_found"], len(studio.said)) == (0, 4, 4)
-    assert record_of() == record
+    assert unmeasured(record_of()) == unmeasured(record)
 
 
 def test_a_run_on_take_settles_a_thought_whose_plain_candidates_end_abruptly(
@@ -427,7 +437,7 @@ def test_a_thought_under_its_line_heard_by_no_one_gets_no_candidate_and_waits(
     said = counts(capsys)
     assert (said["takes_generated"], said["for_the_ear"]) == (0, ["26.2"])
     assert said["fit"] == "not asked: a thought waits for the owner's ear"
-    assert (duration_of()["completed"], studio.said) == (False, [])
+    assert (measured_of()["completed"], studio.said) == (False, [])
 
 
 def test_a_thought_under_its_line_that_another_line_refuses_gets_candidates(

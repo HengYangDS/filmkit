@@ -3,9 +3,9 @@
 A run record states one run of one build node for one edition: each input and output by its
 path below the film's root, its size, its modification time (`mtime_ns`) and its SHA-256, a
 folder by the digest of the members its pattern names; the engine that ran, its `released.json`
-digest and the node's model pins; the outcome and the line the command ended with; the seconds,
-phases, settings and 1-minute load its duration record states, from the same measurement
-(`filmkit.durations.Run`); and the host class as measured (`filmkit.graph.host`). A partial
+digest and the node's model pins; the outcome and the line the command ended with; the run's
+start, seconds, phases, settings and 1-minute load at both ends, as the seam measured them
+(`filmkit.graph.runs.Run`); and the host class as measured (`filmkit.graph.host`). A partial
 record states a run of part of a node: its outputs as they stand after it, its outcome and its
 time, and no inputs, so it accounts for what it wrote and never makes its node fresh.
 
@@ -40,8 +40,8 @@ FOLDER = Path("build/evidence/records/editions")
 Outcome = Literal["pass", "refuse", "error"]
 # A node's host class as host rule 3 measures it, and the plan's word for one never measured.
 HostClass = Literal["light", "heavy", "gpu"]
-# The fields a run record takes from its duration record, which the same `Run` measured.
-FROM_DURATION = ("started_at", "seconds", "load_1m", "phases", "settings")
+# The fields a run record takes from the seam's measurement of the run (`runs.Run.measured`).
+MEASURED = ("started_at", "seconds", "load_1m", "phases", "settings")
 
 
 class Unreadable(ValueError):

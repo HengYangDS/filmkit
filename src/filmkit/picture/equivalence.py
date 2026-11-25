@@ -51,7 +51,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-import filmkit.durations as durations
+import filmkit.graph.runs as seam
 import filmkit.media as media
 import filmkit.picture.faults as faults
 import filmkit.released as released
@@ -336,7 +336,7 @@ def encoded_comparison(
     (`filmkit.picture.faults`). The one owner of this comparison and of its thresholds: an
     edition's rendered pair is compared with its caption band left out (`compare_pictures`),
     and two renders of one stage with no row left out (`compare_renders`)."""
-    with durations.phase("sampled-frames"):
+    with seam.phase("sampled-frames"):
         measured = compare_decoded(pictures, size, sampled, rows, work)
     failing = [m for m in measured if differs(m)]
     worst = sorted(measured, key=lambda m: (-m["largest_tile"], m["psnr_db"] or math.inf))[:WORST]
@@ -355,7 +355,7 @@ def encoded_comparison(
         "failing": failing[:WORST],
         "failing_frames": len(failing),
     }
-    with durations.phase("every-frame-scan"):
+    with seam.phase("every-frame-scan"):
         report["every_frame"] = faults.scan(pictures, size, rows, count, FPS, work)
     return report
 
@@ -422,7 +422,7 @@ def compare_renders(first: Path, second: Path, work: Path) -> dict:
             pictures, sizes["first"], count, list(range(0, count, step)), (0, 0), work
         )
         findings = encoded_findings(encoded, None)
-        with durations.phase("every-frame-psnr"):
+        with seam.phase("every-frame-psnr"):
             psnr, unmeasured = every_frame_psnr(first, second, count)
         if psnr is not None:
             unlike = sorted((v, frame) for frame, v in enumerate(psnr) if math.isfinite(v))
@@ -486,7 +486,7 @@ def compare_pictures(edition: Edition) -> dict:
     """Compare the edition's two pictures, write the record and refuse a finding: a rendered pair
     at both levels, a pair whose uncaptioned picture is derived by its derivation's receipt
     (`filmkit.picture.derivation.compare_derived`)."""
-    with durations.phase("validation"):
+    with seam.phase("validation"):
         receipts = [validate_picture(edition, captions=captions) for captions in (True, False)]
     if isinstance(receipts[1].get("derived"), dict):
         from filmkit.picture import derivation
@@ -496,7 +496,7 @@ def compare_pictures(edition: Edition) -> dict:
     work.mkdir(parents=True, exist_ok=True)
     bound = current_bindings(edition)
     timeline = repository.read(edition.timeline)
-    with durations.phase("composition"):
+    with seam.phase("composition"):
         composition = composition_report(edition, work)
     encoded = None
     if composition["differing_instants"] == 0:

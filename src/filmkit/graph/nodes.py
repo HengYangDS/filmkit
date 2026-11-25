@@ -3,7 +3,7 @@ and writes, and the order from the standard library's `graphlib`. The engine's o
 `filmkit.graph.chain`.
 
 A node is one of today's chain commands for one edition (design decision 1 of record-every-run),
-named as its duration record names it. Each of its ways states its inputs as a function of an
+named as the command's run names it. Each of its ways states its inputs as a function of an
 edition that returns paths by name, and its outputs likewise; a folder names its members by a
 pattern (`records.Folder`).
 

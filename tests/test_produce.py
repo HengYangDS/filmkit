@@ -9,6 +9,7 @@ import filmkit.produce as produce
 import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.review.round as review_round
+from filmkit.graph import records
 from filmkit.picture.rendering import PictureError
 
 # Every action writes a duration record below the film's root, so each test runs below its own.
@@ -71,13 +72,13 @@ def test_the_actions_are_the_documented_ones_in_order():
     ]
 
 
-def test_scan_film_runs_the_scan_s_owner_and_records_how_long_it_took(monkeypatch):
+def test_scan_film_runs_the_scan_s_owner_and_records_its_run(monkeypatch):
     calls = []
     monkeypatch.setattr(produce.still_scan, "scan_film", calls.append)
     produce.main(["scan-film", "--language", "en"])
     assert calls == [production.Edition("en")]
-    record = repository.read("build/evidence/editions/en/durations/scan-film.json")
-    assert (record["command"], record["completed"]) == ("scan-film", True)
+    record = records.read(records.place("scan-film", "en"))
+    assert (record.outcome, record.seconds >= 0) == ("pass", True)
 
 
 def test_a_film_the_scan_refuses_ends_the_command_with_the_run_it_holds(monkeypatch):
@@ -91,7 +92,7 @@ def test_a_film_the_scan_refuses_ends_the_command_with_the_run_it_holds(monkeypa
     assert stopped.value.code == (
         "scan-film: The zh film holds a still picture with 3.5 s of speech or more: 1.00-5.00 s"
     )
-    assert not repository.read("build/evidence/editions/zh/durations/scan-film.json")["completed"]
+    assert records.read(records.place("scan-film", "zh")).outcome == "refuse"
 
 
 def test_an_edition_action_passes_its_options_to_its_owner(monkeypatch, tmp_path):

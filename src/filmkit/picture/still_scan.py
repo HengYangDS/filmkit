@@ -58,7 +58,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-import filmkit.durations as durations
+import filmkit.graph.runs as seam
 import filmkit.picture.still_record as still_record
 import filmkit.released as released
 import filmkit.repository as repository
@@ -484,8 +484,8 @@ def scan_film(edition: Edition) -> dict:
     refuse a film that holds a still run at the limit, after the record is written.
 
     A record that answers for the film as it stands (`film_record`) already holds the verdict:
-    the film is then not decoded again, and the line printed and the command's duration record
-    say so (`scanned`). Any other record, a damaged one included, is replaced by a new scan. A
+    the film is then not decoded again, and the line printed and the run's settings say so
+    (`scanned`). Any other record, a damaged one included, is replaced by a new scan. A
     film that cannot be read, that changes while it is read or that does not decode to the
     frames of its timeline's seconds is refused and leaves no record, an earlier one included.
     """
@@ -494,13 +494,13 @@ def scan_film(edition: Edition) -> dict:
         record, scanned = film_record(edition), False
     except NoAnswerError:
         record, scanned = {}, True
-    run = durations.current()
+    run = seam.current()
     if run is not None:
         run.settings["scanned"] = scanned
     if scanned:
         film, frames = film_subjects(edition)["movie"], film_frames(edition)
         try:
-            with durations.phase("scan"):
+            with seam.phase("scan"):
                 record = judged(film, edition.timeline)
             whole(film, record, frames, path)
         except StillScanError as error:

@@ -2,11 +2,11 @@
 files below a scratch root, declared as the engine's table declares its own, and run through the
 seam as the film's chain runs its commands."""
 
+import os
 import time
 
-import filmkit.durations as durations
 import filmkit.repository as repository
-from filmkit.graph import nodes, runs
+from filmkit.graph import nodes, opens, runs
 from filmkit.production import Edition
 
 CODES = ("zh", "en")
@@ -102,10 +102,23 @@ def scratch(root):
 def ran(name, code="zh", *, refuse=None, whole=True):
     """Run a stand-in command as the chain runs it, after the last one has ended."""
     time.sleep(0.005)
-    with durations.run(code, name, whole=whole):
+    with runs.run(code, name, whole=whole):
         if refuse:
             raise SystemExit(refuse)
         wrote(name, code)
+
+
+def run_stand(root, block=lambda run: None, **options):
+    """Run the one stand-in node of `conftest.one_node` through the seam: it sets a setting,
+    writes out.txt in a phase `work`, then runs `block` with the run."""
+    with runs.run("zh", "stand", **options) as run:
+        run.settings["count"] = 2
+        with run.phase("work"):
+            (root / "out.txt").write_text("out")
+            # A run that records nothing opens no node's run.
+            expected = "stand:zh" if options.get("record", True) else None
+            assert os.environ.get(opens.NODE) == expected
+        block(run)
 
 
 def wrote(name, code):

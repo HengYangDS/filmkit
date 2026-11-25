@@ -4,10 +4,10 @@ every frame by the comparison's own rule for a caption band, in the derivation's
 import pytest
 from test_derivation import CAPTION, FRAMES, FREE, LABEL, ROWS, SIZE, encode
 
-import filmkit.durations as durations
 import filmkit.picture.derivation as derivation
 import filmkit.picture.faults as faults
 import filmkit.repository as repository
+from filmkit.graph import runs
 from filmkit.picture.derivation import BandFault
 
 pytestmark = pytest.mark.ffmpeg
@@ -36,7 +36,7 @@ def derived(root, *boxes, code=None, free=FREE):
 
 
 def test_a_clean_picture_passes_with_its_band_scanned_at_every_frame(root):
-    with durations.run("zh", "render-picture-uncaptioned", record=False) as run:
+    with runs.run("zh", "render-picture-uncaptioned", record=False) as run:
         made, target = derived(root, LABEL, CAPTION)
     assert made["band_scan"] == {
         "frames": FRAMES,

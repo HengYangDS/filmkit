@@ -18,7 +18,7 @@ refusal names the attempt's folder and the commands that bring the edition back:
 for each picture not rendered again, then `compare-pictures`.
 A faulty render is evidence of a fault rather than a reproducible artifact, so the kept pictures
 stay with the edition's evidence and not with the reviewed builds that `set-aside` keeps. Each
-render and comparison runs as the node whose work it does again (`filmkit.durations.node`), so
+render and comparison runs as the node whose work it does again (`filmkit.graph.runs.node`), so
 those nodes' run records bind the repaired pictures and the new comparison.
 
 Usage: python -m filmkit.produce repair-pictures --language <code> [--attempts <n>]
@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import filmkit.child_processes as child_processes
-import filmkit.durations as durations
+import filmkit.graph.runs as seam
 import filmkit.picture.derivation as derivation
 import filmkit.picture.equivalence as equivalence
 import filmkit.picture.faults as faults
@@ -158,12 +158,12 @@ def render_and_compare(edition: Edition, attempt: dict, deadline: float) -> dict
         captions = name == "captioned"
         try:
             if captions:
-                with durations.node(edition.code, "render-picture", refusals=REFUSALS):
+                with seam.node(edition.code, "render-picture", refusals=REFUSALS):
                     rendering.render_picture(edition, deadline, captions=True)
             else:
                 # The uncaptioned picture's render states why it is rendered and not derived.
                 node = "render-picture-uncaptioned"
-                with durations.node(edition.code, node, way="native", refusals=REFUSALS):
+                with seam.node(edition.code, node, way="native", refusals=REFUSALS):
                     derivation.render_uncaptioned(edition, deadline)
         finally:
             receipt = edition.rendered(captions).receipt
@@ -176,7 +176,7 @@ def compare(edition: Edition) -> dict:
     """Compare the two pictures again; the record the comparison wrote, which binds them, or the
     comparison's own refusal where it wrote none."""
     try:
-        with durations.node(edition.code, "compare-pictures", refusals=REFUSALS):
+        with seam.node(edition.code, "compare-pictures", refusals=REFUSALS):
             return equivalence.compare_pictures(edition)
     except PictureError as error:
         refusal = error

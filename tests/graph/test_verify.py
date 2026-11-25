@@ -11,9 +11,8 @@ import sample_sound
 import stand_ins
 from stand_ins import CODES, chain, ran, read, wrote
 
-import filmkit.durations as durations
 import filmkit.repository as repository
-from filmkit.graph import plan, verify
+from filmkit.graph import plan, runs, verify
 from filmkit.production import Edition
 
 
@@ -55,13 +54,13 @@ def test_rewrites_replacements_repairs_and_retakes_pass(stand_in_table, capsys):
     for name in ("stage", "render", "compare", "narrate"):
         ran(name)
     # A repair renders the picture again and compares again, each as its node.
-    with durations.run("zh", "repair"):
-        with durations.node("zh", "render"):
+    with runs.run("zh", "repair"):
+        with runs.node("zh", "render"):
             (repository.ROOT / "zh/picture").write_text("the repaired picture")
-        with durations.node("zh", "compare"):
+        with runs.node("zh", "compare"):
             wrote("compare", "zh")
     # A retake narrates part of the edition again, changing its takes.
-    with durations.run("zh", "narrate", whole=False):
+    with runs.run("zh", "narrate", whole=False):
         (repository.ROOT / "zh/takes.txt").write_text("a retaken thought")
     status, lines = verified(stand_in_table, capsys)
     assert status == 0, lines

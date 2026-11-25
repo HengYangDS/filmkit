@@ -7,11 +7,9 @@ when they are asked for (`conftest.py`: `studio`, `engine`).
 """
 
 import json
-from pathlib import Path
 
 import pytest
 
-import filmkit.durations as durations
 import filmkit.narration.converge as narration_converge
 import filmkit.repository as repository
 from filmkit.production import Edition
@@ -62,15 +60,14 @@ def record_of(code: str = "en") -> dict:
     return repository.read(Edition(code).ear_first / narration_converge.RECORD)
 
 
-def duration_path(code: str = "en") -> Path:
-    """Where the edition's convergence writes its duration record, as the run that writes it
-    names it."""
-    return durations.Run(code, narration_converge.COMMAND).path
+def measured_of(code: str = "en") -> dict:
+    """The measurement of the run that the edition's convergence record states."""
+    return record_of(code)[narration_converge.MEASURED]
 
 
-def duration_of(code: str = "en") -> dict:
-    """The duration record of the edition's convergence."""
-    return repository.read(duration_path(code))
+def unmeasured(record: dict) -> dict:
+    """A convergence record without the measurement of its run, which differs from run to run."""
+    return {key: value for key, value in record.items() if key != narration_converge.MEASURED}
 
 
 def counts(capsys) -> dict:

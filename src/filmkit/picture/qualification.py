@@ -41,7 +41,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import filmkit.durations as durations
+import filmkit.graph.runs as seam
 import filmkit.picture.equivalence as equivalence
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
@@ -75,7 +75,7 @@ def qualify_renderer(edition: Edition, deadline: float = renderer.DEADLINE) -> d
     """Render the edition's captioned stage again and compare the two renders by the measure of a
     rendered pair; the record. The captioned picture must be valid as it stands."""
     renderer.require_renderer()
-    with durations.phase("validation"):
+    with seam.phase("validation"):
         first_receipt = rendering.validate_picture(edition)
     # The record states one canvas for both renders. What the film installs now is asked before
     # the render, and what the second render loaded and ran after it.
@@ -95,7 +95,7 @@ def qualify_renderer(edition: Edition, deadline: float = renderer.DEADLINE) -> d
     again.unlink(missing_ok=True)
     drawn_in = other_count(first_receipt.get("spans"))
     command = renderer.command(rendered.stage, again, FPS, drawn_in)
-    with durations.phase("render"):
+    with seam.phase("render"):
         second_receipt = renderer.record_render(
             command, rendered.page, again, receipt, deadline, rendered.name
         )

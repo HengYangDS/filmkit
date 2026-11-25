@@ -1,5 +1,7 @@
-"""Run records at the seam: each run of a node recorded with its outcome from the same measurement
-as its duration record, partial runs as partial records (design decisions 2 and 8)."""
+"""Run records at the seam: each run of a node recorded with its outcome, partial runs as partial
+records, a node's work done again by another command recorded as that node's run (design
+decisions 2, 5 and 8 of record-every-run). What a run's record states of its measurement is
+`test_runs.py`'s."""
 
 import json
 import os
@@ -9,8 +11,8 @@ import sys
 
 import pytest
 import sample_sound
+import stand_ins
 
-import filmkit.durations as durations
 import filmkit.narration.fitting as fitting
 import filmkit.narration.narrate as narrate
 import filmkit.picture.repair as picture_repair
@@ -23,78 +25,17 @@ from filmkit.production import Edition
 SAMPLE_ROOT = repository.ROOT
 
 
-def stand_in(name, reads, writes):
-    """A node that reads and writes files below the root, each by its name."""
-    return nodes.Node(
-        name,
-        {"default": lambda e: {n: repository.ROOT / f for n, f in reads.items()}},
-        lambda e: {n: repository.ROOT / f for n, f in writes.items()},
-        "light",
-    )
-
-
 @pytest.fixture
-def root(tmp_path, monkeypatch):
-    """A film root whose table is one stand-in node that reads in.txt and writes out.txt."""
-    found = tmp_path.resolve()
-    monkeypatch.setattr(repository, "ROOT", found)
-    (found / "in.txt").write_text("in")
-    table = {"stand": stand_in("stand", {"in": "in.txt"}, {"out": "out.txt"})}
-    table |= {name: node for name, node in runs.table().items() if name != "stand"}
-    monkeypatch.setattr(runs, "table", lambda: table)
-    monkeypatch.delenv(opens.NODE, raising=False)
-    return found
+def root(one_node):
+    return one_node
 
 
 def stand_in_run(root, block=lambda run: None, **options):
-    with durations.run("zh", "stand", **options) as run:
-        run.settings["count"] = 2
-        with run.phase("work"):
-            (root / "out.txt").write_text("out")
-            # A run that records nothing opens no node's run.
-            expected = "stand:zh" if options.get("record", True) else None
-            assert os.environ.get(opens.NODE) == expected
-        block(run)
+    stand_ins.run_stand(root, block, **options)
 
 
 def read(node, *, partial=False):
     return records.read(records.place(node, "zh", partial=partial))
-
-
-def test_a_completed_run_is_recorded_from_the_measurement_of_its_duration_record(root):
-    stand_in_run(root)
-    record = read("stand")
-    assert isinstance(record, records.RunRecord)
-    assert (record.outcome, record.refusal) == ("pass", None)
-    assert record.inputs["in"].path == "in.txt"
-    assert record.outputs["out"].sha256 == records.digest(root / "out.txt")
-    duration = repository.read(Edition("zh").evidence / durations.FOLDER / "stand.json")
-    stated = record.model_dump(mode="json", by_alias=True)
-    for key in records.FROM_DURATION:
-        assert stated[key] == duration[key], key
-    assert record.host_class == "light"
-    assert opens.NODE not in os.environ
-
-
-def test_a_refused_and_a_failed_run_are_recorded_with_their_outcome_and_line(root):
-    def refuse(run):
-        raise SystemExit("stand: the input is not ready")
-
-    def fail(run):
-        raise RuntimeError("the disk went away")
-
-    with pytest.raises(SystemExit):
-        stand_in_run(root, refuse)
-    assert (read("stand").outcome, read("stand").refusal) == (
-        "refuse",
-        "stand: the input is not ready",
-    )
-    with pytest.raises(RuntimeError):
-        stand_in_run(root, fail)
-    assert (read("stand").outcome, read("stand").refusal) == (
-        "error",
-        "RuntimeError: the disk went away",
-    )
 
 
 def test_a_run_that_records_nothing_writes_no_run_record(root):
@@ -106,14 +47,13 @@ def test_a_run_that_a_signal_ends_writes_no_record(root):
     child = """
 import sys, time
 from pathlib import Path
-import filmkit.durations as durations
 import filmkit.repository as repository
 from filmkit.graph import nodes, runs
 # The declaration is the sample's, loaded at import; every file is written below the scratch root.
 repository.ROOT = Path(sys.argv[1])
 stand = nodes.Node("stand", {"default": lambda e: {}}, lambda e: {}, "light")
 runs.table = lambda: {"stand": stand}
-with durations.run("zh", "stand"):
+with runs.run("zh", "stand"):
     print("ready", flush=True)
     time.sleep(60)
 """
@@ -223,9 +163,6 @@ def test_a_repair_writes_the_records_of_the_renders_and_the_comparison_it_runs(r
     assert compared.outputs["caption_equivalence"].sha256 == records.digest(
         edition.caption_equivalence
     )
-    # The repair's duration record is the only one it writes, which counts its seconds once.
-    written = sorted(path.name for path in (edition.evidence / durations.FOLDER).iterdir())
-    assert written == ["repair-pictures.json"]
     assert opens.NODE not in os.environ
 
 
@@ -243,13 +180,12 @@ def test_a_convergence_s_selection_writes_the_record_of_select(root, monkeypatch
     monkeypatch.setattr(
         fitting.soundtrack_fit, "asked", lambda e: [({"verdict": "too long"}, "too long")]
     )
-    with durations.run("zh", "converge"):
+    with runs.run("zh", "converge"):
         fitting.read("zh")
     record = read("select")
     assert (record.outcome, record.refusal) == ("pass", None)
     selected = record.outputs["narration_selected"].sha256
     assert selected == records.digest(edition.narration_selected)
-    assert not (edition.evidence / durations.FOLDER / "select.json").exists()
 
 
 def below_root(places):
@@ -311,7 +247,7 @@ def test_a_failure_of_the_seam_reaches_no_command_and_leaves_the_last_record(
     ):
         monkeypatch.setattr(runs, "table", lambda broken=broken: {**table, "stand": broken})
         with pytest.raises(SystemExit, match="^stand: the input is not ready$"):
-            with durations.run("zh", "stand"):
+            with runs.run("zh", "stand"):
                 (root / "out.txt").write_text("other")
                 raise SystemExit("stand: the input is not ready")
         error = capsys.readouterr().err

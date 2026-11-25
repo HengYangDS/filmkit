@@ -50,12 +50,12 @@ the running narration is ended first, and the record, which says `running` from 
 first effect on, names no thought as unsettled. A narration ended between two thoughts is
 taken up by the next run, which narrates what the cast holds. One ended inside a thought
 leaves that thought's request started and unresolved, which the engine refuses to replay; the
-next run names the file and stops until it is inspected and removed. The command writes the
-duration record `converge` when it ends (`filmkit.durations`), with the seconds of its
-narrations, its judgments, its candidates and its count of the runtime as phases; the record
-says that it completed only where the edition ends settled and is not refused. A run that is
-refused before its first effect writes none (`admitted`). Each narration
-it starts still writes the narration's own record, which a build's sum does not add again.
+next run names the file and stops until it is inspected and removed. When it ends, the record
+states the run's measurement (`run`, from `filmkit.graph.runs`): its start, its seconds, the host's
+load at both ends, and the seconds of its narrations, its judgments, its candidates and its count
+of the runtime as phases, and that it completed only where the edition ends settled and is not
+refused. A run that is refused before its first effect writes nothing (`admitted`). Each
+narration it starts writes the narration's own run record.
 
 Usage: python -m filmkit.narration.converge --language <code> [--rounds 2] [--takes 3]
 """
@@ -69,7 +69,7 @@ import sys
 import time
 
 import filmkit.child_processes as child_processes
-import filmkit.durations as durations
+import filmkit.graph.runs as seam
 import filmkit.narration.candidates as candidates
 import filmkit.narration.fitting as fitting
 import filmkit.narration.group_generation as group_generation
@@ -84,8 +84,9 @@ from filmkit.production import CODES, Edition
 
 WORK = "build/runtime/work/convergence"
 RECORD = "convergence.json"
-# The name of the command's duration record, which `filmkit.durations` starts a build at.
-COMMAND = durations.CONVERGENCE
+# The command's name in its measurement, which names no node of the table, and the record's key
+# that states the measurement.
+COMMAND, MEASURED = "converge", "run"
 RUN_ON = "run-on"
 NOT_NARRATABLE = "not narratable as written"
 UNTRIED = "refused by the last narration, with no round left: no candidate was tried"
@@ -148,7 +149,7 @@ def narrate(code: str) -> None:
     """
     started = time.monotonic()
     command = [sys.executable, "-B", "-m", "filmkit.narration.narrate", "--language", code]
-    with durations.phase("narration"):
+    with seam.phase("narration"):
         child_processes.run(command, cwd=repository.ROOT, seconds=4 * child_processes.STOP_SECONDS)
     report(code, step="narration", seconds=round(time.monotonic() - started, 1))
 
@@ -173,7 +174,7 @@ class Session:
     def judge(self) -> tuple[list[dict], list[dict], judgment.Bench, judgment.Held]:
         """Judge the current receipt's thoughts; the term standards follow its takes."""
         started = time.monotonic()
-        with durations.phase("judgment"):
+        with seam.phase("judgment"):
             records = judge.current(self.code)
             bench, held = judgment.studio(self.code, records, models=self.models)
             self.models = (bench.asr, bench.aligner)
@@ -364,8 +365,10 @@ def left(code: str) -> dict:
 def begin(code: str, asked: dict, former: dict) -> None:
     """Say that a run is under way before its first effect: no thought is unsettled by it yet.
     `former` is the record that a former run left (`left`)."""
-    # A former run's fit is not this run's: nothing of the count is kept between runs.
+    # A former run's fit and measurement are not this run's: nothing of the count is kept
+    # between runs.
     former.pop("fit", None)
+    former.pop(MEASURED, None)
     record = {**former, "state": "running", "asked": asked, "unsettled": {}}
     repository.write(Edition(code).ear_first / RECORD, record)
 
@@ -377,8 +380,8 @@ def admitted(code: str) -> dict:
     place (`judgment.pronunciations`), no narration left a request started, and the former
     record can be read (`left`).
 
-    The command asks this before it opens its run (`main`), so that such a refusal writes no
-    duration record and leaves the record of the convergence that narrated the standing build.
+    The command asks this before it opens its run (`main`), so that such a refusal writes
+    nothing and leaves the record of the convergence that narrated the standing build.
     """
     fitting.declared(code)
     judgment.pronunciations(code)
@@ -405,7 +408,7 @@ def converge(code: str, former: dict, *, rounds: int = 2, takes: int = 3) -> dic
             break
         count = rounds if number == RUN_ON else number - 1
         ks = range(FIRST + count * takes, FIRST + (count + 1) * takes)
-        with durations.phase("candidates"):
+        with seam.phase("candidates"):
             proposals = round_of(session, state, found, number, ks, run_on=number == RUN_ON)
         # The candidates are recorded before a narration that a request to end may cut short.
         write_record(code, found, state[1], asked, ended=False)
@@ -423,7 +426,7 @@ def converge(code: str, former: dict, *, rounds: int = 2, takes: int = 3) -> dic
         fit = fitting.not_asked(fitting.FOR_THE_EAR)
     else:
         try:
-            with durations.phase("count"):
+            with seam.phase("count"):
                 fit = fitting.read(code)
         except Exception as fault:
             # A fault of the count is no refusal and keeps its traceback; the record of the
@@ -464,6 +467,14 @@ def said(code: str, record: dict) -> str:
     return "\n".join(lines)
 
 
+def stamp(code: str, record: dict, measured: dict) -> None:
+    """Write the record the run ended with again, stating the run's measurement: its start, its
+    seconds, the load at both ends, its phases and whether it completed."""
+    kept = ("started_at", "seconds", seam.LOAD, "completed", "phases")
+    record = {**record, MEASURED: {key: measured[key] for key in kept}}
+    repository.write(Edition(code).ear_first / RECORD, record)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Narrate an edition until its takes are accepted.")
     parser.add_argument("--language", choices=CODES, required=True)
@@ -474,12 +485,12 @@ def main(argv: list[str] | None = None) -> None:
         parser.error("--rounds is 0 or more and --takes is 1 or more")
     code = options.language
     stopped = "The convergence was stopped by {request}; what it was running was ended with it"
-    # The run is measured inside the block that answers a request to end, so that its record
-    # is written before the command leaves; an edition that ends unsettled or refused is a run
-    # that did not complete.
+    # The run is measured inside the block that answers a request to end; an edition that ends
+    # unsettled or refused is a run that did not complete, and a run that a request or a fault
+    # ends states no measurement.
     with child_processes.ending(stopped):
         former = admitted(code)
-        with durations.run(code, COMMAND) as run:
+        with seam.run(code, COMMAND) as run:
             record = converge(code, former, rounds=options.rounds, takes=options.takes)
             unsettled = record["unsettled"]
             refused = said(code, record) if unsettled else fitting.said(code, record["fit"])
@@ -489,6 +500,7 @@ def main(argv: list[str] | None = None) -> None:
             refused = "\n".join(filter(None, [refused, *ear]))
             if refused:
                 run.fail()
+            stamp(code, record, run.measured(completed=not refused))
     if refused:
         raise SystemExit(refused)
 

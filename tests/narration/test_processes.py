@@ -10,6 +10,7 @@ import filmkit.child_processes as child_processes
 import filmkit.narration.narrate as narration_narrate
 import filmkit.narration.processes as processes
 import filmkit.repository as repository
+from filmkit.graph import records
 from filmkit.narration.processes import ProcessesError
 
 SOURCES = ("zh", "content/zh/film-script.json", "content/zh/voice-reference.json")
@@ -313,20 +314,16 @@ def narrating(root, monkeypatch):
 
 def test_a_narration_records_the_count_of_processes_it_may_use(narrating, monkeypatch):
     narration_narrate.main(["--language", "zh"])
-    record = repository.read("build/evidence/editions/zh/durations/narrate.json")
-    assert record["settings"] == {"narration_processes": 2}
+    assert records.read(records.place("narrate", "zh")).settings == {"narration_processes": 2}
     monkeypatch.setattr(processes, "host_memory", lambda: 128 * GB)
     narration_narrate.main(["--language", "zh"])
-    record = repository.read("build/evidence/editions/zh/durations/narrate.json")
-    assert record["settings"] == {"narration_processes": 3}
+    assert records.read(records.place("narrate", "zh")).settings == {"narration_processes": 3}
     monkeypatch.setenv(processes.VARIABLE, "1")
     narration_narrate.main(["--language", "zh"])
-    record = repository.read("build/evidence/editions/zh/durations/narrate.json")
-    assert record["settings"] == {"narration_processes": 1}
-    # The checks alone narrate nothing, so their record names no count.
+    assert records.read(records.place("narrate", "zh")).settings == {"narration_processes": 1}
+    # The checks alone narrate nothing, so their partial record names no count.
     narration_narrate.main(["--language", "en", "--skip-generation"])
-    checks = repository.read("build/evidence/editions/en/durations/narrate-checks.json")
-    assert checks["settings"] == {}
+    assert records.read(records.place("narrate", "en", partial=True)).settings == {}
 
 
 def test_a_value_that_is_no_count_refuses_the_narration_before_any_step(narrating, monkeypatch):
@@ -352,5 +349,5 @@ def test_a_narration_asked_to_end_says_so_and_is_recorded_as_not_completed(
         "The narration was stopped by a request to end (SIGTERM); its running step was ended "
         "with it\n"
     )
-    record = repository.read("build/evidence/editions/zh/durations/narrate.json")
-    assert record["completed"] is False
+    record = records.read(records.place("narrate", "zh"))
+    assert record.outcome == "error"

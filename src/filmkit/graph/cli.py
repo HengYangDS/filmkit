@@ -53,6 +53,21 @@ def line(entry: plan.Entry) -> str:
     return "\n".join([text, *(f"  {reason.text}" for reason in entry.reasons)])
 
 
+def timed(entries: list[plan.Entry]) -> str:
+    """The seconds of the listed nodes' last runs, summed, and their span from the first start to
+    the last end; nothing where no listed node has a record."""
+    spans = [entry.span for entry in entries if entry.span is not None]
+    if not spans:
+        return ""
+    summed = sum(entry.seconds or 0.0 for entry in entries if entry.span is not None)
+    first, last = min(start for start, _ in spans), max(end for _, end in spans)
+    spanned = (last - first).total_seconds()
+    return (
+        f"{len(spans)} last runs: {summed:.1f} s summed, spanning {spanned:.1f} s "
+        f"from {first.isoformat(timespec='seconds')} to {last.isoformat(timespec='seconds')}"
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     options = arguments().parse_args(argv)
     if options.verb == "verify":
@@ -67,7 +82,7 @@ def main(argv: list[str] | None = None) -> None:
         return
     for entry in planned.entries:
         print(line(entry))
-    print(f"{planned.hashed} files hashed")
+    print("\n".join(filter(None, [timed(planned.entries), f"{planned.hashed} files hashed"])))
 
 
 if __name__ == "__main__":

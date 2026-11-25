@@ -14,11 +14,11 @@ from converging import (
     REFUSED,
     converge,
     counts,
-    duration_of,
-    duration_path,
+    measured_of,
     record_of,
     refused,
     seed_of,
+    unmeasured,
 )
 
 import filmkit.child_processes as child_processes
@@ -29,31 +29,41 @@ from filmkit.graph import records
 from filmkit.production import Edition
 
 
-def kept() -> dict[str, bytes]:
-    """Every file below the film's root with its bytes, but the duration records and the run
-    records: each states when its run started and how long it took, which differs from run to
-    run (`filmkit.graph.records`)."""
+def everything() -> dict[str, bytes]:
+    """Every file below the film's root with its bytes."""
     return {
         path.relative_to(repository.ROOT).as_posix(): path.read_bytes()
         for path in sorted(repository.ROOT.rglob("*"))
         if path.is_file()
-        and path.parent != duration_path().parent
-        and not path.relative_to(repository.ROOT).is_relative_to(records.FOLDER)
     }
 
 
-def test_the_convergence_s_duration_record_says_whether_the_edition_ended_fit(count):
+def kept() -> dict[str, bytes]:
+    """Every file below the film's root with its bytes, but the run records, and the convergence
+    record without the measurement of its run: each states when its run started and how long it
+    took, which differs from run to run (`filmkit.graph.records`)."""
+    found = {
+        name: data
+        for name, data in everything().items()
+        if not Path(name).is_relative_to(records.FOLDER)
+    }
+    record = Edition("en").ear_first / narration_converge.RECORD
+    name = record.relative_to(repository.ROOT).as_posix()
+    if name in found:
+        found[name] = json.dumps(unmeasured(json.loads(found[name])), sort_keys=True).encode()
+    return found
+
+
+def test_the_convergence_s_record_says_whether_the_edition_ended_fit(count):
     converge()
-    record = duration_of()
-    assert (record["command"], record["completed"]) == ("converge", True)
+    record = measured_of()
+    assert record["completed"] is True
     # Nothing was due and nothing refused: the run judged and counted.
     assert [*record["phases"]] == ["judgment", "count"]
-    # It is the one duration record that the command writes.
-    assert [*duration_path().parent.iterdir()] == [duration_path()]
     # An edition whose pauses the assembly cannot design did not complete.
     count.undesigned = lambda _pause: True
     assert refused().startswith(REFUSED)
-    assert (duration_of()["completed"], [*duration_of()["phases"]]) == (
+    assert (measured_of()["completed"], [*measured_of()["phases"]]) == (
         False,
         ["judgment", "count"],
     )
@@ -103,21 +113,16 @@ def staged(refusal: str) -> str:
         "a leftover request",
     ],
 )
-def test_a_convergence_refused_before_its_first_effect_writes_no_duration_record(count, refusal):
-    record = duration_path()
+def test_a_convergence_refused_before_its_first_effect_writes_nothing(count, refusal):
     # The convergence that narrated the standing build wrote its record.
     converge()
-    standing = record.read_bytes()
     begins = staged(refusal)
+    standing = everything()
     with pytest.raises(SystemExit) as refusing:
         converge()
     assert str(refusing.value).startswith(begins)
-    # The refusal leaves that record byte for byte, and writes none where none stands.
-    assert record.read_bytes() == standing
-    record.unlink()
-    with pytest.raises(SystemExit, match="^en: "):
-        converge()
-    assert not record.exists()
+    # The refusal leaves every file byte for byte, the record that stands included.
+    assert everything() == standing
 
 
 def test_the_former_record_is_read_among_the_checks_and_by_nothing_in_the_run(count, monkeypatch):
@@ -293,10 +298,10 @@ def test_a_run_without_a_former_record_and_one_with_it_write_the_same_record(cou
     path = Edition("en").ear_first / narration_converge.RECORD
     assert not path.exists()
     converge()
-    first = path.read_bytes()
+    first = unmeasured(record_of())
     path.unlink()
     converge()
-    assert path.read_bytes() == first
+    assert unmeasured(record_of()) == first
 
 
 def test_the_count_writes_what_the_selection_writes_and_nothing_else(

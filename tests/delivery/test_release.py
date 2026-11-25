@@ -10,9 +10,8 @@ import filmkit.delivery.folder as delivery_folder
 import filmkit.delivery.packaging as packaging
 import filmkit.delivery.release as release
 import filmkit.delivery.reproduction as reproduction
-import filmkit.durations as durations
 import filmkit.repository as repository
-from filmkit.graph import records
+from filmkit.graph import records, runs
 from filmkit.production import CODES, STAGE_PAGE
 
 # The sample film declares review levels; these reviews keep the overall and dimension floors.
@@ -208,7 +207,7 @@ def test_a_link_that_leads_outside_the_films_root_is_no_source(built):
 
 
 def test_a_soundtrack_changed_by_no_declared_writer_refuses_the_release_and_its_dry_run(built):
-    with durations.run("zh", "assemble"):
+    with runs.run("zh", "assemble"):
         pass
     soundtrack = built.editions["zh"].edition.soundtrack
     soundtrack.write_bytes(soundtrack.read_bytes() + b"changed by hand")
@@ -225,7 +224,7 @@ def test_a_release_is_recorded_after_both_editions_wrote_the_entry_page(built):
     page = repository.ROOT / packaging.LANGUAGE_INDEX
     pages = (b"the entry page as the first package wrote it\n", page.read_bytes())
     for code, written in zip(CODES, pages, strict=True):
-        with durations.run(code, "package-metadata"):
+        with runs.run(code, "package-metadata"):
             page.write_bytes(written)
     bound = [
         records.read(records.place("package-metadata", code)).outputs["entry"] for code in CODES
