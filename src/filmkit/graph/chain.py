@@ -10,6 +10,7 @@ every table, but the narration's for the nodes that make and deliver the picture
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 import filmkit.check as source_check
@@ -29,8 +30,19 @@ import filmkit.soundtrack.gates as sound_gates
 import filmkit.tools as tools
 from filmkit.captions import refresh
 from filmkit.film import FILM
+from filmkit.graph.nodes import (
+    EVERY,
+    REPLACES,
+    REWRITES,
+    Node,
+    Places,
+    Table,
+    Wait,
+    Writer,
+    load,
+    stands,
+)
 from filmkit.graph.nodes import FILM as ONCE
-from filmkit.graph.nodes import REPLACES, REWRITES, Node, Places, Table, Writer, load, stands
 from filmkit.graph.records import DeclarationTable, Folder, table_names
 from filmkit.narration import alignment_records, readings, selection, transcript_records
 from filmkit.narration.narrate import evidence_paths
@@ -339,6 +351,22 @@ def work(name: str) -> Callable[[Edition], Path]:
     return lambda edition: root("build/runtime/work") / name.format(code=edition.code)
 
 
+# The gates a render and a package wait for (design decision 4 of build-a-film-by-its-verbs):
+# their own edition's sound gate, with the owner's hearing, and cover check; and, for a render,
+# every edition's picture gate, geometry check and draft, since every edition renders one
+# composition. A wait orders and gates; it binds none of the gate's bytes, and a wait on a node
+# the table lacks, as on the draft of a film that declares none, is dropped when it loads.
+SOUNDED = (Wait("check-sound"), Wait("player-check-cover"))
+RENDERED = (
+    *SOUNDED,
+    Wait("check-picture", EVERY),
+    Wait("geometry-check", EVERY),
+    Wait("render-draft", EVERY),
+)
+# Every heavy or GPU node waits for the film's source check.
+CHECKED = Wait("check")
+
+
 TABLE = (
     Node(
         "check",
@@ -484,6 +512,7 @@ TABLE = (
         "heavy",
         tools=MEDIA,
         run=lambda e: rendering.render_picture(e, renderer.DEADLINE, captions=True),
+        waits=RENDERED,
     ),
     Node(
         "render-picture-uncaptioned",
@@ -498,6 +527,7 @@ TABLE = (
         default_way=uncaptioned_way,
         tools=MEDIA,
         run=render_uncaptioned,
+        waits=RENDERED,
     ),
     Node(
         "validate-picture",
@@ -557,6 +587,7 @@ TABLE = (
         "heavy",
         tools=(*MEDIA, "ExifTool"),
         run=lambda e: packaging.package_film(e),
+        waits=SOUNDED,
     ),
     Node(
         "scan-film",
@@ -566,6 +597,11 @@ TABLE = (
         tools=MEDIA,
         run=lambda e: still_scan.scan_film(e),
     ),
+)
+# The rule of `CHECKED`, stated once over the table.
+TABLE = tuple(
+    replace(node, waits=(*node.waits, CHECKED)) if node.expected in ("heavy", "gpu") else node
+    for node in TABLE
 )
 
 # The paths that several nodes write, by the name each writer gives the output, with each

@@ -3,10 +3,17 @@ reasons, its host class as measured and as the table expects it, its last second
 is ready, judged from the run records and the files as they stand. It runs nothing and writes
 nothing (design decisions 5, 6 and 7 of record-every-run).
 
-A node is `fresh` when its record judges fresh (`records.judge`: size and time first, the digest
-where either differs), `stale` with each reason otherwise, and `behind` when it is fresh and a
-node upstream is not. It is ready when every node upstream is fresh and every input of its way
-exists. A node without a record is `unmeasured`, beside the class the table expects of it.
+A node is `stale` when its own record judges stale (`records.judge`: size and time first, the
+digest where either differs), with each reason; `behind` when it is fresh by its own record and a
+node upstream of it by a path is stale or behind, so that it will likely run when that node has;
+`waiting` when it is fresh by its own record, nothing upstream of it by a path is stale or
+behind, and a gate it waits for, directly or through a node upstream of it by a path, is not
+fresh (design decision 4 of build-a-film-by-its-verbs); and `fresh` otherwise. The four are
+judged in one pass over the order derived over paths and waits together, so every gate is judged
+before every node that waits for it. A node is ready when every node upstream of it by a path is
+fresh, every gate it waits for is fresh, and every input of its way exists; a waiting node names
+each gate that holds it with that gate's state. A node without a record is `unmeasured`, beside
+the class the table expects of it.
 
 A path that several runs write is judged by decision 5: among the standing records that state it
 as an output, a partial record among them, the one whose run ended last binds the file, which is
@@ -42,7 +49,7 @@ from filmkit.production import Edition
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-FRESH, STALE, BEHIND, UNMEASURED = "fresh", "stale", "behind", "unmeasured"
+FRESH, STALE, BEHIND, WAITING, UNMEASURED = "fresh", "stale", "behind", "waiting", "unmeasured"
 READS = "reads"
 # The kinds of reason that `filmkit verify` refuses.
 REFUSED = ("unaccounted", "blind")
@@ -70,6 +77,8 @@ class Entry:
     ready: bool
     # When the node's last whole run started and ended, where one is recorded.
     span: tuple[datetime, datetime] | None = None
+    # The gates that hold the node, each with its state: none unless it is waiting.
+    held: dict[str, str] = field(default_factory=dict)
 
     def stated(self) -> dict:
         """The entry as `filmkit plan --json` prints it."""
@@ -81,6 +90,7 @@ class Entry:
             "expected": self.expected,
             "seconds": self.seconds,
             "ready": self.ready,
+            "waits": [{"node": gate, "state": state} for gate, state in self.held.items()],
         }
 
 
@@ -365,7 +375,7 @@ def wanted(table: nodes.Table, targets: Iterable[str]) -> set[str]:
             raise ValueError(msg)
         asked |= set(keys)
     asked = asked or set(table.edges)
-    return asked | {up for key in asked for up in table.upstream(key)}
+    return asked | {up for key in asked for up in table.closure(key)}
 
 
 def exists(path: object) -> bool:
@@ -390,15 +400,21 @@ def judge_all(table: nodes.Table, keys: set[str], full: bool) -> list[Entry]:
     settled = settle(bound(table, stand), full)
     states: dict[str, str] = {}
     engines = {name: records.engine(runs.pins(node)) for name, node in table.nodes.items()}
-    entries = []
+    entries, held = [], {}
     for key in (k for k in table.order if k in keys):
         s = stand[key]
         reasons = judged(s, settled, key, engines[s.node.name], full)
         upstream = table.upstream(key)
-        behind = any(states[up] != FRESH for up in table.edges[key])
-        states[key] = STALE if reasons else BEHIND if behind else FRESH
+        behind = any(states[up] in (STALE, BEHIND) for up in table.edges[key])
+        # The gates that hold the node: its own that are not fresh, and those holding a node
+        # upstream of it by a path.
+        held[key] = {g: states[g] for g in sorted(table.waits.get(key, ())) if states[g] != FRESH}
+        for up in table.edges[key]:
+            held[key] |= held[up]
+        states[key] = STALE if reasons else BEHIND if behind else WAITING if held[key] else FRESH
         inputs = s.node.inputs(s.edition, s.way).values()
-        ready = all(states[up] == FRESH for up in upstream) and all(map(exists, inputs))
+        gates = all(states[g] == FRESH for g in table.waits.get(key, ()))
+        ready = all(states[up] == FRESH for up in upstream) and gates and all(map(exists, inputs))
         whole = s.whole
         entries.append(
             Entry(
@@ -410,6 +426,7 @@ def judge_all(table: nodes.Table, keys: set[str], full: bool) -> list[Entry]:
                 whole.seconds if whole else None,
                 ready,
                 (datetime.fromisoformat(whole.started_at), ended(whole)) if whole else None,
+                held[key] if states[key] == WAITING else {},
             )
         )
     return entries

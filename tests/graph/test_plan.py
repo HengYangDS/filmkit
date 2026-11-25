@@ -8,6 +8,7 @@ import pytest
 import stand_ins
 from stand_ins import CODES, chain, ran, selecting
 
+import filmkit.graph.chain as engine_chain
 import filmkit.repository as repository
 from filmkit.graph import nodes, plan, records, runs, verify
 
@@ -251,3 +252,116 @@ def test_a_film_wide_node_is_planned_and_asked_for_by_its_name(stand_in_table, m
     assert list(found) == ["check", "narrate:zh", "narrate:en"]
     with pytest.raises(ValueError, match="check:zh names no node of the plan"):
         judged(table, "check:zh")
+
+
+@pytest.fixture
+def judging(monkeypatch):
+    """The engine's table over the sample, each node judged by a stand-in record: fresh, or stale
+    where the test names it; every input standing. The table and the stale keys to fill."""
+    stale: set[str] = set()
+
+    def judged(s, settled, key, running, full):
+        return [plan.Reason("record", "a stand-in record")] if key in stale else []
+
+    monkeypatch.setattr(plan, "judged", judged)
+    monkeypatch.setattr(plan, "exists", lambda path: True)
+    return engine_chain.table(), stale
+
+
+def entries(table, *targets):
+    return {entry.key: entry for entry in plan.plan(table, targets).entries}
+
+
+GATES = (
+    "check-sound:zh",
+    "player-check-cover:zh",
+    "check-picture:en",
+    "geometry-check:en",
+    "render-draft:en",
+    "check",
+)
+
+
+@pytest.mark.parametrize("gate", GATES)
+def test_a_render_waits_while_a_gate_it_waits_for_did_not_pass(judging, gate):
+    table, stale = judging
+    stale.add(gate)
+    render = entries(table, "render-picture:zh")["render-picture:zh"]
+    assert (render.state, render.ready) == ("waiting", False)
+    assert render.held[gate] == "stale"
+    assert {"node": gate, "state": "stale"} in render.stated()["waits"]
+
+
+def test_a_package_waits_while_its_sound_gate_did_not_pass(judging):
+    table, stale = judging
+    stale.add("check-sound:zh")
+    found = entries(table, "package-film:zh")
+    assert (found["package-film:zh"].state, found["package-film:zh"].ready) == ("waiting", False)
+
+
+def test_a_stale_source_check_leaves_every_other_node_waiting_or_fresh(judging):
+    table, stale = judging
+    stale.add("check")
+    found = entries(table)
+    assert found["check"].state == "stale"
+    others = {entry.state for key, entry in found.items() if key != "check"}
+    assert others <= {"waiting", "fresh"} and "waiting" in others
+    assert found["narrate:zh"].state == "waiting"
+
+
+def test_an_english_retake_leaves_the_chinese_pictures_waiting_not_behind(judging):
+    table, stale = judging
+    stale.add("narrate:en")
+    found = entries(table)
+    assert found["check-picture:en"].state == "behind"
+    pictured = ("render-picture", "render-picture-uncaptioned", "validate-picture")
+    pictured += ("validate-picture-uncaptioned", "qualify-renderer", "compare-pictures")
+    for key in (f"{name}:zh" for name in pictured):
+        assert found[key].state == "waiting", key
+        assert found[key].held["check-picture:en"] == "behind"
+    # The Chinese package metadata, films and scan read every edition's timeline by a path (the
+    # entry page and the viewing package name both editions), so they are behind the English
+    # sound, not held by a wait, and will run: an exception to decision 5's English retake.
+    package = ("package-metadata:zh", "package-film:zh", "scan-film:zh")
+    behind = {
+        key for key, entry in found.items() if key.endswith(":zh") and entry.state == "behind"
+    }
+    assert behind == set(package)
+
+
+def test_a_render_is_fresh_once_its_gates_ran_again_and_passed(judging):
+    table, stale = judging
+    stale |= {"check", "check-sound:zh"}
+    assert entries(table, "render-picture:zh")["render-picture:zh"].state == "waiting"
+    # Run again and passed with changed records, which no render binds: the render is fresh.
+    stale.clear()
+    render = entries(table, "render-picture:zh")["render-picture:zh"]
+    assert (render.state, render.ready, render.held) == ("fresh", True, {})
+
+
+def test_a_film_without_drafts_loads_with_no_wait_on_a_draft(monkeypatch):
+    picture = engine_chain.FILM.picture.model_copy(update={"drafts": False})
+    declared = engine_chain.FILM.model_copy(update={"picture": picture})
+    monkeypatch.setattr(engine_chain, "FILM", declared)
+    table = engine_chain.table()
+    assert not any(key.startswith("render-draft") for key in table.edges)
+    assert not any(
+        gate.startswith("render-draft") for held in table.waits.values() for gate in held
+    )
+
+
+def test_every_input_the_pre_render_check_read_holds_each_render_and_package():
+    # What R2a's node `preflight` read (build/evidence/build-a-film-by-its-verbs/research.md,
+    # item 2): each edition's stages, sound gate and cover check, every edition's picture gate,
+    # geometry check and draft, and the film's source check.
+    table = engine_chain.table()
+    for code in table.codes:
+        own = {f"{n}:{code}" for n in ("stage-picture", "check-sound", "player-check-cover")}
+        every = {
+            f"{n}:{c}"
+            for n in ("check-picture", "geometry-check", "render-draft")
+            for c in table.codes
+        }
+        for render in ("render-picture", "render-picture-uncaptioned", "package-film"):
+            assert own | every | {"check"} <= table.closure(f"{render}:{code}"), (render, code)
+        assert f"stage-picture-uncaptioned:{code}" in table.closure(f"package-film:{code}")

@@ -26,7 +26,7 @@ import contextlib
 import contextvars
 import graphlib
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, NamedTuple
 
@@ -42,6 +42,19 @@ REWRITES, REPLACES = "rewrites", "replaces"
 # How often a node runs: once for each edition it applies to, or once for the film.
 EDITION, FILM = "edition", "film"
 Per = Literal["edition", "film"]
+# Whose run of a gate a node waits for: its own edition's, every edition's, or the film's.
+OWN, EVERY = "own", "every"
+
+
+class Wait(NamedTuple):
+    """A gate a node waits for, by its name, and whose run of it: `OWN` edition's, `EVERY`
+    edition's, or the film's (`FILM`) for a film-wide gate (design decision 4 of
+    build-a-film-by-its-verbs). A wait orders and gates; it binds none of the gate's bytes."""
+
+    gate: str
+    whose: str = OWN
+
+
 # While it holds, a place that a table names only where it stands is named as if it stood, so
 # that the check of each run's opens can ask which absent files a node would read.
 _AS_IF_STANDING: contextvars.ContextVar[bool] = contextvars.ContextVar("as_if", default=False)
@@ -67,6 +80,7 @@ class Node:
     editions: Callable[[tuple[str, ...]], tuple[str, ...]] | None = None
     per: Per = EDITION
     run: Callable[[Edition | None], object] | None = None
+    waits: tuple[Wait, ...] = ()
 
     def codes(self, codes: tuple[str, ...]) -> tuple[str, ...]:
         """The editions, of the film's, that an edition's node applies to; none for a film-wide
@@ -158,13 +172,15 @@ def overlaps(a: Path, b: Path) -> bool:
 @dataclass(frozen=True)
 class Table:
     """A loaded table: its nodes by name, its declared writers by output name, its editions,
-    each node's predecessors by key and the derived order."""
+    each node's predecessors by key, the gates each waits for by key, and the order derived over
+    both."""
 
     nodes: dict[str, Node]
     shared: dict[str, tuple[Writer, ...]]
     codes: tuple[str, ...]
     edges: dict[str, frozenset[str]]
     order: tuple[str, ...]
+    waits: dict[str, frozenset[str]] = field(default_factory=dict)
 
     def node(self, named: str) -> tuple[Node, Edition | None]:
         """A node by its key, with its edition; no edition for a film-wide node, keyed by its
@@ -176,13 +192,23 @@ class Table:
         return node, None if code is None else Edition(code)
 
     def upstream(self, named: str) -> set[str]:
-        """Every node before one, transitively."""
+        """Every node before one by a path, transitively."""
         found, pending = set(), list(self.edges[named])
         while pending:
             before = pending.pop()
             if before not in found:
                 found.add(before)
                 pending.extend(self.edges[before])
+        return found
+
+    def closure(self, named: str) -> set[str]:
+        """Every node before one by a path or by a wait, transitively: what a build of it needs."""
+        found, pending = set(), [*self.edges[named], *self.waits.get(named, ())]
+        while pending:
+            before = pending.pop()
+            if before not in found:
+                found.add(before)
+                pending.extend([*self.edges[before], *self.waits.get(before, ())])
         return found
 
 
@@ -247,22 +273,45 @@ def edges(nodes: dict[str, Node], shared: dict, codes: tuple[str, ...]) -> dict[
     return before
 
 
+def waited(nodes: dict[str, Node], codes: tuple[str, ...]) -> dict[str, set[str]]:
+    """Each node's gates by key, its waits resolved to the runs the table holds; a wait on a node
+    the table lacks, or on an edition it does not apply to, is dropped."""
+    found: dict[str, set[str]] = {}
+    for node in nodes.values():
+        for named, edition in node.instances(codes):
+            keys = set()
+            for wait in node.waits:
+                gate = nodes.get(wait.gate)
+                if gate is None:
+                    continue
+                if gate.per == FILM:
+                    keys.add(gate.name)
+                elif wait.whose == EVERY:
+                    keys |= {key(gate.name, code) for code in gate.codes(codes)}
+                elif edition is not None and edition.code in gate.codes(codes):
+                    keys.add(key(gate.name, edition.code))
+            found[named] = keys
+    return found
+
+
 def load(nodes: Iterable[Node], shared: dict, codes: tuple[str, ...] = CODES) -> Table:
     """Load a table: refused for a path two nodes write with no declaration, naming it and its
-    writers, and for a cycle, naming its nodes."""
+    writers, and for a cycle of paths and waits, naming its nodes."""
     named = {node.name: node for node in nodes}
     refused = undeclared(written(named, codes), shared)
     if refused:
         raise TableError("; ".join(refused))
     before = edges(named, shared, codes)
-    sorter = graphlib.TopologicalSorter(before)
+    gates = waited(named, codes)
+    sorter = graphlib.TopologicalSorter({k: before[k] | gates.get(k, set()) for k in before})
     try:
         order = tuple(sorter.static_order())
     except graphlib.CycleError as error:
         cycle = " -> ".join(error.args[1])
         raise TableError(f"the node table has a cycle: {cycle}") from None
     frozen = {name: frozenset(found) for name, found in before.items()}
-    return Table(named, dict(shared), tuple(codes), frozen, order)
+    held = {name: frozenset(found) for name, found in gates.items()}
+    return Table(named, dict(shared), tuple(codes), frozen, order, held)
 
 
 def stands(path: Path) -> bool:
