@@ -29,6 +29,9 @@ LIGHT_CORES = 2.0
 # samples above two cores make a run heavy.
 SAMPLE_SECONDS = 5.0
 CONSECUTIVE = 2
+# Host rule 7: consecutive heavy commands share one ticket only while every one is measured and
+# their last run times sum to at most this many seconds; a command never measured enters alone.
+SHARED_TICKET_SECONDS = 1800
 # The sampler's command, which lists every process with its parent and its `%cpu`.
 PS = ("/bin/ps", "-A", "-o", "pid=,ppid=,%cpu=")
 

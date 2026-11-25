@@ -11,6 +11,16 @@ inside the seam (`runs.run`), which writes the node's run record, only where the
 A node behind a refused or failed node, or waiting on a gate that did not pass, is not run;
 nodes not downstream of it go on. A node with no run, the narration, is never run here.
 
+Before it runs anything it schedules the closure as the host's rules ask (design decision 5;
+`refusals`): it refuses a closure that holds a stale narration, naming `filmkit narrate`; one
+that holds heavy work that will run while light work that can run now is stale, naming the
+light `filmkit build` to run first, outside any ticket; and one whose heavy work that will run
+has more than one name, unless every such node is measured and their last seconds sum to at most
+`host.SHARED_TICKET_SECONDS`, printing the invocations to run in order, one ticket each. Heavy
+work that will run is a heavy or GPU node, by its measured class or else the class the table
+expects, that is stale or behind; a waiting node is never counted. A closure with no heavy work
+that will run is a light invocation, which runs outside any ticket.
+
 The build ends with one line for each node that refused or failed and returns 1, and 0 where
 every node of the closure is fresh. An interrupt or a request to end ends the running node as
 any command ends (`child_processes.ending`) and runs no further node. It writes no tracked file
@@ -25,7 +35,7 @@ from typing import TYPE_CHECKING
 import filmkit.tools as tools
 from filmkit.captions import CaptionError
 from filmkit.delivery.packaging import PackagingError
-from filmkit.graph import nodes, plan, runs
+from filmkit.graph import host, nodes, plan, records, runs
 from filmkit.media import MediaError
 from filmkit.narration.anchors import AnchorError
 from filmkit.picture.errors import PictureError
@@ -89,11 +99,64 @@ def run_node(table: nodes.Table, key: str) -> str | None:
     return None
 
 
+def heavy(entry: plan.Entry) -> bool:
+    """Whether a node is heavy or GPU work: by its measured class, or else the one expected."""
+    measured = entry.host_class != plan.UNMEASURED
+    return (entry.host_class if measured else entry.expected) in ("heavy", "gpu")
+
+
+def refusals(table: nodes.Table, entries: list[plan.Entry]) -> list[str]:
+    """Why a closure, as the plan judged it, must not run as one invocation, each in one line and
+    naming what to run instead; none where it may (design decision 5)."""
+    run = [entry for entry in entries if entry.state in (plan.STALE, plan.BEHIND)]
+    found = [
+        f"{entry.key} is stale and narration is no build's: filmkit narrate --edition "
+        f"{nodes.split(entry.key)[1]}"
+        for entry in run
+        if table.node(entry.key)[0].run is None
+    ]
+    weighty = [entry for entry in run if heavy(entry)]
+    first = {e.key for e in weighty}
+    light = [
+        entry.key for entry in run if not heavy(entry) and not table.closure(entry.key) & first
+    ]
+    if weighty and light:
+        found.append(
+            "light work can run now and runs first, outside any ticket: "
+            f"filmkit build {' '.join(light)}"
+        )
+    if found:
+        return found
+    names = list(dict.fromkeys(nodes.split(entry.key)[0] for entry in weighty))
+    measured = all(e.host_class != plan.UNMEASURED and e.seconds is not None for e in weighty)
+    if len(names) < 2 or measured and sum(e.seconds for e in weighty) <= host.SHARED_TICKET_SECONDS:
+        return []
+    invocations = []
+    for name in names:
+        kind = [e for e in weighty if nodes.split(e.key)[0] == name]
+        classes = "/".join(
+            sorted({e.host_class if e.host_class != plan.UNMEASURED else e.expected for e in kind})
+        )
+        known = all(e.host_class != plan.UNMEASURED and e.seconds is not None for e in kind)
+        last = f"{sum(e.seconds for e in kind):.1f} s" if known else "unmeasured"
+        keys = " ".join(e.key for e in kind)
+        invocations.append(f"filmkit build {keys} ({classes}, {last})")
+    return [
+        f"heavy work of {len(names)} kinds that will run takes one ticket each, in this order: "
+        + "; ".join(invocations)
+    ]
+
+
 def build(table: nodes.Table, targets: Iterable[str] = ()) -> Built:
     """Make the targets fresh: each stale node of their closure run in the derived order, a node
     downstream of one that refused or failed, or held by a gate that did not pass, left as it
-    stands (`Built.held`)."""
+    stands (`Built.held`); nothing runs where the closure must be scheduled otherwise
+    (`refusals`)."""
     closure = plan.wanted(table, list(targets))
+    with records.once():
+        refused = refusals(table, plan.judge_all(table, closure, False))
+    if refused:
+        return Built(refused=refused)
     built, stopped = Built(), set()
     for key in (k for k in table.order if k in closure):
         node, _ = table.node(key)
