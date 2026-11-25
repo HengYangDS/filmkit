@@ -498,6 +498,17 @@ def test_a_film_that_removed_its_contract_without_splitting_it_is_named(declared
     assert len(problems) == 4
 
 
+def test_a_release_record_in_content_is_named_beside_another_refusal(declared):
+    # The record moves to the film's root (design decision 15 of build-a-film-by-its-verbs).
+    (declared / "content/release.json").write_text("{}")
+    (declared / "assets/audio/zh/narration-reference.wav").unlink()
+    assert film.problems(declared) == [
+        f"{MISSING}editions.zh: assets/audio/zh/narration-reference.wav",
+        "content/release.json: this release removes it; move it with git mv to release.json at "
+        "the film's root, its bytes unchanged",
+    ]
+
+
 def test_a_reference_recording_the_cast_no_longer_names_is_named_missing_at_its_place(declared):
     (declared / "assets/audio/zh/narration-reference.wav").unlink()
     assert film.problems(declared) == [

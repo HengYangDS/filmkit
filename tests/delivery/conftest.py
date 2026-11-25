@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
-from release_build import ENCODERS, Built
+from release_build import ENCODERS, SOURCES, Built
 from reproducing import Release, drawn_digest, encode
 
 import filmkit.delivery.folder as delivery_folder
@@ -428,7 +428,8 @@ def built(editions, tmp_path_factory, monkeypatch, table_of) -> Built:
     monkeypatch.setattr(runs, "encoder", lambda tool: ENCODERS.get(tool, runs.ABSENT))
     folder = tmp_path_factory.mktemp("host").resolve() / FILM.delivery_folder
     monkeypatch.setenv(delivery_folder.ROOT_VARIABLE, str(folder.parent))
-    current = Built(repository.ROOT, folder, editions, VERSION)
+    current = Built(repository.ROOT, folder, editions, VERSION, monkeypatch)
+    current.declare(SOURCES)
 
     def staged_now(edition, stage, *, captions=True):
         current.asked.append((edition.code, stage, captions))

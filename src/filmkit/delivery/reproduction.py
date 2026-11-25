@@ -1,12 +1,12 @@
 """Compare a rebuild with the published release under the reproduction standard.
 
 The published assets lie in build/artifacts/release under the names that the release manifest
-content/release.json records with each asset's size and SHA-256; an asset that differs from
-the manifest, or a film-bound source that differs from the bytes the manifest records, refuses
-the comparison before any layer is compared. Each edition's soundtrack and staged picture
-documents must hold the bytes the manifest records, its captions, transcript and cover the
-published bytes, and its published review must bind the published films and the current
-script and composition. Each rebuilt film that the release publishes must have its published
+release.json, at the film's root, records with each asset's size and SHA-256; an asset that
+differs from the manifest, or a film-bound source that differs from the bytes the manifest
+records, refuses the comparison before any layer is compared. Each edition's soundtrack and
+staged picture documents must hold the bytes the manifest records, its captions, transcript and
+cover the published bytes, and its published review must bind the published films and the
+current script and composition. Each rebuilt film that the release publishes must have its published
 film's frame count, decoded audio, streams, chapters and tags, and every decoded frame's PSNR
 against it at or above the floor that the manifest records. Without a floor the comparison
 reports the lowest frames, so that they can be inspected and the floor recorded, and does not
@@ -62,7 +62,7 @@ import filmkit.repository as repository
 from filmkit.delivery.player import COVER
 from filmkit.film import Declared
 
-MANIFEST = Path("content/release.json")
+MANIFEST = Path(repository.RELEASE_RECORD)
 RELEASE = Path("build/artifacts/release")
 REPORT = Path("build/evidence/reproduction/report.json")
 CHECKSUMS = "SHA256SUMS"

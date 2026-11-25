@@ -12,7 +12,7 @@ import sample_sound
 import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.declared_sources import named_files
-from filmkit.film import FILM
+from filmkit.film import FILM, Film
 from filmkit.graph import bindings, chain, nodes, opens, records
 
 # A Node child that reads a declared and an undeclared file, writes in the temporary folder,
@@ -389,4 +389,7 @@ def test_a_read_of_a_table_the_node_does_not_declare_fails_naming_the_table(decl
 def test_a_read_of_the_whole_declaration_is_a_read_of_every_table(declared_film):
     root, log, table = declared_film
     python_child(root, log, "from filmkit.film import FILM\nFILM.model_dump()\n", "reader:zh")
-    assert tables_named(opens.check(log, table)) == sorted(set(bindings.TABLES) - {"picture"})
+    # Every table, the release's too, which no node declares (`chain.UNREAD`).
+    every = set(records.table_names(Film).values())
+    assert tables_named(opens.check(log, table)) == sorted(every - {"picture"})
+    assert set(bindings.UNREAD) <= every - set(bindings.TABLES)

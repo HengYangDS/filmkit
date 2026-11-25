@@ -1,9 +1,10 @@
 """Write the release record of the reviewed, delivered build, and stage the assets it names.
 
-content/release.json is the record a rebuild is compared with; `filmkit.delivery.reproduction`
-holds its model, its asset names and its checksums format, and reads it. This command writes it
-from the build as it stands, and stages every asset the record names, under its release name,
-in build/artifacts/release, where the comparison reads the published assets. It asks each fact
+release.json, at the film's root, is the record a rebuild is compared with;
+`filmkit.delivery.reproduction` holds its model, its asset names and its checksums format, and
+reads it. This command writes it from the build as it stands, and stages every asset the record
+names, under its release name, in build/artifacts/release, where the comparison reads the
+published assets. It asks each fact
 of the module that owns it, in this order, and the first refusal stops it in one line, before
 any file is written:
 
@@ -20,18 +21,17 @@ any file is written:
 - the film's version, which the manifest states as three numbers;
 - the record it replaces, read by the manifest's model alone, so that a record whose asset names
   have changed since still gives its floors;
-- the film-bound sources, which `--sources` states at every run: each a path as the manifest's
-  model lists one (`reproduction.SourcePath`, whose pattern the refusal prints) and a file below
-  the film's root that is not the record and does not lie below the folder of what the engine
-  generates, with no link that leads to either or outside the root. Nothing asks whether the
-  file is tracked: which files are film-bound is the film's to declare.
+- the film-bound sources, which the declaration's `[release] sources` states: each a path as
+  the manifest's model lists one (`reproduction.SourcePath`, whose pattern the refusal prints)
+  and a file below the film's root that is not the record and does not lie below the folder of
+  what the engine generates, with no link that leads to either or outside the root. Nothing asks
+  whether the file is tracked: which files are film-bound is the film's to declare.
 
-Which files are film-bound is declared once, in the film. The command therefore keeps no list of
-them and takes none from the record it replaces, which would be a second copy beside that
-declaration: the film's task derives the paths from the declaration when it calls the command.
-What the stated set changes of the list the replaced record held is printed beside the version
-line, each path that left the list and each that joined it: a report, for which nothing is
-refused.
+Which files are film-bound is declared once, in the film's declaration (design decision 15 of
+build-a-film-by-its-verbs). The command takes no list from the record it replaces, which would
+be a second copy beside that declaration. What the declared set changes of the list the replaced
+record held is printed beside the version line, each path that left the list and each that
+joined it: a report, for which nothing is refused.
 
 The record states the film's version; each edition's soundtrack and both its staged documents by
 SHA-256; each film's PSNR floor as the replaced record states it for a film of that name, and
@@ -71,7 +71,7 @@ Stopped after the rename and before the manifest was written, the folder holds t
 assets beside the old manifest, a pair the comparison refuses: the next run finds the folder
 whole and writes the manifest.
 
-Usage: python -m filmkit.delivery.release --sources <path> ... [--replace] [--dry-run]
+Usage: python -m filmkit.delivery.release [--replace] [--dry-run]
 """
 
 from __future__ import annotations
@@ -91,6 +91,7 @@ import filmkit.delivery.folder as delivery_folder
 import filmkit.delivery.packaging as packaging
 import filmkit.delivery.reproduction as reproduction
 import filmkit.delivery.verification as verification
+import filmkit.film as film_declaration
 import filmkit.picture.rendering as picture_rendering
 import filmkit.production as production
 import filmkit.repository as repository
@@ -256,24 +257,36 @@ def no_source(path: str) -> str | None:
     return None if place.is_file() else "is no file"
 
 
+# Where the declaration states the film-bound sources.
+SOURCES_KEY = "[release] sources"
+
+
 def bound_sources(stated: list[str]) -> dict[str, str]:
-    """The stated film-bound sources with their current SHA-256, in sorted order and each once.
-    A stated path that is no source the record lists (`no_source`) is refused by name, with
-    every other stated path that is none for the same reason."""
-    paths = sorted(stated)
+    """The declared film-bound sources with their current SHA-256, in sorted order and each
+    once. None declared is refused naming the key; a declared path that is no source the record
+    lists (`no_source`) is refused by name, with every other declared path that is none for the
+    same reason."""
+    if not stated:
+        msg = (
+            f"{repository.DECLARATION} declares no film-bound source in {SOURCES_KEY}: declare "
+            "there each tracked file whose exact bytes the build of the published films reads"
+        )
+        raise ReproductionError(msg)
+    paths = sorted(set(stated))
     refused = {path: reason for path in paths if (reason := no_source(path))}
     if refused:
         reason = next(iter(refused.values()))
         named = [path for path, why in refused.items() if why == reason]
-        msg = f"A film-bound source {reason}: {', '.join(named)}"
+        declared = f"A film-bound source that {repository.DECLARATION} declares in {SOURCES_KEY}"
+        msg = f"{declared} {reason}: {', '.join(named)}"
         raise ReproductionError(msg)
     return {path: repository.sha(path) for path in paths}
 
 
 def record(stated: list[str]) -> tuple[Release, Release | None]:
     """The record of the build as it stands and the record it replaces, every fact asked of its
-    owner first, in the command's order. `stated` holds the paths `--sources` names; the
-    replaced record gives the floors alone."""
+    owner first, in the command's order. `stated` holds the paths the declaration's `[release]
+    sources` names; the replaced record gives the floors alone."""
     require_reviewed()
     require_delivered()
     version = release_version()
@@ -429,8 +442,9 @@ def stage(written: Release) -> None:
     staging.rename(folder)
 
 
-def write(stated: list[str], *, replace: bool, dry_run: bool) -> None:
-    """Record the release: verify the build by its run records (`filmkit.graph.verify`), ask,
+def write(*, replace: bool, dry_run: bool) -> None:
+    """Record the release of the sources the declaration states: verify the build by its run
+    records (`filmkit.graph.verify`), ask,
     build the record and hold it to the manifest's rules, refuse a release or sibling path that
     is no folder of the command's own, refuse a release folder that holds other bytes unless
     `replace` says to replace it, print what the record replaces, what its sources change of
@@ -440,7 +454,7 @@ def write(stated: list[str], *, replace: bool, dry_run: bool) -> None:
         graph_verify.check()
     except graph_verify.VerifyError as error:
         raise ReproductionError(str(error)) from None
-    written, replaced = record(stated)
+    written, replaced = record(list(film_declaration.FILM.release.sources))
     reproduction.check(written)
     require_own_folders()
     others, whole = held(written, repository.ROOT / RELEASE)
@@ -473,13 +487,6 @@ def write(stated: list[str], *, replace: bool, dry_run: bool) -> None:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
-        "--sources",
-        nargs="+",
-        required=True,
-        metavar="PATH",
-        help="the film-bound sources, at every run, each by the path the record lists it by",
-    )
-    parser.add_argument(
         "--replace",
         action="store_true",
         help="replace a release folder that holds other bytes than the record's",
@@ -487,7 +494,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--dry-run", action="store_true", help="print the record only")
     options = parser.parse_args(argv)
     try:
-        write(options.sources, replace=options.replace, dry_run=options.dry_run)
+        write(replace=options.replace, dry_run=options.dry_run)
     except ReproductionError as error:
         raise SystemExit(str(error)) from None
 

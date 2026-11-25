@@ -15,6 +15,7 @@ import pytest
 import filmkit.delivery.folder as delivery_folder
 import filmkit.delivery.release as release
 import filmkit.delivery.reproduction as reproduction
+import filmkit.film as film
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
 from filmkit.production import CODES, Edition
@@ -23,8 +24,8 @@ from filmkit.production import CODES, Edition
 SOURCES = sorted(
     [*(Edition(code).script for code in CODES), str(picture_rendering.COMPOSITION_SCRIPT)]
 )
-# What the command is given at every run: the film-bound sources, stated.
-STATED = ["--sources", *SOURCES]
+# How the command's refusal of a declared source begins.
+DECLARED = "A film-bound source that content/film.toml declares in [release] sources"
 # The version of the earlier release whose record a test tracks, unless it names another.
 EARLIER_VERSION = "1.2.0"
 # The version line each encoder states to a built film's tests, on a host with or without it.
@@ -42,6 +43,7 @@ class Built:
     folder: Path
     editions: dict
     fixture_version: str
+    monkeypatch: pytest.MonkeyPatch
     asked: list = field(default_factory=list)
 
     @property
@@ -65,6 +67,11 @@ class Built:
             for top in (self.root, self.folder.parent)
             for path in sorted(top.rglob("*"))
         }
+
+    def declare(self, sources: list[str]) -> None:
+        """Declare the film-bound sources, as the film's `[release] sources` declares them."""
+        held = film.FILM.release.model_copy(update={"sources": tuple(sources)})
+        self.monkeypatch.setattr(film, "FILM", film.FILM.model_copy(update={"release": held}))
 
     def version(self, held: str) -> None:
         """Give the film another version, bound as a build of that version binds it."""
@@ -117,10 +124,15 @@ def refused(arguments: list[str]) -> str:
     return line
 
 
-def unchanged_refusal(built: Built, arguments: list[str] = STATED) -> str:
-    """The command's one line of refusal, no file of the film or of the host's root changed."""
+def unchanged_refusal(
+    built: Built, arguments: tuple[str, ...] = (), *, sources: list[str] | None = None
+) -> str:
+    """The command's one line of refusal, no file of the film or of the host's root changed;
+    with `sources`, the film declares those as its film-bound sources first."""
+    if sources is not None:
+        built.declare(sources)
     before = built.tree()
-    line = refused(arguments)
+    line = refused(list(arguments))
     assert built.tree() == before
     return line
 

@@ -12,7 +12,6 @@ from release_build import (
     EARLIER_VERSION,
     FFMPEG,
     SOURCES,
-    STATED,
     refused,
     uncaptioned_stage,
     unchanged_refusal,
@@ -82,7 +81,7 @@ def test_each_film_keeps_the_floor_its_replaced_record_states_and_the_output_nam
     }
     # A film the replaced record does not name gets no floor, and the command says so.
     assert record.editions["en"].picture_floor_db == {}
-    release.main(["--dry-run", *STATED])
+    release.main(["--dry-run"])
     lines = capsys.readouterr().out.splitlines()
     assert f"{chinese[0]}: floor 45.0 dB" in lines
     assert f"{chinese[1]}: floor 41.5 dB" in lines
@@ -92,7 +91,7 @@ def test_each_film_keeps_the_floor_its_replaced_record_states_and_the_output_nam
 
 
 def test_a_first_record_states_no_floor_and_names_each_film_as_without_one(built, capsys):
-    release.main(["--dry-run", *STATED])
+    release.main(["--dry-run"])
     lines = capsys.readouterr().out.splitlines()
     films = [film.name for code in CODES for film in Edition(code).films]
     assert [line for line in lines if ": no floor" in line] == [
@@ -106,17 +105,18 @@ def test_a_script_changed_since_the_last_release_is_recorded_at_its_current_byte
     built.track()
     replaced = reproduction.Release.model_validate_json(built.manifest.read_bytes())
     assert set(replaced.sources.values()) == {"0" * 64}
-    release.main(STATED)
+    release.main([])
     assert dict(reproduction.load().sources) == {path: repository.sha(path) for path in SOURCES}
 
 
-def test_the_stated_set_replaces_whatever_the_replaced_record_listed(built):
+def test_the_declared_set_replaces_whatever_the_replaced_record_listed(built):
     cast = Edition("zh").cast
     built.track(sources=[cast, *SOURCES])
-    # A path the replaced record listed and the caller does not state is not recorded.
-    release.main(["--sources", *SOURCES[:2]])
+    # A path the replaced record listed and the film does not declare is not recorded.
+    built.declare(SOURCES[:2])
+    release.main([])
     assert list(reproduction.load().sources) == SOURCES[:2]
-    # A path it did not list is recorded when it is stated; the paths stand sorted, each once.
+    # A path it did not list is recorded when it is declared; the paths stand sorted, each once.
     record, replaced = release.record([cast, *reversed(SOURCES), cast])
     assert list(replaced.sources) == SOURCES[:2]
     assert list(record.sources) == sorted([cast, *SOURCES])
@@ -142,7 +142,7 @@ def test_a_replaced_record_whose_asset_names_changed_still_gives_its_floors(buil
 def test_the_written_manifest_states_the_carried_floors_in_the_manifests_form(built):
     chinese = [film.name for film in Edition("zh").films]
     built.track(floors={"zh": {**dict.fromkeys(chinese, 45.0), chinese[1]: 41.5}, "en": {}})
-    release.main(STATED)
+    release.main([])
     # The floors are read back from the written manifest, as the comparison reads them.
     loaded = reproduction.load()
     assert loaded.editions["zh"].picture_floor_db == {
@@ -176,13 +176,13 @@ def test_the_written_manifest_states_the_carried_floors_in_the_manifests_form(bu
 
 def test_a_dry_run_says_which_record_it_replaces(built, capsys):
     built.track()
-    release.main(["--dry-run", *STATED])
+    release.main(["--dry-run"])
     version = built.fixture_version
     assert capsys.readouterr().out.startswith(
         f"This record of {version} replaces a record of {EARLIER_VERSION}.\n"
     )
     built.manifest.unlink()
-    release.main(["--dry-run", *STATED])
+    release.main(["--dry-run"])
     assert capsys.readouterr().out.startswith(f"This record of {version} is the film's first")
 
 
@@ -195,14 +195,14 @@ def test_a_run_reports_the_sources_that_left_and_joined_the_replaced_records_lis
         f"Stated as a source now and not listed by the replaced record: {SOURCES[0]}",
     ]
     # The report stands beside the version line, in a dry run as in a run, and refuses nothing.
-    for arguments in (["--dry-run", *STATED], STATED):
+    for arguments in (["--dry-run"], []):
         release.main(arguments)
         assert capsys.readouterr().out.splitlines()[1:3] == report
     assert list(reproduction.load().sources) == SOURCES
     # A run that states what the replaced record lists, and a first record, report neither.
-    release.main(STATED)
+    release.main([])
     built.manifest.unlink()
-    release.main(["--dry-run", *STATED])
+    release.main(["--dry-run"])
     assert " as a source " not in capsys.readouterr().out
 
 
@@ -220,7 +220,7 @@ def test_a_run_stages_exactly_the_recorded_assets_and_writes_the_manifest_last(
         write_text(path, text)
 
     monkeypatch.setattr(repository, "write_text", written)
-    release.main(STATED)
+    release.main([])
     manifest = reproduction.load()
     assert manifest.version == built.fixture_version
     names = sorted(asset.name for asset in manifest.assets)
@@ -238,18 +238,18 @@ def test_a_run_stages_exactly_the_recorded_assets_and_writes_the_manifest_last(
 
 
 def test_a_second_run_changes_no_byte_and_says_which_record_it_replaces(built, capsys):
-    release.main(STATED)
+    release.main([])
     first = built.tree()
     held = {entry.name: entry.stat().st_ino for entry in built.release.iterdir()}
     capsys.readouterr()
-    release.main(STATED)
+    release.main([])
     assert built.tree() == first
     # The folder that was already whole was left, not staged again.
     assert {entry.name: entry.stat().st_ino for entry in built.release.iterdir()} == held
     version = built.fixture_version
     assert f"This record of {version} replaces a record of {version}" in capsys.readouterr().out
     # With --replace too, a whole folder is left as it is.
-    release.main(["--replace", *STATED])
+    release.main(["--replace"])
     assert {entry.name: entry.stat().st_ino for entry in built.release.iterdir()} == held
 
 
@@ -257,9 +257,9 @@ def test_finders_file_refuses_nothing(built):
     # In a folder that holds nothing else, and beside a whole set of assets.
     built.release.mkdir(parents=True)
     (built.release / ".DS_Store").write_text("finder\n")
-    release.main(STATED)
+    release.main([])
     (built.release / ".DS_Store").write_text("finder\n")
-    release.main(STATED)
+    release.main([])
     assert (built.release / ".DS_Store").read_text() == "finder\n"
     assert sorted(reproduction.published(reproduction.load())) == [
         name for name in built.staged() if name != ".DS_Store"
@@ -277,9 +277,9 @@ def test_the_films_of_the_release_before_refuse_by_name_and_keep_every_byte(buil
     assert "sample-reel-zh-1080p.mp4, sample-reel-zh-uhd.mp4" in line
     assert "--replace" in line
     # A dry run refuses as the run would.
-    assert unchanged_refusal(built, ["--dry-run", *STATED]) == line
+    assert unchanged_refusal(built, ["--dry-run"]) == line
     capsys.readouterr()
-    release.main(["--replace", *STATED])
+    release.main(["--replace"])
     manifest = reproduction.load()
     assert built.staged() == sorted(asset.name for asset in manifest.assets)
     assert sorted(reproduction.published(manifest)) == built.staged()
@@ -288,12 +288,12 @@ def test_the_films_of_the_release_before_refuse_by_name_and_keep_every_byte(buil
 
 
 def test_a_record_written_again_after_its_review_was_recorded_again_replaces_the_folder(built):
-    release.main(STATED)
+    release.main([])
     built.editions["zh"].review("# Review of zh, recorded again\n")
     line = unchanged_refusal(built)
     assert "sample-reel-zh-production-review.json, sample-reel-zh-production-review.md" in line
     assert "--replace" in line
-    release.main(["--replace", *STATED])
+    release.main(["--replace"])
     manifest = reproduction.load()
     assert built.staged() == sorted(asset.name for asset in manifest.assets)
     assert sorted(reproduction.published(manifest)) == built.staged()
@@ -309,7 +309,7 @@ def test_a_sibling_left_by_an_interrupted_run_is_removed(built):
     leftover = built.root / release.STAGING / "half-a-film.mp4"
     leftover.parent.mkdir(parents=True)
     leftover.write_text("half a film")
-    release.main(STATED)
+    release.main([])
     assert not leftover.parent.exists()
     assert "half-a-film.mp4" not in built.staged()
     assert sorted(reproduction.published(reproduction.load())) == built.staged()
@@ -317,15 +317,15 @@ def test_a_sibling_left_by_an_interrupted_run_is_removed(built):
     # dry run leaves it, as it leaves every file.
     leftover.parent.mkdir()
     leftover.write_text("half a film")
-    release.main(["--dry-run", *STATED])
+    release.main(["--dry-run"])
     assert leftover.read_text() == "half a film"
-    release.main(STATED)
+    release.main([])
     assert not leftover.parent.exists()
 
 
 def test_a_dry_run_prints_the_record_and_changes_no_file(built, capsys):
     before = built.tree()
-    release.main(["--dry-run", *STATED])
+    release.main(["--dry-run"])
     assert built.tree() == before
     out = capsys.readouterr().out
     printed = out[out.index("{\n") :]
@@ -337,7 +337,7 @@ def test_a_dry_run_prints_the_record_and_changes_no_file(built, capsys):
 def test_a_failure_while_staging_leaves_the_folder_and_the_manifest_as_they_were(
     built, monkeypatch
 ):
-    release.main(STATED)
+    release.main([])
     built.editions["en"].review("# Review of en, recorded again\n")
     copy = release.copy
 
@@ -349,7 +349,7 @@ def test_a_failure_while_staging_leaves_the_folder_and_the_manifest_as_they_were
 
     monkeypatch.setattr(release, "copy", failing)
     before = built.tree()
-    line = refused(["--replace", *STATED])
+    line = refused(["--replace"])
     assert "sample-reel-en.srt" in line
     assert "No space left" in line
     # The folder and the manifest hold the bytes they held, and no half-staged set is left.
@@ -371,7 +371,7 @@ def test_a_failure_while_staging_leaves_the_folder_and_the_manifest_as_they_were
     monkeypatch.setattr(reproduction, "members", members)
     moved.write_text("sample-reel-zh.vtt\n")
     assert built.tree() == before
-    release.main(["--replace", *STATED])
+    release.main(["--replace"])
     assert sorted(reproduction.published(reproduction.load())) == built.staged()
 
 
@@ -386,7 +386,7 @@ def test_on_macos_each_asset_is_copied_by_the_systems_own_cp_whatever_path_holds
 
     monkeypatch.setattr(release, "sys", SimpleNamespace(platform="darwin"))
     monkeypatch.setattr(repository, "run", copied)
-    release.main(STATED)
+    release.main([])
     files = {
         name: source
         for code in CODES
@@ -406,7 +406,7 @@ def test_on_another_platform_each_asset_is_copied_without_the_systems_option(bui
 
     monkeypatch.setattr(release, "sys", SimpleNamespace(platform="linux"))
     monkeypatch.setattr(repository, "run", asked)
-    release.main(STATED)
+    release.main([])
     assert sorted(reproduction.published(reproduction.load())) == built.staged()
     # The copy keeps the file's times.
     film = Edition("zh").film("uhd")
@@ -431,7 +431,7 @@ def test_a_release_or_sibling_path_that_is_no_real_folder_refuses_naming_the_pat
         path.symlink_to(kept, target_is_directory=True)
     found = "a link" if kind == "link" else "no folder"
     # With --replace too, and in a dry run: nothing is staged and nothing removed.
-    for arguments in (STATED, ["--replace", *STATED], ["--dry-run", *STATED]):
+    for arguments in ([], ["--replace"], ["--dry-run"]):
         assert unchanged_refusal(built, arguments).startswith(f"{place} is {found}")
     assert path.is_symlink() == (kind == "link")
 
@@ -439,7 +439,7 @@ def test_a_release_or_sibling_path_that_is_no_real_folder_refuses_naming_the_pat
 def test_a_run_that_stops_before_the_staged_set_is_in_place_is_completed_by_the_next(
     built, monkeypatch
 ):
-    release.main(STATED)
+    release.main([])
     tracked = built.manifest.read_bytes()
     review = built.editions["zh"].review("# Review of zh, recorded again\n")
 
@@ -449,13 +449,13 @@ def test_a_run_that_stops_before_the_staged_set_is_in_place_is_completed_by_the_
     with monkeypatch.context() as patch:
         patch.setattr(Path, "rename", interrupted)
         with pytest.raises(OSError, match="interrupted"):
-            release.main(["--replace", *STATED])
+            release.main(["--replace"])
     # No release folder stands: the sibling holds the whole set, and the manifest what it held.
     assert not built.release.exists()
     assert len(list((built.root / release.STAGING).iterdir())) == 21
     assert built.manifest.read_bytes() == tracked
     # The next run stages again and needs no --replace, since no other bytes stand.
-    release.main(STATED)
+    release.main([])
     manifest = reproduction.load()
     assert sorted(reproduction.published(manifest)) == built.staged()
     assert not (built.root / release.STAGING).exists()
@@ -466,7 +466,7 @@ def test_a_run_that_stops_before_the_staged_set_is_in_place_is_completed_by_the_
 def test_a_run_that_stops_before_the_manifest_is_written_is_completed_by_the_next(
     built, monkeypatch, capsys
 ):
-    release.main(STATED)
+    release.main([])
     tracked = built.manifest.read_bytes()
     built.editions["zh"].review("# Review of zh, recorded again\n")
 
@@ -476,7 +476,7 @@ def test_a_run_that_stops_before_the_manifest_is_written_is_completed_by_the_nex
     with monkeypatch.context() as patch:
         patch.setattr(repository, "write_text", unwritable)
         with pytest.raises(PermissionError):
-            release.main(["--replace", *STATED])
+            release.main(["--replace"])
     # The folder holds the new record's assets beside the manifest of the record before, so the
     # comparison refuses the pair until the next run.
     assert built.manifest.read_bytes() == tracked
@@ -484,6 +484,6 @@ def test_a_run_that_stops_before_the_manifest_is_written_is_completed_by_the_nex
         reproduction.published(reproduction.load())
     capsys.readouterr()
     # The next run finds the folder whole, leaves it, and writes the manifest: no --replace.
-    release.main(STATED)
+    release.main([])
     assert "already held the record's 21 assets" in capsys.readouterr().out
     assert sorted(reproduction.published(reproduction.load())) == built.staged()

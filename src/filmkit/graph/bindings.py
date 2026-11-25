@@ -35,7 +35,13 @@ if TYPE_CHECKING:
 # decision 9).
 NARRATED = ("identity", "editions", "pronunciation")
 # The declaration's tables, each bound by its digest.
-TABLES = tuple(dict.fromkeys(table_names(film.Film).values()))
+# The table no node reads: the release's sources, which `filmkit release` reads (design
+# decision 15), so that an edit of them leaves every node fresh; the check of each run's opens
+# holds each node to it.
+UNREAD = ("release",)
+
+
+TABLES = tuple(t for t in dict.fromkeys(table_names(film.Film).values()) if t not in UNREAD)
 
 
 # The tables no node that makes or delivers the pictures reads: no module of `filmkit.picture` or

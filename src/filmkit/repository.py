@@ -18,6 +18,8 @@ from pathlib import Path
 
 # The film's declaration, below its root.
 DECLARATION = "content/film.toml"
+# The film's release record, at its root (design decision 15 of build-a-film-by-its-verbs).
+RELEASE_RECORD = "release.json"
 # Below the root, the folders of the editions' films and documents and of their evidence, each
 # holding a folder for each edition by its code (`filmkit.production.Edition`). They stand here,
 # where no declaration loads, so that a module that serves or finds those folders, such as the

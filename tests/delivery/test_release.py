@@ -1,10 +1,11 @@
 """The writer of the release record: what it asks before it writes, and each refusal."""
 
+import json
 import shutil
 
 import pytest
 from pydantic import TypeAdapter
-from release_build import SOURCES, STATED, refused, uncaptioned_stage, unchanged_refusal
+from release_build import DECLARED, SOURCES, refused, uncaptioned_stage, unchanged_refusal
 
 import filmkit.delivery.folder as delivery_folder
 import filmkit.delivery.packaging as packaging
@@ -23,7 +24,7 @@ pytestmark = pytest.mark.usefixtures("unleveled")
 
 def test_a_build_that_the_films_folder_below_a_host_root_holds_passes_every_check(built):
     before = built.tree()
-    release.main(["--dry-run", *STATED])
+    release.main(["--dry-run"])
     # The staging was asked for each edition's uncaptioned stage, which a derived picture's
     # receipt does not bind.
     assert built.asked == [(code, uncaptioned_stage(code), False) for code in CODES]
@@ -96,28 +97,27 @@ def test_a_pre_release_version_refuses_naming_the_version(built):
 def test_a_tracked_manifest_that_is_none_refuses_naming_the_file(built, held):
     built.manifest.write_text(held)
     line = unchanged_refusal(built)
-    assert line.startswith("content/release.json is not a release manifest")
+    assert line.startswith("release.json is not a release manifest")
 
 
-def test_a_run_without_its_sources_is_refused_by_the_command_line(built, capsys):
-    # With no record to replace and with one that lists sources: the command carries no list.
+def test_a_film_that_declares_no_source_is_refused_naming_the_key(built):
+    # With no record to replace and with one that lists sources: the command takes no list
+    # from the record.
     for tracked in (False, True):
         if tracked:
             built.track()
-        before = built.tree()
-        with pytest.raises(SystemExit) as refusal:
-            release.main([])
-        assert refusal.value.code == 2
-        assert "the following arguments are required: --sources" in capsys.readouterr().err
-        assert built.tree() == before
+        assert unchanged_refusal(built, sources=[]) == (
+            "content/film.toml declares no film-bound source in [release] sources: declare "
+            "there each tracked file whose exact bytes the build of the published films reads"
+        )
 
 
 def test_a_source_that_is_gone_refuses_naming_the_path(built):
-    line = unchanged_refusal(built, [*STATED, "content/gone.json"])
-    assert line == "A film-bound source is no file: content/gone.json"
+    line = unchanged_refusal(built, sources=[*SOURCES, "content/gone.json"])
+    assert line == f"{DECLARED} is no file: content/gone.json"
     # A folder is no file either.
-    line = unchanged_refusal(built, ["--sources", "content", *SOURCES])
-    assert line == "A film-bound source is no file: content"
+    line = unchanged_refusal(built, sources=["content", *SOURCES])
+    assert line == f"{DECLARED} is no file: content"
 
 
 def test_the_checks_refuse_in_their_order_and_the_first_stops_the_command(built):
@@ -130,8 +130,9 @@ def test_the_checks_refuse_in_their_order_and_the_first_stops_the_command(built)
     edition.production_review.unlink()
     (built.folder / "index.html").unlink()
     built.manifest.write_text("{}")
-    # The sources stated are asked last: every other refusal comes before this one's.
-    absent = ["--sources", "content/absent.json"]
+    # The sources declared are asked last: every other refusal comes before this one's.
+    built.declare(["content/absent.json"])
+    absent = []
     assert refused(absent).startswith("en: Narration custody differs")
     # The Chinese edition was asked whole before the English one, whose stage was not reached.
     assert built.asked == [("zh", uncaptioned_stage("zh"), False)]
@@ -144,9 +145,9 @@ def test_the_checks_refuse_in_their_order_and_the_first_stops_the_command(built)
     built.deliver()
     assert "three numbers" in refused(absent)
     built.version(built.fixture_version)
-    assert refused(absent).startswith("content/release.json is not a release manifest")
+    assert refused(absent).startswith("release.json is not a release manifest")
     built.manifest.unlink()
-    assert refused(absent) == "A film-bound source is no file: content/absent.json"
+    assert refused(absent) == f"{DECLARED} is no file: content/absent.json"
 
 
 def test_a_path_the_manifests_model_does_not_list_is_refused_by_that_models_rule(built):
@@ -162,39 +163,37 @@ def test_a_path_the_manifests_model_does_not_list_is_refused_by_that_models_rule
         *(".config/policy.toml", "content/My Notes.md"),
         *(absolute, f"./{SOURCES[0]}", f"content/../{SOURCES[0]}"),
     ):
-        line = unchanged_refusal(built, ["--sources", stated, *SOURCES[1:]])
+        line = unchanged_refusal(built, sources=[stated, *SOURCES[1:]])
         assert line == (
-            "A film-bound source is no path as the release manifest's model lists one "
+            f"{DECLARED} is no path as the release manifest's model lists one "
             f"(reproduction.SourcePath: {pattern}): {stated}"
         )
 
 
 def test_the_record_itself_is_no_source(built):
     # Before a first record is written, and beside one that stands.
-    stated = ["--sources", str(reproduction.MANIFEST), *SOURCES]
-    refusal = "A film-bound source is or leads to the release record itself, which lists the "
-    refusal += "sources and is none"
-    first = unchanged_refusal(built, stated)
+    stated = [str(reproduction.MANIFEST), *SOURCES]
+    refusal = f"{DECLARED} is or leads to the release record itself, which lists the sources "
+    refusal += "and is none"
+    first = unchanged_refusal(built, sources=stated)
     assert first == f"{refusal}: {reproduction.MANIFEST}"
     built.track()
-    assert unchanged_refusal(built, stated) == first
+    assert unchanged_refusal(built, sources=stated) == first
     # A link elsewhere below the root that leads to the record is refused as the record.
     (built.root / "content/alias.json").symlink_to(built.manifest)
-    line = unchanged_refusal(built, ["--sources", "content/alias.json", *SOURCES])
+    line = unchanged_refusal(built, sources=["content/alias.json", *SOURCES])
     assert line == f"{refusal}: content/alias.json"
 
 
 def test_a_path_below_the_films_generated_folder_is_no_source(built):
     generated = "build/artifacts/film/zh/sample-reel-zh.srt"
     assert (built.root / generated).is_file()
-    refusal = (
-        "A film-bound source lies or leads below build/, which holds what the engine generates"
-    )
-    line = unchanged_refusal(built, ["--sources", generated, *SOURCES])
+    refusal = f"{DECLARED} lies or leads below build/, which holds what the engine generates"
+    line = unchanged_refusal(built, sources=[generated, *SOURCES])
     assert line == f"{refusal}: {generated}"
     # A link elsewhere below the root that leads there is refused the same way.
     (built.root / "content/captions.srt").symlink_to(built.root / generated)
-    line = unchanged_refusal(built, ["--sources", "content/captions.srt", *SOURCES])
+    line = unchanged_refusal(built, sources=["content/captions.srt", *SOURCES])
     assert line == f"{refusal}: content/captions.srt"
 
 
@@ -202,8 +201,8 @@ def test_a_link_that_leads_outside_the_films_root_is_no_source(built):
     elsewhere = built.folder.parent / "another-films-script.json"
     elsewhere.write_text("{}\n")
     (built.root / "content/linked.json").symlink_to(elsewhere)
-    line = unchanged_refusal(built, ["--sources", "content/linked.json", *SOURCES])
-    assert line == "A film-bound source leads outside the film's root: content/linked.json"
+    line = unchanged_refusal(built, sources=["content/linked.json", *SOURCES])
+    assert line == f"{DECLARED} leads outside the film's root: content/linked.json"
 
 
 # The record is written only after `filmkit verify` passes (record-every-run).
@@ -217,7 +216,7 @@ def test_a_soundtrack_changed_by_no_declared_writer_refuses_the_release_and_its_
         pass
     soundtrack = built.editions["zh"].edition.soundtrack
     soundtrack.write_bytes(soundtrack.read_bytes() + b"changed by hand")
-    for arguments in (["--dry-run", *STATED], STATED):
+    for arguments in (["--dry-run"], []):
         assert unchanged_refusal(built, arguments).startswith(
             f"filmkit verify refuses: {repository.relative(soundtrack)}: its bytes are "
             "accounted for by no record of a declared writer; it is bound by assemble:zh"
@@ -237,5 +236,17 @@ def test_a_release_is_recorded_after_both_editions_wrote_the_entry_page(built, t
         records.read(records.place("package-metadata", code)).outputs["entry"] for code in CODES
     ]
     assert bound[0].sha256 != bound[1].sha256 == records.digest(page)
-    release.main(STATED)
+    release.main([])
     assert built.manifest.is_file()
+
+
+# The record stands at the film's root, its sources declared (design decision 15 of
+# build-a-film-by-its-verbs).
+
+
+def test_a_release_is_written_at_the_films_root_from_the_declared_sources(built):
+    built.declare(SOURCES[:2])
+    release.main([])
+    written = json.loads((built.root / "release.json").read_text())
+    assert written["sources"] == {path: repository.sha(path) for path in SOURCES[:2]}
+    assert not (built.root / "content/release.json").exists()

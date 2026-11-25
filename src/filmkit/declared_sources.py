@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 import filmkit.withdrawn as withdrawn
 from filmkit.places import IDENTITY, places
-from filmkit.repository import ARTIFACTS, DECLARATION, EVIDENCE
+from filmkit.repository import ARTIFACTS, DECLARATION, EVIDENCE, RELEASE_RECORD
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -192,6 +192,8 @@ REMOVED = {
     f"{withdrawn.PLACE.pronunciation} and the declaration's [pronunciation], then remove it",
     "content/review/readings.json": "move each edition's analyst readings into "
     f"{withdrawn.PLACE.readings}, then remove it",
+    "content/release.json": f"move it with git mv to {RELEASE_RECORD} at the film's root, "
+    "its bytes unchanged",
 }
 NARRATION_COPY = "narration.md"
 

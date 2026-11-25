@@ -496,6 +496,13 @@ class Heard(Declared):
     note: Stated
 
 
+class ReleaseDeclaration(Declared):
+    """The film's release: its film-bound sources, each tracked file whose exact bytes the build
+    of the published films reads, which `filmkit release` records with its SHA-256."""
+
+    sources: tuple[str, ...] = ()
+
+
 class Narration(Declared):
     """How the narration must flow and say its terms (`narration.flow`, `narration.terms`), and
     the owner's hearings of its takes (`narration.heard`, refused by `hearings.refusals`)."""
@@ -665,6 +672,7 @@ class Film(Declared):
     pronunciation: Pronunciation
     narration: Narration = Field(default_factory=Narration)
     captions: Captions = Field(default_factory=Captions)
+    release: ReleaseDeclaration = Field(default_factory=ReleaseDeclaration)
     # Declared as [register]: `register` would shadow the model class's own (ABCMeta's).
     formal_register: Register = Field(default_factory=Register, alias="register")
 
