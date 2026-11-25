@@ -6,6 +6,7 @@ from itertools import pairwise
 
 import pytest
 
+import filmkit.api as api
 import filmkit.captions.refresh as refresh
 import filmkit.check as check
 import filmkit.concepts as concepts
@@ -183,7 +184,7 @@ def broken(tmp_path, monkeypatch):
         lambda zh: rendering.stage_picture(zh, None, 9, 3840, 2160),
         lambda zh: gates.check_picture(zh),
         lambda zh: script_edits.apply_edits(repository.read("edits.json")),
-        lambda zh: anchors.main(["--timeline", "build/derived"]),
+        lambda zh: anchors.main([]),
     ],
     ids=[
         "assemble",
@@ -290,15 +291,16 @@ def test_the_report_gives_the_times_an_editions_timeline_holds(editions, capsys)
     assert "are stale: run filmkit build refresh-captions:zh" in capsys.readouterr().out
 
 
-def test_the_engine_places_the_anchors_on_a_timeline_of_other_words(editions, tmp_path):
+def test_the_engine_places_the_anchors_on_a_timeline_of_other_words(editions):
     words = [
         {"text": unit, "start": index, "end": index + 1} for index, unit in enumerate("依据有先后")
     ]
     # The segment states another chapter title than its chapter's, which nothing reads.
     own = {**editions["zh"]["segments"][0], "chapter_title": "Other", "words": words}
-    put(tmp_path / "own.json", {"chapters": CHAPTERS, "segments": [own]})
-    anchors.main(["--place", str(tmp_path / "own.json"), "--language", "zh"])
-    timeline = json.loads((tmp_path / "own.json").read_text())
+    given = {"chapters": CHAPTERS, "segments": [own]}
+    held = json.dumps(given)
+    timeline = api.place_anchors(given, "zh")
+    assert json.dumps(given) == held
     placed = timeline["segments"][0]
     assert placed["anchors"] == {"order": {"start": 2, "end": 5, "units": [2, 5], "thought": 1}}
     # It takes what the engine derives for every timeline, as the derived timeline does.
@@ -306,16 +308,12 @@ def test_the_engine_places_the_anchors_on_a_timeline_of_other_words(editions, tm
     assert (placed["chapter_index"], placed["chapter_title"]) == (0, "One")
 
 
-def test_the_derived_timeline_is_the_same_twice_and_times_each_anchor_by_its_words(
-    editions, tmp_path, capsys
-):
-    for folder in ("first", "second"):
-        anchors.main(["--timeline", str(tmp_path / folder)])
-    capsys.readouterr()
+@pytest.mark.usefixtures("editions")
+def test_the_derived_timeline_is_the_same_twice_and_times_each_anchor_by_its_words():
     for code in ("zh", "en"):
-        first, second = (tmp_path / folder / f"{code}.json" for folder in ("first", "second"))
-        assert first.read_bytes() == second.read_bytes()
-    derived = json.loads((tmp_path / "first/zh.json").read_text())
+        first, second = (json.dumps(api.derived_timeline(code)) for _ in range(2))
+        assert first == second
+    derived = api.derived_timeline("zh")
     words = derived["segments"][0]["words"]
     # One word per Han character, 0.2 s each, after the 1.0 s before the segment.
     assert [(w["text"], w["start"], w["end"]) for w in words[:3]] == [

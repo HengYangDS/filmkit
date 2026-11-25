@@ -63,7 +63,7 @@ Shown by `tests/graph/test_cli.py`, `tests/narration/test_converge.py` and `test
 
 Shown by `tests/test_api.py` and `tests/picture/testing.test.mjs`.
 
-- [ ] 8.1 Write `src/filmkit/api.py` with the names of design decision 16. Done when `tests/test_api.py` holds each name on the sample (`ROOT`, `film()`, `editions()`, `Edition`, `derived_timeline`, `place_anchors`, `typeset`, `composition`, `release`, `changed_sources`, `TEST_ENTRY`) and `api.__all__` equal to that list, and passes.
+- [x] 8.1 Write `src/filmkit/api.py` with the names of design decision 16. Done when `tests/test_api.py` holds each name on the sample (`ROOT`, `film()`, `editions()`, `Edition`, `derived_timeline`, `place_anchors`, `typeset`, `composition`, `release`, `changed_sources`, `TEST_ENTRY`) and `api.__all__` equal to that list, and passes.
 - [ ] 8.2 Write `src/filmkit/picture/testing.mjs` with `openComposition(code, timeline)`, whose handle offers `render` and `evaluate`, `openModules(code, timeline, entry)` and `derivedTimeline(code)`, the last taken from `filmkit.api` through the film's Python, and make the engine's sample tests import only it. Done when `tests/picture/testing.test.mjs` holds the sample's Chinese composition opened on its derived timeline and that timeline equal to `filmkit.api.derived_timeline("zh")`, an expression evaluated in the composition's context, and the sample's unbundled modules rendered through `openModules`; `git grep -n 'headless-composition' -- tests` names only the engine's own runtime tests; and `npm test` passes in its ticket.
 
 ## 9. The sample's tasks and the documents

@@ -1,7 +1,7 @@
 /** What the picture tests share: the sample film's folder, a timeline staged from its scripts, and scratch folders. */
 import { after } from "node:test";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,38 +19,31 @@ export async function scratchFolder() {
   return folder;
 }
 
-/* The engine's own command that gives a timeline of other words the anchors its marks take from them
- * (filmkit.narration.anchors --place): the marks are read and resolved there alone. Each edition's placed timeline is
- * kept for the file's tests. */
+/* The engine's own placing of the anchors a timeline of other words takes from them (filmkit.api.place_anchors), run
+ * by the engine's Python: the marks are read and resolved there alone. Each edition's placed timeline is kept for the
+ * file's tests. */
 const PLACE = [
   "run",
-  "--python",
-  "3.12",
   "--frozen",
   "--offline",
-  "--group",
-  "dev",
+  "--no-sync",
   "python",
   "-I",
   "-B",
+  "-c",
+  "import json, sys; from filmkit import api; " +
+    "print(json.dumps(api.place_anchors(json.load(sys.stdin), sys.argv[1]), ensure_ascii=False))",
 ];
 const placed = new Map();
 async function withAnchors(timeline, code) {
   if (!placed.has(code)) {
-    const folder = await scratchFolder(),
-      path = join(folder, `${code}.json`);
-    await writeFile(path, JSON.stringify(timeline));
-    const command = [
-      ...PLACE,
-      "-m",
-      "filmkit.narration.anchors",
-      "--place",
-      path,
-      "--language",
-      code,
-    ];
-    execFileSync("uv", command, { cwd: SAMPLE, stdio: ["ignore", "ignore", "inherit"] });
-    placed.set(code, await readFile(path, "utf8"));
+    const printed = execFileSync("uv", [...PLACE, code], {
+      cwd: SAMPLE,
+      input: JSON.stringify(timeline),
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "inherit"],
+    });
+    placed.set(code, printed);
   }
   return JSON.parse(placed.get(code));
 }

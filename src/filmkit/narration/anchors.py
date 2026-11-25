@@ -32,15 +32,11 @@ and per run of Latin letters and digits of its text, each 0.2 s long, 0.5 s betw
 each edition's anchors with their thought, words and units and, where the edition's timeline holds
 them, their times, and names each id that one edition marks in a segment and the other does not,
 which refuses nothing; times that are stale, of other marks than the script's, are named stale and
-not given. With --json it prints the same as one document, and with --timeline it writes each
-edition's derived timeline as <folder>/<code>.json, so that a film's own tests draw the timeline
-that narration's check draws. With --place it gives a timeline that other code built, of its own
-words, what the engine derives for every timeline (`filmkit.film.timeline_values`) and the
-anchors its marks take from those words, as `place` does, and writes it back, so that a test that
-times its words otherwise still takes its anchors and those values from this module.
+not given. With --json it prints the same as one document. A film's own tests take the derived
+timeline and the anchors of a timeline of other words from `filmkit.api` (`derived_timeline`,
+`place_anchors`).
 
-Usage: python -m filmkit.narration.anchors [--json] [--timeline FOLDER]
-       python -m filmkit.narration.anchors --place TIMELINE --language <code>
+Usage: python -m filmkit.narration.anchors [--json]
 """
 
 from __future__ import annotations
@@ -50,7 +46,6 @@ import json
 import math
 import re
 from dataclasses import dataclass
-from pathlib import Path
 
 import filmkit.repository as repository
 from filmkit.film import FILM, timeline_values
@@ -395,32 +390,11 @@ def printed(listed: dict) -> list[str]:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Report every edition's anchors.")
     parser.add_argument("--json", action="store_true", help="Print the report as one document")
-    parser.add_argument("--timeline", type=Path, help="Write each edition's derived timeline here")
-    parser.add_argument(
-        "--place", type=Path, help="Give a timeline of other words its anchors, in place"
-    )
-    parser.add_argument("--language", choices=CODES, help="--place: the timeline's edition")
     options = parser.parse_args(argv)
-    if (options.place is None) != (options.language is None):
-        parser.error("--place and --language go together")
-    if options.place is not None:
-        # A timeline other code built takes what the engine derives for every timeline.
-        timeline = timeline_values(repository.read(repository.ROOT / options.place), FILM)
-        try:
-            place(timeline, options.language)
-        except AnchorError as error:
-            raise SystemExit(str(error)) from None
-        repository.write(repository.ROOT / options.place, timeline)
-        return
     try:
         marked = require_editions()
     except AnchorError as error:
         raise SystemExit(str(error)) from None
-    if options.timeline is not None:
-        folder = repository.ROOT / options.timeline
-        for code in CODES:
-            derived = derived_timeline(repository.read(Edition(code).script), code)
-            repository.write(folder / f"{code}.json", derived)
     listed = report(marked, {code: repository.read(Edition(code).script) for code in CODES})
     print(json.dumps(listed, ensure_ascii=False) if options.json else "\n".join(printed(listed)))
 
