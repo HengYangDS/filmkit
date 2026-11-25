@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import wave
@@ -146,8 +147,33 @@ HOST_TOOLS = {
 host_skipped: dict[str, list[str]] = {marker: [] for marker in HOST_TOOLS}
 
 
+# The only step of the engine that reaches the network is a film's supply (`filmkit supply`),
+# which every test stubs; any other test that connects beyond this host is refused, in this
+# process, rather than reaching it. A test's child processes are the engine's own commands, none
+# of which connects.
+LOCAL = ("127.0.0.1", "::1", "localhost")
+
+
+def local(address) -> bool:
+    """Whether a socket's address is a path or a name of this host."""
+    return not isinstance(address, tuple) or address[0] in LOCAL
+
+
+def refused_beyond_this_host(connect):
+    def guarded(self, address, *rest):
+        if not local(address):
+            message = f"the engine's tests reach no network: a connection to {address}"
+            raise ConnectionRefusedError(message)
+        return connect(self, address, *rest)
+
+    return guarded
+
+
 def pytest_configure(config) -> None:
-    """Register the markers of the tests that run a host tool."""
+    """Register the markers of the tests that run a host tool, and refuse every connection
+    beyond this host (`refused_beyond_this_host`)."""
+    socket.socket.connect = refused_beyond_this_host(socket.socket.connect)
+    socket.socket.connect_ex = refused_beyond_this_host(socket.socket.connect_ex)
     for marker, tool in HOST_TOOLS.items():
         config.addinivalue_line("markers", f"{marker}: runs {tool.runs}")
     config.addinivalue_line(

@@ -1,6 +1,7 @@
 """The supply task: the browser build and model snapshots it installs and checks."""
 
 import json
+import socket
 
 import pronounced
 import pytest
@@ -146,3 +147,10 @@ def test_a_download_that_fails_is_refused_in_one_line_that_names_the_file(root, 
     assert "\n" not in said and cmudict.URL in said and cmudict.PLACE in said
     assert said.endswith("nodename nor servname provided, or not known")
     assert not list((folder / cmudict.PLACE).parent.iterdir())
+
+
+def test_no_test_reaches_the_network():
+    # The suite refuses a connection beyond this host (`conftest.refused_beyond_this_host`), so a
+    # download that a stub does not catch fails rather than reaching the network.
+    with pytest.raises(ConnectionRefusedError, match="the engine's tests reach no network"):
+        socket.create_connection(("192.0.2.1", 443), timeout=1)
