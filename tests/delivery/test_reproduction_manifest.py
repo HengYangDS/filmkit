@@ -5,6 +5,7 @@ its own consistency."""
 import json
 
 import pytest
+from reproducing import RECORDED
 
 import filmkit.delivery.packaging as packaging
 import filmkit.delivery.reproduction as reproduction
@@ -88,6 +89,16 @@ def test_checksums_list_every_other_asset_for_shasum():
                 {"sample-reel-zh.srt": 30.0}
             ),
             "records a floor for an asset that is not a film",
+        ),
+        (
+            lambda manifest: manifest["editions"]["en"]["ffmpeg"].update(
+                {"sample-reel-en.vtt": RECORDED}
+            ),
+            "records an FFmpeg for an asset that is not a film of en",
+        ),
+        (
+            lambda manifest: manifest["editions"]["zh"]["drawn_sha256"].update({"draft": "0" * 64}),
+            "is not a release manifest",
         ),
         (
             lambda manifest: manifest["assets"][-1].update(sha256="0" * 64),

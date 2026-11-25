@@ -5,7 +5,7 @@ import json
 import shutil
 
 import pytest
-from reproducing import listing
+from reproducing import ANOTHER, RECORDED, drawn_digest, listing, packaged_anew
 
 import filmkit.delivery.reproduction as reproduction
 import filmkit.production as production
@@ -153,6 +153,104 @@ def test_a_frame_below_its_floor_fails_naming_the_film_and_frame(release, releas
     assert film["psnr"]["below_floor"][0] == 0
     with pytest.raises(SystemExit, match=r"en: sample-reel-en-1080p-captioned\.mp4: picture"):
         released()
+
+
+def test_under_the_recorded_ffmpeg_a_film_is_compared_as_before(release, decodes):
+    packaged_anew(release, "zh")
+    uhd = release.compare()["editions"]["zh"]["films"][0]
+    assert uhd["encoders"] == {"recorded": RECORDED, "running": RECORDED}
+    assert uhd["compared"] == {"audio": "decoded", "picture": "decoded frames against the floor"}
+    assert (uhd["psnr"]["measured"], uhd["verdict"]) == (True, "pass")
+    assert sorted(decodes) == sorted(film.name for film in production.Edition("zh").films)
+
+
+@pytest.mark.usefixtures("unleveled")
+def test_under_another_ffmpeg_audio_and_pictures_are_compared_before_encoding(release, decodes):
+    packaged_anew(release, *production.CODES)
+    release.running = ANOTHER
+    report = release.compare()
+    assert (report["verdict"], report["ffmpeg"]) == ("pass", ANOTHER)
+    # No film is decoded: each picture is held to its drawn-frame digest.
+    assert decodes == []
+    for code, edition in report["editions"].items():
+        for film in edition["films"]:
+            picture = "captioned" if "-uncaptioned" not in film["asset"] else "uncaptioned"
+            assert film["encoders"] == {"recorded": RECORDED, "running": ANOTHER}
+            assert film["compared"] == {
+                "audio": "before encoding: the soundtrack's bytes",
+                "picture": f"before encoding: the {picture} picture's drawn-frame digest",
+            }
+            digest = drawn_digest(code, picture)
+            assert film["drawn_sha256"] == {"recorded": digest, "rebuilt": digest}
+            assert (film["frames"], film["audio"], film["psnr"]["measured"]) == (
+                6,
+                "identical",
+                False,
+            )
+            assert film["verdict"] == "pass"
+    # The audio is held to the soundtrack's bytes.
+    production.Edition("en").soundtrack.write_bytes(b"another soundtrack")
+    english = release.compare()["editions"]["en"]
+    assert english["soundtrack"]["verdict"] == "fail"
+    assert {film["audio"] for film in english["films"]} == {"differs"}
+
+
+def test_under_another_ffmpeg_a_picture_drawn_otherwise_is_refused(release, decodes, released):
+    packaged_anew(release, "zh")
+    receipt = production.Edition("zh").rendered(captions=True).receipt
+    repository.write(receipt, {"picture": "captioned", "drawn_sha256": "0" * 64})
+    release.running = ANOTHER
+    films = release.compare()["editions"]["zh"]["films"]
+    assert [film["failing"] for film in films] == [["picture"], ["picture"], [], []]
+    assert films[0]["drawn_sha256"] == {
+        "recorded": drawn_digest("zh", "captioned"),
+        "rebuilt": "0" * 64,
+    }
+    assert decodes == []
+    with pytest.raises(SystemExit, match=r"zh: sample-reel-zh-uhd\.mp4: picture"):
+        released()
+
+
+@pytest.mark.usefixtures("unleveled")
+def test_across_encoders_a_derived_picture_is_compared_by_decoded_frames(release, decodes):
+    english = production.Edition("en")
+    derived = {"picture": "uncaptioned", "derived": {"rows": [1872, 2048]}}
+    repository.write(english.rendered(captions=False).receipt, derived)
+    release.record()
+    assert "uncaptioned" not in reproduction.load().editions["en"].drawn_sha256
+    packaged_anew(release, "en")
+    release.running = ANOTHER
+    report = release.compare()
+    assert report["verdict"] == "pass"
+    films = {film["asset"]: film for film in report["editions"]["en"]["films"]}
+    uncaptioned = {name for name in films if "-uncaptioned" in name}
+    assert set(decodes) == uncaptioned and len(decodes) == 2
+    for name, film in films.items():
+        decoded = name in uncaptioned
+        assert film["compared"]["picture"].startswith("decoded") is decoded
+        assert film["psnr"]["measured"] is decoded
+        assert (film["psnr"]["floor_db"], film["verdict"]) == (30.0, "pass")
+
+
+@pytest.mark.usefixtures("unleveled")
+def test_a_record_without_encoders_compares_films_of_an_unknown_encoder(release, decodes):
+    release.record(encoders=False)
+    packaged_anew(release, "zh")
+    report = release.compare()
+    assert report["verdict"] == "pass"
+    films = report["editions"]["zh"]["films"]
+    assert sorted(decodes) == sorted(film["asset"] for film in films)
+    for film in films:
+        assert film["encoders"] == {"recorded": None, "running": RECORDED}
+        assert film["compared"] == {
+            "audio": "before encoding: the soundtrack's bytes",
+            "picture": "decoded frames against the floor",
+        }
+        assert "encoder is unknown" in film["note"]
+        assert (film["psnr"]["floor_db"], film["verdict"]) == (30.0, "pass")
+    production.Edition("zh").soundtrack.write_bytes(b"another soundtrack")
+    films = release.compare()["editions"]["zh"]["films"]
+    assert {film["audio"] for film in films} == {"differs"}
 
 
 def test_a_film_packaged_later_differs_only_in_its_creation_date(release):

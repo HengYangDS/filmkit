@@ -36,8 +36,10 @@ refused.
 The record states the film's version; each edition's soundtrack and both its staged documents by
 SHA-256; each film's PSNR floor as the replaced record states it for a film of that name, and
 none for a film it does not name, since the floor is the film's and the engine holds no number
-for it; the stated sources in sorted order, each once, with its current SHA-256; and every
-asset an edition publishes with its size and SHA-256, in the order it publishes them, the
+for it; each film's FFmpeg, the one that runs, to which `filmkit verify` has held every node
+that encodes; each UHD picture the renderer drew by the drawn-frame digest its receipt states;
+the stated sources in sorted order, each once, with its current SHA-256; and every asset an
+edition publishes with its size and SHA-256, in the order it publishes them, the
 checksums file last. The command prints each film's floor or that it has none: a film without
 one does not pass the comparison until its record states one. It also prints the version of the
 record it replaces beside the version it writes. A record of the version already recorded is
@@ -277,6 +279,9 @@ def record(stated: list[str]) -> tuple[Release, Release | None]:
     version = release_version()
     replaced = replaced_record()
     sources = bound_sources(stated)
+    # `filmkit verify` has held every node that encodes to the FFmpeg that runs, so the films of
+    # the build it passed were encoded by that one.
+    ffmpeg = reproduction.running_ffmpeg()
     # A film has the same asset name from one record to the next, so a floor is carried by name.
     floors = {
         name: floor
@@ -292,6 +297,8 @@ def record(stated: list[str]) -> tuple[Release, Release | None]:
             stage_sha256=repository.sha(edition.rendered().page),
             uncaptioned_stage_sha256=repository.sha(edition.rendered(captions=False).page),
             picture_floor_db={name: floors[name] for name in films if name in floors},
+            ffmpeg=dict.fromkeys(films, ffmpeg),
+            drawn_sha256=reproduction.drawn(edition),
         )
         assets += [
             Asset(name=name, bytes=source.stat().st_size, sha256=repository.sha(source))

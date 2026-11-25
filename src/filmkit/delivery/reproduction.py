@@ -14,6 +14,14 @@ pass. A rebuilt film that holds its published film's size and SHA-256 decodes as
 comparison decodes neither, reports an identical file whose every layer holds and whose PSNR
 is not measured, and, without a floor, still does not pass, for such a film calibrates none.
 
+The manifest states the FFmpeg that encoded each film and the drawn-frame digest of each UHD
+picture the renderer drew (design decision 13 of build-a-film-by-its-verbs). A film rebuilt by
+another FFmpeg, or whose record states none, is compared before encoding where FFmpeg encodes:
+its audio through the soundtrack's recorded bytes, and its picture through the drawn-frame
+digest of the UHD picture it carries or is encoded from, where the renderer drew that picture
+for the release and for the rebuild; a derived picture, and any picture of a record without an
+encoder, by decoded frames against the floor. The report names both encoders for each film.
+
 A release publishes either all four films of each edition, with the uncaptioned picture's stage
 document recorded beside the captioned one's, or, published before the films without captions
 existed, only each edition's two films with captions; the comparison then lists the rebuilt
@@ -39,8 +47,9 @@ import json
 import math
 import time
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, NonNegativeInt, PositiveFloat, StringConstraints, ValidationError
 
@@ -88,13 +97,25 @@ class Asset(Declared):
     sha256: Digest
 
 
+# The first line `ffmpeg -version` prints, which names the encoder's version.
+EncoderVersion = Annotated[str, StringConstraints(min_length=1, pattern=r"^\S")]
+
+
 class EditionRecord(Declared):
-    """What an edition's published films were made from, and each film's PSNR floor."""
+    """What an edition's published films were made from, and each film's PSNR floor.
+
+    `ffmpeg` states, for each published film, the FFmpeg that encoded it, and `drawn_sha256`
+    each of the edition's UHD pictures that the renderer drew by its drawn-frame digest; a
+    picture derived from another is drawn by none and has none. A record written before the
+    release that added them states neither, and its films are of an unknown encoder.
+    """
 
     soundtrack_sha256: Digest
     stage_sha256: Digest
     uncaptioned_stage_sha256: Digest | None = None
     picture_floor_db: dict[AssetName, PositiveFloat] = Field(default_factory=dict)
+    ffmpeg: dict[AssetName, EncoderVersion] = Field(default_factory=dict)
+    drawn_sha256: dict[Literal["captioned", "uncaptioned"], Digest] = Field(default_factory=dict)
 
 
 class Release(Declared):
@@ -187,9 +208,10 @@ def check(release: Release) -> Release:
         raise ReproductionError(msg)
     for code, record in release.editions.items():
         films = {film.name for film in production.Edition(code).films} & set(names)
-        if not set(record.picture_floor_db) <= films:
-            msg = f"{MANIFEST} records a floor for an asset that is not a film of {code}"
-            raise ReproductionError(msg)
+        for said, named in (("a floor", record.picture_floor_db), ("an FFmpeg", record.ffmpeg)):
+            if not set(named) <= films:
+                msg = f"{MANIFEST} records {said} for an asset that is not a film of {code}"
+                raise ReproductionError(msg)
     listed = next(asset for asset in release.assets if asset.name == CHECKSUMS)
     if listed.sha256 != repository.content_sha(checksums(release)):
         msg = f"{MANIFEST}: {CHECKSUMS} differs from the assets it lists"
@@ -205,6 +227,29 @@ def load() -> Release:
         msg = f"{MANIFEST} is not a release manifest: {error}"
         raise ReproductionError(msg) from None
     return check(release)
+
+
+def drawn(edition: production.Edition) -> dict[str, str]:
+    """The drawn-frame digest of each of the edition's UHD pictures that the renderer drew, by
+    the picture's name, as its render receipt states it. A derived picture's receipt states
+    none, nor does a picture without a receipt."""
+    found = {}
+    for captions in (True, False):
+        picture = edition.rendered(captions)
+        if picture.receipt.is_file():
+            digest = json.loads(picture.receipt.read_text()).get("drawn_sha256")
+            if isinstance(digest, str):
+                found[picture.name] = digest
+    return found
+
+
+def running_ffmpeg() -> str:
+    """The first line of the running FFmpeg's `ffmpeg -version`, refused where none runs."""
+    version = seam.encoder("FFmpeg")
+    if version == seam.ABSENT:
+        msg = "FFmpeg cannot be run here: install it as Homebrew does (brew install ffmpeg)"
+        raise ReproductionError(msg)
+    return version
 
 
 def changed_sources(release: Release) -> list[str]:
@@ -315,6 +360,75 @@ def container(path: Path) -> dict:
     }
 
 
+@dataclass(frozen=True)
+class Encoded:
+    """What a film's encoded layers are compared through: the FFmpeg the record states for the
+    film (None where it states none) and the one that runs; the edition's soundtrack against its
+    recorded bytes; and the drawn-frame digest of the UHD picture the film carries or is encoded
+    from, as the record states it and as the rebuilt picture's receipt does."""
+
+    recorded: str | None
+    running: str
+    soundtrack: bool
+    picture: str
+    drawn: tuple[str | None, str | None]
+
+    @property
+    def same(self) -> bool:
+        """Whether the film is rebuilt by the FFmpeg that encoded it, so that its encoded
+        layers are compared decoded, as before the encoder was recorded."""
+        return self.recorded == self.running
+
+    @property
+    def digests(self) -> bool:
+        """Whether the picture is compared before encoding: another FFmpeg than the recorded one
+        rebuilds it, and the renderer drew it both times, so that each draw states its digest."""
+        return self.recorded is not None and not self.same and None not in self.drawn
+
+    def stated(self) -> dict:
+        """The encoders and what each encoded layer was compared through, as the report
+        states them."""
+        audio = "decoded" if self.same else "before encoding: the soundtrack's bytes"
+        picture = (
+            f"before encoding: the {self.picture} picture's drawn-frame digest"
+            if self.digests
+            else "decoded frames against the floor"
+        )
+        return {
+            "encoders": {"recorded": self.recorded, "running": self.running},
+            "compared": {"audio": audio, "picture": picture},
+        }
+
+
+def unmeasured(floor: float | None) -> dict:
+    """A film's PSNR where no frame was decoded."""
+    return {
+        "floor_db": floor,
+        "measured": False,
+        "identical_frames": None,
+        "minimum_db": None,
+        "mean_db": None,
+        "lowest": [],
+        "below_floor": [],
+    }
+
+
+def measured(psnr: list[float], floor: float | None) -> dict:
+    """A film's PSNR from every decoded frame's, against its floor."""
+    finite = sorted((value, index) for index, value in enumerate(psnr) if math.isfinite(value))
+    return {
+        "floor_db": floor,
+        "measured": True,
+        "identical_frames": len(psnr) - len(finite),
+        "minimum_db": finite[0][0] if finite else None,
+        "mean_db": sum(value for value, _ in finite) / len(finite) if finite else None,
+        "lowest": [{"frame": index, "psnr_db": value} for value, index in finite[:LOWEST]],
+        "below_floor": [
+            index for index, value in enumerate(psnr) if floor is not None and value < floor
+        ][:LOWEST],
+    }
+
+
 def identical_film(asset: Asset, floor: float | None) -> dict:
     """A rebuilt film that holds its published film's bytes: every layer holds, none decoded.
 
@@ -332,71 +446,82 @@ def identical_film(asset: Asset, floor: float | None) -> dict:
         "frames": None,
         "audio": "identical",
         "container": "identical",
-        "psnr": {
-            "floor_db": floor,
-            "measured": False,
-            "identical_frames": None,
-            "minimum_db": None,
-            "mean_db": None,
-            "lowest": [],
-            "below_floor": [],
-        },
+        "psnr": unmeasured(floor),
         "failing": [],
         "verdict": "calibrating" if floor is None else "pass",
     }
 
 
-def film(asset: Asset, rebuilt: Path, published: Path, floor: float | None) -> dict:
+def film(
+    asset: Asset, rebuilt: Path, published: Path, floor: float | None, encoded: Encoded
+) -> dict:
     """A rebuilt film against its published film: frames, audio, container and picture.
 
     `published` holds the bytes that `asset` records; a rebuilt film of that size and SHA-256
-    is reported as an identical file, and any other is decoded.
+    is reported as an identical file, and any other is compared. Rebuilt by the FFmpeg that
+    encoded it, its audio and every frame are decoded and compared, each frame against the
+    floor. Rebuilt by another, or of an unknown encoder, its audio is compared before encoding,
+    through the soundtrack's recorded bytes; its picture through the drawn-frame digest where
+    the renderer drew it both times, and otherwise by decoded frames against the floor. Its
+    frame count, streams, chapters and tags, which FFmpeg does not encode, are compared in
+    every case.
     """
-    name = asset.name
+    stated = encoded.stated()
     if not rebuilt.is_file():
-        return {"asset": name, "verdict": "fail", "failing": ["missing"]}
+        return {"asset": asset.name, "verdict": "fail", "failing": ["missing"]}
     if rebuilt.stat().st_size == asset.bytes and repository.sha(rebuilt) == asset.sha256:
-        return identical_film(asset, floor)
+        return {**identical_film(asset, floor), "encoders": stated["encoders"]}
+    head = {"asset": asset.name, **stated}
     frames = media.video_stream(media.probe(published)).get("nb_frames")
-    psnr = media.frame_psnr(rebuilt, published, DECODE_DEADLINE)
-    finite = sorted((value, index) for index, value in enumerate(psnr) if math.isfinite(value))
-    below = [index for index, value in enumerate(psnr) if floor is not None and value < floor]
+    if encoded.digests:
+        probed = media.video_stream(media.probe(rebuilt)).get("nb_frames")
+        counted = int(probed) if str(probed).isdigit() else probed
+        psnr, picture = unmeasured(floor), encoded.drawn[0] == encoded.drawn[1]
+        head["drawn_sha256"] = dict(zip(("recorded", "rebuilt"), encoded.drawn, strict=True))
+    else:
+        decoded = media.frame_psnr(rebuilt, published, DECODE_DEADLINE)
+        counted, psnr = len(decoded), measured(decoded, floor)
+        picture = not psnr["below_floor"]
+    audio = (
+        decoded_audio(rebuilt) == decoded_audio(published) if encoded.same else encoded.soundtrack
+    )
     result = {
-        "asset": name,
+        **head,
         "identical_file": False,
-        "frames": len(psnr),
-        "audio": "identical" if decoded_audio(rebuilt) == decoded_audio(published) else "differs",
+        "frames": counted,
+        "audio": "identical" if audio else "differs",
         "container": "identical" if container(rebuilt) == container(published) else "differs",
-        "psnr": {
-            "floor_db": floor,
-            "measured": True,
-            "identical_frames": len(psnr) - len(finite),
-            "minimum_db": finite[0][0] if finite else None,
-            "mean_db": sum(value for value, _ in finite) / len(finite) if finite else None,
-            "lowest": [{"frame": index, "psnr_db": value} for value, index in finite[:LOWEST]],
-            "below_floor": below[:LOWEST],
-        },
+        "psnr": psnr,
     }
     failing = [
         layer
         for layer, held in (
-            ("frames", str(len(psnr)) == str(frames)),
-            ("audio", result["audio"] == "identical"),
+            ("frames", str(counted) == str(frames)),
+            ("audio", audio),
             ("container", result["container"] == "identical"),
-            ("picture", not below),
+            ("picture", picture),
         )
         if not held
     ]
+    if encoded.recorded is None:
+        result["note"] = (
+            "The record states no FFmpeg for this film, so its encoder is unknown: its audio is "
+            "compared through the soundtrack's bytes and its picture by decoded frames."
+        )
+    calibrating = floor is None and psnr["measured"]
     result["failing"] = failing
-    result["verdict"] = "fail" if failing else "calibrating" if floor is None else "pass"
+    result["verdict"] = "fail" if failing else "calibrating" if calibrating else "pass"
     return result
 
 
-def compare_films(pairs: list[tuple[Asset, Path, Path, float | None]]) -> dict:
+Pair = tuple[Asset, Path, Path, float | None, Encoded]
+
+
+def compare_films(pairs: list[Pair]) -> dict:
     """Compare each rebuilt film with its published film, up to `PAIR_POOL` pairs at the same
     time: the results in the order given, and the seconds each pair took."""
 
-    def timed(pair: tuple[Asset, Path, Path, float | None]) -> tuple[dict, float]:
+    def timed(pair: Pair) -> tuple[dict, float]:
         started = time.monotonic()
         result = film(*pair)
         return result, round(time.monotonic() - started, 1)
@@ -411,16 +536,38 @@ def compare_films(pairs: list[tuple[Asset, Path, Path, float | None]]) -> dict:
 
 
 def compare_edition(
-    edition: production.Edition, record: EditionRecord, assets: dict, listed: dict[str, Asset]
+    edition: production.Edition,
+    record: EditionRecord,
+    assets: dict,
+    listed: dict[str, Asset],
+    running: str,
 ) -> dict:
     """One edition's every layer against its published assets and its manifest record.
 
-    `assets` holds each published asset's file and `listed` its record in the manifest.
+    `assets` holds each published asset's file, `listed` its record in the manifest, and
+    `running` the running FFmpeg's version.
     """
     layers = members(edition)
     uncaptioned = edition.rendered(captions=False).page
+    soundtrack = recorded(edition.soundtrack, record.soundtrack_sha256)
+    rebuilt = drawn(edition)
+    pictures = {
+        edition.film(kind): edition.rendered(rendition.captions).name
+        for kind, rendition in production.RENDITIONS.items()
+    }
+
+    def encoded(name: str, source: Path) -> Encoded:
+        picture = pictures[source]
+        return Encoded(
+            record.ffmpeg.get(name),
+            running,
+            soundtrack["verdict"] == "pass",
+            picture,
+            (record.drawn_sha256.get(picture), rebuilt.get(picture)),
+        )
+
     return {
-        "soundtrack": recorded(edition.soundtrack, record.soundtrack_sha256),
+        "soundtrack": soundtrack,
         "stage": recorded(edition.rendered().page, record.stage_sha256),
         **(
             {}
@@ -435,7 +582,13 @@ def compare_edition(
         ],
         **compare_films(
             [
-                (listed[name], source, assets[name], record.picture_floor_db.get(name))
+                (
+                    listed[name],
+                    source,
+                    assets[name],
+                    record.picture_floor_db.get(name),
+                    encoded(name, source),
+                )
                 for name, (layer, source) in layers.items()
                 if layer == "film" and name in assets
             ]
@@ -471,7 +624,7 @@ def passed(code: str, compared: dict) -> bool:
     return not calibrating and not failures({"editions": {code: compared}})
 
 
-def compare_editions(records: dict, assets: dict, listed: dict) -> dict:
+def compare_editions(records: dict, assets: dict, listed: dict, running: str) -> dict:
     """Each edition's comparison in the editions' order, as a run of its own. The comparison
     reports every layer before the command refuses, so an edition that did not pass says so to
     its run, which then did not complete."""
@@ -479,7 +632,7 @@ def compare_editions(records: dict, assets: dict, listed: dict) -> dict:
     for code in production.CODES:
         with seam.run(code, "reproduce") as run:
             edition = production.Edition(code)
-            compared[code] = compare_edition(edition, records[code], assets, listed)
+            compared[code] = compare_edition(edition, records[code], assets, listed, running)
             if not passed(code, compared[code]):
                 run.fail()
     return compared
@@ -494,10 +647,11 @@ def compare() -> dict:
         raise ReproductionError(msg)
     assets = published(release)
     listed = {asset.name: asset for asset in release.assets}
+    running = running_ffmpeg()
     report = {
         "release": release.version,
-        "ffmpeg": repository.run(["ffmpeg", "-version"]).stdout.decode().splitlines()[0],
-        "editions": compare_editions(release.editions, assets, listed),
+        "ffmpeg": running,
+        "editions": compare_editions(release.editions, assets, listed, running),
     }
     verdicts = [
         result["verdict"] for edition in report["editions"].values() for result in edition["films"]

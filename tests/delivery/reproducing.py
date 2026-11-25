@@ -14,6 +14,10 @@ import filmkit.picture.rendering as picture_rendering
 import filmkit.production as production
 import filmkit.repository as repository
 
+# The FFmpeg that encoded the published films, as the record states it, and another.
+RECORDED = "ffmpeg version 8.0.1 Copyright (c) 2000-2025 the FFmpeg developers"
+ANOTHER = "ffmpeg version 8.1 Copyright (c) 2000-2026 the FFmpeg developers"
+
 
 def encode(target: Path, picture: str, tone: int, created: str = "2026-10-28T11:29:43Z") -> Path:
     """A six-frame 60 fps film of a test picture and a sine tone, titled and dated like a film."""
@@ -62,6 +66,8 @@ class Release:
 
     root: Path
     films: dict[str, Path]
+    # The FFmpeg that runs, as the comparison reads its version.
+    running: str = RECORDED
 
     @property
     def folder(self) -> Path:
@@ -72,9 +78,11 @@ class Release:
         self.folder.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, self.folder / name)
 
-    def record(self, floors: float | None = 30.0) -> None:
+    def record(self, floors: float | None = 30.0, *, encoders: bool = True) -> None:
         """Write the release manifest of the published folder, with each published film's floor;
-        a release that publishes the films without captions records their stage too."""
+        a release that publishes the films without captions records their stage too. With
+        `encoders` it states each film's FFmpeg, `RECORDED`, and each drawn picture's digest as
+        its receipt states it; without, it is a record written before they were recorded."""
         editions = {}
         for code in production.CODES:
             edition = production.Edition(code)
@@ -90,6 +98,9 @@ class Release:
                 ),
                 "picture_floor_db": {} if floors is None else dict.fromkeys(films, floors),
             }
+            if encoders:
+                editions[code]["ffmpeg"] = dict.fromkeys(films, RECORDED)
+                editions[code]["drawn_sha256"] = reproduction.drawn(edition)
         sources = [
             *(production.Edition(code).script for code in production.CODES),
             picture_rendering.COMPOSITION_SCRIPT,
@@ -120,5 +131,17 @@ class Release:
         return reproduction.compare()
 
 
+def drawn_digest(code: str, picture: str) -> str:
+    """The drawn-frame digest a stand-in render of an edition's picture states."""
+    return repository.content_sha(f"{code} {picture} drawn")
+
+
 def listing(root: Path) -> list[tuple[Path, int, int]]:
     return [(path, path.stat().st_size, path.stat().st_mtime_ns) for path in root.rglob("*")]
+
+
+def packaged_anew(release: Release, *codes: str) -> None:
+    """Package each film of the editions anew: it holds other bytes than its published film."""
+    for code in codes:
+        for film in production.Edition(code).films:
+            shutil.copyfile(release.films["later"], film)

@@ -27,6 +27,9 @@ SOURCES = sorted(
 STATED = ["--sources", *SOURCES]
 # The version of the earlier release whose record a test tracks, unless it names another.
 EARLIER_VERSION = "1.2.0"
+# The version line each encoder states to a built film's tests, on a host with or without it.
+FFMPEG = "ffmpeg version 8.0.1 Copyright (c) 2000-2025 the FFmpeg developers"
+ENCODERS = {"FFmpeg": FFMPEG}
 
 
 @dataclass

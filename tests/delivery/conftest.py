@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
-from release_build import Built
-from reproducing import Release, encode
+from release_build import ENCODERS, Built
+from reproducing import Release, drawn_digest, encode
 
 import filmkit.delivery.folder as delivery_folder
 import filmkit.delivery.packaging as delivery_packaging
@@ -39,7 +39,7 @@ import filmkit.review.record as review_record
 import filmkit.sources as sources
 import filmkit.specification as specification
 from filmkit.film import FILM
-from filmkit.graph import cli
+from filmkit.graph import cli, runs
 
 # The runtime each edition's timeline states, which every check reads a film's length from, the
 # last second of it credits: long enough to hold a still run of more than the scan's limit, and
@@ -268,6 +268,8 @@ def picture(inputs: Inputs, *, derived: bool = False) -> None:
         receipt = {"picture": rendered.name, "output_sha256": sha(rendered.file)}
         if derived and not captions:
             receipt["derived"] = {"rows": [1872, 2048], "ground": {"y": 21, "u": 129, "v": 125}}
+        else:
+            receipt["drawn_sha256"] = repository.content_sha(f"{rendered.name} drawn")
         write_input(rendered.receipt, receipt)
     equivalence = {
         **picture_equivalence.current_bindings(edition),
@@ -420,8 +422,10 @@ def built(editions, tmp_path_factory, monkeypatch, table_of) -> Built:
     """A reviewed, delivered build. The staging's check of a stage is a stand-in that records
     what it was asked and refuses, in the staging's words, a document other than the one the
     fixture's sources stage; the real check has its own tests. Its run records are no subject
-    here: the engine's table is held to no node, so `filmkit verify` judges none (`table_of`)."""
+    here: the engine's table is held to no node, so `filmkit verify` judges none (`table_of`).
+    Each encoder states the version `ENCODERS` gives it, on a host with or without it."""
     table_of()
+    monkeypatch.setattr(runs, "encoder", lambda tool: ENCODERS.get(tool, runs.ABSENT))
     folder = tmp_path_factory.mktemp("host").resolve() / FILM.delivery_folder
     monkeypatch.setenv(delivery_folder.ROOT_VARIABLE, str(folder.parent))
     current = Built(repository.ROOT, folder, editions, VERSION)
@@ -461,6 +465,9 @@ def release(tmp_path, monkeypatch, films) -> Release:
     composition.parent.mkdir(parents=True)
     composition.write_text("/* film */")
     published = Release(tmp_path, films)
+    monkeypatch.setattr(
+        runs, "encoder", lambda tool: published.running if tool == "FFmpeg" else runs.ABSENT
+    )
     for code in production.CODES:
         edition = production.Edition(code)
         script = tmp_path / edition.script
@@ -468,9 +475,11 @@ def release(tmp_path, monkeypatch, films) -> Release:
         script.write_text(json.dumps({"edition": code}))
         edition.artifacts.mkdir(parents=True)
         for captions in (True, False):
-            stage = edition.rendered(captions).stage
-            stage.mkdir(parents=True)
-            (stage / production.STAGE_PAGE).write_text(f"<html>{code} {captions}</html>")
+            picture = edition.rendered(captions)
+            picture.stage.mkdir(parents=True)
+            (picture.stage / production.STAGE_PAGE).write_text(f"<html>{code} {captions}</html>")
+            drawn = {"picture": picture.name, "drawn_sha256": drawn_digest(code, picture.name)}
+            repository.write(picture.receipt, drawn)
         edition.soundtrack.write_bytes(f"soundtrack {code}".encode())
         for film in edition.films:
             shutil.copyfile(films["same"], film)

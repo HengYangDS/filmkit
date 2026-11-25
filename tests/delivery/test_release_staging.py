@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import pytest
 from release_build import (
     EARLIER_VERSION,
+    FFMPEG,
     SOURCES,
     STATED,
     refused,
@@ -42,6 +43,9 @@ def test_the_record_states_the_version_each_editions_digests_the_sources_and_eve
             uncaptioned_stage(code) / "index.html"
         )
         assert held.picture_floor_db == {}
+        # Each film was encoded by the FFmpeg that runs, and the uncaptioned picture is derived.
+        assert held.ffmpeg == dict.fromkeys([film.name for film in edition.films], FFMPEG)
+        assert held.drawn_sha256 == {"captioned": repository.content_sha("captioned drawn")}
     # The sources stand in sorted order, however they were stated.
     assert list(record.sources.items()) == [(path, repository.sha(path)) for path in SOURCES]
     files = {
