@@ -514,7 +514,7 @@ def test_a_request_that_arrives_while_a_tool_starts_still_has_that_tool_asked_to
     monkeypatch.setattr(tools.picture_browser, "browser_path", lambda: "no-browser")
     monkeypatch.setattr(tools.shutil, "which", lambda name: "node")
     monkeypatch.setattr(tools, "stage_tools", lambda: tmp_path)
-    monkeypatch.setattr(tools, "TOOLS", {"standin": "standin.mjs"})
+    monkeypatch.setattr(tools, "TOOLS", {"standin": tools.Tool("standin.mjs")})
     monkeypatch.setattr(tools.subprocess, "Popen", Started)
     with pytest.raises(Terminated), child_processes.terminable():
         tools.run("standin", [])

@@ -11,6 +11,7 @@ import filmkit.picture.qualification as qualification
 import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
+from filmkit.child_processes import MissingToolError
 from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
 
@@ -119,7 +120,7 @@ def test_the_record_states_the_canvas_that_ran(rendered):
     manifest = film_root.path / "node_modules" / picture_renderer.RENDERER_PACKAGE
     manifest.write_text('{"name": "@napi-rs/canvas", "version": "0.0.1"}')
     runs = len(film_root.runs())
-    with pytest.raises(PictureError, match="The film installs @napi-rs/canvas 0.0.1"):
+    with pytest.raises(MissingToolError, match="The film installs @napi-rs/canvas 0.0.1"):
         qualification.qualify_renderer(edition, 60)
     assert len(film_root.runs()) == runs
 

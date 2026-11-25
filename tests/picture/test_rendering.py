@@ -20,6 +20,7 @@ import filmkit.picture.encoding as encoding
 import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.repository as repository
+from filmkit.child_processes import MissingToolError
 from filmkit.film import FILM
 from filmkit.picture.rendering import PictureError
 from filmkit.production import STAGE_RECORD
@@ -281,17 +282,17 @@ def test_failed_rendering_stops_its_remaining_workers(staged, tmp_path, monkeypa
                 os.kill(int(worker.with_suffix(".pid").read_text()), signal.SIGKILL)
 
 
-def test_another_renderer_version_refuses_staging_and_rendering(
+def test_another_renderer_version_stops_staging_and_rendering_as_a_missing_tool(
     staged, root, tmp_path, monkeypatch
 ):
     manifest = root / "node_modules" / picture_renderer.RENDERER_PACKAGE
     manifest.write_text(json.dumps({"name": "@napi-rs/canvas", "version": "0.0.1"}))
     pinned = re.escape(picture_renderer.RENDERER_VERSION)
     versions = rf"installs @napi-rs/canvas 0\.0\.1; the engine draws with @napi-rs/canvas {pinned}"
-    with pytest.raises(PictureError, match=versions):
+    with pytest.raises(MissingToolError, match=versions):
         picture_rendering.stage_picture(staged, None, RUNTIME, 3840, 2160)
     fake = renderer(tmp_path, "open(__file__ + '.ran', 'w').close()")
-    with pytest.raises(PictureError, match=versions):
+    with pytest.raises(MissingToolError, match=versions):
         render(monkeypatch, staged, fake, 60)
     assert not Path(f"{fake}.ran").exists()
     assert not staged.render_receipt.exists()

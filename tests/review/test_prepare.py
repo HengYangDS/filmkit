@@ -273,10 +273,12 @@ def test_a_preparation_that_stops_while_it_derives_refuses_in_one_line_and_leave
     ]
 
     def absent(binding, receipt):
-        raise PictureError("The film installs no @napi-rs/canvas")
+        raise child_processes.MissingToolError("The film installs no @napi-rs/canvas")
 
+    # A player check the host cannot run stops the round, which is no refusal.
     monkeypatch.setattr(delivery_folder, "check_players", absent)
-    assert refusal() == "prepare: The player check cannot run: The film installs no @napi-rs/canvas"
+    with pytest.raises(child_processes.MissingToolError, match="installs no @napi-rs/canvas"):
+        prepare()
     assert names(folder) == [
         "measurements.json",
         "player-check-artifacts.json",

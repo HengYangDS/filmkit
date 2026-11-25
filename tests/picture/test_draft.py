@@ -17,6 +17,7 @@ import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
 import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
+from filmkit.child_processes import MissingToolError
 from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
 
@@ -171,12 +172,13 @@ def earlier(edition):
     repository.write(places(edition.code)[2], {"picture": "draft", "exit": 0})
 
 
-def test_a_draft_refused_before_it_renders_leaves_no_earlier_record(film_root):
+def test_a_draft_stopped_before_it_renders_leaves_no_earlier_record(film_root):
+    # Another canvas build in the film's packages is a tool the host lacks.
     edition = Edition("zh")
     earlier(edition)
     manifest = film_root.path / "node_modules" / picture_renderer.RENDERER_PACKAGE
     manifest.write_text('{"name": "@napi-rs/canvas", "version": "0.0.1"}')
-    with pytest.raises(PictureError, match="installs @napi-rs/canvas 0.0.1"):
+    with pytest.raises(MissingToolError, match="installs @napi-rs/canvas 0.0.1"):
         picture_draft.render_draft(edition, 60)
     assert not edition.draft_stills.exists()
     assert not places()[2].exists()

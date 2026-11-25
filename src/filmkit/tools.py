@@ -34,6 +34,7 @@ import signal
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import NamedTuple
 
 import filmkit.child_processes as child_processes
 import filmkit.picture.browser as picture_browser
@@ -47,26 +48,35 @@ from filmkit.picture import metrics
 # they read beside themselves: the classes of characters (`filmkit.languages`).
 PACKAGE = Path(__file__).resolve().parent
 COPIED = ("**/*.mjs", "languages/scripts.json")
-# The tools a film runs by name, as paths below the package; the other modules are libraries
-# that the tools import.
+
+
+class Tool(NamedTuple):
+    """One of the engine's Node tools: its module below the package, whether it drives the
+    supplied browser (`picture/headless-browser.mjs`), and whether it runs the composition
+    headlessly, measuring text by the film's declared faces."""
+
+    module: str
+    browses: bool = False
+    measures: bool = False
+
+
+# The tools a film runs by name; the other modules are libraries that the tools import.
 TOOLS = {
-    "geometry-check": "picture/geometry-check.mjs",
-    "frame-audit": "picture/frame-audit.mjs",
-    "motion-audit": "picture/motion-audit.mjs",
-    "detail-audit": "picture/detail-audit.mjs",
-    "caption-equivalence": "picture/caption-equivalence.mjs",
-    "band-audit": "picture/band-audit.mjs",
-    "player-check": "delivery/player-check.mjs",
-    "whole-turns": "picture/whole-turns.mjs",
-    "anchor-reads": "picture/anchor-reads.mjs",
+    "geometry-check": Tool("picture/geometry-check.mjs", browses=True),
+    "frame-audit": Tool("picture/frame-audit.mjs", measures=True),
+    "motion-audit": Tool("picture/motion-audit.mjs", measures=True),
+    "detail-audit": Tool("picture/detail-audit.mjs", measures=True),
+    "caption-equivalence": Tool("picture/caption-equivalence.mjs", measures=True),
+    "band-audit": Tool("picture/band-audit.mjs", measures=True),
+    "player-check": Tool("delivery/player-check.mjs", browses=True),
+    "whole-turns": Tool("picture/whole-turns.mjs", browses=True),
+    "anchor-reads": Tool("picture/anchor-reads.mjs"),
 }
 # The copies, below the film's root, in a folder for each engine version.
 CACHE = picture_browser.TOOL_CACHE / released.ENGINE
 # Seconds a tool has to end, once the command's wait for it was cut short and it was asked to,
 # before it is killed.
 STOP_SECONDS = 20
-# The tools that run the composition headlessly, which measure text by the film's declared faces.
-MEASURING = ("frame-audit", "motion-audit", "detail-audit", "caption-equivalence", "band-audit")
 
 
 class ToolError(RuntimeError):
@@ -132,14 +142,18 @@ def run(
     if node is None:
         msg = "No node on PATH; run the tools in the film's Mise environment"
         raise child_processes.MissingToolError(msg)
-    script = stage_tools() / TOOLS[tool]
+    browser = picture_browser.browser_path()
+    if TOOLS[tool].browses and not browser.is_file():
+        msg = f"No browser build at {browser}; supply it with filmkit supply"
+        raise child_processes.MissingToolError(msg)
+    script = stage_tools() / TOOLS[tool].module
     variables = {
         **os.environ,
         **(environment or {}),
-        "FILM_CHROMIUM_PATH": str(picture_browser.browser_path()),
+        "FILM_CHROMIUM_PATH": str(browser),
         **opens.node_options(),
     }
-    if tool in MEASURING and metrics.VARIABLE not in variables:
+    if TOOLS[tool].measures and metrics.VARIABLE not in variables:
         variables[metrics.VARIABLE] = str(metrics.current_table())
     with contextlib.ExitStack() as stack:
         output = None if stdout is None else stack.enter_context(stdout.open("w"))

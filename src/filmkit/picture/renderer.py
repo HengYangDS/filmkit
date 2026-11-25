@@ -23,10 +23,10 @@ digest; their encoded bytes are not compared.
 
 The engine pins one build: the version `RENDERER_VERSION` of the package with the integrity
 `INTEGRITY` names, and the native library `BINARY_SHA256` names, which is the one the binary
-package of Apple silicon holds. A film that installs another version is refused
-(`require_renderer`); a picture whose receipt names another package, version or text renderer
-does not validate (`require_receipt_renderer`); and a receipt whose render loaded another
-library, on any host, is no render by the build a release qualifies (`unqualified`), so no
+package of Apple silicon holds. A film whose packages install another version stops as a tool
+the host lacks (`require_renderer`); a picture whose receipt names another package, version or
+text renderer does not validate (`require_receipt_renderer`); and a receipt whose render loaded
+another library, on any host, is no render by the build a release qualifies (`unqualified`), so no
 picture is derived from it. The canvas's loader takes the library `NAPI_RS_NATIVE_LIBRARY_PATH`
 names before the package's own; a render is not given that variable.
 """
@@ -116,12 +116,14 @@ def installed() -> dict:
 
 
 def require_renderer() -> None:
-    """Refuse a film whose npm packages install another canvas version than the engine's."""
+    """Stop where the film's npm packages install another canvas version than the engine's, or
+    none: the canvas the engine draws with is a tool the host lacks until the packages are
+    installed again, which no input of a node records."""
     version = installed()["version"]
     if version != RENDERER_VERSION:
         found = f"{RENDERER_NAME} {version}" if version else f"no {RENDERER_NAME}"
         msg = f"The film installs {found}; the engine draws with {RENDERER_NAME} {RENDERER_VERSION}"
-        raise PictureError(msg)
+        raise child_processes.MissingToolError(msg)
 
 
 def drawn_by(report: dict) -> dict:

@@ -13,8 +13,9 @@ Two checks refuse by those ids, each naming every one with its segment and editi
   as not judged, with its error and the ids it read in a frame that threw, and a composition that
   does not load is named as not judged for its whole edition with its error's one line, whether or
   not the film marks anchors; neither refuses, and the check's answer is then "not judged", not
-  "pass": the picture gate still refuses before any render. A check whose tool or packages are
-  missing refuses with the reason, and so does an unmarked id read by a scene that loads. A film
+  "pass": the picture gate still refuses before any render. A tool that ends otherwise refuses
+  with the reason, and so does an unmarked id read by a scene that loads; a tool the host lacks,
+  `node` or the canvas the engine draws with, stops the check (`MissingToolError`). A film
   without a composition is not asked.
 - the picture gate (`filmkit.picture.gates`), which refuses each unmarked id that the frame audit
   records while it draws the edition's timeline (`unmarked`), also when an audit fails.
@@ -29,7 +30,6 @@ import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.narration import anchors
 from filmkit.narration.anchors import AnchorError
-from filmkit.picture.errors import PictureError
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
 from filmkit.production import CODES, Edition
 
@@ -94,14 +94,10 @@ def _draw(code: str, folder: Path) -> dict:
     repository.write(
         timeline, anchors.derived_timeline(repository.read(Edition(code).script), code)
     )
-    try:
-        status = tools.run("anchor-reads", [str(timeline), str(STEP)], stdout=report)
-    except PictureError as error:
-        reason = str(error)
-    else:
-        drawn = repository.read(report) if report.stat().st_size else {}
-        if (status == 0 and drawn.get("drawn")) or drawn.get("loads") is False:
-            return drawn
-        reason = drawn.get("error") or f"the anchor-reads tool exited with status {status}"
+    status = tools.run("anchor-reads", [str(timeline), str(STEP)], stdout=report)
+    drawn = repository.read(report) if report.stat().st_size else {}
+    if (status == 0 and drawn.get("drawn")) or drawn.get("loads") is False:
+        return drawn
+    reason = drawn.get("error") or f"the anchor-reads tool exited with status {status}"
     msg = f"The check of what the {code} picture reads cannot draw it: {reason}"
     raise AnchorError(msg)

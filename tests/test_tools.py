@@ -15,7 +15,7 @@ import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.film import FILM
 from filmkit.picture.metrics import TABLE, VARIABLE
-from filmkit.picture.rendering import STYLE, PictureError
+from filmkit.picture.rendering import STYLE
 
 # The engine's npm packages, found before a test rebinds the film root; they hold the renderer
 # version the engine supports.
@@ -29,14 +29,18 @@ SAMPLE = Path(__file__).resolve().parents[1] / "examples/sample-film"
 @pytest.fixture
 def film(tmp_path, monkeypatch):
     """A film root whose npm packages are the engine's own, away from the engine's sources,
-    with the sample film's stylesheet and fonts."""
+    with the sample film's stylesheet and fonts and a stand-in for the supplied browser build,
+    which a tool that drives the browser asks for before it starts."""
     root = tmp_path.resolve() / "film"
     root.mkdir()
     (root / "node_modules").symlink_to(PACKAGES)
+    monkeypatch.setattr(repository, "ROOT", root)
+    browser = picture_browser.browser_path()
+    browser.parent.mkdir(parents=True)
+    browser.write_text("a stand-in for the supplied browser build")
     for path in (STYLE, *FILM.picture.fonts):
         (root / path).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(SAMPLE / path, root / path)
-    monkeypatch.setattr(repository, "ROOT", root)
     return root
 
 
@@ -84,9 +88,11 @@ def test_a_tool_runs_at_the_film_root_with_the_renderers_browser(
     assert tools.run("geometry-check", []) == 0
     shown = json.loads(capfd.readouterr().out)
     assert shown == {"cwd": str(film), "browser": str(picture_browser.supplied_browser())}
-    monkeypatch.setenv("FILM_CHROMIUM_PATH", "/opt/chromium/chrome")
+    named = tmp_path / "chromium"
+    named.write_text("another browser build, which the variable names")
+    monkeypatch.setenv("FILM_CHROMIUM_PATH", str(named))
     assert tools.run("geometry-check", []) == 0
-    assert json.loads(capfd.readouterr().out)["browser"] == "/opt/chromium/chrome"
+    assert json.loads(capfd.readouterr().out)["browser"] == str(named)
 
 
 def test_a_tool_takes_added_variables_and_may_write_its_output_to_a_file(
@@ -108,9 +114,9 @@ def test_the_headless_audits_measure_text_by_the_films_faces(film, tmp_path, mon
     package = tmp_path / "package"
     (package / "picture").mkdir(parents=True)
     probe = f"console.log(JSON.stringify({{table: process.env.{VARIABLE} ?? null}}));"
-    headless = ("frame-audit", "motion-audit", "detail-audit", "caption-equivalence", "band-audit")
+    headless = [name for name, tool in tools.TOOLS.items() if tool.measures]
     for tool in (*headless, "geometry-check"):
-        (package / tools.TOOLS[tool]).write_text(probe)
+        (package / tools.TOOLS[tool].module).write_text(probe)
     monkeypatch.setattr(tools, "PACKAGE", package)
     monkeypatch.delenv(VARIABLE, raising=False)
     # Each tool that runs the composition headlessly is given the table of the film's declared
@@ -131,21 +137,28 @@ def test_the_headless_audits_measure_text_by_the_films_faces(film, tmp_path, mon
     assert json.loads(capfd.readouterr().out) == {"table": "own.json"}
 
 
-def test_another_renderer_version_refuses_before_any_tool_runs(tmp_path, monkeypatch):
+def test_another_renderer_version_stops_before_any_tool_runs(tmp_path, monkeypatch):
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
     manifest = root / "node_modules" / picture_renderer.RENDERER_PACKAGE
     manifest.parent.mkdir(parents=True)
     manifest.write_text(json.dumps({"name": "@napi-rs/canvas", "version": "0.8.149"}))
     pinned = re.escape(picture_renderer.RENDERER_VERSION)
-    with pytest.raises(PictureError, match=rf"@napi-rs/canvas 0\.8\.149.*@napi-rs/canvas {pinned}"):
+    # The canvas the engine draws with is a tool the host lacks until the packages are installed
+    # again, which no input of a node records.
+    missing = child_processes.MissingToolError
+    with pytest.raises(missing, match=rf"@napi-rs/canvas 0\.8\.149.*@napi-rs/canvas {pinned}"):
         tools.run("geometry-check", [])
     manifest.unlink()
-    with pytest.raises(
-        PictureError, match=rf"installs no @napi-rs/canvas.*@napi-rs/canvas {pinned}"
-    ):
+    with pytest.raises(missing, match=rf"installs no @napi-rs/canvas.*@napi-rs/canvas {pinned}"):
         tools.run("frame-audit", [])
     assert not (root / "build").exists()
+
+
+def test_a_tool_that_drives_the_browser_stops_where_no_browser_build_stands(film, monkeypatch):
+    monkeypatch.setattr(picture_browser, "browser_path", lambda: film / "no-browser")
+    with pytest.raises(child_processes.MissingToolError, match="No browser build at .*no-browser"):
+        tools.run("player-check", [])
 
 
 def test_a_film_without_node_on_its_path_cannot_run_its_tools(film, monkeypatch):
@@ -166,5 +179,12 @@ def test_the_engine_names_each_tool_by_its_module():
         "player-check",
         "whole-turns",
     ]
-    for path in tools.TOOLS.values():
-        assert (tools.PACKAGE / path).is_file()
+    for tool in tools.TOOLS.values():
+        assert (tools.PACKAGE / tool.module).is_file()
+
+
+def test_a_tool_browses_where_its_module_drives_the_supplied_browser():
+    # The field states what the module does: it imports the browser driver.
+    for name, tool in tools.TOOLS.items():
+        drives = "headless-browser.mjs" in (tools.PACKAGE / tool.module).read_text()
+        assert tool.browses is drives, name

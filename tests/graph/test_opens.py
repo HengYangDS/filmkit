@@ -163,9 +163,9 @@ def test_nothing_is_recorded_and_node_starts_unaudited_when_the_variable_is_unse
             return 0
 
     monkeypatch.setattr(tools.picture_renderer, "require_renderer", lambda: None)
+    (root / "chrome").write_text("a stand-in for the supplied browser build")
     monkeypatch.setattr(tools.picture_browser, "browser_path", lambda: root / "chrome")
     monkeypatch.setattr(tools, "stage_tools", lambda: root)
-    monkeypatch.setattr(tools, "MEASURING", ())
     monkeypatch.setattr(tools.subprocess, "Popen", Started)
     monkeypatch.delenv("NODE_OPTIONS", raising=False)
     assert tools.run(next(iter(tools.TOOLS)), []) == 0

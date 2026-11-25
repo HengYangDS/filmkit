@@ -9,6 +9,7 @@ import pytest
 import filmkit.api as api
 import filmkit.captions.refresh as refresh
 import filmkit.check as check
+import filmkit.child_processes as child_processes
 import filmkit.concepts as concepts
 import filmkit.narration.anchors as anchors
 import filmkit.narration.readings as readings
@@ -435,10 +436,11 @@ def test_a_composition_that_does_not_load_is_not_judged_and_refuses_nothing(draw
     assert judged["not_loaded"] == {"zh": loaded, "en": loaded}
 
 
-def test_a_check_whose_packages_are_missing_refuses_with_its_reason(drawing, tmp_path):
+def test_a_check_whose_canvas_package_is_missing_stops_as_a_missing_tool(drawing, tmp_path):
+    # No input of the check records the installed packages: the canvas is a tool the host lacks.
     (tmp_path / "node_modules" / renderer.RENDERER_PACKAGE).unlink()
-    refused = "\n".join(drawing()[0])
-    assert re.search(f"cannot draw it: .*no {renderer.RENDERER_NAME}", refused)
+    with pytest.raises(child_processes.MissingToolError, match=f"no {renderer.RENDERER_NAME}"):
+        drawing()
 
 
 def test_a_film_without_a_composition_is_not_asked(drawing, tmp_path):

@@ -297,15 +297,15 @@ def test_a_player_that_fails_its_readback_refuses_delivery_before_any_change(fil
     assert not destination.exists()
 
 
-def test_a_player_check_that_cannot_run_refuses_delivery(film, monkeypatch):
+def test_a_player_check_the_host_cannot_run_delivers_nothing(film, monkeypatch):
     root, destination = film
 
-    def refused(binding, receipt):
-        raise PictureError("The film installs no @napi-rs/canvas")
+    def missing(binding, receipt):
+        raise child_processes.MissingToolError("The film installs no @napi-rs/canvas")
 
-    monkeypatch.setattr(delivery_folder, "check_players", refused)
+    monkeypatch.setattr(delivery_folder, "check_players", missing)
     monkeypatch.setattr(delivery_folder, "rsync_version", lambda: "rsync  version 3.4.1")
-    with pytest.raises(DeliveryRefusedError, match="cannot run, so nothing is delivered: The film"):
+    with pytest.raises(child_processes.MissingToolError, match="installs no @napi-rs/canvas"):
         delivery_folder.deliver(root, destination)
     assert not destination.exists()
 

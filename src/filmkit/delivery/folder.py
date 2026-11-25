@@ -403,11 +403,7 @@ def read_bound_players(
     caller that delivers nothing, such as a review round, passes its own words or none."""
     receipt = receipt or root / PLAYERS
     receipt.unlink(missing_ok=True)
-    try:
-        status = check_players(binding, receipt)
-    except PictureError as error:
-        msg = f"The player check cannot run{outcome}: {error}"
-        raise DeliveryRefusedError(msg) from error
+    status = check_players(binding, receipt)
     if status != 0:
         failed = []
         if receipt.is_file():

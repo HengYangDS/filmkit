@@ -155,7 +155,7 @@ tools.picture_renderer.require_renderer = lambda: None
 tools.picture_browser.browser_path = lambda: "no-browser"
 tools.shutil.which = lambda name: sys.executable
 tools.stage_tools = lambda: tool.parent
-tools.TOOLS = {"standin": tool.name}
+tools.TOOLS = {"standin": tools.Tool(tool.name)}
 with child_processes.ending("check: stopped by {request}"):
     gates.run_audits([("standin", [], tool.parent / "report.json", None)])
 """
@@ -189,7 +189,7 @@ tools.picture_renderer.require_renderer = lambda: None
 tools.picture_browser.browser_path = lambda: "no-browser"
 tools.shutil.which = lambda name: sys.executable
 tools.stage_tools = lambda: tool.parent
-tools.TOOLS = {"standin": tool.name}
+tools.TOOLS = {"standin": tools.Tool(tool.name)}
 if len(sys.argv) > 2:
     tools.STOP_SECONDS = float(sys.argv[2])
 with child_processes.ending("check: stopped by {request}"):
