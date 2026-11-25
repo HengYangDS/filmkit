@@ -162,11 +162,16 @@ def test_an_error_of_the_host_is_a_fault_and_no_refusal_of_the_edition(
     count, where, kind, named, words, capsys
 ):
     setattr(count, where, kind(*named))
-    # The command cannot finish: it exits 2 with the fault's traceback, and refuses nothing.
+    # The command cannot finish: it exits 2 and refuses nothing, naming a decoder the host lacks
+    # in one line and any other fault with its traceback.
     with pytest.raises(SystemExit) as failed:
         converge()
     assert failed.value.code == child_processes.UNFINISHED
-    assert capsys.readouterr().err.endswith(f"{words}\n")
+    said = capsys.readouterr().err
+    if kind is FileNotFoundError:
+        assert said == "No ffmpeg on the path; install it as Homebrew does: brew install ffmpeg\n"
+    else:
+        assert said.startswith("Traceback") and said.endswith(f"{words}\n")
     record = record_of()
     assert (record["state"], record["unsettled"]) == ("ended", {})
     assert record["fit"] == {

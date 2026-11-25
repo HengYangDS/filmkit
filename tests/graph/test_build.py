@@ -133,6 +133,11 @@ def test_a_refusal_stands_until_what_its_node_reads_changes(table, monkeypatch):
     [
         (RuntimeError("the disk is gone"), "stage:zh: RuntimeError: the disk is gone", True),
         (child_processes.MissingToolError("No node on PATH"), "stage:zh: No node on PATH", False),
+        (
+            FileNotFoundError(2, "No such file or directory", "ffmpeg"),
+            "stage:zh: No ffmpeg on the path; install it as Homebrew does: brew install ffmpeg",
+            False,
+        ),
     ],
 )
 def test_a_node_that_cannot_finish_fails_and_the_build_exits_2(

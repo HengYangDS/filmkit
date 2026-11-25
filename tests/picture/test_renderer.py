@@ -2,6 +2,7 @@
 the canvas a receipt names, and the data a stage holds for it."""
 
 import json
+import shutil
 import sys
 import textwrap
 from pathlib import Path
@@ -239,6 +240,13 @@ def test_no_render_reads_the_declared_capture(film_root, monkeypatch, capture):
     picture_draft.render_draft(edition, 60)
     draft = repository.read(edition.draft_receipt)
     assert "capture" not in draft and draft["command"][3:5] == [str(film_root.renderer), "render"]
+
+
+def test_a_render_without_ffmpeg_names_it_before_the_renderer_starts(monkeypatch):
+    # Node is on the path; FFmpeg, which the renderer starts, is not.
+    monkeypatch.setattr(shutil, "which", lambda name: None if name == "ffmpeg" else f"/bin/{name}")
+    with pytest.raises(child_processes.MissingToolError, match="^No ffmpeg on the path; install"):
+        picture_renderer.launcher()
 
 
 def test_a_render_without_node_cannot_finish(monkeypatch):

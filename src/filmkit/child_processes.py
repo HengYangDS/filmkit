@@ -70,13 +70,14 @@ import contextlib
 import errno
 import os
 import select
+import shutil
 import signal
 import stat
 import subprocess
 import sys
 import threading
 import time
-from typing import TYPE_CHECKING, NoReturn
+from typing import TYPE_CHECKING, NamedTuple, NoReturn
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -101,6 +102,50 @@ FINISHED, REFUSED, UNFINISHED = 0, 1, 2
 class MissingToolError(RuntimeError):
     """A tool the engine runs is not on this host as its owner installs it, so the command
     cannot finish: no refusal of the film's, and its status is `UNFINISHED`."""
+
+
+class HostTool(NamedTuple):
+    """A program of the host that the engine starts by name: how Homebrew installs it and, for an
+    encoder whose version a node's record pins, the name it is pinned by and the arguments that
+    print that version (`filmkit.graph.runs.ENCODERS`)."""
+
+    install: str
+    pinned: str | None = None
+    version: tuple[str, ...] = ()
+
+
+# The host's programs that the engine starts by name (design decision 13 of
+# build-a-film-by-its-verbs for the encoders' pins).
+HOST_TOOLS = {
+    "ffmpeg": HostTool("brew install ffmpeg", "FFmpeg", ("-version",)),
+    "ffprobe": HostTool("brew install ffmpeg", "ffprobe", ("-version",)),
+    "exiftool": HostTool("brew install exiftool", "ExifTool", ("-ver",)),
+    "rsync": HostTool("brew install rsync"),
+}
+
+
+def absent(program: str) -> MissingToolError:
+    """The host lacks one of `HOST_TOOLS`: named in one line with how Homebrew installs it."""
+    install = HOST_TOOLS[program].install
+    return MissingToolError(f"No {program} on the path; install it as Homebrew does: {install}")
+
+
+def required(program: str) -> str:
+    """The path of one of `HOST_TOOLS` on the host, or its absence (`absent`)."""
+    found = shutil.which(program)
+    if found is None:
+        raise absent(program)
+    return found
+
+
+def missing(error: BaseException) -> MissingToolError | None:
+    """The tool the host lacks that an error says: a `MissingToolError`, or the
+    `FileNotFoundError` that starting one of `HOST_TOOLS` raises where it is not on the path;
+    None for any other error."""
+    if isinstance(error, MissingToolError):
+        return error
+    named = error.filename if isinstance(error, FileNotFoundError) else None
+    return absent(named) if named in HOST_TOOLS else None
 
 
 class Terminated(BaseException):

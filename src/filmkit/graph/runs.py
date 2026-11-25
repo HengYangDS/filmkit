@@ -42,6 +42,7 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+import filmkit.child_processes as child_processes
 from filmkit.graph import host, nodes, opens, records
 from filmkit.production import CODES, Edition
 
@@ -198,12 +199,12 @@ def table() -> dict[str, nodes.Node]:
     return {node.name: node for node in chain.TABLE}
 
 
-# The host's encoders a node may name among its tools, each with the command that states its
-# version: FFmpeg's and ffprobe's first line of `-version`, ExifTool's `-ver` (design decision 13).
+# The host's encoders a node may name among its tools, each by the name its record pins it under,
+# with the command that states its version (design decision 13), from the host's programs.
 ENCODERS = {
-    "FFmpeg": ("ffmpeg", "-version"),
-    "ffprobe": ("ffprobe", "-version"),
-    "ExifTool": ("exiftool", "-ver"),
+    tool.pinned: (program, *tool.version)
+    for program, tool in child_processes.HOST_TOOLS.items()
+    if tool.pinned
 }
 # What a pin states of an encoder the host does not have.
 ABSENT = "absent"

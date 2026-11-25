@@ -114,9 +114,10 @@ def run_node(table: nodes.Table, key: str) -> tuple[int, str | None]:
             return child_processes.REFUSED, status
         status = child_processes.REFUSED if status is None else status
         return status, f"{key}: exit status {status}"
-    except child_processes.MissingToolError as error:
-        return child_processes.UNFINISHED, f"{key}: {error}"
     except Exception as error:
+        tool = child_processes.missing(error)
+        if tool is not None:
+            return child_processes.UNFINISHED, f"{key}: {tool}"
         traceback.print_exc(file=sys.stderr)
         return child_processes.UNFINISHED, f"{key}: {type(error).__name__}: {error}".rstrip(": ")
     return child_processes.FINISHED, None

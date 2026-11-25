@@ -35,7 +35,7 @@ Every verb SHALL exit 0 where it did what it was asked; 1 where the film or a ga
 
 #### Scenario: A missing tool
 
-- **WHEN** a verb needs a tool the host lacks: no `node`, FFmpeg or Vale on the path, or no rsync 3
+- **WHEN** a verb or a node it runs needs a tool the host lacks: no `node`, `ffmpeg`, `ffprobe`, `exiftool` or Vale on the path, or no rsync 3
 - **THEN** it names the tool in one line and exits 2
 
 #### Scenario: A node that fails

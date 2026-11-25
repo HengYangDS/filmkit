@@ -346,11 +346,12 @@ def main(argv: list[str] | None = None) -> None:
     options = arguments().parse_args(argv)
     try:
         status = ran(options)
-    except child_processes.MissingToolError as error:
-        print(error, file=sys.stderr)
-        sys.exit(child_processes.UNFINISHED)
-    except Exception:
-        traceback.print_exc(file=sys.stderr)
+    except Exception as error:
+        tool = child_processes.missing(error)
+        if tool is not None:
+            print(tool, file=sys.stderr)
+        else:
+            traceback.print_exc(file=sys.stderr)
         sys.exit(child_processes.UNFINISHED)
     if status:
         sys.exit(status)

@@ -210,13 +210,15 @@ def spans() -> int:
 
 
 def launcher() -> list[str]:
-    """What starts the renderer: Node on the film's copy of the engine's module."""
+    """What starts the renderer: Node on the film's copy of the engine's module, once the host
+    holds the FFmpeg it encodes with (`child_processes.required`)."""
     import filmkit.tools as tools
 
     node = shutil.which("node")
     if node is None:
         msg = "No node on PATH; render in the film's Mise environment"
         raise child_processes.MissingToolError(msg)
+    child_processes.required("ffmpeg")
     return [node, str(tools.stage_tools() / MODULE)]
 
 

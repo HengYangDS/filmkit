@@ -170,6 +170,11 @@ MISSING = "No node on PATH; run the tools in the film's Mise environment"
         (None, child_processes.FINISHED, ""),
         (supply.SupplyError("The CMUdict differs"), child_processes.REFUSED, ""),
         (child_processes.MissingToolError(MISSING), child_processes.UNFINISHED, f"{MISSING}\n"),
+        (
+            FileNotFoundError(2, "No such file or directory", "ffprobe"),
+            child_processes.UNFINISHED,
+            "No ffprobe on the path; install it as Homebrew does: brew install ffmpeg\n",
+        ),
         (RuntimeError("the disk is gone"), child_processes.UNFINISHED, "Traceback"),
     ],
 )
