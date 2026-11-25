@@ -76,7 +76,8 @@ def pair(film_root, monkeypatch):
     def derive(source, target, size, rows, frames, work, deadline, *, edges, code):
         encodes.append({"rows": rows, "frames": frames, "deadline": deadline, "edges": edges})
         if tools.band_fault:
-            raise derivation.BandFault(tools.band_fault.format(code=code))
+            again = faults.render_again(code, "captioned")
+            raise derivation.BandFault(tools.band_fault.format(again=again))
         target.write_text(f"derived from {repository.sha(source)}")
         check = {"frames": 99, "largest_departure": 1, "verdict": "pass"}
         whole = edition.runtime * derivation.FPS
@@ -200,14 +201,13 @@ def test_a_one_frame_change_in_the_band_refuses_naming_the_captioned_render_alon
     tools.band_fault = (
         "The captioned picture's caption band changes for one frame: encoded frame 50 at 0.833 "
         "s: the captioned picture holds a one-frame fault of 219 levels in box [1500, 1900, "
-        "1540, 1940] in the caption band; render it again with filmkit build "
-        "render-picture:{code}"
+        "1540, 1940] in the caption band; render it again with {again}"
     )
     with pytest.raises(derivation.BandFault) as refused:
         derivation.derive_uncaptioned(edition)
     # The fault is the captioned picture's: the refusal does not offer a native uncaptioned
     # render, which would leave the fault in the captioned films.
-    assert str(refused.value).endswith("filmkit build render-picture:zh")
+    assert str(refused.value).endswith(faults.render_again("zh", "captioned"))
     assert "native" not in str(refused.value)
     assert not uncaptioned.file.exists() and not uncaptioned.receipt.exists()
 

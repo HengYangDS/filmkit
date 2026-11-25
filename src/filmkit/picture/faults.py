@@ -89,12 +89,19 @@ REPAIR = "python -m filmkit.picture.repair --language {code}"
 
 
 def render_again(code: str, picture: str) -> str:
-    """The command that renders one picture of a rendered pair again: the uncaptioned one from
+    """What renders one picture of a rendered pair again: the picture's file removed, since a
+    build runs nothing for a node that is fresh, and then the node built; the uncaptioned one from
     its own stage, which the film declares in `[picture] native_uncaptioned`."""
-    if picture == "captioned":
-        return target("render-picture", code)
-    native = f"{code} in [picture] native_uncaptioned"
-    return f"{target('render-picture-uncaptioned', code)} with {native}"
+    from filmkit.production import Edition
+
+    captions = picture == "captioned"
+    removed = repository.relative(Edition(code).rendered(captions).file)
+    if captions:
+        command = target("render-picture", code)
+    else:
+        native = f"{code} in [picture] native_uncaptioned"
+        command = f"{target('render-picture-uncaptioned', code)} with {native}"
+    return f"{command}, after removing {removed}"
 
 
 def apart(a: np.ndarray, b: np.ndarray) -> np.ndarray:

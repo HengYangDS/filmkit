@@ -23,8 +23,14 @@ CAPTION = "drawbox=x=30:y=44:w=36:h=6:color=white:t=fill:enable='between(t,0.5,1
 LABEL = "drawbox=x=8:y=6:w=24:h=8:color=white:t=fill:enable='between(t,0.5,1)'"
 BAND = {"left": 600, "top": 880, "right": 1320, "bottom": 1000}
 CUES = [{"start": 0.5, "end": 1.0, "text": "One."}]
-RENDER = "filmkit build render-picture:zh"
-NATIVE = "filmkit build render-picture-uncaptioned:zh with zh in [picture] native_uncaptioned"
+# The command a refusal names to render a picture of the pair again: its file removed first, since a
+# fresh node's build runs nothing.
+PICTURE = "build/artifacts/film/zh/sample-reel-final-picture"
+RENDER = f"filmkit build render-picture:zh, after removing {PICTURE}.mp4"
+NATIVE = (
+    "filmkit build render-picture-uncaptioned:zh with zh in [picture] native_uncaptioned, "
+    f"after removing {PICTURE}-uncaptioned.mp4"
+)
 # The next step a refusal names when repair-pictures can answer each of its findings.
 NEXT = "; next: python -m filmkit.picture.repair --language zh"
 
@@ -381,6 +387,7 @@ def test_the_findings_leave_residues_out_and_count_the_differences_not_listed():
     assert equivalence.faults.findings({**report, "lasting": [], "lasting_runs": 0}, "en") == [
         "encoded frame 9 at 0.150 s: the captioned picture holds a one-frame fault of 200 levels "
         "in box [0, 0, 1, 1] outside the caption band; render it again with "
-        "filmkit build render-picture:en",
+        "filmkit build render-picture:en, after removing "
+        "build/artifacts/film/en/sample-reel-final-picture.mp4",
         "encoded: 2 more one-frame differences",
     ]

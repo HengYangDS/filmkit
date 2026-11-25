@@ -30,7 +30,7 @@ def test_a_node_is_named_by_the_verb_that_builds_it():
     assert target("check-picture", "zh") == "filmkit build check-picture:zh"
     assert target("check") == "filmkit build check"
     assert Edition("zh").unassembled().args[0].endswith("run filmkit build assemble:zh")
-    assert faults.render_again("en", "captioned") == "filmkit build render-picture:en"
+    assert faults.render_again("en", "captioned").startswith("filmkit build render-picture:en, ")
     assert faults.REPAIR.format(code="zh") == "python -m filmkit.picture.repair --language zh"
     assert set_aside.SET_ASIDE_COMMAND.startswith("filmkit review set-aside --round {number}")
 

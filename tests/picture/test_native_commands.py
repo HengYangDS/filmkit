@@ -6,9 +6,14 @@ import filmkit.picture.faults as faults
 
 
 def test_the_uncaptioned_picture_of_a_rendered_pair_is_rendered_again_natively():
-    assert faults.render_again("en", "captioned") == "filmkit build render-picture:en"
+    # The picture's node is fresh, so its file goes first and the build then renders it.
+    picture = "build/artifacts/film/en/sample-reel-final-picture"
+    assert faults.render_again("en", "captioned") == (
+        f"filmkit build render-picture:en, after removing {picture}.mp4"
+    )
     assert faults.render_again("en", "uncaptioned") == (
-        "filmkit build render-picture-uncaptioned:en with en in [picture] native_uncaptioned"
+        "filmkit build render-picture-uncaptioned:en with en in [picture] native_uncaptioned, "
+        f"after removing {picture}-uncaptioned.mp4"
     )
 
 
@@ -19,5 +24,6 @@ def test_a_fault_of_the_uncaptioned_picture_names_the_native_render():
     found = faults.findings(report, "zh")[0]
     assert found.endswith(
         "render it again with filmkit build render-picture-uncaptioned:zh with zh in [picture] "
-        "native_uncaptioned"
+        "native_uncaptioned, after removing build/artifacts/film/zh/"
+        "sample-reel-final-picture-uncaptioned.mp4"
     )

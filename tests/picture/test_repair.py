@@ -28,8 +28,14 @@ import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
 
-RENDER = "filmkit build render-picture:zh"
-NATIVE = "filmkit build render-picture-uncaptioned:zh with zh in [picture] native_uncaptioned"
+# The command a refusal names to render a picture of the pair again: its file removed first, since a
+# fresh node's build runs nothing.
+PICTURE = "build/artifacts/film/zh/sample-reel-final-picture"
+RENDER = f"filmkit build render-picture:zh, after removing {PICTURE}.mp4"
+NATIVE = (
+    "filmkit build render-picture-uncaptioned:zh with zh in [picture] native_uncaptioned, "
+    f"after removing {PICTURE}-uncaptioned.mp4"
+)
 COMPARE = "filmkit build compare-pictures:zh"
 # The fault that compare-pictures attributes to the uncaptioned picture holding FRAGMENT.
 FAULT = {
@@ -347,7 +353,7 @@ def test_a_refusal_names_the_repair_only_where_the_repair_can_answer_it(
     with pytest.raises(PictureError) as refusal:
         equivalence.compare_pictures(pair)
     assert str(refusal.value).endswith(NEXT) is named
-    assert ("repair-pictures" in str(refusal.value)) is named
+    assert ("filmkit.picture.repair" in str(refusal.value)) is named
 
 
 @pytest.mark.ffmpeg
