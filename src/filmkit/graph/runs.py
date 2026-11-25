@@ -40,10 +40,8 @@ import sys
 import threading
 import time
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-import filmkit.repository as repository
 from filmkit.graph import host, nodes, opens, records
 from filmkit.production import CODES, Edition
 
@@ -397,25 +395,3 @@ def open_node(
         # A failure of the seam is never the command's.
         unwritten(nodes.key(node.name, code), error)
         return None
-
-
-def own_places(code: str, command: str, arguments: list[str]) -> bool:
-    """Whether every argument that names a place below the film's root lies in a place the node
-    declares, so that the run is the node's whole run; a command that names no node is."""
-    node = table().get(command)
-    if node is None:
-        return True
-    edition = Edition(code)
-    places = [*node.outputs(edition).values()]
-    places += [p for way in node.ways.values() for p in way(edition).values()]
-    declared = [nodes.place(p) for p in places]
-    root = repository.ROOT.resolve()
-    for argument in arguments:
-        named = Path(os.path.normpath(repository.ROOT / argument)).resolve()
-        if argument.startswith("-") or not ("/" in argument or named.exists()):
-            continue
-        if named == root or not named.is_relative_to(root):
-            continue
-        if not any(nodes.overlaps(named, place) for place in declared):
-            return False
-    return True
