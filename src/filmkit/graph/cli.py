@@ -179,7 +179,8 @@ def checked(read_only: bool) -> int:
             print("\n".join(f"{name}: {text}" for text in texts), end="\n" if texts else "")
         count = sum(map(len, verdict["findings"].values()))
         if count:
-            print(f"filmkit check refuses the sources: {count} finding{'s' * (count != 1)}")
+            refused = f"filmkit check refuses the sources: {count} finding{'s' * (count != 1)}"
+            print(refused, file=sys.stderr)
             return 1
     else:
         from filmkit.graph import runs

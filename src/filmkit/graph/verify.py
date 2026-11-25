@@ -14,6 +14,7 @@ A review round's preparation and a release's record run `check` before they writ
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 
 from filmkit.graph import nodes, plan
@@ -83,7 +84,8 @@ def run(table: nodes.Table | None = None) -> int:
         print(f"refused: {line}")
     files = f"{verified.hashed} files hashed"
     if verified.refusals:
-        print(f"filmkit verify refuses the build ({len(verified.refusals)} refusals); {files}")
+        refused = f"filmkit verify refuses the build ({len(verified.refusals)} refusals); {files}"
+        print(refused, file=sys.stderr)
         return 1
     print(
         f"filmkit verify passes: every node is fresh and passed, every byte accounted for; {files}"

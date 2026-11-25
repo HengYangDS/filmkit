@@ -148,8 +148,10 @@ def test_a_read_only_check_writes_no_file_whether_it_passes_or_refuses(copied, c
     with pytest.raises(SystemExit) as refused:
         cli.main(["check", "--read-only"])
     assert refused.value.code == 1
-    said = capsys.readouterr().out.splitlines()
-    assert said[0].startswith("template: no ") and said[-1].startswith("filmkit check refuses")
+    # Each finding is printed; the refusal is one line on standard error.
+    said = capsys.readouterr()
+    assert said.out.splitlines()[0].startswith("template: no ")
+    assert said.err.splitlines() == ["filmkit check refuses the sources: 1 finding"]
     assert listing(copied) == before
 
 

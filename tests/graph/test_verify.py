@@ -129,6 +129,16 @@ def test_a_build_without_records_is_refused_and_verify_writes_nothing(stand_in_t
     assert listing() == before
 
 
+def test_each_refusal_is_printed_and_the_refusal_is_one_line_on_standard_error(
+    stand_in_table, capsys
+):
+    assert verify.run(stand_in_table) == 1
+    said = capsys.readouterr()
+    assert said.out.startswith("refused: no record: ")
+    (line,) = said.err.splitlines()
+    assert line.startswith("filmkit verify refuses the build (1 refusals); ")
+
+
 def test_a_whole_build_passes_and_writes_nothing(stand_in_table, capsys):
     whole()
     before = listing()
