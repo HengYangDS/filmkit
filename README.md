@@ -11,6 +11,20 @@ The engine carries no film's content. Each film's repository holds its scripts, 
 - FFmpeg with libx264, ExifTool and rsync 3, from Homebrew: `brew install ffmpeg exiftool rsync`.
 - Network access for `filmkit supply` alone, which installs the browser build of the checks, the pinned CMUdict and the three speech models; `HF_ENDPOINT` names a Hugging Face mirror where the hub is unreachable.
 
+## Installing the engine in a film
+
+A film pins a release tag in its Python project and locks it:
+
+```toml
+[project]
+dependencies = ["filmkit"]
+
+[tool.uv.sources]
+filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.33.0" }
+```
+
+Its `package.json` declares the npm packages the engine runs, `@napi-rs/canvas`, `puppeteer-core` and `@puppeteer/browsers`, each at the version the engine's own `package.json` names under `dependencies`, the one source of those versions; `filmkit check` names a package the film holds at another version.
+
 ## A film's layout
 
 A film is the folder that holds `content/film.toml`. The engine builds the film that `FILMKIT_ROOT` names or, when it is unset, the nearest film at or above the working directory.
@@ -24,6 +38,22 @@ A film is the folder that holds `content/film.toml`. The engine builds the film 
 | `picture/index.html`, `picture/film.js`, `picture/film.css` | The picture composition                                                                  |
 | `release.json`                                              | The release record, which `filmkit release` writes                                       |
 | `build/`                                                    | Everything the engine writes; keep it out of version control                             |
+
+The declaration states the film's file prefix (`slug`), `author`, `delivery_folder`, `entry`, `source_manifest` and `credits_duration`, optionally a concept contract (`concepts`), and these tables:
+
+| Table               | What it declares                                                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[editions.<code>]` | Each edition, in the film's order: the summary its player shows and its caption terms                                                                   |
+| `[picture]`         | The fonts, the capture, the drafts, the geometry's row gaps, the editions rendered natively uncaptioned, and the wrapping, motion and detail exceptions |
+| `[player]`          | The player page's colours                                                                                                                               |
+| `[review]`          | The reviewer prompt, the floors, the scored dimensions, the clarity floors and their exceptions                                                         |
+| `[pronunciation]`   | What every edition's pronunciation shares                                                                                                               |
+| `[narration]`       | The narration's flow and terms and the owner's hearings                                                                                                 |
+| `[captions]`        | The caption cues above the reading rate that the film keeps                                                                                             |
+| `[register]`        | The forms the film keeps against the register style                                                                                                     |
+| `[release]`         | The film-bound sources its release records                                                                                                              |
+
+The fields and their refusals are specified in [`openspec/specs/`](openspec/specs/): the film's parameters in `film-engine`, the other tables in the specifications of what reads them.
 
 ## The verbs
 
