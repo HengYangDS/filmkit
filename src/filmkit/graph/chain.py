@@ -1,11 +1,9 @@
-"""The engine's node table: each command of an edition's build chain as a node, its inputs and
-outputs as functions of an edition, the paths that several of them write, and the reads each
-makes aside (design decisions 1, 4 and 5 of record-every-run; `filmkit.graph.nodes` loads it).
-
-Where an owner binds its inputs, the node takes that owner's function (design decision 4). Every
-node reads the film's declaration, which every command loads, and binds each top-level table of it
-that the node may read, by the table's digest (design decision 12 of build-a-film-by-its-verbs):
-every table, but the narration's for the nodes that make and deliver the pictures.
+"""The engine's node table: each command of an edition's build chain as a node, by what it binds
+(`filmkit.graph.bindings`), its run, the gates it waits for and the host class it is expected
+to measure at; the paths that several nodes write and the reads each makes aside (design
+decisions 1, 4 and 5 of record-every-run; `filmkit.graph.nodes` loads it). The runs of the
+nodes that no owner's function runs are here: the engine's tools run with the arguments the
+films' task lines passed, a whole stage and the uncaptioned picture's way.
 """
 
 from __future__ import annotations
@@ -30,273 +28,48 @@ import filmkit.soundtrack.gates as sound_gates
 import filmkit.tools as tools
 from filmkit.captions import refresh
 from filmkit.film import FILM
-from filmkit.graph.nodes import (
-    EVERY,
-    REPLACES,
-    REWRITES,
-    Node,
-    Places,
-    Table,
-    Wait,
-    Writer,
-    load,
-    stands,
+from filmkit.graph.bindings import (
+    NARRATED,
+    caches,
+    check_outputs,
+    checked,
+    compared,
+    declared,
+    derived_from,
+    derived_uncaptioned,
+    documents,
+    faces,
+    metadata,
+    metadata_inputs,
+    named,
+    narration,
+    native,
+    only,
+    packaged,
+    pictured,
+    rendered,
+    root,
+    sources,
+    stage,
+    staged_picture,
+    staging,
+    uncaptioned_way,
+    work,
 )
+from filmkit.graph.nodes import EVERY, REPLACES, REWRITES, Node, Places, Table, Wait, Writer, load
 from filmkit.graph.nodes import FILM as ONCE
-from filmkit.graph.records import DeclarationTable, Folder, table_names
-from filmkit.narration import alignment_records, readings, selection, transcript_records
-from filmkit.narration.narrate import evidence_paths
+from filmkit.graph.records import Folder
+from filmkit.narration import selection
 from filmkit.production import CODES, Edition
 from filmkit.review import set_aside
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
 
 # The tools whose reads the check of each run's opens sees only through their arguments.
 MEDIA, BROWSER = ("FFmpeg", "ffprobe"), ("Chrome",)
 # The geometry check's step, which every film's task line passed (design decision 14).
 GEOMETRY_STEP = "2"
-# The declaration's tables, each bound by its digest.
-TABLES = tuple(dict.fromkeys(table_names(film.Film).values()))
-# The tables no node that makes or delivers the pictures reads: no module of `filmkit.picture` or
-# `filmkit.delivery` reaches a reader of the narration's table (`narration.audition`,
-# `judgment`, `readings` and `selection`, `review.listening_plan` and `measurement`,
-# `soundtrack.assembly`; read 2026-11-25), so a hearing recorded there leaves them fresh; the
-# check of each run's opens holds each node to it.
-PICTURED = tuple(t for t in TABLES if t != "narration")
-# The tables the narration reads: the film's identity and editions and the pronunciation that
-# the editions share (`narration.synthesis`, `narration.pronunciation`), so that an edit of the
-# composition, of another edition's script or of the narration's table leaves it fresh (design
-# decision 9).
-NARRATED = ("identity", "editions", "pronunciation")
-
-
-def root(path: str | Path) -> Path:
-    """A path below the film's root, as the root stands when the table is read."""
-    return repository.ROOT / path
-
-
-def named(bindings: dict[str, Path]) -> Places:
-    """An owner's binding list by the names its record keys them under, less `_sha256`."""
-    return Places({name.removesuffix("_sha256"): path for name, path in bindings.items()})
-
-
-def declared(edition: Edition | None, tables: tuple[str, ...] = TABLES) -> Places:
-    """What every command reads: the film's declaration, which it loads, as the tables it may read,
-    every one by default."""
-    del edition
-    path = root(repository.DECLARATION)
-    return Places({f"declaration.{t}": DeclarationTable(path, t) for t in tables})
-
-
-def pictured(edition: Edition | None) -> Places:
-    """What a node that makes or delivers the pictures reads of the declaration (`PICTURED`)."""
-    return declared(edition, PICTURED)
-
-
-def sources(edition: Edition) -> Places:
-    """The edition's tracked sources that its narration reads; its readings where it has them
-    (`nodes.stands`)."""
-    places = edition.places
-    found = Places(
-        script=root(edition.script),
-        cast=root(edition.cast),
-        pronunciation=root(places.pronunciation),
-        reference=root(places.reference),
-    )
-    return found | ({"readings": root(places.readings)} if stands(root(places.readings)) else {})
-
-
-def checked_words(edition: Edition) -> Places:
-    """What the checks of words read: the source manifest, the concepts, every script and the
-    composition's sources (`filmkit.concepts`, `filmkit.register`)."""
-    del edition
-    found = Places(
-        source_manifest=root(FILM.source_manifest),
-        composition_sources=Folder(root("picture"), "**/*"),
-    )
-    found |= {f"script_{code}": root(Edition(code).script) for code in CODES}
-    return found | ({"concepts": root(FILM.concepts)} if FILM.concepts else {})
-
-
-def checked(edition: None) -> Places:
-    """What the source check reads (`filmkit.check`): the declaration whole, which the loader
-    reads, the words of every edition and its pronunciation and readings, the picture's sources
-    with its template, the entry page and the review prompt, and the film's npm and Python
-    manifests and locks."""
-    del edition
-    found = checked_words(None) | {"declaration": root(repository.DECLARATION)}
-    for code in CODES:
-        places = Edition(code).places
-        found |= {f"cast_{code}": root(places.cast)}
-        found |= {f"pronunciation_{code}": root(places.pronunciation)}
-        if stands(root(places.readings)):
-            found |= {f"readings_{code}": root(places.readings)}
-    found |= {"entry": root(FILM.entry), "prompt": root(FILM.review.prompt)}
-    pins = ("package.json", "package-lock.json", "pyproject.toml", "uv.lock")
-    return found | {name: root(name) for name in pins if stands(root(name))}
-
-
-def check_outputs(edition: None) -> Places:
-    """The source check's verdict and each edition's occurrence plan."""
-    del edition
-    found = Places(verdict=root(source_check.VERDICT))
-    return found | {f"plan_{code}": root(readings.plan_path(code)) for code in CODES}
-
-
-def narration(edition: Edition) -> Places:
-    """The edition's narration: its takes, their receipt, alignment and transcript."""
-    paths = evidence_paths(edition.code)
-    return Places(
-        recordings=Folder(root(paths["folder"]), "**/*"),
-        receipt=root(paths["receipt"]),
-        alignment=root(paths["alignment"]),
-        asr=root(paths["asr"]),
-    )
-
-
-def caches(edition: Edition) -> Places:
-    """The narration's caches, which each narration reads and adds to: each recording's alignment
-    and transcript, under the recording and the model that made it, in a folder for each
-    language. Its outputs, not its inputs: a run reads them as they stood and leaves them grown,
-    and a read of a node's own output is allowed."""
-    language = edition.language.lower()
-    return Places(
-        alignments=Folder(root(alignment_records.CACHE) / language, "*"),
-        transcripts=Folder(root(transcript_records.CACHE) / language, "*"),
-    )
-
-
-def documents(edition: Edition) -> Places:
-    """What the assembly writes and the caption refresh writes again."""
-    return Places(
-        soundtrack=edition.soundtrack,
-        timeline=edition.timeline,
-        assembly=edition.audio_assembly,
-        srt=edition.srt,
-        vtt=edition.vtt,
-        chapters=edition.chapters,
-        transcript=edition.transcript,
-        chapter_metadata=edition.chapter_metadata,
-    )
-
-
-def faces() -> Places:
-    """The stylesheet and the declared fonts, each by its path."""
-    return Places({f"face {name}": path for name, path in rendering.face_places().items()})
-
-
-def staging(edition: Edition) -> Places:
-    """What a stage is made from: the stage record's inputs, the composition, the template and
-    the faces."""
-    found = {name: root(path) for name, path in rendering.stage_places(edition).items()}
-    found |= {
-        "composition": root(rendering.COMPOSITION_SCRIPT),
-        "template": root(rendering.TEMPLATE),
-    }
-    return pictured(edition) | found | faces()
-
-
-def stage(edition: Edition, captions: bool = True) -> Places:
-    """A picture's stage, as a folder."""
-    return Places({"stage": Folder(edition.rendered(captions).stage, "**/*")})
-
-
-def rendered(edition: Edition, captions: bool = True) -> Places:
-    """A picture and its receipt."""
-    picture = edition.rendered(captions)
-    return Places({"picture": picture.file, "receipt": picture.receipt})
-
-
-def staged_picture(edition: Edition, captions: bool = True) -> Places:
-    """What a render or a validation of a staged picture reads: the stage and its sources."""
-    return staging(edition) | stage(edition, captions)
-
-
-def derived_uncaptioned(edition: Edition) -> bool:
-    """Whether the edition's uncaptioned picture, as its receipt stands, was derived, by the
-    owner's rule (`derivation.is_derived`). A receipt that is missing or cannot be read is no
-    derived picture's, as `uncaptioned_way` takes one, so that the table loads and the owner's
-    own check refuses the receipt (design decision 5)."""
-    try:
-        found = repository.read(edition.rendered(captions=False).receipt)
-    except (OSError, ValueError):
-        return False
-    return isinstance(found, dict) and derivation.is_derived(found)
-
-
-def native(edition: Edition) -> bool:
-    """Whether the film renders the edition's uncaptioned picture from its own stage
-    (`[picture] native_uncaptioned`)."""
-    return edition.code in FILM.picture.native_uncaptioned
-
-
-def uncaptioned_way(edition: Edition) -> str:
-    """The way the uncaptioned picture takes: `derived` or `native`."""
-    try:
-        way = derivation.uncaptioned_way(edition, native=native(edition))["way"]
-    except (OSError, ValueError, KeyError):
-        way = "rendered"
-    return "derived" if way == "derived" else "native"
-
-
-def derived_from(edition: Edition) -> Places:
-    """What the derived uncaptioned picture is made from: the captioned picture and receipt,
-    the composition and the timeline, and what the validation of the captioned picture reads
-    first (`derivation.derive_uncaptioned` calls `rendering.validate_picture`): its stage and the
-    stage's sources."""
-    found = {f"captioned_{name}": path for name, path in rendered(edition).items()}
-    found |= {"composition": root(rendering.COMPOSITION_SCRIPT), "timeline": edition.timeline}
-    return pictured(edition) | found | staged_picture(edition)
-
-
-def compared(edition: Edition) -> Places:
-    """What the comparison of the two pictures reads: the equivalence's list and both pictures,
-    with the stage of each picture that was rendered."""
-    found = pictured(edition) | named(equivalence.bound_inputs(edition)) | staged_picture(edition)
-    for captions, side in ((True, "captioned"), (False, "uncaptioned")):
-        found |= {f"{side}_{name}": path for name, path in rendered(edition, captions).items()}
-    if not derived_uncaptioned(edition):
-        found |= {"uncaptioned_stage": stage(edition, captions=False)["stage"]}
-    return found
-
-
-def metadata_inputs(edition: Edition) -> Places:
-    """What the viewing package and the entry page are made from."""
-    found = Places(
-        cover=root(edition.cover),
-        version=root(packaging.VERSION),
-        script=root(edition.script),
-        composition=root(rendering.COMPOSITION_SCRIPT),
-        entry_source=root(FILM.entry),
-    )
-    kept = ("srt", "vtt", "chapters", "transcript", "chapter_metadata")
-    found |= {name: path for name, path in documents(edition).items() if name in kept}
-    found |= {f"timeline_{code}": Edition(code).timeline for code in CODES}
-    return pictured(edition) | found
-
-
-def metadata(edition: Edition) -> Places:
-    """The viewing package's own files and the entry page, which every edition replaces."""
-    output = edition.artifacts
-    return Places(
-        cover_png=output / packaging.COVER_PNG,
-        cover_jpg=output / packaging.COVER_JPEG,
-        player=output / packaging.PAGE,
-        shot_plan=edition.shot_plan,
-        viewing_package=edition.viewing_package,
-        entry=repository.ROOT / packaging.LANGUAGE_INDEX,
-    )
-
-
-def packaged(edition: Edition) -> Places:
-    """What the films are made from: their inputs (`packaging.film_inputs`, each name marked
-    `film_`) but the cover the packaging writes itself, both pictures' validations, and the
-    viewing package's inputs."""
-    bound = named(packaging.film_inputs(edition)).items()
-    films = {f"film_{k}": p for k, p in bound if k != "cover"}
-    return compared(edition) | metadata_inputs(edition) | films
 
 
 def ran(tool: str, arguments: list[str]) -> None:
@@ -339,16 +112,6 @@ def render_uncaptioned(edition: Edition) -> object:
     if derivation.uncaptioned_way(edition, native=asked)["way"] == "derived":
         return derivation.derive_uncaptioned(edition, derivation.DEADLINE)
     return derivation.render_uncaptioned(edition, renderer.DEADLINE, asked=asked)
-
-
-def only(name: str, path: Callable[[Edition], Path | Folder]) -> Callable[[Edition], Places]:
-    """A node's outputs that are one file or folder."""
-    return lambda edition: Places({name: path(edition)})
-
-
-def work(name: str) -> Callable[[Edition], Path]:
-    """A file or folder below the work folder, named for the edition."""
-    return lambda edition: root("build/runtime/work") / name.format(code=edition.code)
 
 
 # The gates a render and a package wait for (design decision 4 of build-a-film-by-its-verbs):

@@ -12,7 +12,7 @@ import filmkit.picture.derivation as derivation
 import filmkit.produce as produce
 import filmkit.repository as repository
 import filmkit.tools as tools
-from filmkit.graph import chain, nodes, opens, plan, runs
+from filmkit.graph import bindings, chain, nodes, opens, plan, runs
 from filmkit.graph.records import Folder
 from filmkit.narration import converge, readings
 from filmkit.production import Edition
@@ -283,11 +283,13 @@ def test_no_node_runs_preflight_and_only_the_narration_has_no_run():
 
 
 def declaring(monkeypatch, **picture):
-    """The film's declaration with these keys of its `[picture]` table, as the table reads it."""
+    """The film's declaration with these keys of its `[picture]` table, as the table and what each
+    node binds read it."""
     declared = film.FILM.model_copy(
         update={"picture": film.FILM.picture.model_copy(update=picture)}
     )
-    monkeypatch.setattr(chain, "FILM", declared)
+    for module in (chain, bindings):
+        monkeypatch.setattr(module, "FILM", declared)
 
 
 @pytest.mark.parametrize("gaps", [False, True])
@@ -325,7 +327,7 @@ def test_an_edition_the_film_declares_native_renders_its_uncaptioned_picture(mon
     )
     chain.render_uncaptioned(Edition("zh"))
     assert (asked, rendered) == ([True], [(Edition("zh"), True)])
-    assert chain.uncaptioned_way(Edition("zh")) == "native"
+    assert bindings.uncaptioned_way(Edition("zh")) == "native"
 
 
 def test_an_edit_of_the_composition_or_of_the_english_script_leaves_the_chinese_narration_fresh(

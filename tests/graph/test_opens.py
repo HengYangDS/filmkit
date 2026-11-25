@@ -13,7 +13,7 @@ import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.declared_sources import named_files
 from filmkit.film import FILM
-from filmkit.graph import chain, nodes, opens, records
+from filmkit.graph import bindings, chain, nodes, opens, records
 
 # A Node child that reads a declared and an undeclared file, writes in the temporary folder,
 # opens a socket to a closed port and runs to its end.
@@ -233,12 +233,12 @@ def test_the_recorder_s_own_reads_of_the_table_are_no_reads_of_the_run(
     log = tmp_path / "opens.jsonl"
     # A function of the table that reads a file, as the way of a derived picture reads its
     # receipt, read while the recorder states Node's allowances inside the run.
-    code = "from filmkit.graph import chain, opens\nfrom filmkit.production import Edition\n"
-    code += "real = chain.derived_uncaptioned\n"
+    code = "from filmkit.graph import bindings, opens\nfrom filmkit.production import Edition\n"
+    code += "real = bindings.derived_uncaptioned\n"
     code += "def reading(edition):\n"
     code += "    (repository.ROOT / Edition('en').script).read_bytes()\n"
     code += "    return real(edition)\n"
-    code += "chain.derived_uncaptioned = reading\nassert opens.node_options()\n"
+    code += "bindings.derived_uncaptioned = reading\nassert opens.node_options()\n"
     python_child(root, log, code, node="compare-pictures:zh")
     assert opens.check(log).findings == []
 
@@ -389,4 +389,4 @@ def test_a_read_of_a_table_the_node_does_not_declare_fails_naming_the_table(decl
 def test_a_read_of_the_whole_declaration_is_a_read_of_every_table(declared_film):
     root, log, table = declared_film
     python_child(root, log, "from filmkit.film import FILM\nFILM.model_dump()\n", "reader:zh")
-    assert tables_named(opens.check(log, table)) == sorted(set(chain.TABLES) - {"picture"})
+    assert tables_named(opens.check(log, table)) == sorted(set(bindings.TABLES) - {"picture"})
