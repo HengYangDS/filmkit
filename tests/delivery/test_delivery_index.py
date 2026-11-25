@@ -134,7 +134,7 @@ def test_the_entry_page_waits_for_both_editions_runtimes(tmp_path, monkeypatch):
         delivery_packaging.package_language_index("1.3.0")
     assert str(refused.value) == (
         "The en edition has no timeline at build/artifacts/film/en/timeline.json, so no runtime: "
-        "run produce assemble --language en"
+        "run filmkit build assemble:en"
     )
     assert not (tmp_path / delivery_packaging.LANGUAGE_INDEX).exists()
     # An anchor outside the language links names no edition's runtime.

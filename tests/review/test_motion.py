@@ -160,7 +160,8 @@ def test_a_gate_record_or_report_bound_to_other_inputs_is_refused(gated, put, ro
     record["reports"]["motion"]["sha256"] = repository.sha(report)
     put(edition.picture_gates, record)
     with pytest.raises(
-        ReviewError, match="zh: the motion report follows no marks; run check-picture again"
+        ReviewError,
+        match="zh: the motion report follows no marks; run filmkit build check-picture:zh again",
     ):
         review_motion.picture_motion(edition)
     # A report of an engine before 0.17.0 judges no jumps or dash snaps; check-picture judges them.
@@ -169,7 +170,9 @@ def test_a_gate_record_or_report_bound_to_other_inputs_is_refused(gated, put, ro
     record["reports"]["motion"]["sha256"] = repository.sha(report)
     put(edition.picture_gates, record)
     with pytest.raises(
-        ReviewError, match="zh: the motion report judges no jumps or dash snaps; run check-picture"
+        ReviewError,
+        match="zh: the motion report judges no jumps or dash snaps; run filmkit build "
+        "check-picture:zh",
     ):
         review_motion.picture_motion(edition)
     # A report of an engine before the pace gate judges no paces; check-picture judges them.
@@ -177,7 +180,8 @@ def test_a_gate_record_or_report_bound_to_other_inputs_is_refused(gated, put, ro
     record["reports"]["motion"]["sha256"] = repository.sha(report)
     put(edition.picture_gates, record)
     with pytest.raises(
-        ReviewError, match="zh: the motion report judges no paces; run check-picture again"
+        ReviewError,
+        match="zh: the motion report judges no paces; run filmkit build check-picture:zh again",
     ):
         review_motion.picture_motion(edition)
     put(report, {"followed": {**FOLLOWED, "halts": []}})
@@ -194,20 +198,21 @@ def test_a_gate_record_or_report_bound_to_other_inputs_is_refused(gated, put, ro
         review_motion.picture_motion(edition)
     assert str(refusal.value) == (
         "zh: missing build/runtime/work/picture-gates/zh/motion.json, the motion report its gate "
-        "record binds; run check-picture again"
+        "record binds; run filmkit build check-picture:zh again"
     )
     put(edition.picture_gates, record | {"reports": {}})
     with pytest.raises(ReviewError) as refusal:
         review_motion.picture_motion(edition)
     assert str(refusal.value) == (
-        "zh: the picture gate record binds no motion report; run check-picture again"
+        "zh: the picture gate record binds no motion report; run filmkit build check-picture:zh "
+        "again"
     )
     edition.picture_gates.unlink()
     with pytest.raises(ReviewError) as refusal:
         review_motion.picture_motion(edition)
     assert str(refusal.value) == (
         "zh: missing build/evidence/editions/zh/picture-gates.json, the picture gate record; "
-        "run check-picture"
+        "run filmkit build check-picture:zh"
     )
 
 

@@ -55,7 +55,7 @@ def test_a_record_written_under_another_limit_is_refused_with_both_limits(inputs
         verify()
     assert str(refused.value) == (
         "The zh film's still scan record states other rules than the engine's: a limit of "
-        f"{limit} s where the engine's is 3.5 s; run scan-film"
+        f"{limit} s where the engine's is 3.5 s; run filmkit build scan-film:zh"
     )
 
 
@@ -64,7 +64,10 @@ def test_a_record_cut_short_is_refused_with_the_action_that_writes_it(inputs, ve
     record.write_text(record.read_text()[:200])
     with pytest.raises(PictureError) as refused:
         verify()
-    assert str(refused.value) == "The zh film's still scan record cannot be read; run scan-film"
+    assert (
+        str(refused.value)
+        == "The zh film's still scan record cannot be read; run filmkit build scan-film:zh"
+    )
 
 
 def test_a_record_whose_runs_a_hand_emptied_is_not_trusted(inputs, verify):
@@ -76,7 +79,7 @@ def test_a_record_whose_runs_a_hand_emptied_is_not_trusted(inputs, verify):
         verify()
     assert str(refused.value) == (
         "The zh film's still scan record cannot be trusted, as it contradicts itself in its runs "
-        "at the limit and its longest speech; run scan-film"
+        "at the limit and its longest speech; run filmkit build scan-film:zh"
     )
 
 
@@ -96,7 +99,7 @@ def test_a_record_of_another_film_timeline_composition_or_engine_is_refused(
     with pytest.raises(PictureError) as refused:
         verify()
     assert str(refused.value) == (
-        f"The zh film's still scan record binds another {named}; run scan-film"
+        f"The zh film's still scan record binds another {named}; run filmkit build scan-film:zh"
     )
 
 
@@ -104,12 +107,16 @@ def test_an_edition_without_the_record_is_refused_with_the_action_that_writes_it
     inputs.edition.film_stills.unlink()
     with pytest.raises(PictureError) as refused:
         verify()
-    assert str(refused.value) == "The zh film has no still scan record; run scan-film"
+    assert (
+        str(refused.value) == "The zh film has no still scan record; run filmkit build scan-film:zh"
+    )
 
 
 def test_the_draft_s_record_does_not_stand_in_for_the_film_s(inputs, verify):
     # A film that declares drafts holds a passing draft record; the film's own record decides.
     record = inputs.edition.film_stills
     record.rename(inputs.edition.draft_stills)
-    with pytest.raises(PictureError, match="has no still scan record; run scan-film"):
+    with pytest.raises(
+        PictureError, match="has no still scan record; run filmkit build scan-film:zh"
+    ):
         verify()

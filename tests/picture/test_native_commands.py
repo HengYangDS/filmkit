@@ -1,13 +1,15 @@
-"""The commands a refusal of a rendered pair names: the uncaptioned picture is rendered again by
-`render-picture --uncaptioned --native`, since without `--native` that command may derive."""
+"""The commands a refusal of a rendered pair names: the uncaptioned picture is rendered again from
+its own stage, which the film declares in `[picture] native_uncaptioned`, since without it the
+node may derive the picture."""
 
 import filmkit.picture.faults as faults
 
 
 def test_the_uncaptioned_picture_of_a_rendered_pair_is_rendered_again_natively():
-    render = "python -m filmkit.produce render-picture --language en"
-    assert faults.render_again("en", "captioned") == render
-    assert faults.render_again("en", "uncaptioned") == f"{render} --uncaptioned --native"
+    assert faults.render_again("en", "captioned") == "filmkit build render-picture:en"
+    assert faults.render_again("en", "uncaptioned") == (
+        "filmkit build render-picture-uncaptioned:en with en in [picture] native_uncaptioned"
+    )
 
 
 def test_a_fault_of_the_uncaptioned_picture_names_the_native_render():
@@ -16,6 +18,6 @@ def test_a_fault_of_the_uncaptioned_picture_names_the_native_render():
     report = {"faults": [row], "fault_frames": 1, "lasting": [], "lasting_runs": 0}
     found = faults.findings(report, "zh")[0]
     assert found.endswith(
-        "render it again with python -m filmkit.produce render-picture --language zh "
-        "--uncaptioned --native"
+        "render it again with filmkit build render-picture-uncaptioned:zh with zh in [picture] "
+        "native_uncaptioned"
     )

@@ -11,8 +11,9 @@ take's request, so a record narrates nothing again.
 A record is refused when the declaration loads where it names an edition the film does not
 declare, a take that is no SHA-256, no line or another, a line twice, a listener other than the
 film's author, or a take that another record names; the selection refuses one whose take is not
-its thought's selected take (`stale`). Preflight counts a thought's selected take as heard only
-where the soundtrack was assembled from that selection (`filmkit.preflight.clarity`).
+its thought's selected take (`stale`). The sound gate counts a thought's selected take as heard
+only where the soundtrack was assembled from that selection
+(`filmkit.soundtrack.gates.thought_findings`).
 """
 
 from __future__ import annotations

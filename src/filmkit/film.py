@@ -322,7 +322,7 @@ class Review(Declared):
     The floor holds for a soundtrack and its segments. A single thought varies about its segment,
     so a film may keep a thought under the floor by a `clarity_exceptions` entry, and with
     `clarity_thought_margin_db` states the line no kept thought may read under, the floor less
-    that margin (`filmkit.preflight`). A margin of zero holds every thought to the floor
+    that margin (`filmkit.soundtrack.gates`). A margin of zero holds every thought to the floor
     itself, and such a film keeps none.
     The levels, 信, 达 and 雅 when the film declares them, each hold some of the dimensions,
     every dimension in exactly one; a review then passes level by level (`review.record`).
@@ -525,7 +525,7 @@ class RateException(Declared):
 
 
 class Captions(Declared):
-    """The caption cues above the reading rate that the film keeps (`filmkit.preflight`)."""
+    """The caption cues above the reading rate that the film keeps (`filmkit.soundtrack.gates`)."""
 
     rate_exceptions: tuple[RateException, ...] = ()
 

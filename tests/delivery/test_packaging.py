@@ -185,11 +185,11 @@ def test_packaging_waits_for_both_valid_pictures_and_their_equivalence(packaging
 
     def refuse(_edition):
         checked.append(("equivalence",))
-        msg = "The zh equivalence record did not pass; run compare-pictures"
+        msg = "The zh equivalence record did not pass; run filmkit build compare-pictures:zh"
         raise PictureError(msg)
 
     monkeypatch.setattr(delivery_packaging, "require_equivalence", refuse)
-    with pytest.raises(PictureError, match="did not pass; run compare-pictures"):
+    with pytest.raises(PictureError, match="did not pass; run filmkit build compare-pictures"):
         delivery_packaging.package_film(edition)
     assert checked == [("picture", True), ("picture", False), ("equivalence",)]
     assert calls == []

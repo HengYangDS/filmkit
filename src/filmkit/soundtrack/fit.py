@@ -24,7 +24,7 @@ with `assemble`.
 `asked` gives the same reports and refusals without printing or refusing, for a caller that
 decides by them.
 
-Usage: python -m filmkit.produce fit --language <code> [--variants <file>]
+Usage: python -m filmkit.soundtrack.fit --language <code> [--variants <file>]
 """
 
 from __future__ import annotations
@@ -185,7 +185,7 @@ def _each(
 
 # What reading an edition's fit may refuse: the binding of the selected recordings to the
 # script and the design of a policy. A caller that decides answers them as the edition's,
-# and the production command takes them among its own (`filmkit.produce.REFUSALS`).
+# and a build takes them among its nodes' own (`filmkit.graph.build.REFUSALS`).
 REFUSALS = (
     SelectionError,
     RetainedUtteranceError,

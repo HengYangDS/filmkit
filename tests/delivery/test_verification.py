@@ -46,7 +46,10 @@ def test_an_edition_without_its_film_s_still_scan_is_refused_in_either_scope(sco
     films = [str(film) for film in production.Edition("en").films]
     with pytest.raises(SystemExit) as stopped:
         delivery_verification.main(["--read-only", *scope, "--language", "en", *films])
-    assert stopped.value.code == "en: The en film has no still scan record; run scan-film"
+    assert (
+        stopped.value.code
+        == "en: The en film has no still scan record; run filmkit build scan-film:en"
+    )
     assert capsys.readouterr().out == ""
 
 

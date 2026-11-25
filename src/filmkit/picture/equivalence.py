@@ -36,7 +36,7 @@ The record, build/evidence/editions/<code>/caption-equivalence.json, binds the c
 timeline, the engine version and both pictures' stage documents, files and receipts, and holds
 each level's measures and its findings; a refusal raises `PictureError` after it is written.
 
-Usage: python -m filmkit.produce compare-pictures --language <code>
+Run by `filmkit build compare-pictures:<code>`.
 """
 
 from __future__ import annotations
@@ -57,6 +57,7 @@ import filmkit.picture.faults as faults
 import filmkit.released as released
 import filmkit.repository as repository
 import filmkit.tools as tools
+from filmkit.graph import target
 from filmkit.picture.rendering import (
     COMPOSITION_SCRIPT,
     PICTURE_SIZE,
@@ -535,7 +536,8 @@ def require_equivalence(edition: Edition) -> dict:
     composition, timeline and engine."""
     path = edition.caption_equivalence
     if not path.is_file():
-        msg = f"The {edition.code} pictures have no equivalence record; run compare-pictures"
+        again = target("compare-pictures", edition.code)
+        msg = f"The {edition.code} pictures have no equivalence record; run {again}"
         raise PictureError(msg)
     record = repository.read(path)
     current = current_bindings(edition)
@@ -543,10 +545,11 @@ def require_equivalence(edition: Edition) -> dict:
     if stale:
         msg = (
             f"The {edition.code} equivalence record binds another {', '.join(stale)}; "
-            "run compare-pictures"
+            f"run {target('compare-pictures', edition.code)}"
         )
         raise PictureError(msg)
     if record.get("verdict") != "pass":
-        msg = f"The {edition.code} equivalence record did not pass; run compare-pictures"
+        again = target("compare-pictures", edition.code)
+        msg = f"The {edition.code} equivalence record did not pass; run {again}"
         raise PictureError(msg)
     return record

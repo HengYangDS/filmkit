@@ -44,7 +44,8 @@ comparison record of a derived pair from the receipt, decoding no picture. Packa
 `film_source` which picture each film reads: the 1080p uncaptioned film of a derived pair is
 painted and scaled from the captioned picture in one pass.
 
-Usage: python -m filmkit.produce render-picture --language <code> --uncaptioned [--native]
+Run by `filmkit build render-picture-uncaptioned:<code>`, natively for an edition that
+`[picture] native_uncaptioned` names.
 """
 
 from __future__ import annotations
@@ -66,6 +67,7 @@ import filmkit.picture.rendering as rendering
 import filmkit.released as released
 import filmkit.repository as repository
 import filmkit.tools as tools
+from filmkit.graph import target
 from filmkit.picture import renderer
 from filmkit.picture.encoding import encoder
 from filmkit.picture.errors import PictureError
@@ -88,7 +90,10 @@ WORK = Path("build/runtime/work/derivation")
 ENCODER = encoder(FPS)  # the pictures' encoding, at the films' frame rate
 # Seconds a derivation's encode may take.
 DEADLINE = 7200
-NATIVE = "render-picture --language {code} --uncaptioned --native"
+NATIVE = (
+    "from its own stage: declare {code} in [picture] native_uncaptioned and run "
+    "filmkit build render-picture-uncaptioned:{code}"
+)
 # The proofs a derivation's receipt records, each with its verdict.
 PROOFS = ("band_audit", "ground_check", "edge_check", "band_scan")
 
@@ -353,7 +358,7 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
             if composition["band"] is None
             else f"differs beyond its captions at {composition['differing_instants']} instants"
         )
-        msg = f"The {edition.code} composition {why}; render the uncaptioned picture with {native}"
+        msg = f"The {edition.code} composition {why}; render the uncaptioned picture {native}"
         raise PictureError(msg)
     rows = equivalence.excluded_rows(composition["band"], PICTURE_SIZE[1])
     with seam.phase("band-audit"):
@@ -369,7 +374,7 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
             else f"leaves no row free of captions at {unmeasured} edge of the painted rows, "
             "beyond which the picture continues"
         )
-        msg = f"The {edition.code} film {why}; render the uncaptioned picture with {native}"
+        msg = f"The {edition.code} film {why}; render the uncaptioned picture {native}"
         raise PictureError(msg)
     started = datetime.now(UTC)
     try:
@@ -388,7 +393,7 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
         # The fault is the captioned picture's: its refusal names that render, not a native one.
         raise
     except PictureError as error:
-        msg = f"{error}; render the uncaptioned picture with {native}"
+        msg = f"{error}; render the uncaptioned picture {native}"
         raise PictureError(msg) from error
     try:
         with seam.phase("media"):
@@ -472,7 +477,7 @@ def validate_binding(edition: Edition, receipt: dict) -> None:
     rendered = edition.rendered(False)
     require_receipt_picture(receipt, rendered)
     derived = receipt["derived"]
-    again = f"run render-picture --language {edition.code} --uncaptioned"
+    again = f"run {target('render-picture-uncaptioned', edition.code)}"
     declared = rendering.FILM.picture.capture
     if declared != DERIVING_CAPTURE:
         msg = (
@@ -525,7 +530,7 @@ def compare_derived(edition: Edition, receipt: dict) -> dict:
     if not findings and composition["band"] != derived["band"]:
         findings.append(
             f"the derivation painted the band {derived['band']} and the composition reports "
-            f"{composition['band']}; run render-picture --language {edition.code} --uncaptioned"
+            f"{composition['band']}; run {target('render-picture-uncaptioned', edition.code)}"
         )
     report = work / "composition.json"
     record = {

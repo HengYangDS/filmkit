@@ -54,6 +54,7 @@ from pathlib import Path
 
 import filmkit.repository as repository
 from filmkit.film import FILM, timeline_values
+from filmkit.graph import target
 from filmkit.narration.spoken_units import HAN, LATIN, units
 from filmkit.production import CODES, Edition
 
@@ -255,7 +256,7 @@ def require_placed(timeline: dict, code: str) -> None:
     ]:
         msg = (
             f"The {code} timeline's anchors are not those its marks take from its words; run"
-            f" produce refresh-captions --language {code}"
+            f" {target('refresh-captions', code)}"
         )
         raise AnchorError(msg)
 
@@ -374,9 +375,7 @@ def printed(listed: dict) -> list[str]:
         rows = [(sid, row) for sid, rows in edition["segments"].items() for row in rows]
         source = edition["timeline"]
         if edition["stale"]:
-            times = (
-                f"the times in {source} are stale: run produce refresh-captions --language {code}"
-            )
+            times = f"the times in {source} are stale: run {target('refresh-captions', code)}"
         else:
             times = f"times from {source}" if source else "no timeline holds their times"
         count = f"{len(rows)} anchor{'s' * (len(rows) != 1)} in {len(edition['segments'])} segment"

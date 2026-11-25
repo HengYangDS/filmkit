@@ -300,11 +300,17 @@ def test_another_renderer_version_refuses_staging_and_rendering(
 @pytest.mark.parametrize(
     ("record", "reason"),
     [
-        (None, "has no gate record; run check-picture"),
-        ({"verdict": "refuse"}, "did not pass; run check-picture"),
-        ({"engine_version": "0.0.0"}, "binds another engine_version; run check-picture"),
-        ({"fonts_sha256": {}}, "binds another fonts_sha256; run check-picture"),
-        ({"stylesheet_sha256": "0" * 64}, "binds another stylesheet_sha256; run check-picture"),
+        (None, "has no gate record; run filmkit build check-picture"),
+        ({"verdict": "refuse"}, "did not pass; run filmkit build check-picture"),
+        (
+            {"engine_version": "0.0.0"},
+            "binds another engine_version; run filmkit build check-picture",
+        ),
+        ({"fonts_sha256": {}}, "binds another fonts_sha256; run filmkit build check-picture"),
+        (
+            {"stylesheet_sha256": "0" * 64},
+            "binds another stylesheet_sha256; run filmkit build check-picture",
+        ),
     ],
 )
 def test_rendering_refuses_a_picture_without_a_current_passing_check(
@@ -327,7 +333,9 @@ def test_rendering_refuses_a_composition_changed_after_its_check(
     script = root / picture_rendering.COMPOSITION_SCRIPT
     script.write_text(script.read_text() + "\n// changed after its check\n")
     fake = renderer(tmp_path, "open(__file__ + '.ran', 'w').close()")
-    with pytest.raises(PictureError, match="binds another composition_sha256; run check-picture"):
+    with pytest.raises(
+        PictureError, match="binds another composition_sha256; run filmkit build check-picture"
+    ):
         render(monkeypatch, staged, fake, 60)
     assert not Path(f"{fake}.ran").exists()
 

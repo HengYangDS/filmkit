@@ -188,7 +188,7 @@ def test_an_uncaptioned_picture_that_differs_outside_the_captions_is_refused(pic
     assert record["verdict"] == "refuse"
     assert record["encoded"]["failing_frames"] == 3
     assert [row["frame"] for row in record["encoded"]["failing"]] == [30, 45, 60]
-    with pytest.raises(PictureError, match="did not pass; run compare-pictures"):
+    with pytest.raises(PictureError, match="did not pass; run filmkit build compare-pictures"):
         equivalence.require_equivalence(edition)
 
 
@@ -217,11 +217,15 @@ def test_a_picture_short_of_the_sampled_frames_is_refused(pictures):
 @pytest.mark.ffmpeg
 def test_packaging_needs_a_record_of_the_current_pictures(pictures):
     edition, _, _ = pictures
-    with pytest.raises(PictureError, match="no equivalence record; run compare-pictures"):
+    with pytest.raises(
+        PictureError, match="no equivalence record; run filmkit build compare-pictures"
+    ):
         equivalence.require_equivalence(edition)
     equivalence.compare_pictures(edition)
     encode(edition.rendered(False).file, CAPTION)
-    with pytest.raises(PictureError, match="binds another pictures; run compare-pictures"):
+    with pytest.raises(
+        PictureError, match="binds another pictures; run filmkit build compare-pictures"
+    ):
         equivalence.require_equivalence(edition)
     record = json.loads(edition.caption_equivalence.read_text())
     assert record["verdict"] == "pass"

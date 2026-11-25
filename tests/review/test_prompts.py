@@ -298,7 +298,9 @@ def test_the_reading_checks_ask_each_edition_s_passing_still_scan(root, put, mon
     monkeypatch.setattr(still_scan, "require_film_scan", REQUIRE_FILM_SCAN)
     with pytest.raises(PictureError) as refused:
         review_prompts.read_round(None, out)
-    assert str(refused.value) == "The zh film has no still scan record; run scan-film"
+    assert (
+        str(refused.value) == "The zh film has no still scan record; run filmkit build scan-film:zh"
+    )
     asked = []
 
     def held(edition):

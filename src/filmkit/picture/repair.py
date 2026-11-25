@@ -21,7 +21,7 @@ stay with the edition's evidence and not with the reviewed builds that `set-asid
 render and comparison runs as the node whose work it does again (`filmkit.graph.runs.node`), so
 those nodes' run records bind the repaired pictures and the new comparison.
 
-Usage: python -m filmkit.produce repair-pictures --language <code> [--attempts <n>]
+Usage: python -m filmkit.picture.repair --language <code> [--attempts <n>]
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ import filmkit.picture.equivalence as equivalence
 import filmkit.picture.faults as faults
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
+from filmkit.graph import target
 from filmkit.media import MediaError
 from filmkit.picture import renderer
 from filmkit.picture.errors import PictureError
@@ -51,7 +52,6 @@ if TYPE_CHECKING:
 # The attempts of one run, unless it is given another number, and the command that compares the
 # two pictures again once an attempt stopped.
 ATTEMPTS = 2
-COMPARE = "python -m filmkit.produce compare-pictures --language {code}"
 # What a render or comparison inside an attempt refuses with.
 REFUSALS = (PictureError, MediaError, ToolError)
 
@@ -61,7 +61,8 @@ def current_record(edition: Edition) -> dict:
     composition, the timeline and the engine."""
     path = edition.caption_equivalence
     if not path.is_file():
-        msg = f"The {edition.code} pictures have no comparison record; run compare-pictures"
+        again = target("compare-pictures", edition.code)
+        msg = f"The {edition.code} pictures have no comparison record; run {again}"
         raise PictureError(msg)
     record = repository.read(path)
     try:
@@ -74,7 +75,7 @@ def current_record(edition: Edition) -> dict:
     if stale:
         msg = (
             f"The {edition.code} comparison record does not bind the current {', '.join(stale)}; "
-            "run compare-pictures"
+            f"run {target('compare-pictures', edition.code)}"
         )
         raise PictureError(msg)
     return record
@@ -136,7 +137,7 @@ def stopped(edition: Edition, folder: Path, attempt: dict, error: BaseException)
     again = f"render again with {' and '.join(renders)}, then " if renders else ""
     return (
         f"Attempt {folder.name} of the {code} repair stopped, with the faulty pictures kept in "
-        f"{repository.relative(folder)}: {error}; {again}run {COMPARE.format(code=code)}"
+        f"{repository.relative(folder)}: {error}; {again}run {target('compare-pictures', code)}"
     )
 
 
@@ -198,8 +199,9 @@ def repair_pictures(
     if "derived" in record.get("encoded", {}) and record.get("verdict") != "pass":
         msg = (
             f"The {edition.code} pair is derived, which rendering a picture again does not repair: "
-            f"{'; '.join(record['findings'])}; run render-picture --uncaptioned, then "
-            "compare-pictures"
+            f"{'; '.join(record['findings'])}; run "
+            f"{target('render-picture-uncaptioned', edition.code)}, then "
+            f"{target('compare-pictures', edition.code)}"
         )
         raise PictureError(msg)
     named = faults.repairable(record, edition.code)

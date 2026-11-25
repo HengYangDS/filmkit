@@ -28,8 +28,9 @@ import filmkit.repository as repository
 from filmkit.picture.rendering import PictureError
 from filmkit.production import Edition
 
-RENDER = "python -m filmkit.produce render-picture --language zh"
-COMPARE = "python -m filmkit.produce compare-pictures --language zh"
+RENDER = "filmkit build render-picture:zh"
+NATIVE = "filmkit build render-picture-uncaptioned:zh with zh in [picture] native_uncaptioned"
+COMPARE = "filmkit build compare-pictures:zh"
 # The fault that compare-pictures attributes to the uncaptioned picture holding FRAGMENT.
 FAULT = {
     "frame": 77,
@@ -158,7 +159,7 @@ def test_a_fault_that_remains_is_refused_after_the_last_attempt(pair, film_root,
         f"The zh pictures still hold one-frame faults after 2 attempts, kept in {REPAIRS} as "
         "attempts 1, 2: encoded frame 77 at 1.283 s: the uncaptioned picture holds a one-frame "
         f"fault of 150 levels in box [40, 10, 44, 14] outside the caption band; render it again "
-        f"with {RENDER} --uncaptioned --native"
+        f"with {NATIVE}"
     )
     assert outputs(film_root) == ["captioned", *["uncaptioned"] * 3]
     for number in (1, 2):
@@ -174,7 +175,7 @@ def test_a_fault_that_remains_is_refused_after_the_last_attempt(pair, film_root,
         (
             moving_bar(50),
             "frame 70 differs by 150 levels in box [30, 10, 31, 11] and no one picture holds it; "
-            f"render both pictures again with {RENDER} and with --uncaptioned --native",
+            f"render both pictures again with {RENDER} and {NATIVE}",
         ),
         # A difference over frames 10 to 12, which no sampled frame sees.
         (
@@ -211,7 +212,8 @@ def test_a_missing_or_stale_record_is_refused(pair, film_root, takes):
     # A picture rendered again after the comparison is not the one its record binds.
     takes(False)
     picture_rendering.render_picture(pair, 60, captions=False)
-    stale = "^The zh comparison record does not bind the current pictures; run compare-pictures$"
+    stale = "^The zh comparison record does not bind the current pictures; run filmkit build "
+    stale += "compare-pictures:zh$"
     with pytest.raises(PictureError, match=stale):
         picture_repair.repair_pictures(pair, 2, 60)
     pair.rendered(False).file.unlink()
@@ -257,7 +259,7 @@ def test_a_picture_whose_stage_or_check_is_not_current_is_refused_before_moving(
         repository.write(
             pair.picture_gates, {**repository.read(pair.picture_gates), "verdict": "x"}
         )
-        reason = "did not pass; run check-picture"
+        reason = "did not pass; run filmkit build check-picture"
     else:
         template = repository.ROOT / picture_rendering.TEMPLATE
         template.write_text(template.read_text().replace("<title>", "<title>Changed "))
@@ -392,8 +394,8 @@ def test_a_render_that_fails_in_an_attempt_is_recorded_with_the_way_back(pair, f
     folder = f"{REPAIRS}/1"
     assert str(refusal.value) == (
         f"Attempt 1 of the zh repair stopped, with the faulty pictures kept in {folder}: Native "
-        f"picture render did not complete from the current stage; render again with {RENDER} "
-        f"--uncaptioned --native, then run {COMPARE}"
+        "picture render did not complete from the current stage; render again with "
+        f"{NATIVE}, then run {COMPARE}"
     )
     attempt = repository.read(repository.ROOT / folder / "attempt.json")
     assert attempt["error"] == "Native picture render did not complete from the current stage"

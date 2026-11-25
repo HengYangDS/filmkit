@@ -32,7 +32,7 @@ frames that decode identically with the first that does not and the lowest PSNR 
 finding raises `PictureError` after the record is written, and the second render is kept beside
 its receipt for inspection. A passing run removes it.
 
-Usage: python -m filmkit.produce qualify-renderer --language <code>
+Run by `filmkit build qualify-renderer:<code>`.
 """
 
 from __future__ import annotations

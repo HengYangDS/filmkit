@@ -45,6 +45,7 @@ import numpy as np
 
 import filmkit.picture.slivers as slivers
 import filmkit.repository as repository
+from filmkit.graph import target
 from filmkit.picture.rendering import PictureError
 
 if TYPE_CHECKING:
@@ -84,14 +85,16 @@ RAW = ["-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "gray", "pipe:1
 # and the command that renders again each picture that holds a fault and compares the two again.
 # Only a rendered pair is scanned here, and without --native the uncaptioned picture's command
 # may derive it (`filmkit.picture.derivation`), which would replace the rendered picture.
-RENDER = "python -m filmkit.produce render-picture --language {code}"
-UNCAPTIONED = "--uncaptioned --native"
-REPAIR = "python -m filmkit.produce repair-pictures --language {code}"
+REPAIR = "python -m filmkit.picture.repair --language {code}"
 
 
 def render_again(code: str, picture: str) -> str:
-    """The command that renders one picture of a rendered pair again."""
-    return RENDER.format(code=code) + ("" if picture == "captioned" else f" {UNCAPTIONED}")
+    """The command that renders one picture of a rendered pair again: the uncaptioned one from
+    its own stage, which the film declares in `[picture] native_uncaptioned`."""
+    if picture == "captioned":
+        return target("render-picture", code)
+    native = f"{code} in [picture] native_uncaptioned"
+    return f"{target('render-picture-uncaptioned', code)} with {native}"
 
 
 def apart(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -488,7 +491,7 @@ def repairable(record: dict, code: str) -> dict[str, list[dict]]:
             reasons.append(
                 f"frame {row['frame']} differs by {row['peak']} levels in box {row['box']} and "
                 f"no one picture holds it; render both pictures again with "
-                f"{RENDER.format(code=code)} and with {UNCAPTIONED}"
+                f"{render_again(code, 'captioned')} and {render_again(code, 'uncaptioned')}"
             )
         else:
             named.setdefault(row["picture"], []).append(row)

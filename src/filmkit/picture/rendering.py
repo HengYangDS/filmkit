@@ -28,6 +28,7 @@ import filmkit.media as media
 import filmkit.repository as repository
 import filmkit.sources as sources
 from filmkit.film import CHAPTER_VALUES, FILM
+from filmkit.graph import target
 from filmkit.narration import anchors
 from filmkit.picture import encoding, faces, renderer, template
 from filmkit.picture.errors import PictureError
@@ -432,7 +433,8 @@ def require_passing_gates(edition: Edition) -> None:
     """
     path = edition.picture_gates
     if not path.is_file():
-        msg = f"The {edition.code} picture has no gate record; run check-picture"
+        again = target("check-picture", edition.code)
+        msg = f"The {edition.code} picture has no gate record; run {again}"
         raise PictureError(msg)
     record = read(path)
     # The gate's owner imports this module, so its list is read when a render asks.
@@ -443,11 +445,12 @@ def require_passing_gates(edition: Edition) -> None:
     if stale:
         msg = (
             f"The {edition.code} picture gate record binds another {', '.join(stale)}; "
-            "run check-picture"
+            f"run {target('check-picture', edition.code)}"
         )
         raise PictureError(msg)
     if record.get("verdict") != "pass":
-        msg = f"The {edition.code} picture gate record did not pass; run check-picture"
+        again = target("check-picture", edition.code)
+        msg = f"The {edition.code} picture gate record did not pass; run {again}"
         raise PictureError(msg)
 
 

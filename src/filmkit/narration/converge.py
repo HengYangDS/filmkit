@@ -19,8 +19,9 @@ The command needs no targets file, no phrase and no seed from a person:
    the thought that follows it and cut in the quiet between them (`narration.run_on`).
 5. When no thought is refused or waits for the ear it counts the settled edition by the
    assembly's own count (`filmkit.narration.fitting`): it selects the recordings and counts them
-   as `produce select` and `produce fit` do, replaces no take and changes no pause policy. An
-   edition lasts as long as its narration, so the count states its runtime and never misses one.
+   as the node `select` and `python -m filmkit.soundtrack.fit` do, replaces no take and changes
+   no pause policy. An edition lasts as long as its narration, so the count states its runtime
+   and never misses one.
 
 A thought whose take reads under its clarity line, with no hearing of that take that settles it,
 is for the owner's ear (`judgment.for_the_ear`): it is refused by no line, so it gets no candidate,

@@ -40,7 +40,7 @@ The detail audit's findings and the frame audit's runs far off centre are gated 
 `render-picture` reads the record before it starts the renderer
 (`filmkit.picture.rendering.require_passing_gates`).
 
-Usage: python -m filmkit.produce check-picture --language <code>
+Run by `filmkit build check-picture:<code>`.
 """
 
 from __future__ import annotations

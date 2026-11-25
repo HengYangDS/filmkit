@@ -18,7 +18,7 @@ import filmkit.repository as repository
 from filmkit.picture.errors import PictureError
 from filmkit.production import Edition
 
-UNREADABLE = "The zh film's still scan record cannot be read; run scan-film"
+UNREADABLE = "The zh film's still scan record cannot be read; run filmkit build scan-film:zh"
 DRAFT = "build/evidence/editions/zh/draft-stills.json"
 
 
@@ -183,7 +183,7 @@ def test_a_record_that_states_a_rule_twice_must_agree_with_itself(packaged, edit
     rewrite(packaged.edition.film_stills, **edit)
     assert refusal(packaged.edition) == (
         f"The zh film's still scan record cannot be trusted, as it contradicts itself in {named}; "
-        "run scan-film"
+        "run filmkit build scan-film:zh"
     )
     assert rescanned(packaged)
 
@@ -200,7 +200,7 @@ def test_the_rules_state_the_decode_and_the_cut_of_speech(packaged, monkeypatch)
             patch.setattr(still_scan, name, other)
             assert refusal(packaged.edition) == (
                 "The zh film's still scan record states other rules than the engine's; "
-                "run scan-film"
+                "run filmkit build scan-film:zh"
             )
 
 
@@ -224,7 +224,8 @@ def test_a_refusal_names_a_record_s_limit_only_where_it_is_another_number(packag
         del stated["limit_seconds"]
     rewrite(packaged.edition.film_stills, rules=stated)
     assert refusal(packaged.edition) == (
-        "The zh film's still scan record states other rules than the engine's; run scan-film"
+        "The zh film's still scan record states other rules than the engine's; run filmkit "
+        "build scan-film:zh"
     )
 
 
@@ -450,5 +451,5 @@ def test_the_film_s_record_names_the_engine_and_the_reader_asks_it(packaged):
     rewrite(packaged.edition.film_stills, engine_version="0.0.1")
     assert version("filmkit") != "0.0.1"
     assert refusal(packaged.edition) == (
-        "The zh film's still scan record binds another engine; run scan-film"
+        "The zh film's still scan record binds another engine; run filmkit build scan-film:zh"
     )

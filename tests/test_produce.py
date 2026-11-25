@@ -139,7 +139,7 @@ def test_an_edition_without_a_timeline_is_staged_at_no_runtime():
         produce.main(["stage-picture", "--language", "zh"])
     assert str(refused.value) == (
         "stage-picture: The zh edition has no timeline at build/artifacts/film/zh/timeline.json, "
-        "so no runtime: run produce assemble --language zh"
+        "so no runtime: run filmkit build assemble:zh"
     )
     assert not production.Edition("zh").picture_stage.exists()
 

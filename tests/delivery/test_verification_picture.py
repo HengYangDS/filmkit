@@ -43,7 +43,9 @@ def test_pictures_without_their_current_passing_equivalence_are_refused(inputs, 
     with pytest.raises(PictureError, match=reason):
         delivery_verification.verify_picture(inputs.edition)
     inputs.edition.caption_equivalence.unlink()
-    with pytest.raises(PictureError, match="no equivalence record; run compare-pictures"):
+    with pytest.raises(
+        PictureError, match="no equivalence record; run filmkit build compare-pictures"
+    ):
         delivery_verification.verify_picture(inputs.edition)
 
 

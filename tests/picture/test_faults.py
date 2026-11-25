@@ -23,9 +23,10 @@ CAPTION = "drawbox=x=30:y=44:w=36:h=6:color=white:t=fill:enable='between(t,0.5,1
 LABEL = "drawbox=x=8:y=6:w=24:h=8:color=white:t=fill:enable='between(t,0.5,1)'"
 BAND = {"left": 600, "top": 880, "right": 1320, "bottom": 1000}
 CUES = [{"start": 0.5, "end": 1.0, "text": "One."}]
-RENDER = "python -m filmkit.produce render-picture --language zh"
+RENDER = "filmkit build render-picture:zh"
+NATIVE = "filmkit build render-picture-uncaptioned:zh with zh in [picture] native_uncaptioned"
 # The next step a refusal names when repair-pictures can answer each of its findings.
-NEXT = "; next: python -m filmkit.produce repair-pictures --language zh"
+NEXT = "; next: python -m filmkit.picture.repair --language zh"
 
 
 def box(x, y, width, height, grey, frames):
@@ -222,7 +223,7 @@ def test_a_caption_that_appears_and_leaves_passes(edition):
 def test_a_fault_in_the_uncaptioned_picture_names_its_render_command(edition):
     draw(edition, uncaptioned=[FRAGMENT])
     message, record = refusal(edition)
-    command = f"{RENDER} --uncaptioned --native"
+    command = NATIVE
     assert message.endswith(
         "encoded frame 77 at 1.283 s: the uncaptioned picture holds a one-frame fault of 150 "
         f"levels in box [40, 10, 44, 14] outside the caption band; render it again with {command}"
@@ -309,8 +310,8 @@ def test_without_a_caption_band_every_row_is_compared(edition, monkeypatch):
     message, record = refusal(edition)
     assert message.endswith(
         "encoded frame 50 at 0.833 s: the uncaptioned picture holds a one-frame fault of 150 "
-        f"levels in box [40, 44, 44, 48] outside the caption band; render it again with {RENDER} "
-        f"--uncaptioned --native{NEXT}"
+        f"levels in box [40, 44, 44, 48] outside the caption band; render it again with {NATIVE}"
+        f"{NEXT}"
     )
     encoded = record["encoded"]
     assert (encoded["excluded_rows"], encoded["every_frame"]["band_changes"]) == ([0, 0], {})
@@ -380,6 +381,6 @@ def test_the_findings_leave_residues_out_and_count_the_differences_not_listed():
     assert equivalence.faults.findings({**report, "lasting": [], "lasting_runs": 0}, "en") == [
         "encoded frame 9 at 0.150 s: the captioned picture holds a one-frame fault of 200 levels "
         "in box [0, 0, 1, 1] outside the caption band; render it again with "
-        "python -m filmkit.produce render-picture --language en",
+        "filmkit build render-picture:en",
         "encoded: 2 more one-frame differences",
     ]

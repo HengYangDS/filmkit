@@ -30,6 +30,7 @@ import filmkit.review.clarity as clarity
 import filmkit.review.endings as endings
 from filmkit.captions.timing import captions_above_rate, reading_rate
 from filmkit.film import FILM
+from filmkit.graph import target
 from filmkit.soundtrack.assembly import AssemblyError
 
 if TYPE_CHECKING:
@@ -99,7 +100,7 @@ def thought_findings(edition: Edition, measured: dict) -> list[str]:
     unassembled = [
         f"thought {name} reads {under[name]} dB: the owner heard its selected take, but the "
         f"soundtrack was assembled from another selection of segment {name.rsplit('.', 1)[0]};"
-        " run assemble"
+        f" run {target('assemble', edition.code)}"
         for name in sorted(clear - assembled)
     ]
     refused = {name: value for name, value in under.items() if name not in clear}
@@ -173,8 +174,7 @@ def sound_findings(clarity_measured: dict, endings_measured: dict) -> list[str]:
 def bound_inputs(edition: Edition) -> dict[str, Path]:
     """The inputs the gate record binds, by the key of each one's SHA-256: the soundtrack and
     the timeline it measures, the assembly record whose levels its endings read, and the film's
-    declaration, whose clarity floors it holds them to. The pre-render check judges the record
-    by the same list (`filmkit.preflight.sound`)."""
+    declaration, whose clarity floors it holds them to."""
     return {
         "soundtrack_sha256": edition.soundtrack,
         "timeline_sha256": edition.timeline,

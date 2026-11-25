@@ -2,6 +2,7 @@
 of receipt validates, and the comparison of a derived pair by its record."""
 
 import json
+import re
 
 import pytest
 
@@ -137,7 +138,7 @@ def test_a_derivation_writes_the_picture_and_a_receipt_that_binds_its_source(pai
                 intruding_instants=4,
                 intrusions=[{"time": 1.5, "kind": "stroke", "scene": "03"}],
             ),
-            "a stroke of scene 03 reaches the rows at 1.500 s .* --uncaptioned --native",
+            "a stroke of scene 03 reaches the rows at 1.500 s .* native_uncaptioned",
         ),
         (
             lambda tools: tools.audit.update(
@@ -147,24 +148,25 @@ def test_a_derivation_writes_the_picture_and_a_receipt_that_binds_its_source(pai
         ),
         (
             lambda tools: tools.composition.update(differing_instants=3),
-            "differs beyond its captions at 3 instants; .* --native",
+            "differs beyond its captions at 3 instants; .* native_uncaptioned",
         ),
         (lambda tools: tools.composition.update(band=None), "paints no caption"),
         (lambda tools: tools.audit.update(free=[[1.0, 1.1]]), "a caption at every instant"),
         (
             lambda tools: tools.audit.update(caption_rows=[936, 1024]),
             "leaves no row free of captions at either edge of the painted rows, beyond which "
-            "the picture continues; .* --native",
+            "the picture continues; .* native_uncaptioned",
         ),
         # One side alone without a row to measure, where the picture continues beyond it.
         (
             lambda tools: tools.audit.update(caption_rows=[936, 1000]),
             "leaves no row free of captions at the top edge of the painted rows, beyond which "
-            "the picture continues; .* --native",
+            "the picture continues; .* native_uncaptioned",
         ),
         (
             lambda tools: tools.audit.update(caption_rows=[960, 1024]),
-            "leaves no row free of captions at the bottom edge of the painted rows, .* --native",
+            "leaves no row free of captions at the bottom edge of the painted rows, "
+            ".* native_uncaptioned",
         ),
     ],
 )
@@ -198,15 +200,15 @@ def test_a_one_frame_change_in_the_band_refuses_naming_the_captioned_render_alon
     tools.band_fault = (
         "The captioned picture's caption band changes for one frame: encoded frame 50 at 0.833 "
         "s: the captioned picture holds a one-frame fault of 219 levels in box [1500, 1900, "
-        "1540, 1940] in the caption band; render it again with python -m filmkit.produce "
-        "render-picture --language {code}"
+        "1540, 1940] in the caption band; render it again with filmkit build "
+        "render-picture:{code}"
     )
     with pytest.raises(derivation.BandFault) as refused:
         derivation.derive_uncaptioned(edition)
     # The fault is the captioned picture's: the refusal does not offer a native uncaptioned
     # render, which would leave the fault in the captioned films.
-    assert str(refused.value).endswith("render-picture --language zh")
-    assert "--native" not in str(refused.value)
+    assert str(refused.value).endswith("filmkit build render-picture:zh")
+    assert "native" not in str(refused.value)
     assert not uncaptioned.file.exists() and not uncaptioned.receipt.exists()
 
 
@@ -216,7 +218,8 @@ def test_a_derived_receipt_without_a_passed_band_scan_does_not_validate(pair):
     derivation.validate_binding(edition, receipt)
     # A receipt of the Change's earlier form holds no scan of the band.
     earlier = {key: value for key, value in receipt["derived"].items() if key != "band_scan"}
-    with pytest.raises(PictureError, match="records no completed derivation; run render-picture"):
+    again = "records no completed derivation; run filmkit build render-picture-uncaptioned:zh"
+    with pytest.raises(PictureError, match=again):
         derivation.validate_binding(edition, {**receipt, "derived": earlier})
 
 
@@ -283,7 +286,9 @@ def test_a_captioned_picture_rendered_again_asks_for_the_derivation_again(compar
     receipt = repository.read(edition.render_receipt)
     receipt["output_sha256"] = repository.sha(edition.rendered(True).file)
     repository.write(edition.render_receipt, receipt)
-    with pytest.raises(PictureError, match="binds another source_sha256.* --uncaptioned$"):
+    with pytest.raises(
+        PictureError, match="binds another source_sha256.* render-picture-uncaptioned:zh$"
+    ):
         equivalence.compare_pictures(edition)
     with pytest.raises(PictureError, match="binds another pictures"):
         equivalence.require_equivalence(edition)
@@ -322,8 +327,10 @@ def test_a_ground_refusal_of_the_encode_names_the_native_render(pair, monkeypatc
         raise PictureError(message)
 
     monkeypatch.setattr(derivation, "derive", refuse)
-    named = "not the ground at frame 40; render the uncaptioned picture with render-picture "
-    with pytest.raises(PictureError, match=named + "--language zh --uncaptioned --native"):
+    named = "not the ground at frame 40; render the uncaptioned picture from its own stage: "
+    named += "declare zh in [picture] native_uncaptioned and run "
+    named += "filmkit build render-picture-uncaptioned:zh"
+    with pytest.raises(PictureError, match=re.escape(named)):
         derivation.derive_uncaptioned(edition)
 
 

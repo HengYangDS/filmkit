@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import filmkit.repository as repository
+from filmkit.graph import target
 from filmkit.picture.gates import MOTION_GATES as GATED
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
 from filmkit.review import ReviewError
@@ -53,7 +54,9 @@ def bound_report(edition: Edition, name: str) -> tuple[dict, dict]:
     code = edition.code
     if not edition.picture_gates.is_file():
         where = repository.relative(edition.picture_gates)
-        msg = f"{code}: missing {where}, the picture gate record; run check-picture"
+        msg = (
+            f"{code}: missing {where}, the picture gate record; run {target('check-picture', code)}"
+        )
         raise ReviewError(msg)
     record = repository.read(edition.picture_gates)
     current = {
@@ -66,13 +69,14 @@ def bound_report(edition: Edition, name: str) -> tuple[dict, dict]:
             raise ReviewError(msg)
     bound = record.get("reports", {}).get(name)
     if bound is None:
-        msg = f"{code}: the picture gate record binds no {name} report; run check-picture again"
+        again = target("check-picture", code)
+        msg = f"{code}: the picture gate record binds no {name} report; run {again} again"
         raise ReviewError(msg)
     report = repository.ROOT / bound["path"]
     if not report.is_file():
         msg = (
             f"{code}: missing {bound['path']}, the {name} report its gate record binds; "
-            "run check-picture again"
+            f"run {target('check-picture', code)} again"
         )
         raise ReviewError(msg)
     if repository.sha(report) != bound["sha256"]:
@@ -86,13 +90,14 @@ def picture_motion(edition: Edition) -> dict:
     record, report = bound_report(edition, "motion")
     followed = report.get("followed")
     if followed is None:
-        msg = f"{edition.code}: the motion report follows no marks; run check-picture again"
+        again = target("check-picture", edition.code)
+        msg = f"{edition.code}: the motion report follows no marks; run {again} again"
         raise ReviewError(msg)
     unjudged = [kind.replace("_", " ") for kind in KINDS if kind not in followed]
     if unjudged:
         msg = (
             f"{edition.code}: the motion report judges no {' or '.join(unjudged)};"
-            " run check-picture again"
+            f" run {target('check-picture', edition.code)} again"
         )
         raise ReviewError(msg)
     largest = {}

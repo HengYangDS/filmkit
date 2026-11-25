@@ -145,7 +145,9 @@ def test_an_edition_whose_film_holds_no_passing_still_scan_is_not_delivered(
     monkeypatch.setattr(delivery_folder, "run", lambda *_: pytest.fail("the delivery ran rsync"))
     with pytest.raises(DeliveryRefusedError) as refused:
         delivery_folder.deliver(root, destination, dry_run=dry_run)
-    assert str(refused.value) == "The zh film has no still scan record; run scan-film"
+    assert (
+        str(refused.value) == "The zh film has no still scan record; run filmkit build scan-film:zh"
+    )
     assert not destination.exists()
 
 
@@ -160,7 +162,7 @@ def test_an_edition_without_a_timeline_is_refused_in_one_line_before_rsync(film,
         delivery_folder.main(["--destination", str(destination)])
     assert str(refused.value) == (
         "The en edition has no timeline at build/artifacts/film/en/timeline.json, so no runtime: "
-        "run produce assemble --language en"
+        "run filmkit build assemble:en"
     )
     assert not destination.exists()
 
@@ -173,7 +175,7 @@ def test_the_delivery_asks_the_scan_of_every_edition(film, monkeypatch):
     def require(edition):
         asked.append(edition.code)
         if edition.code == CODES[-1]:
-            msg = f"The {edition.code} film has no still scan record; run scan-film"
+            msg = f"The {edition.code} film has no still scan record; run filmkit build scan-film"
             raise PictureError(msg)
 
     monkeypatch.setattr(still_scan, "require_film_scan", require)
@@ -181,7 +183,10 @@ def test_the_delivery_asks_the_scan_of_every_edition(film, monkeypatch):
     with pytest.raises(DeliveryRefusedError) as refused:
         delivery_folder.deliver(root, destination)
     assert asked == list(CODES)
-    assert str(refused.value) == f"The {CODES[-1]} film has no still scan record; run scan-film"
+    assert (
+        str(refused.value)
+        == f"The {CODES[-1]} film has no still scan record; run filmkit build scan-film"
+    )
     assert not destination.exists()
 
 

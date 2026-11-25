@@ -51,14 +51,18 @@ def test_the_measured_sync_is_the_report_the_picture_gate_judged(root, put):
     report.unlink()
     assert refusal() == (
         "zh: missing build/runtime/work/picture-gates/zh/sync.json, the sync report its gate "
-        "record binds; run check-picture again"
+        "record binds; run filmkit build check-picture:zh again"
     )
     put(edition.picture_gates, record | {"reports": {"motion": record["reports"]["sync"]}})
-    assert refusal() == "zh: the picture gate record binds no sync report; run check-picture again"
+    assert (
+        refusal()
+        == "zh: the picture gate record binds no sync report; run filmkit build check-picture:zh "
+        "again"
+    )
     edition.picture_gates.unlink()
     assert refusal() == (
         "zh: missing build/evidence/editions/zh/picture-gates.json, the picture gate record; "
-        "run check-picture"
+        "run filmkit build check-picture:zh"
     )
 
 

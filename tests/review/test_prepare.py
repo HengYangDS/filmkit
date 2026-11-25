@@ -206,7 +206,9 @@ def test_a_film_without_its_passing_still_scan_is_refused_and_leaves_no_director
     folder = review_files.round_directory(ROUND)
     # Below this root no edition holds a record, and the scan's own requirement says so.
     monkeypatch.setattr(still_scan, "require_film_scan", REQUIRE_FILM_SCAN)
-    assert refusal() == "prepare: The zh film has no still scan record; run scan-film"
+    assert (
+        refusal() == "prepare: The zh film has no still scan record; run filmkit build scan-film:zh"
+    )
     assert (ready, folder.exists()) == ([], False)
     asked = []
 
@@ -370,7 +372,7 @@ def missing_timeline(root, put, previous, monkeypatch):
     Edition("en").timeline.unlink()
     return previous, (
         "The en edition has no timeline at build/artifacts/film/en/timeline.json, so no runtime: "
-        "run produce assemble --language en"
+        "run filmkit build assemble:en"
     )
 
 

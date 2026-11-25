@@ -222,7 +222,7 @@ def test_a_timeline_whose_anchors_are_not_its_words_times_is_refused(broken, com
     hand = {"order": {"start": 0, "end": 5, "units": [2, 5], "thought": 1}}
     put(zh.timeline, {"segments": [{**marked, "words": words, "anchors": hand}], "duration": 9})
     before = tree(broken)
-    with pytest.raises((AnchorError, PictureError), match="run produce refresh-captions"):
+    with pytest.raises((AnchorError, PictureError), match="run filmkit build refresh-captions"):
         command(zh)
     assert tree(broken) == before
 
@@ -290,7 +290,7 @@ def test_the_report_gives_the_times_an_editions_timeline_holds(editions, capsys)
     listed = json.loads(capsys.readouterr().out)["editions"]["zh"]
     assert listed["stale"] is True and "start" not in listed["segments"]["03"][0]
     anchors.main([])
-    assert "are stale: run produce refresh-captions --language zh" in capsys.readouterr().out
+    assert "are stale: run filmkit build refresh-captions:zh" in capsys.readouterr().out
 
 
 def test_the_engine_places_the_anchors_on_a_timeline_of_other_words(editions, tmp_path):

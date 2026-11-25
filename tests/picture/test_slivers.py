@@ -4,7 +4,7 @@ compare-pictures refuses."""
 
 import numpy as np
 import pytest
-from test_faults import NEXT, NO_SLIVERS, RENDER, box, draw, prepared, refusal
+from test_faults import NATIVE, NEXT, NO_SLIVERS, box, draw, prepared, refusal
 
 import filmkit.picture.equivalence as equivalence
 import filmkit.picture.slivers as slivers
@@ -202,8 +202,7 @@ def test_a_dim_mark_missing_for_one_frame_is_refused_and_names_its_picture(editi
     message, record = refusal(edition)
     fault = (
         "encoded frame 77 at 1.283 s: the uncaptioned picture holds a one-frame fault of 60 levels "
-        f"in box [8, 6, 32, 14] outside the caption band{DENSE}; render it again with {RENDER} "
-        "--uncaptioned --native"
+        f"in box [8, 6, 32, 14] outside the caption band{DENSE}; render it again with {NATIVE}"
     )
     assert message == f"The zh pictures differ beyond their captions: {fault}{NEXT}"
     every = record["encoded"]["every_frame"]

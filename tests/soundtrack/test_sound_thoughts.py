@@ -188,7 +188,7 @@ def test_a_heard_take_selected_after_the_assembly_is_refused_until_assembled(edi
     heard_clear(monkeypatch, C)
     refused = (
         "thought 01.1 reads 17.4 dB: the owner heard its selected take, but the soundtrack was "
-        "assembled from another selection of segment 01; run assemble"
+        "assembled from another selection of segment 01; run filmkit build assemble:zh"
     )
     assert said(edition, HEARD) == refused
     # With no assembly record, nothing holds the heard take either.

@@ -1,22 +1,23 @@
-"""Render an edition's draft and scan it into the record that the pre-render check reads.
+"""Render an edition's draft and scan it into the record that every render waits for.
 
 `render_draft` stages the edition's captioned picture afresh at DRAFT_SIZE over the whole film in
 the draft's own stage (`Edition.draft_stage`), after removing that stage, the draft beside it
 (`Edition.draft_picture`) and the edition's earlier draft record and receipt, so that a refused
-draft leaves no record for the pre-render check. It draws the stage in one process with the
+draft leaves no record for a render to wait for. It draws the stage in one process with the
 pictures' encoding (`filmkit.picture.renderer.command`) at DRAFT_FPS, under `nice` at NICENESS
 or the caller's niceness if that is higher, so that it yields to other work on the host, within
 its deadline, and writes the draft's receipt beside the pictures'
 receipts (`Edition.draft_receipt`). The still scan then
-writes the edition's draft record (`still_scan.record_draft`), which `filmkit.preflight` requires
-before a render. That scan is an early warning: a draft can end a still run that the film holds
-whole, and the scan of the packaged film decides (`still_scan.scan_film`).
+writes the edition's draft record (`still_scan.record_draft`), the output of the node
+`render-draft`, for which every render waits in a film that declares drafts. That scan is an
+early warning: a draft can end a still run that the film holds whole, and the scan of the
+packaged film decides (`still_scan.scan_film`).
 
 A render that does not complete raises `PictureError` after its receipt is written and scans
 nothing; a draft that holds a still picture at the limit raises it after its record is written.
 A draft needs no passing gate record: it shows how the picture looks before the gates pass.
 
-Usage: python -m filmkit.produce render-draft --language <code> [--deadline <seconds>]
+Run by `filmkit build render-draft:<code>`.
 """
 
 from __future__ import annotations

@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import filmkit.languages as languages
 import filmkit.repository as repository
 from filmkit.film import FILM
+from filmkit.graph import target
 from filmkit.places import Places, places
 
 if TYPE_CHECKING:
@@ -278,7 +279,7 @@ class Edition:
         place = repository.relative(self.timeline)
         message = (
             f"The {self.code} edition has no timeline at {place}, so no runtime: "
-            f"run produce assemble --language {self.code}"
+            f"run {target('assemble', self.code)}"
         )
         return UnassembledError(message)
 
@@ -290,7 +291,7 @@ class Edition:
         if type(stated) is not int or stated < 1:
             message = (
                 f"{repository.relative(self.timeline)} states no runtime in whole seconds: "
-                f"run produce assemble --language {self.code}"
+                f"run {target('assemble', self.code)}"
             )
             raise UnassembledError(message)
         return stated
@@ -392,8 +393,8 @@ class Edition:
 
     @property
     def readiness(self) -> Path:
-        """The receipt of the pre-render check, bound to the inputs it judged
-        (`filmkit.preflight`)."""
+        """The receipt the pre-render check wrote, which no node reads (it leaves with the
+        `produce` command)."""
         return self.evidence / "readiness.json"
 
     @property

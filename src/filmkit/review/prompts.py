@@ -15,7 +15,7 @@ and states the rules R1 to R6 of the formal register as the engine's standard st
 
 No round is prepared for films the engine's own measure refuses: the checks that only read
 (`read_round`) ask each edition's passing still scan of its 1080p captioned film
-(`filmkit.picture.still_scan.require_film_scan`, whose record `produce scan-film` writes), so a
+(`filmkit.picture.still_scan.require_film_scan`, whose record the node `scan-film` writes), so a
 round is not spent on a film that the delivery's verification would refuse afterwards.
 
 `{previous_review}` states the previous round's review, its findings and that each repair is to

@@ -20,7 +20,7 @@ Both records of an edition are read by one reader (`filmkit.picture.still_record
 which answers only from a record that has the scan's shape, binds what stands, states the
 engine's own rules, read the whole film and agrees with itself.
 
-The final film's scan decides. `scan_film`, the action `scan-film` of `filmkit.produce`, scans
+The final film's scan decides. `scan_film`, the run of the node `scan-film`, scans
 the edition's 1080p captioned film against its timeline into the edition's film record
 (`Edition.film_stills`), which also names the engine that scanned. `film_record` reads it for
 the film, the timeline, the composition and the engine as they stand; `scan-film` scans again
@@ -34,8 +34,8 @@ A draft's scan is an early warning and settles nothing about the film. A draft i
 the size the film's picture is drawn at, and text is set on whole pixels of the size it is drawn
 at, so a label can step by one pixel in a draft where the film holds it still, and the draft
 then ends a still run that the film holds whole. With --language the timeline is the edition's
-and the record is its draft's (`Edition.draft_stills`), which `filmkit.preflight` requires, of a
-film that declares drafts, before a render (`draft_record`: the same reader, for the timeline
+and the record is its draft's (`Edition.draft_stills`), for which every render waits, of a
+film that declares drafts (`draft_record`: the same reader, for the timeline
 and the composition as they stand); `record_draft` writes it, for this command and for
 `filmkit.picture.draft`, of a draft that decodes to its timeline's seconds.
 
@@ -43,7 +43,7 @@ What the scan cannot read is its command's refusal, in one line, and no error of
 
 Usage: python -m filmkit.picture.still_scan <movie> --language <code> [--limit <seconds>]
        python -m filmkit.picture.still_scan <movie> <timeline> --out <record> [--limit <seconds>]
-       python -m filmkit.produce scan-film --language <code>
+The film's scan is run by `filmkit build scan-film:<code>`.
 """
 
 from __future__ import annotations
@@ -62,6 +62,7 @@ import filmkit.graph.runs as seam
 import filmkit.picture.still_record as still_record
 import filmkit.released as released
 import filmkit.repository as repository
+from filmkit.graph import target
 from filmkit.picture.errors import PictureError
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
 from filmkit.picture.still_record import NoAnswerError
@@ -388,7 +389,7 @@ def record_draft(edition: Edition, movie: Path, limit: float = LIMIT_SECONDS) ->
     names what drew the draft as the draft's receipt does (`drawn_by`: the canvas package, its
     version and its text renderer; none where the draft has no receipt). The scan's limits were
     set on drafts a browser drew, and a renderer's frames fall otherwise at them, so a record
-    admits a render only by the renderer that drew its draft (`filmkit.preflight`). A draft
+    admits a render only by the renderer that drew its draft (the node `render-draft`). A draft
     that does not decode to its timeline's seconds is refused and leaves no record."""
     record = judged(movie, edition.timeline, limit)
     whole(repository.ROOT / movie, record, film_frames(edition), edition.draft_stills)
@@ -521,7 +522,7 @@ def require_film_scan(edition: Edition) -> dict:
     try:
         record = film_record(edition)
     except NoAnswerError as error:
-        msg = f"The {edition.code} film{error}; run {SCAN_ACTION}"
+        msg = f"The {edition.code} film{error}; run {target(SCAN_ACTION, edition.code)}"
         raise PictureError(msg) from error
     refuse_still_pictures(edition, record)
     return {

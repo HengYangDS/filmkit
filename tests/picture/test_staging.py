@@ -166,6 +166,6 @@ def test_an_edition_without_a_timeline_is_refused_before_a_stage_is_written():
         picture_rendering.stage_picture(edition, None, RUNTIME, 3840, 2160)
     assert str(refused.value) == (
         "The en edition has no timeline at build/artifacts/film/en/timeline.json, so no runtime: "
-        "run produce assemble --language en"
+        "run filmkit build assemble:en"
     )
     assert not edition.picture_stage.exists()

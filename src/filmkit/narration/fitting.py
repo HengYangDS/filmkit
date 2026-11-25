@@ -2,8 +2,8 @@
 
 `read` is asked by the convergence (`filmkit.narration.converge`) when its rounds end. It asks
 the assembly's own count and nothing else: it selects the edition's recordings as
-`produce select` does (`filmkit.narration.selection`) and counts them under the script's pause
-policy as `produce fit` does (`filmkit.soundtrack.fit`). What it returns is the record's `fit`:
+the node `select` does (`filmkit.narration.selection`) and counts them under the script's pause
+policy as `python -m filmkit.soundtrack.fit` does. What it returns is the record's `fit`:
 
 - `fits`, with the runtime the assembly would give, in whole seconds, and the seconds of the
   rounding's fraction that the gaps and the credits take, as counted: an edition lasts as long

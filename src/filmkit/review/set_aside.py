@@ -18,9 +18,9 @@ a consumer folder that holds its films byte-identical in <consumer>/<code>/, and
 round-<n> or by a name of its own. Every planned edition is checked before anything moves.
 
 Assembling an edition's soundtrack or refreshing its captions rewrites the inputs of its
-packaged build in place, so `filmkit.produce` refuses both while the prompts of a review round
-bind the edition's current films and that round has not set the edition aside
-(`require_set_aside`).
+packaged build in place, so the nodes `assemble` and `refresh-captions` refuse both while the
+prompts of a review round bind the edition's current films and that round has not set the
+edition aside (`require_set_aside`).
 """
 
 from __future__ import annotations

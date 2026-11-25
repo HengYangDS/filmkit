@@ -69,8 +69,7 @@ def test_a_one_frame_fragment_in_the_band_refuses_naming_the_frame_and_the_capti
     assert str(refused.value) == (
         "The captioned picture's caption band changes for one frame: encoded frame 50 at 0.833 s: "
         "the captioned picture holds a one-frame fault of 219 levels in box [150, 154, 154, 158] "
-        "in the caption band; render it again with python -m filmkit.produce render-picture "
-        "--language zh"
+        "in the caption band; render it again with filmkit build render-picture:zh"
     )
     # Nothing was put in place, and the work holds no picture.
     assert not (root / "uncaptioned.mp4").exists()

@@ -22,7 +22,7 @@ declares a floor for the edition, and its verdict on each line:
            record names each unit of the transcript that stood for a declared term in other
            letters (`terms_in_other_letters`, `recognition.stands_for`);
   clarity  it reads at or above the film's line for a single thought
-           (`review.clarity.under_its_line`, which `filmkit.preflight` asks too). A take under
+           (`review.clarity.under_its_line`, which the sound gate asks too). A take under
            its line is not refused but named for the owner's ear (`FOR_THE_EAR`, decision D-46
            of 24 November 2026): it waits for his hearing and gets no candidate. A film that
            declares a floor and no line for a single thought has its takes' clarity recorded
@@ -133,7 +133,7 @@ GATE_NOT_ASKED = "not asked: no alignment of the receipt's recordings stands bes
 NOT_OPENING = "not judged: the thought does not open its recording"
 NO_FLOOR = "not judged: the film declares no clarity floor for the edition"
 NO_FRAMES = "not judged: the take keeps no frame to measure"
-# What `filmkit.preflight` says of thoughts under the floor in a film without a thought line.
+# What is said of thoughts under the floor in a film without a thought line.
 NO_THOUGHT_LINE = clarity.NO_THOUGHT_LINE
 
 

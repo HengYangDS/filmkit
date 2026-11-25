@@ -93,7 +93,9 @@ def test_a_record_is_refused_by_the_pre_render_check_after_an_edit_of_the_declar
     assert record["declaration_sha256"] == repository.sha(film / repository.DECLARATION)
     rendering.require_passing_gates(edition)
     (film / repository.DECLARATION).write_text('slug = "edited"\n')
-    with pytest.raises(PictureError, match="binds another declaration_sha256; run check-picture"):
+    with pytest.raises(
+        PictureError, match="binds another declaration_sha256; run filmkit build check-picture"
+    ):
         rendering.require_passing_gates(edition)
 
 

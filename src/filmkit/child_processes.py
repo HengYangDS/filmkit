@@ -27,8 +27,8 @@ until the tool has ended or been killed. The audits that a check runs side by si
 threads of their own, which no interrupt reaches: one that reached the command alone leaves
 them running to their end.
 
-`ending`, around the whole run of `filmkit.produce` and of the synthesis and around the steps of
-`narrate`, whose concept and readings checks run before it, sets no handler. It words the exit
+`ending`, around the whole run of `filmkit build` and of the synthesis and around the steps of
+`narrate`, sets no handler. It words the exit
 of a command that was asked to end where it stood in such a block, or that was interrupted
 anywhere inside it: one line
 that says what stopped it, then, after SIGTERM or a hang-up, the exit status 128 and the

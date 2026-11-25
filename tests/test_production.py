@@ -90,7 +90,7 @@ def test_an_edition_without_a_timeline_has_no_runtime(tmp_path, monkeypatch):
         _ = Edition("zh").runtime
     assert str(refused.value) == (
         "The zh edition has no timeline at build/artifacts/film/zh/timeline.json, so no runtime: "
-        "run produce assemble --language zh"
+        "run filmkit build assemble:zh"
     )
 
 
@@ -119,7 +119,7 @@ def test_a_timeline_that_states_no_whole_number_of_seconds_is_refused(
         _ = edition.runtime
     assert str(refused.value) == (
         "build/artifacts/film/zh/timeline.json states no runtime in whole seconds: "
-        "run produce assemble --language zh"
+        "run filmkit build assemble:zh"
     )
 
 

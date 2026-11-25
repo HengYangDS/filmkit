@@ -391,14 +391,17 @@ def test_a_record_of_another_film_timeline_composition_or_engine_is_refused(
     still_scan.scan_film(packaged.edition)
     change(packaged)
     assert refusal(packaged.edition) == (
-        f"The zh film's still scan record binds another {named}; run scan-film"
+        f"The zh film's still scan record binds another {named}; run filmkit build scan-film:zh"
     )
     # The scan does not answer from such a record: it decodes the film again and rebinds it.
     assert rescanned(packaged)
 
 
 def test_an_edition_without_a_record_is_refused_with_the_action_that_writes_it(packaged):
-    assert refusal(packaged.edition) == "The zh film has no still scan record; run scan-film"
+    assert (
+        refusal(packaged.edition)
+        == "The zh film has no still scan record; run filmkit build scan-film:zh"
+    )
 
 
 def cut_to(share):
@@ -453,7 +456,7 @@ def test_a_record_that_cannot_be_read_is_refused_and_repaired_by_the_action_it_n
     still_scan.scan_film(packaged.edition)
     damage(packaged)
     assert refusal(packaged.edition) == (
-        "The zh film's still scan record cannot be read; run scan-film"
+        "The zh film's still scan record cannot be read; run filmkit build scan-film:zh"
     )
     assert rescanned(packaged)
 
@@ -482,7 +485,7 @@ def test_a_record_that_contradicts_itself_is_not_trusted_and_the_film_is_scanned
     rewrite(packaged, **edit)
     assert refusal(packaged.edition) == (
         f"The zh film's still scan record cannot be trusted, as it contradicts itself in {named}; "
-        "run scan-film"
+        "run filmkit build scan-film:zh"
     )
     with pytest.raises(PictureError) as refused:
         still_scan.scan_film(packaged.edition)
@@ -496,11 +499,14 @@ def test_a_record_written_under_another_limit_is_refused_with_both_limits(packag
     edition = packaged.edition
     record = still_scan.record_scan(packaged.film, edition.timeline, edition.film_stills, 99)
     assert (record["over_limit"], record["limit_seconds"]) == ([], 99)
-    assert refusal(edition) == "The zh film's still scan record cannot be read; run scan-film"
+    assert (
+        refusal(edition)
+        == "The zh film's still scan record cannot be read; run filmkit build scan-film:zh"
+    )
     rewrite(packaged, engine_version=released.version())
     assert refusal(edition) == (
         "The zh film's still scan record states other rules than the engine's: a limit of 99 s "
-        "where the engine's is 3.5 s; run scan-film"
+        "where the engine's is 3.5 s; run filmkit build scan-film:zh"
     )
     with pytest.raises(PictureError) as refused:
         still_scan.scan_film(edition)
@@ -515,7 +521,8 @@ def test_a_record_of_earlier_rules_is_refused_though_the_engine_s_version_stands
     still_scan.scan_film(packaged.edition)
     monkeypatch.setattr(still_scan, "FINE_RULE", "at most 8 band pixels change")
     assert refusal(packaged.edition) == (
-        "The zh film's still scan record states other rules than the engine's; run scan-film"
+        "The zh film's still scan record states other rules than the engine's; run filmkit "
+        "build scan-film:zh"
     )
     assert rescanned(packaged)
 
@@ -559,7 +566,7 @@ def test_a_timeline_that_states_no_runtime_is_named(packaged):
         still_scan.scan_film(packaged.edition)
     assert str(refused.value) == (
         "build/artifacts/film/zh/timeline.json states no runtime in whole seconds: "
-        "run produce assemble --language zh"
+        "run filmkit build assemble:zh"
     )
 
 
