@@ -36,8 +36,8 @@ def test_plan_prints_each_node_of_the_sound_chain_as_json(sound_chain, capsys):
 @pytest.mark.ffmpeg
 def test_an_unknown_target_is_refused_in_one_line_naming_the_nodes(sound_chain):
     with pytest.raises(SystemExit) as refused:
-        cli.main(["plan", "sound:zh"])
+        cli.main(["plan", "pictures:zh"])
     line = refused.value.code
     assert isinstance(line, str) and "\n" not in line
-    assert line.startswith("filmkit plan: sound:zh names no node of the plan; its nodes are ")
+    assert line.startswith("filmkit plan: pictures:zh names no node or group of the plan; ")
     assert "check-sound" in line and "package-film" in line

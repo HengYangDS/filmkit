@@ -250,7 +250,7 @@ def test_a_film_wide_node_is_planned_and_asked_for_by_its_name(stand_in_table, m
     # Each edition's narration reads the verdict, so the film's check is upstream of it.
     _, found = judged(table, "narrate:all")
     assert list(found) == ["check", "narrate:zh", "narrate:en"]
-    with pytest.raises(ValueError, match="check:zh names no node of the plan"):
+    with pytest.raises(ValueError, match="check:zh names no node or group of the plan"):
         judged(table, "check:zh")
 
 
@@ -386,3 +386,39 @@ def test_a_hearing_reruns_the_picture_gate_and_the_renders_until_outputs_are_key
     for code in table.codes:
         for name in ("render-picture", "render-picture-uncaptioned"):
             assert found[f"{name}:{code}"].state == "behind", (name, code)
+
+
+def test_a_group_s_target_lists_its_nodes_and_every_node_upstream_by_path_and_wait(judging):
+    table, _ = judging
+    listed = set(entries(table, "picture:zh"))
+    picture = {
+        f"{name}:zh"
+        for name in engine_chain.GROUPS["picture"]
+        if f"{name}:zh" in table.edges  # the qualification where the film qualifies Chinese
+    }
+    assert picture <= listed
+    assert {"render-picture:zh", "compare-pictures:zh"} <= picture
+    # Upstream by a path (the stage, the sound, the narration) and by a wait (every edition's
+    # picture gate, the film's source check).
+    assert {"stage-picture:zh", "assemble:zh", "narrate:zh"} <= listed
+    assert {"check-picture:en", "geometry-check:en", "check-sound:zh", "check"} <= listed
+    assert listed == set().union(picture, *(table.closure(key) for key in picture))
+    # `<group>:all` names the group's nodes of every edition.
+    assert {"render-picture:zh", "render-picture:en"} <= set(entries(table, "picture:all"))
+
+
+def test_all_lists_every_node_but_the_narration(judging):
+    table, _ = judging
+    listed = set(entries(table, "all"))
+    assert listed == {key for key in table.edges if not key.startswith("narrate:")}
+    assert "check" in listed and "package-film:en" in listed
+
+
+def test_an_unknown_group_is_refused_in_one_line_naming_the_groups_and_nodes(judging):
+    table, _ = judging
+    with pytest.raises(ValueError) as refused:
+        plan.plan(table, ["pictures:zh"])
+    line = str(refused.value)
+    assert "\n" not in line and line.startswith("pictures:zh names no node or group of the plan;")
+    assert "its groups are sound, audit, picture, package" in line
+    assert "check-sound" in line and "package-film" in line

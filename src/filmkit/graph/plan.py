@@ -355,22 +355,53 @@ def changed_by_part(partial: records.PartialRecord, whole: records.RunRecord | N
     return left != {name: state.sha256 for name, state in whole.outputs.items()}
 
 
+# The target that names every node of the table but those `chain.NOT_IN_ALL` names.
+ALL = "all"
+
+
+def named(table: nodes.Table, target: str) -> list[str]:
+    """The keys a target names: a node or a group of nodes (`Table.groups`), for one edition or
+    for `all` of them, `<name>:<code>`; a film-wide node by its name alone; none where it names
+    nothing of the table."""
+    name, code = nodes.split(target)
+    members = table.groups.get(name, (name,))
+    found = []
+    for member in members:
+        node = table.nodes.get(member)
+        if node is None:
+            return []
+        every = node.codes(table.codes)
+        found += [nodes.key(member, c) for c in every] if code == ALL else [nodes.key(member, code)]
+    return [key for key in found if key in table.edges] if name in table.groups else found
+
+
+def unlisted(table: nodes.Table, targets: Iterable[str]) -> set[str]:
+    """The nodes a plan judges and does not list: for `all`, those `chain.NOT_IN_ALL` names, which
+    `filmkit narrate` runs, unless another target names them."""
+    targets = list(targets)
+    if ALL not in targets:
+        return set()
+    left = {k for k in table.edges if nodes.split(k)[0] in chain.NOT_IN_ALL}
+    return left - {k for t in targets if t != ALL for k in named(table, t)}
+
+
 def wanted(table: nodes.Table, targets: Iterable[str]) -> set[str]:
-    """The nodes asked for, `<node>:<code>` or `<node>:all` for an edition's node and the node's
-    name for a film-wide one, and every node upstream of them; every node where none is asked
-    for. An unknown target is refused, naming the nodes."""
+    """The nodes the targets name (`named`), or for `all` every node but those `chain.NOT_IN_ALL`
+    names, and every node upstream of them by a path or by a wait, which the plan judges; every
+    node where none is asked for. A target that names nothing is refused in one line, naming the
+    groups and the nodes."""
     asked = set()
     for target in targets:
-        name, code = nodes.split(target)
-        node = table.nodes.get(name)
-        every = node.codes(table.codes) if node else table.codes
-        keys = [nodes.key(name, c) for c in every] if code == "all" else [target]
-        unknown = [k for k in keys if k not in table.edges]
-        if unknown or not keys:
-            known = ", ".join(table.nodes)
+        if target == ALL:
+            asked |= set(table.edges) - unlisted(table, [ALL])
+            continue
+        keys = named(table, target)
+        if not keys or any(k not in table.edges for k in keys):
+            groups = ", ".join(table.groups) or "none"
             msg = (
-                f"{target} names no node of the plan; its nodes are {known}, each as <node>:<code> "
-                "but a film-wide node, which is named alone"
+                f"{target} names no node or group of the plan; its groups are {groups}, each as "
+                f"<group>:<code> or <group>:all; its nodes are {', '.join(table.nodes)}, each as "
+                "<node>:<code> or <node>:all but a film-wide node, which is named alone; or all"
             )
             raise ValueError(msg)
         asked |= set(keys)
@@ -387,10 +418,10 @@ def plan(
 ) -> Planned:
     """The entries of the nodes asked for and every node upstream, in the derived order; each
     file that several records state is hashed once (`records.once`)."""
-    table = table or chain.table()
-    keys = wanted(table, targets)
+    table, targets = table or chain.table(), list(targets)
+    keys, hidden = wanted(table, targets), unlisted(table, targets)
     with records.once() as taken:
-        entries = judge_all(table, keys, full)
+        entries = [entry for entry in judge_all(table, keys, full) if entry.key not in hidden]
     return Planned(entries, len(taken))
 
 

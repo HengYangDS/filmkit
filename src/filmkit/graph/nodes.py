@@ -181,6 +181,7 @@ class Table:
     edges: dict[str, frozenset[str]]
     order: tuple[str, ...]
     waits: dict[str, frozenset[str]] = field(default_factory=dict)
+    groups: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     def node(self, named: str) -> tuple[Node, Edition | None]:
         """A node by its key, with its edition; no edition for a film-wide node, keyed by its
@@ -294,9 +295,15 @@ def waited(nodes: dict[str, Node], codes: tuple[str, ...]) -> dict[str, set[str]
     return found
 
 
-def load(nodes: Iterable[Node], shared: dict, codes: tuple[str, ...] = CODES) -> Table:
-    """Load a table: refused for a path two nodes write with no declaration, naming it and its
-    writers, and for a cycle of paths and waits, naming its nodes."""
+def load(
+    nodes: Iterable[Node],
+    shared: dict,
+    codes: tuple[str, ...] = CODES,
+    groups: dict[str, tuple[str, ...]] | None = None,
+) -> Table:
+    """Load a table, with the groups of its nodes that targets may name: refused for a path two
+    nodes write with no declaration, naming it and its writers, for a cycle of paths and waits,
+    naming its nodes, and for a group that names a node the table lacks."""
     named = {node.name: node for node in nodes}
     refused = undeclared(written(named, codes), shared)
     if refused:
@@ -311,7 +318,11 @@ def load(nodes: Iterable[Node], shared: dict, codes: tuple[str, ...] = CODES) ->
         raise TableError(f"the node table has a cycle: {cycle}") from None
     frozen = {name: frozenset(found) for name, found in before.items()}
     held = {name: frozenset(found) for name, found in gates.items()}
-    return Table(named, dict(shared), tuple(codes), frozen, order, held)
+    grouped = dict(groups or {})
+    strays = sorted({n for members in grouped.values() for n in members} - set(named))
+    if strays:
+        raise TableError(f"a group names no node of the table: {', '.join(strays)}")
+    return Table(named, dict(shared), tuple(codes), frozen, order, held, grouped)
 
 
 def stands(path: Path) -> bool:

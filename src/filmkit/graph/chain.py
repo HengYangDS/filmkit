@@ -1,9 +1,9 @@
 """The engine's node table: each command of an edition's build chain as a node, by what it binds
 (`filmkit.graph.bindings`), its run, the gates it waits for and the host class it is expected
-to measure at; the paths that several nodes write and the reads each makes aside (design
-decisions 1, 4 and 5 of record-every-run; `filmkit.graph.nodes` loads it). The runs of the
-nodes that no owner's function runs are here: the engine's tools run with the arguments the
-films' task lines passed, a whole stage and the uncaptioned picture's way.
+to measure at; the paths that several nodes write, the reads each makes aside, and the groups a
+target may name (design decisions 1, 4 and 5 of record-every-run; `filmkit.graph.nodes` loads
+it). The runs of the nodes that no owner's function runs are here: the engine's tools run with
+the arguments the films' task lines passed, a whole stage and the uncaptioned picture's way.
 """
 
 from __future__ import annotations
@@ -457,6 +457,32 @@ NOT_NODES = {
 }
 
 
+# The derivation's nodes as groups of the table's nodes, which a target may name (design decision
+# 2 of build-a-film-by-its-verbs); `narrate` is its own, and the target `all` holds every node but
+# it, which `filmkit narrate` runs.
+GROUPS = {
+    "sound": ("select", "assemble", "refresh-captions", "check-sound"),
+    "audit": (
+        "stage-picture",
+        "stage-picture-uncaptioned",
+        "geometry-check",
+        "player-check-cover",
+        "check-picture",
+        "render-draft",
+    ),
+    "picture": (
+        "render-picture",
+        "render-picture-uncaptioned",
+        "validate-picture",
+        "validate-picture-uncaptioned",
+        "qualify-renderer",
+        "compare-pictures",
+    ),
+    "package": ("package-metadata", "package-film", "scan-film"),
+}
+NOT_IN_ALL = ("narrate",)
+
+
 def table() -> Table:
     """The engine's table over the film's editions."""
-    return load(TABLE, SHARED, CODES)
+    return load(TABLE, SHARED, CODES, GROUPS)
