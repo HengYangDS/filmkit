@@ -51,10 +51,13 @@ GitHub Actions and GitLab CI run the same portable proof. Building the sample fi
 
 ```sh
 mise run sample:supply
+mise run sample:check
+mise run sample:narrate
 mise run sample:build
+mise run sample:verify
 ```
 
-A change to narration, sound or picture rebuilds the sample film and compares it with its previous output. Packaging refuses to extend films bound to other inputs, so first delete each edition's four films and its `film-package.json`, as the README describes.
+`sample:build` runs `filmkit build all`, which names the light build to run first and then each heavy invocation, each the child of its own host ticket. A change to narration, sound or picture rebuilds the sample film and compares it with its previous output. Packaging refuses to extend films bound to other inputs, so first remove each edition's four films and its `build/evidence/editions/<code>/film-package.json`, or set a reviewed build's packages aside with `filmkit review set-aside`.
 
 ## Commit
 
