@@ -9,7 +9,9 @@ thresholds.
 Aesthetic judgment belongs to the review record; human listening stays separate.
 The verifier reads and decodes, and prints each edition's report, which states the seconds each
 film's media took. Up to four films' media are verified at the same time. It writes nothing;
---read-only, which the films' gate passes, is accepted and changes nothing.
+--read-only, which the films' gate passes, is accepted and changes nothing. `filmkit verify
+--technical-only` runs the technical checks of each edition's current films after the records
+(`verify_editions`).
 
 Usage: python -m filmkit.delivery.verification [--technical-only] --language <code>|all
            [<films>]
@@ -544,6 +546,24 @@ REFUSALS = (
 )
 
 
+def verify_editions(
+    groups: dict[str, list[Path]] | None = None, *, technical_only: bool = True
+) -> None:
+    """Qualify each edition as its films, each declared edition's current delivered films where
+    `groups` names none, printing each edition's report as its run ends. An owner's refusal stops
+    at that edition in one line, "<language>: <reason>"; nothing is written."""
+    groups = groups or {code: production.Edition(code).films for code in production.CODES}
+    for language, members in groups.items():
+        try:
+            with seam.run(language, "verify"):
+                edition = production.Edition(language)
+                report = qualify(edition, members, technical_only=technical_only)
+        except REFUSALS as error:
+            msg = f"{language}: {error}"
+            raise SystemExit(msg) from None
+        print(json.dumps(report, ensure_ascii=False), flush=True)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("files", nargs="*", type=Path)
@@ -557,16 +577,7 @@ def main(argv: list[str] | None = None) -> None:
         film for code in codes for film in production.Edition(code).films
     ]
     groups = edition_inputs(files) if options.language == "all" else {options.language: files}
-    for language, members in groups.items():
-        try:
-            with seam.run(language, "verify"):
-                report = qualify(
-                    production.Edition(language), members, technical_only=options.technical_only
-                )
-        except REFUSALS as error:
-            msg = f"{language}: {error}"
-            raise SystemExit(msg) from None
-        print(json.dumps(report, ensure_ascii=False), flush=True)
+    verify_editions(groups, technical_only=options.technical_only)
 
 
 if __name__ == "__main__":

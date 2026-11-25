@@ -3,7 +3,7 @@ build-a-film-by-its-verbs).
 
 Usage: filmkit check [--read-only]
        filmkit plan [TARGET...] [--json]
-       filmkit verify
+       filmkit verify [--technical-only] [--release]
 
 Run in a film's folder, where the engine finds the film. `check` asks every question of the
 film's sources at once (`filmkit.check`) as the run of the film-wide node `check`, which writes
@@ -13,8 +13,11 @@ the nodes a target
 names (`<node>:<code>` or `<node>:all`, every node where none is named) and every node upstream of
 them, each node's state and reasons, its host class as measured and as expected, its last seconds
 and whether it is ready (`filmkit.graph.plan`); it writes nothing. `verify` hashes every file a run
-record states and exits 1 where it refuses (`filmkit.graph.verify`). A target that names no node
-is refused in one line that names the nodes.
+record states and exits 1 where it refuses (`filmkit.graph.verify`); only once the records pass,
+`--technical-only` runs the verifier's technical checks of each edition's delivered films, which
+decode them (`filmkit.delivery.verification`), and `--release` compares the build with the
+published release (`filmkit.delivery.reproduction`). `verify` writes nothing in any mode. A target
+that names no node is refused in one line that names the nodes.
 """
 
 from __future__ import annotations
@@ -50,10 +53,20 @@ def arguments() -> argparse.ArgumentParser:
         help="<node>:<code> or <node>:all, with every node upstream; every node where none",
     )
     planning.add_argument("--json", action="store_true", help="print the plan as JSON")
-    verbs.add_parser(
+    verifying = verbs.add_parser(
         "verify",
-        help="hash every file a run record states; exit 1 for bytes no declared writer "
-        "accounts for and for a change that kept a file's size and time",
+        help="hash every file a run record states and judge every node; exit 1 for a node that "
+        "is not fresh and passed and for bytes no declared writer accounts for; writes nothing",
+    )
+    verifying.add_argument(
+        "--technical-only",
+        action="store_true",
+        help="then decode and check each edition's delivered films, the review aside",
+    )
+    verifying.add_argument(
+        "--release",
+        action="store_true",
+        help="then compare the build with the published release under the reproduction standard",
     )
     return parser
 
@@ -107,14 +120,33 @@ def checked(read_only: bool) -> int:
     return 0
 
 
+def verified(technical: bool, release: bool) -> int:
+    """`filmkit verify`: the records, and once they pass, with `technical` the verifier's
+    technical checks of each edition's delivered films and with `release` the comparison with the
+    published release, each refusing in its own words; a refusal of the records stops before any
+    film is decoded, and nothing is written."""
+    from filmkit.graph import verify
+
+    status = verify.run()
+    if status == 0 and technical:
+        import filmkit.delivery.verification as delivery_verification
+
+        delivery_verification.verify_editions(technical_only=True)
+    if status == 0 and release:
+        import filmkit.delivery.reproduction as reproduction
+
+        reproduction.judge(reproduction.compared())
+    return status
+
+
 def main(argv: list[str] | None = None) -> None:
     options = arguments().parse_args(argv)
     if options.verb == "check":
         sys.exit(checked(options.read_only))
-    from filmkit.graph import plan, verify
-
     if options.verb == "verify":
-        sys.exit(verify.run())
+        sys.exit(verified(options.technical_only, options.release))
+    from filmkit.graph import plan
+
     try:
         planned = plan.plan(targets=options.targets)
     except ValueError as error:

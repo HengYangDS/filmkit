@@ -1,208 +1,18 @@
-"""The comparison of a rebuild with the published release under the reproduction standard."""
+"""The comparison of a rebuild with the published release under the reproduction standard,
+layer by layer, across the encoders' versions and through `filmkit verify --release`."""
 
 import json
 import shutil
-import subprocess
-from dataclasses import dataclass
-from pathlib import Path
 
 import pytest
+from reproducing import listing
 
-import filmkit.delivery.packaging as packaging
 import filmkit.delivery.reproduction as reproduction
-import filmkit.picture.rendering as picture_rendering
 import filmkit.production as production
 import filmkit.repository as repository
-import filmkit.review.record as review_record
-from filmkit.delivery.reproduction import ReproductionError
+from filmkit.graph import cli
 
 pytestmark = pytest.mark.ffmpeg
-
-
-def encode(target: Path, picture: str, tone: int, created: str = "2026-10-28T11:29:43Z") -> Path:
-    """A six-frame 60 fps film of a test picture and a sine tone, titled and dated like a film."""
-    subprocess.run(
-        [
-            "ffmpeg",
-            "-v",
-            "error",
-            "-nostdin",
-            "-f",
-            "lavfi",
-            "-i",
-            f"{picture}=s=64x36:r=60",
-            "-f",
-            "lavfi",
-            "-i",
-            f"sine=frequency={tone}:sample_rate=48000",
-            "-frames:v",
-            "6",
-            "-t",
-            "0.1",
-            "-ac",
-            "2",
-            "-c:v",
-            "libx264",
-            "-bf",
-            "0",
-            "-c:a",
-            "aac",
-            "-metadata",
-            "title=A film",
-            "-metadata",
-            f"creation_time={created}",
-            str(target),
-        ],
-        check=True,
-        capture_output=True,
-        timeout=60,
-    )
-    return target
-
-
-@pytest.fixture(scope="session")
-def films(tmp_path_factory) -> dict[str, Path]:
-    """The published film, and rebuilt films of another picture and of another sound."""
-    folder = tmp_path_factory.mktemp("films")
-    return {
-        "same": encode(folder / "same.mp4", "testsrc2", 440),
-        "picture": encode(folder / "picture.mp4", "smptebars", 440),
-        "sound": encode(folder / "sound.mp4", "testsrc2", 880),
-        "later": encode(folder / "later.mp4", "testsrc2", 440, "2026-11-05T09:00:00Z"),
-    }
-
-
-@dataclass
-class Release:
-    """A rebuild of both editions below the root and the release it is compared with."""
-
-    root: Path
-    films: dict[str, Path]
-
-    @property
-    def folder(self) -> Path:
-        return self.root / reproduction.RELEASE
-
-    def publish(self, name: str, source: Path) -> None:
-        """Place a published asset as a copy of a file."""
-        self.folder.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source, self.folder / name)
-
-    def record(self, floors: float | None = 30.0) -> None:
-        """Write the release manifest of the published folder, with each published film's floor;
-        a release that publishes the films without captions records their stage too."""
-        editions = {}
-        for code in production.CODES:
-            edition = production.Edition(code)
-            films = [film.name for film in edition.films if (self.folder / film.name).is_file()]
-            uncaptioned = edition.rendered(captions=False).page
-            editions[code] = {
-                "soundtrack_sha256": repository.sha(edition.soundtrack),
-                "stage_sha256": repository.sha(edition.rendered().page),
-                **(
-                    {"uncaptioned_stage_sha256": repository.sha(uncaptioned)}
-                    if len(films) == len(edition.films)
-                    else {}
-                ),
-                "picture_floor_db": {} if floors is None else dict.fromkeys(films, floors),
-            }
-        sources = [
-            *(production.Edition(code).script for code in production.CODES),
-            picture_rendering.COMPOSITION_SCRIPT,
-        ]
-        assets = [
-            {"name": path.name, "bytes": path.stat().st_size, "sha256": repository.sha(path)}
-            for path in sorted(self.folder.iterdir())
-            if path.name != reproduction.CHECKSUMS
-        ]
-        manifest = {
-            "version": "1.0.0",
-            "editions": editions,
-            "sources": {str(path): repository.sha(path) for path in sources},
-            "assets": assets,
-        }
-        checksums = reproduction.checksums(reproduction.Release.model_validate(manifest))
-        (self.folder / reproduction.CHECKSUMS).write_text(checksums)
-        assets.append(
-            {
-                "name": reproduction.CHECKSUMS,
-                "bytes": len(checksums.encode()),
-                "sha256": repository.content_sha(checksums),
-            }
-        )
-        (self.root / reproduction.MANIFEST).write_text(json.dumps(manifest))
-
-    def compare(self) -> dict:
-        return reproduction.compare()
-
-
-@pytest.fixture
-def release(tmp_path, monkeypatch, films) -> Release:
-    """A faithful rebuild of both editions and their published release, with every floor."""
-    monkeypatch.setattr(repository, "ROOT", tmp_path)
-    composition = tmp_path / picture_rendering.COMPOSITION_SCRIPT
-    composition.parent.mkdir(parents=True)
-    composition.write_text("/* film */")
-    published = Release(tmp_path, films)
-    for code in production.CODES:
-        edition = production.Edition(code)
-        script = tmp_path / edition.script
-        script.parent.mkdir(parents=True, exist_ok=True)
-        script.write_text(json.dumps({"edition": code}))
-        edition.artifacts.mkdir(parents=True)
-        for captions in (True, False):
-            stage = edition.rendered(captions).stage
-            stage.mkdir(parents=True)
-            (stage / production.STAGE_PAGE).write_text(f"<html>{code} {captions}</html>")
-        edition.soundtrack.write_bytes(f"soundtrack {code}".encode())
-        for film in edition.films:
-            shutil.copyfile(films["same"], film)
-        for name, (layer, source) in reproduction.members(edition).items():
-            if layer == "document":
-                source.write_text(f"{name}\n")
-            if layer != "review":
-                published.publish(name, source)
-        report, reviewed = f"# Review of {code}\n", edition.production_review
-        named = reproduction.release_name(edition, production.review_report(reviewed))
-        (published.folder / named).write_text(report)
-        review = {
-            "schema_version": review_record.SCHEMA_VERSION,
-            "language": code,
-            "reviewer": "independent reviewer",
-            "media": [
-                {"path": repository.relative(film), "sha256": repository.sha(film)}
-                for film in edition.films
-            ],
-            "script_sha256": repository.sha(script),
-            "composition_sha256": repository.sha(composition),
-            "scores": dict.fromkeys(review_record.DIMENSIONS, 96),
-            "overall": 96.0,
-            "findings": [],
-            "human_listening": {"state": "performed"},
-            "report": {"path": "evidence/reviews/production-review.md", "sha256": ""},
-        }
-        review["report"]["sha256"] = repository.content_sha(report)
-        (published.folder / reproduction.release_name(edition, reviewed)).write_text(
-            json.dumps(review)
-        )
-    published.record()
-    return published
-
-
-@pytest.fixture
-def decodes(monkeypatch) -> list[str]:
-    """The name of each film that the comparison decodes, with every decode standing in for six
-    equal frames, equal audio and an equal container, so that no damaged file reaches FFmpeg."""
-    decoded = []
-
-    def frames(rebuilt: Path, _published: Path, _timeout: int) -> list[float]:
-        decoded.append(rebuilt.name)
-        return [float("inf")] * 6
-
-    monkeypatch.setattr(reproduction.media, "frame_psnr", frames)
-    monkeypatch.setattr(reproduction, "decoded_audio", lambda _path: "audio")
-    monkeypatch.setattr(reproduction, "container", lambda _path: {})
-    return decoded
 
 
 @pytest.mark.usefixtures("unleveled")
@@ -243,7 +53,9 @@ def test_a_film_that_differs_by_one_byte_is_decoded(release, decodes, change):
 
 
 @pytest.mark.usefixtures("unleveled")
-def test_without_a_floor_a_film_that_holds_the_published_bytes_calibrates_none(release, decodes):
+def test_without_a_floor_a_film_that_holds_the_published_bytes_calibrates_none(
+    release, decodes, released
+):
     release.record(floors=None)
     report = release.compare()
     assert decodes == []
@@ -254,7 +66,7 @@ def test_without_a_floor_a_film_that_holds_the_published_bytes_calibrates_none(r
     assert (psnr["floor_db"], psnr["measured"], psnr["minimum_db"]) == (None, False, None)
     assert "calibrates no floor" in uhd["note"]
     with pytest.raises(SystemExit, match="calibrating"):
-        reproduction.main(["--read-only"])
+        released()
 
 
 @pytest.mark.usefixtures("unleveled")
@@ -295,7 +107,32 @@ def test_the_report_is_written_unless_read_only(release, capsys):
 
 
 @pytest.mark.usefixtures("unleveled")
-def test_without_a_floor_the_comparison_reports_the_lowest_frames_and_does_not_pass(release):
+def test_filmkit_verify_release_compares_only_after_the_records_and_writes_nothing(
+    release, decodes, released, capsys
+):
+    # One byte changed: the comparison would decode the film.
+    film = production.Edition("zh").film("uhd")
+    film.write_bytes(film.read_bytes() + b"\x00")
+    before = listing(release.root)
+    # Every node of the engine's table is without its record below the release's root: the
+    # records refuse, and no film is decoded.
+    with pytest.raises(SystemExit) as stopped:
+        cli.main(["verify", "--release"])
+    lines = capsys.readouterr().out.splitlines()
+    assert stopped.value.code == 1 and lines[0].startswith("refused: no record: ")
+    assert decodes == []
+    status, lines = released()
+    assert status == 0
+    assert lines[0].startswith("filmkit verify passes")
+    assert json.loads(lines[1]) == {"verdict": "pass", "release": "1.0.0"}
+    assert decodes == ["sample-reel-zh-uhd.mp4"]
+    assert listing(release.root) == before
+
+
+@pytest.mark.usefixtures("unleveled")
+def test_without_a_floor_the_comparison_reports_the_lowest_frames_and_does_not_pass(
+    release, released
+):
     shutil.copyfile(release.films["picture"], production.Edition("zh").film("uhd"))
     release.record(floors=None)
     report = release.compare()
@@ -306,16 +143,16 @@ def test_without_a_floor_the_comparison_reports_the_lowest_frames_and_does_not_p
     assert lowest == sorted(lowest)
     assert psnr["minimum_db"] == lowest[0]
     with pytest.raises(SystemExit, match="calibrating"):
-        reproduction.main(["--read-only"])
+        released()
 
 
-def test_a_frame_below_its_floor_fails_naming_the_film_and_frame(release):
+def test_a_frame_below_its_floor_fails_naming_the_film_and_frame(release, released):
     shutil.copyfile(release.films["picture"], production.Edition("en").film("1080p-captioned"))
     film = release.compare()["editions"]["en"]["films"][1]
     assert film["verdict"] == "fail"
     assert film["psnr"]["below_floor"][0] == 0
     with pytest.raises(SystemExit, match=r"en: sample-reel-en-1080p-captioned\.mp4: picture"):
-        reproduction.main(["--read-only"])
+        released()
 
 
 def test_a_film_packaged_later_differs_only_in_its_creation_date(release):
@@ -348,12 +185,14 @@ def test_different_decoded_audio_fails(release):
         ),
     ],
 )
-def test_a_rebuilt_byte_that_differs_fails_naming_the_edition_and_layer(release, change, layer):
+def test_a_rebuilt_byte_that_differs_fails_naming_the_edition_and_layer(
+    release, released, change, layer
+):
     change(production.Edition("zh"))
     report = release.compare()
     assert report["verdict"] == "fail"
     with pytest.raises(SystemExit, match=f"zh: .*{layer}"):
-        reproduction.main(["--read-only"])
+        released()
 
 
 @pytest.mark.usefixtures("unleveled")
@@ -382,160 +221,3 @@ def test_a_release_without_the_films_without_captions_compares_the_films_it_publ
     ]
     assert "uncaptioned_stage" not in zh
     assert zh["review"]["verdict"] == "pass"
-
-
-def test_a_release_publishes_every_edition_s_films_without_captions_or_none(release):
-    path = release.root / reproduction.MANIFEST
-    manifest = json.loads(path.read_text())
-    manifest["editions"]["en"].pop("uncaptioned_stage_sha256")
-    path.write_text(json.dumps(manifest))
-    with pytest.raises(ReproductionError, match="uncaptioned picture's stage exactly when"):
-        reproduction.load()
-    # One edition's films without captions, and not the other's, name no complete release.
-    (release.folder / "sample-reel-en-uhd-uncaptioned.mp4").unlink()
-    release.record()
-    with pytest.raises(ReproductionError, match="does not name every published asset"):
-        reproduction.load()
-
-
-def test_a_review_that_does_not_bind_the_published_films_fails(release):
-    edition = production.Edition("en")
-    path = release.folder / reproduction.release_name(edition, edition.production_review)
-    review = json.loads(path.read_text())
-    review["media"][0]["sha256"] = "0" * 64
-    path.write_text(json.dumps(review))
-    release.record()
-    report = release.compare()
-    assert report["editions"]["en"]["review"]["verdict"] == "fail"
-    assert "current delivered edition" in report["editions"]["en"]["review"]["reason"]
-    assert report["verdict"] == "fail"
-
-
-def test_a_published_asset_that_differs_from_the_manifest_refuses_before_any_layer(release):
-    (release.folder / "sample-reel-zh.srt").write_text("edited\n")
-    with pytest.raises(
-        ReproductionError,
-        match=r"published asset differs from the release manifest: sample-reel-zh\.srt",
-    ):
-        release.compare()
-
-
-def test_a_film_bound_source_that_differs_from_the_manifest_refuses_before_any_layer(release):
-    (release.root / picture_rendering.COMPOSITION_SCRIPT).write_text("/* edited */")
-    with pytest.raises(
-        ReproductionError,
-        match=r"film-bound sources differ from the release manifest: picture/film\.js",
-    ):
-        release.compare()
-
-
-@pytest.mark.usefixtures("release")
-def test_checksums_list_every_other_asset_for_shasum():
-    manifest = reproduction.load()
-    lines = reproduction.checksums(manifest).splitlines()
-    names = [line.split("  ", 1)[1] for line in lines]
-    assert names == sorted(asset.name for asset in manifest.assets if asset.name != "SHA256SUMS")
-    assert all(len(line.split("  ", 1)[0]) == 64 for line in lines)
-
-
-@pytest.mark.parametrize(
-    ("change", "message"),
-    [
-        (lambda manifest: manifest["editions"].pop("en"), "records the editions"),
-        (
-            lambda manifest: manifest["assets"].pop(0),
-            "does not name every published asset of the editions",
-        ),
-        (
-            lambda manifest: manifest["editions"]["zh"].update(soundtrack_sha256="abc"),
-            "is not a release manifest",
-        ),
-        (
-            lambda manifest: manifest["editions"]["zh"]["picture_floor_db"].update(
-                {"sample-reel-zh.srt": 30.0}
-            ),
-            "records a floor for an asset that is not a film",
-        ),
-        (
-            lambda manifest: manifest["assets"][-1].update(sha256="0" * 64),
-            "SHA256SUMS differs from the assets it lists",
-        ),
-        (lambda manifest: manifest.pop("sources"), "is not a release manifest"),
-        (
-            lambda manifest: manifest["sources"].update({"../film.js": "0" * 64}),
-            "is not a release manifest",
-        ),
-    ],
-)
-def test_an_inconsistent_manifest_is_refused(release, change, message):
-    path = release.root / reproduction.MANIFEST
-    manifest = json.loads(path.read_text())
-    change(manifest)
-    path.write_text(json.dumps(manifest))
-    with pytest.raises(ReproductionError, match=message):
-        reproduction.load()
-
-
-@pytest.mark.parametrize(
-    ("change", "message"),
-    [
-        (lambda manifest: manifest["editions"].pop("en"), "records the editions"),
-        (
-            lambda manifest: manifest["assets"].pop(0),
-            "does not name every published asset of the editions",
-        ),
-        (
-            lambda manifest: manifest["editions"]["en"].pop("uncaptioned_stage_sha256"),
-            "uncaptioned picture's stage exactly when",
-        ),
-        (
-            lambda manifest: manifest["editions"]["zh"]["picture_floor_db"].update(
-                {"sample-reel-zh.srt": 30.0}
-            ),
-            "records a floor for an asset that is not a film",
-        ),
-        (
-            lambda manifest: manifest["assets"][-1].update(sha256="0" * 64),
-            "SHA256SUMS differs from the assets it lists",
-        ),
-    ],
-)
-def test_the_check_refuses_a_record_in_memory_as_load_refuses_it_on_disk(release, change, message):
-    path = release.root / reproduction.MANIFEST
-    manifest = json.loads(path.read_text())
-    # The record as it stands passes, and the check hands it back.
-    faithful = reproduction.Release.model_validate(manifest)
-    assert reproduction.check(faithful) is faithful
-    change(manifest)
-    path.write_text(json.dumps(manifest))
-    with pytest.raises(ReproductionError, match=message) as on_disk:
-        reproduction.load()
-    # The same record, not yet written: the check reads no manifest, and words it as `load` does.
-    path.unlink()
-    with pytest.raises(ReproductionError, match=message) as in_memory:
-        reproduction.check(reproduction.Release.model_validate(manifest))
-    assert str(in_memory.value) == str(on_disk.value)
-
-
-@pytest.mark.usefixtures("release")
-def test_each_edition_publishes_its_films_documents_cover_and_review():
-    edition = production.Edition("en")
-    published = reproduction.members(edition)
-    assert published["sample-reel-en-cover.png"] == (
-        "document",
-        edition.artifacts / packaging.COVER_PNG,
-    )
-    assert published["sample-reel-en-production-review.json"] == (
-        "review",
-        edition.production_review,
-    )
-    assert [name for name, (layer, _) in published.items() if layer == "film"] == [
-        film.name for film in edition.films
-    ]
-
-
-def test_a_record_of_a_film_of_three_editions_names_the_edition_it_misses(release, monkeypatch):
-    monkeypatch.setattr(production, "CODES", ("zh", "en", "xb"))
-    with pytest.raises(ReproductionError) as refusal:
-        reproduction.load()
-    assert "records the editions ['en', 'zh']: no record of the xb edition" in str(refusal.value)

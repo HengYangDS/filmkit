@@ -4,12 +4,16 @@
 `inputs` is one edition's inputs bound as the film verifier reads them, the still scan of its
 1080p captioned film among them (`Inputs.scan_film`), and `editions` both
 editions' with the manifest of the pinned sources; `built` is that build reviewed and held by
-the film's own folder, for the tests of the release's writer (`release_build.Built`).
+the film's own folder, for the tests of the release's writer (`release_build.Built`). `release`
+is a rebuild of both editions and the release it is compared with (`reproducing.Release`), with
+`films`, the films it holds, `decodes`, what its comparison decodes, and `released`, the verb
+`filmkit verify --release` on it.
 """
 
 import contextlib
 import io
 import json
+import shutil
 import wave
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -17,10 +21,12 @@ from typing import NamedTuple
 
 import pytest
 from release_build import Built
+from reproducing import Release, encode
 
 import filmkit.delivery.folder as delivery_folder
 import filmkit.delivery.packaging as delivery_packaging
 import filmkit.delivery.player as delivery_player
+import filmkit.delivery.reproduction as reproduction
 import filmkit.narration.selection as narration_selection
 import filmkit.narration.thought_groups as narration_thought_groups
 import filmkit.picture.derivation as picture_derivation
@@ -33,6 +39,7 @@ import filmkit.review.record as review_record
 import filmkit.sources as sources
 import filmkit.specification as specification
 from filmkit.film import FILM
+from filmkit.graph import cli
 
 # The runtime each edition's timeline states, which every check reads a film's length from, the
 # last second of it credits: long enough to hold a still run of more than the scan's limit, and
@@ -432,3 +439,100 @@ def built(editions, tmp_path_factory, monkeypatch, table_of) -> Built:
         inputs.review()
     current.deliver()
     return current
+
+
+@pytest.fixture(scope="session")
+def films(tmp_path_factory) -> dict[str, Path]:
+    """The published film, and rebuilt films of another picture and of another sound."""
+    folder = tmp_path_factory.mktemp("films")
+    return {
+        "same": encode(folder / "same.mp4", "testsrc2", 440),
+        "picture": encode(folder / "picture.mp4", "smptebars", 440),
+        "sound": encode(folder / "sound.mp4", "testsrc2", 880),
+        "later": encode(folder / "later.mp4", "testsrc2", 440, "2026-11-05T09:00:00Z"),
+    }
+
+
+@pytest.fixture
+def release(tmp_path, monkeypatch, films) -> Release:
+    """A faithful rebuild of both editions and their published release, with every floor."""
+    monkeypatch.setattr(repository, "ROOT", tmp_path)
+    composition = tmp_path / picture_rendering.COMPOSITION_SCRIPT
+    composition.parent.mkdir(parents=True)
+    composition.write_text("/* film */")
+    published = Release(tmp_path, films)
+    for code in production.CODES:
+        edition = production.Edition(code)
+        script = tmp_path / edition.script
+        script.parent.mkdir(parents=True, exist_ok=True)
+        script.write_text(json.dumps({"edition": code}))
+        edition.artifacts.mkdir(parents=True)
+        for captions in (True, False):
+            stage = edition.rendered(captions).stage
+            stage.mkdir(parents=True)
+            (stage / production.STAGE_PAGE).write_text(f"<html>{code} {captions}</html>")
+        edition.soundtrack.write_bytes(f"soundtrack {code}".encode())
+        for film in edition.films:
+            shutil.copyfile(films["same"], film)
+        for name, (layer, source) in reproduction.members(edition).items():
+            if layer == "document":
+                source.write_text(f"{name}\n")
+            if layer != "review":
+                published.publish(name, source)
+        report, reviewed = f"# Review of {code}\n", edition.production_review
+        named = reproduction.release_name(edition, production.review_report(reviewed))
+        (published.folder / named).write_text(report)
+        review = {
+            "schema_version": review_record.SCHEMA_VERSION,
+            "language": code,
+            "reviewer": "independent reviewer",
+            "media": [
+                {"path": repository.relative(film), "sha256": repository.sha(film)}
+                for film in edition.films
+            ],
+            "script_sha256": repository.sha(script),
+            "composition_sha256": repository.sha(composition),
+            "scores": dict.fromkeys(review_record.DIMENSIONS, 96),
+            "overall": 96.0,
+            "findings": [],
+            "human_listening": {"state": "performed"},
+            "report": {"path": "evidence/reviews/production-review.md", "sha256": ""},
+        }
+        review["report"]["sha256"] = repository.content_sha(report)
+        (published.folder / reproduction.release_name(edition, reviewed)).write_text(
+            json.dumps(review)
+        )
+    published.record()
+    return published
+
+
+@pytest.fixture
+def released(table_of, capsys):
+    """`filmkit verify --release` on records that pass, the engine's table held to no node: its
+    exit status and printed lines, or the refusal it raises."""
+
+    def verb() -> tuple[int | str, list[str]]:
+        table_of()
+        with pytest.raises(SystemExit) as stopped:
+            cli.main(["verify", "--release"])
+        if stopped.value.code not in (0, 1):
+            raise stopped.value
+        return stopped.value.code, capsys.readouterr().out.splitlines()
+
+    return verb
+
+
+@pytest.fixture
+def decodes(monkeypatch) -> list[str]:
+    """The name of each film that the comparison decodes, with every decode standing in for six
+    equal frames, equal audio and an equal container, so that no damaged file reaches FFmpeg."""
+    decoded = []
+
+    def frames(rebuilt: Path, _published: Path, _timeout: int) -> list[float]:
+        decoded.append(rebuilt.name)
+        return [float("inf")] * 6
+
+    monkeypatch.setattr(reproduction.media, "frame_psnr", frames)
+    monkeypatch.setattr(reproduction, "decoded_audio", lambda _path: "audio")
+    monkeypatch.setattr(reproduction, "container", lambda _path: {})
+    return decoded

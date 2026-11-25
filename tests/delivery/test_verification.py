@@ -10,6 +10,7 @@ import filmkit.production as production
 import filmkit.repository as repository
 from filmkit.delivery.verification import VerificationError
 from filmkit.film import FILM
+from filmkit.graph import cli
 
 
 @pytest.fixture
@@ -176,6 +177,45 @@ def test_the_command_prints_each_editions_report_and_writes_nothing(tmp_path, ca
         delivery_verification.main(["--language", "all", *films[1:]])
     with pytest.raises(SystemExit):
         delivery_verification.main(["--language", "fr", *films])
+
+
+def verb(capsys, *arguments: str) -> tuple[int | str, list[str]]:
+    """`filmkit verify` with the arguments: its exit status or refusal, and its printed lines."""
+    with pytest.raises(SystemExit) as stopped:
+        cli.main(["verify", *arguments])
+    return stopped.value.code, capsys.readouterr().out.splitlines()
+
+
+@pytest.mark.usefixtures("checked")
+def test_filmkit_verify_technical_only_reads_the_films_only_after_the_records(
+    tmp_path, table_of, capsys, monkeypatch
+):
+    decoded = []
+    monkeypatch.setattr(
+        delivery_verification, "verify_films", lambda *_: decoded.append("films") or {}
+    )
+    # Every node of the engine's table is without its record below the empty root: the records
+    # refuse, and no film is decoded.
+    status, lines = verb(capsys, "--technical-only")
+    assert status == 1
+    assert lines[0].startswith("refused: no record: ")
+    assert decoded == []
+    # Held to no node, the records pass; the still scan's own requirement then refuses the first
+    # edition in one line that names it.
+    table_of()
+    status, lines = verb(capsys, "--technical-only")
+    assert status == "zh: The zh film has no still scan record; run filmkit build scan-film:zh"
+    assert lines == [lines[0]] and lines[0].startswith("filmkit verify passes")
+    monkeypatch.setattr(picture_still_scan, "require_film_scan", lambda _edition: "still_scan")
+    status, lines = verb(capsys, "--technical-only")
+    assert status == 0
+    reports = [json.loads(line) for line in lines[1:]]
+    assert [(r["language"], r["scope"], r["review"]["verdict"]) for r in reports] == [
+        ("zh", "technical", "not_reviewed"),
+        ("en", "technical", "not_reviewed"),
+    ]
+    assert decoded == ["films", "films"]
+    assert sorted(tmp_path.rglob("*")) == []
 
 
 def test_captions_end_where_the_timeline_s_credits_begin():

@@ -26,7 +26,8 @@ writer asks them before it changes a file.
 The report goes to build/evidence/reproduction/report.json unless --read-only is given; each
 edition's comparison is measured as a run (`filmkit.graph.runs`), which writes nothing of its
 own. A comparison that does not pass exits with "<edition>: <asset>: <layer>" for each failing
-layer.
+layer. `filmkit verify --release` compares after the records and writes no report (`compared`,
+`judge`).
 
 Usage: python -m filmkit.delivery.reproduction [--read-only]
 """
@@ -507,22 +508,33 @@ def compare() -> dict:
     return report
 
 
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--read-only", action="store_true", help="print the report only")
-    options = parser.parse_args(argv)
+def compared() -> dict:
+    """The comparison, a refusal of the release or its sources as the command's one line."""
     try:
-        report = compare()
+        return compare()
     except ReproductionError as error:
         raise SystemExit(str(error)) from None
-    if not options.read_only:
-        repository.write(REPORT, report)
+
+
+def judge(report: dict) -> None:
+    """Print the comparison's verdict and release, and refuse one that did not pass: a
+    comparison still calibrating in one line, one that failed with each failing layer."""
     print(json.dumps({"verdict": report["verdict"], "release": report["release"]}))
     if report["verdict"] == "calibrating":
         msg = "The comparison is calibrating: inspect each film's lowest frames, record its floor"
         raise SystemExit(msg)
     if report["verdict"] != "pass":
         raise SystemExit("\n".join(failures(report)))
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--read-only", action="store_true", help="print the report only")
+    options = parser.parse_args(argv)
+    report = compared()
+    if not options.read_only:
+        repository.write(REPORT, report)
+    judge(report)
 
 
 if __name__ == "__main__":
