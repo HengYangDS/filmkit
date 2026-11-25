@@ -29,6 +29,7 @@ import filmkit.soundtrack.gates as sound_gates
 import filmkit.tools as tools
 from filmkit.captions import refresh
 from filmkit.film import FILM
+from filmkit.graph import build_command, key
 from filmkit.graph.bindings import (
     NARRATED,
     caches,
@@ -100,8 +101,8 @@ def geometry_check(edition: Edition) -> None:
     if lacks:
         message = (
             f"{record} does not cover the current staged film: {'; '.join(lacks)}; stage the "
-            f"whole picture and check it again, filmkit build stage-picture:{edition.code} "
-            f"geometry-check:{edition.code}"
+            "whole picture and check it again, "
+            + build_command(key(name, edition.code) for name in ("stage-picture", "geometry-check"))
         )
         raise tools.ToolError(message)
 

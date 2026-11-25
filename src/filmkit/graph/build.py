@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING
 import filmkit.tools as tools
 from filmkit.captions import CaptionError
 from filmkit.delivery.packaging import PackagingError
-from filmkit.graph import host, nodes, plan, records, runs
+from filmkit.graph import build_command, host, narrate_command, nodes, plan, records, runs
 from filmkit.media import MediaError
 from filmkit.narration.anchors import AnchorError
 from filmkit.picture.errors import PictureError
@@ -110,8 +110,8 @@ def refusals(table: nodes.Table, entries: list[plan.Entry]) -> list[str]:
     naming what to run instead; none where it may (design decision 5)."""
     run = [entry for entry in entries if entry.state in (plan.STALE, plan.BEHIND)]
     found = [
-        f"{entry.key} is stale and narration is no build's: filmkit narrate --edition "
-        f"{nodes.split(entry.key)[1]}"
+        f"{entry.key} is stale and narration is no build's: "
+        f"{narrate_command(nodes.split(entry.key)[1])}"
         for entry in run
         if table.node(entry.key)[0].run is None
     ]
@@ -122,8 +122,7 @@ def refusals(table: nodes.Table, entries: list[plan.Entry]) -> list[str]:
     ]
     if weighty and light:
         found.append(
-            "light work can run now and runs first, outside any ticket: "
-            f"filmkit build {' '.join(light)}"
+            f"light work can run now and runs first, outside any ticket: {build_command(light)}"
         )
     if found:
         return found
@@ -139,8 +138,7 @@ def refusals(table: nodes.Table, entries: list[plan.Entry]) -> list[str]:
         )
         known = all(e.host_class != plan.UNMEASURED and e.seconds is not None for e in kind)
         last = f"{sum(e.seconds for e in kind):.1f} s" if known else "unmeasured"
-        keys = " ".join(e.key for e in kind)
-        invocations.append(f"filmkit build {keys} ({classes}, {last})")
+        invocations.append(f"{build_command(e.key for e in kind)} ({classes}, {last})")
     return [
         f"heavy work of {len(names)} kinds that will run takes one ticket each, in this order: "
         + "; ".join(invocations)

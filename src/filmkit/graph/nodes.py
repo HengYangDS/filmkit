@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, NamedTuple
 
 import filmkit.repository as repository
+from filmkit.graph import key
 from filmkit.graph.records import DeclarationTable, Folder, HostClass
 from filmkit.production import CODES, Edition
 
@@ -141,12 +142,6 @@ def joined(first: dict, second: dict) -> dict:
     if clash:
         raise TableError(f"a node's places bind {', '.join(clash)} to two places each")
     return {**first, **second}
-
-
-def key(node: str, code: str | None) -> str:
-    """A node's run as the plan names it: `<node>:<code>` for an edition's, the node's name for
-    the film's."""
-    return node if code is None else f"{node}:{code}"
 
 
 def split(named: str) -> tuple[str, str | None]:
