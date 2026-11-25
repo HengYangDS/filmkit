@@ -50,8 +50,8 @@ Every verb SHALL exit 0 where it did what it was asked; 1 where the film or a ga
 
 #### Scenario: A tool that crashes
 
-- **WHEN** an engine tool that a node runs, as the geometry check's, ends with an error that nothing catches, or a signal ends it
-- **THEN** the tool exits 2 or by the signal, the node's run is a failure with the outcome `error`, never its refusal, and `filmkit build` exits 2
+- **WHEN** an engine tool of `tools.TOOLS` that a node runs, as the geometry check's, ends with an error that nothing catches, or a signal ends it
+- **THEN** the tool exits 2 or by the signal, the node's run is a failure with the outcome `error`, never its refusal, and `filmkit build` exits 2; the renderer and the players' check are not yet held to this (task 8.1 of `key-outputs-by-their-inputs`)
 
 #### Scenario: A node that fails
 
