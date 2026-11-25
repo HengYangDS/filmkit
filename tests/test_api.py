@@ -58,7 +58,7 @@ def test_the_typesetter_the_composition_and_the_test_entry():
     assert api.typeset('It "is".') == "It “is”."
     assert api.composition() == repository.ROOT / "picture/film.js"
     assert api.composition().is_file()
-    assert api.TEST_ENTRY.name == "testing.mjs"
+    assert api.TEST_ENTRY.name == "testing.mjs" and api.TEST_ENTRY.is_file()
 
 
 def test_the_release_record_and_its_changed_sources():

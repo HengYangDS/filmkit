@@ -16,7 +16,7 @@
  * one the timeline marks there is given as the timeline holds it, and one it does not mark is given a stand-in at the
  * segment's voice, so that the scene goes on and every unmarked id of a draw is found. A segment without `anchors`,
  * as every segment of an edition that marks none, has an empty recorder, so each read there is unmarked. The caller's
- * timeline is not changed. */
+ * timeline is not changed. The handle's `evaluate` runs an expression in the composition's own context. */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import vm from "node:vm";
@@ -481,5 +481,6 @@ export function openComposition(timeline, { faces = null } = {}) {
       );
       return new Map(cuts ? [...cuts.entries()].map(([scene, at]) => [scene, new Set(at)]) : []);
     },
+    evaluate: (expression) => vm.runInContext(expression, context),
   };
 }

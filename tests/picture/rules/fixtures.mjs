@@ -1,13 +1,13 @@
 /** What the rule tests share: the film's palette and the frame rule over it, and builders of the
  * labels, strokes, fills and words they measure. */
-import { openComposition } from "../../../src/filmkit/picture/headless-composition.mjs";
+import { openComposition } from "../../../src/filmkit/picture/testing.mjs";
 import { analysis } from "../../../src/filmkit/picture/rules/frame.mjs";
 import { inkLevel, readingLoad } from "../../../src/filmkit/picture/rules/ink.mjs";
 import { nameRules } from "../../../src/filmkit/picture/rules/names.mjs";
 import { authoredTimeline } from "../sample-film.mjs";
 
 // The rules are measured against the film's own palette, as the composition defines it.
-export const { palette } = openComposition(await authoredTimeline("zh"));
+export const { palette } = openComposition("zh", await authoredTimeline("zh"));
 export const inspectFrame = analysis(inkLevel(palette));
 export const contrast = readingLoad(palette);
 export const label = (text, bounds, extra = {}) => ({
