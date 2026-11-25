@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-11-25
+
 ### Added
 
 - A film builds by one console command and its verbs (OpenSpec Change `build-a-film-by-its-verbs`, the derivation's R2b-1): `filmkit supply`, `check`, `edit`, `narrate`, `plan`, `build`, `verify`, `review prepare|record|set-aside`, `deliver` and `release`. A refusal is one line on standard error with status 1, a declaration that the loader refuses among them, and a refusal that names a step names the verb that runs it, as `filmkit build <node>:<code>`. A command that cannot finish exits 2: an owner's exception with its traceback, or a tool the host lacks (`node`, FFmpeg, Vale, rsync 3, the canvas build the engine draws with, the supplied browser build) or no film where it runs, in one line; `filmkit build` exits 2 where a node failed, where before it counted the failure as a refusal. An engine tool of `tools.TOOLS` that crashes, or that a signal ends, is such a failure: each now ends with 2 on an error nothing catches, and only its 1 is a finding. Not yet the renderer, whose crash, end by a signal or timeout is still read as a render that did not complete (a refusal, exit 1), nor the delivery's players' check, which reads a browser that does not launch or a read past its deadline as a failed page (exit 1); `key-outputs-by-their-inputs` brings both under the rule.
@@ -738,7 +740,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.33.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.34.0...HEAD
+[0.34.0]: https://github.com/HengYangDS/filmkit/compare/v0.33.0...v0.34.0
 [0.33.0]: https://github.com/HengYangDS/filmkit/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/HengYangDS/filmkit/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/HengYangDS/filmkit/compare/v0.30.0...v0.31.0
