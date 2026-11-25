@@ -185,9 +185,9 @@ def test_every_node_the_light_suite_runs_reads_and_writes_only_what_it_declares(
     for code in sample_sound.NARRATED:
         assert named[nodes.key("assemble", code)] == chain.MEDIA
         assert named[nodes.key("check-sound", code)] == chain.MEDIA
-    # Each exemption is reported with the nodes it covered.
-    records = f"records: {opens.EXEMPT['records']}"
-    assert report.exempted[records] == report.seen
+    # The seam reads and writes the run records with the recorder quiet, so no run reads one
+    # under an exemption.
+    assert not any(reason.startswith("records") for reason in report.exempted)
 
 
 @pytest.mark.ffmpeg

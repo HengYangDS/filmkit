@@ -71,7 +71,6 @@ DID = {
 # What a path below the root may be read or written without a declaration, each with its reason.
 EXEMPT = {
     "environment": "the Python environment and the npm packages, which the lock files supply",
-    "records": "the run records, which the run itself writes",
     "work": "bounded work and tool copies below build/runtime/, which no node declares",
     "resolution": "the package.json files that Node's module resolution looks up",
     "log": "the recorder's own log",
@@ -475,8 +474,6 @@ def exemption(path: Path, kind: str, judged: _Judged, log: Path) -> str:
         if folder.is_relative_to(root)
     ):
         return "environment"
-    if relative.parts[:3] == ("build", "evidence", "records"):
-        return "records"
     if relative.is_relative_to(RUNTIME) and not covered(path, judged.declared):
         return "work"
     if kind in ("read", "argument") and path.name == "package.json":
