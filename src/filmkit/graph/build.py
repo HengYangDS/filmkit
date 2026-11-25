@@ -21,17 +21,22 @@ work that will run is a heavy or GPU node, by its measured class or else the cla
 expects, that is stale or behind; a waiting node is never counted. A closure with no heavy work
 that will run is a light invocation, which runs outside any ticket.
 
-The build ends with one line for each node that refused or failed and returns 1, and 0 where
-every node of the closure is fresh. An interrupt or a request to end ends the running node as
-any command ends (`child_processes.ending`) and runs no further node. It writes no tracked file
-and takes no host ticket.
+The build ends with one line for each node that refused or failed. It returns 2 where a node
+failed, an exception of its owner that is no refusal, whose traceback it prints, or a tool the
+host lacks; else 1 where a node refused or was held; and 0 where every node of the closure is
+fresh (design decision 19). An interrupt or a request to end ends the running node as any
+command ends (`child_processes.ending`) and runs no further node. It writes no tracked file and
+takes no host ticket.
 """
 
 from __future__ import annotations
 
+import sys
+import traceback
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+import filmkit.child_processes as child_processes
 import filmkit.tools as tools
 from filmkit.captions import CaptionError
 from filmkit.delivery.packaging import PackagingError
@@ -64,15 +69,20 @@ REFUSALS = (
 @dataclass
 class Built:
     """What a build did: the nodes it ran, those it left for a node before them that did not
-    pass, and each refusal or failure in one line."""
+    pass, and each refusal and each failure in one line."""
 
     ran: list[str] = field(default_factory=list)
     held: list[str] = field(default_factory=list)
     refused: list[str] = field(default_factory=list)
+    failed: list[str] = field(default_factory=list)
 
     @property
     def status(self) -> int:
-        return 1 if self.refused or self.held else 0
+        """The command's exit status: a failure first, then a refusal or a node held."""
+        if self.failed:
+            return child_processes.UNFINISHED
+        held = self.refused or self.held
+        return child_processes.REFUSED if held else child_processes.FINISHED
 
 
 def state(table: nodes.Table, key: str) -> plan.Entry:
@@ -81,8 +91,12 @@ def state(table: nodes.Table, key: str) -> plan.Entry:
     return entry
 
 
-def run_node(table: nodes.Table, key: str) -> str | None:
-    """Run one node's owner inside the seam; its refusal or failure in one line, or None."""
+def run_node(table: nodes.Table, key: str) -> tuple[int, str | None]:
+    """Run one node's owner inside the seam: the exit status its run ends with, and its refusal
+    or failure in one line, or None where it passed. An owner's refusal (`REFUSALS`, or a
+    command's line) is `REFUSED`; any other exception is `UNFINISHED`, a tool the host lacks in
+    its own words and any other with its traceback printed, and its record's outcome is
+    `error`."""
     node, edition = table.node(key)
     code = edition.code if edition else None
     try:
@@ -92,11 +106,17 @@ def run_node(table: nodes.Table, key: str) -> str | None:
             except REFUSALS as error:
                 raise SystemExit(f"{key}: {error}") from None
     except SystemExit as ended:
-        code = ended.code
-        return code if isinstance(code, str) else f"{key}: exit status {code}"
+        status = ended.code
+        if isinstance(status, str):
+            return child_processes.REFUSED, status
+        status = child_processes.REFUSED if status is None else status
+        return status, f"{key}: exit status {status}"
+    except child_processes.MissingToolError as error:
+        return child_processes.UNFINISHED, f"{key}: {error}"
     except Exception as error:
-        return f"{key}: {type(error).__name__}: {error}".rstrip(": ")
-    return None
+        traceback.print_exc(file=sys.stderr)
+        return child_processes.UNFINISHED, f"{key}: {type(error).__name__}: {error}".rstrip(": ")
+    return child_processes.FINISHED, None
 
 
 def heavy(entry: plan.Entry) -> bool:
@@ -171,9 +191,10 @@ def build(table: nodes.Table, targets: Iterable[str] = ()) -> Built:
             stopped.add(key)
             built.held.append(key)
             continue
-        refused = run_node(table, key)
+        status, said = run_node(table, key)
         built.ran.append(key)
-        if refused is not None:
+        if said is not None:
             stopped.add(key)
-            built.refused.append(refused)
+            unfinished = status >= child_processes.UNFINISHED
+            (built.failed if unfinished else built.refused).append(said)
     return built

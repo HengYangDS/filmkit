@@ -2,14 +2,16 @@
 judged again at its turn and run only where stale (design decision 3 of
 build-a-film-by-its-verbs)."""
 
+import signal
 from dataclasses import replace
 
 import pytest
 import stand_ins
 from stand_ins import CODES
 
+import filmkit.child_processes as child_processes
 import filmkit.repository as repository
-from filmkit.graph import build, nodes, plan, records, runs
+from filmkit.graph import build, chain, cli, nodes, plan, records, runs
 from filmkit.soundtrack.assembly import AssemblyError
 
 
@@ -94,6 +96,52 @@ def test_a_refused_gate_holds_what_follows_it_and_the_other_edition_is_built(tab
     assert not ({"render:zh", "compare:zh"} & set(built.ran))
     assert keys(*EVERY, codes=("en",)) <= set(built.ran)
     assert built.status == 1
+
+
+def failing(table, monkeypatch, name, fault):
+    """The table with a node whose owner raises `fault` for the Chinese edition."""
+
+    def fails(edition):
+        if edition.code == "zh":
+            raise fault
+        stand_ins.wrote(name, edition.code)
+
+    held = {**table.nodes, name: replace(table.nodes[name], run=fails)}
+    monkeypatch.setattr(runs, "table", lambda: held)
+    loaded = nodes.load(held.values(), stand_ins.SHARED, CODES)
+    monkeypatch.setattr(chain, "table", lambda: loaded)
+    return loaded
+
+
+@pytest.mark.parametrize(
+    ("fault", "said", "traced"),
+    [
+        (RuntimeError("the disk is gone"), "stage:zh: RuntimeError: the disk is gone", True),
+        (child_processes.MissingToolError("No node on PATH"), "stage:zh: No node on PATH", False),
+    ],
+)
+def test_a_node_that_cannot_finish_fails_and_the_build_exits_2(
+    table, monkeypatch, capsys, fault, said, traced
+):
+    failing(table, monkeypatch, "stage", fault)
+    with pytest.raises(SystemExit) as ended:
+        cli.main(["build", "all"])
+    assert ended.value.code == child_processes.UNFINISHED
+    # The failure is no refusal: its record says `error`, what follows it is held, and the other
+    # edition is built.
+    assert records.read(records.place("stage", "zh")).outcome == "error"
+    assert not records.place("render", "zh").exists()
+    assert records.read(records.place("render", "en")).outcome == "pass"
+    err = capsys.readouterr().err
+    assert err.endswith(f"{said}\n") and ("Traceback" in err) is traced
+
+
+def test_a_request_to_end_a_node_ends_the_build_with_its_status(table, monkeypatch, capsys):
+    failing(table, monkeypatch, "stage", child_processes.Terminated(signal.SIGTERM))
+    with pytest.raises(SystemExit) as ended:
+        cli.main(["build", "all"])
+    assert ended.value.code == 143
+    assert "stopped by a request to end (SIGTERM)" in capsys.readouterr().err
 
 
 def test_an_interrupt_runs_no_further_node(table, monkeypatch):

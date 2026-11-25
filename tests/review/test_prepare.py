@@ -10,6 +10,7 @@ import pytest
 from preparing import PREPARED, REGISTER_REPORT, ROUND, names, prepare, refusal, tree
 from still_records import REQUIRE_FILM_SCAN
 
+import filmkit.child_processes as child_processes
 import filmkit.concepts as concepts
 import filmkit.delivery.folder as delivery_folder
 import filmkit.media as media
@@ -22,7 +23,6 @@ import filmkit.review.prompts as review_prompts
 import filmkit.review.round as review_round
 import filmkit.soundtrack.level as soundtrack_level
 import filmkit.sources as sources
-import filmkit.tools as tools
 from filmkit.film import FILM, Film
 from filmkit.narration.spoken_units import AlignmentError
 from filmkit.picture.errors import PictureError
@@ -273,11 +273,10 @@ def test_a_preparation_that_stops_while_it_derives_refuses_in_one_line_and_leave
     ]
 
     def absent(binding, receipt):
-        message = "No node on PATH"
-        raise delivery_folder.tools.ToolError(message)
+        raise PictureError("The film installs no @napi-rs/canvas")
 
     monkeypatch.setattr(delivery_folder, "check_players", absent)
-    assert refusal() == "prepare: The player check cannot run: No node on PATH"
+    assert refusal() == "prepare: The player check cannot run: The film installs no @napi-rs/canvas"
     assert names(folder) == [
         "measurements.json",
         "player-check-artifacts.json",
@@ -394,13 +393,6 @@ def refused_words(root, put, previous, monkeypatch):
     return previous, "zh 01.1: '你们' addresses the audience (R1) A film keeps a standard word "
 
 
-def no_pinned_vale(root, put, previous, monkeypatch):
-    # The round asks the check itself, which refuses where the Vale it runs is not on the path.
-    monkeypatch.setattr(register, "check", REGISTER_CHECK)
-    monkeypatch.setenv("PATH", str(root / "no-tools"))
-    return previous, "No vale on the path; the register check runs Vale "
-
-
 @pytest.mark.parametrize(
     "case",
     [
@@ -412,7 +404,6 @@ def no_pinned_vale(root, put, previous, monkeypatch):
         missing_timeline,
         no_register_field,
         refused_words,
-        no_pinned_vale,
     ],
 )
 def test_every_check_that_only_reads_refuses_in_one_line_before_anything_is_derived(
@@ -424,6 +415,17 @@ def test_every_check_that_only_reads_refuses_in_one_line_before_anything_is_deri
     assert not review_files.round_directory(ROUND).exists()
 
 
+def test_a_round_without_vale_cannot_finish_and_derives_nothing(previous, ready, monkeypatch):
+    # The round asks the register check itself; with no Vale on the path the host lacks a tool,
+    # which is no refusal of the film's.
+    monkeypatch.setattr(register, "check", REGISTER_CHECK)
+    monkeypatch.setenv("PATH", str(repository.ROOT / "no-tools"))
+    with pytest.raises(child_processes.MissingToolError, match="^No vale on the path; "):
+        prepare(*previous)
+    assert ready == []
+    assert not review_files.round_directory(ROUND).exists()
+
+
 @pytest.mark.parametrize(
     "refused",
     [
@@ -431,7 +433,6 @@ def test_every_check_that_only_reads_refuses_in_one_line_before_anything_is_deri
         AlignmentError("03: the aligned words do not cover the text"),
         soundtrack_level.LevelError("K-weighting is declared for 48 kHz audio"),
         sources.SourceError("Source manifest pins no canonical document"),
-        tools.ToolError("No node on PATH"),
         PictureError("The renderer is not built"),
         delivery_folder.DeliveryRefusedError("The players fail their readback:\n  zh/index.html"),
     ],

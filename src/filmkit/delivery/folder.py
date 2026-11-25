@@ -61,6 +61,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+import filmkit.child_processes as child_processes
 import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
 import filmkit.tools as tools
@@ -404,7 +405,7 @@ def read_bound_players(
     receipt.unlink(missing_ok=True)
     try:
         status = check_players(binding, receipt)
-    except (PictureError, tools.ToolError) as error:
+    except PictureError as error:
         msg = f"The player check cannot run{outcome}: {error}"
         raise DeliveryRefusedError(msg) from error
     if status != 0:
@@ -454,7 +455,7 @@ def deliver(root: Path, destination: Path, *, dry_run: bool = False, rule: str =
     version = rsync_version()
     if not version.startswith(RSYNC_3):
         msg = f"rsync 3 is required to deliver, as Homebrew installs it; PATH holds {version}"
-        raise DeliveryRefusedError(msg)
+        raise child_processes.MissingToolError(msg)
     paths = [path for _, path in members]
     for place, text in (
         (FILTER, rules(paths)),

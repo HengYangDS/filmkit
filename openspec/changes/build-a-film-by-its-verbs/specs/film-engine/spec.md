@@ -14,6 +14,40 @@ The engine SHALL offer a film one console command, `filmkit`, with the verbs `su
 - **WHEN** `stage-picture` is asked of an edition whose soundtrack is not assembled
 - **THEN** it refuses in one line that names `filmkit build assemble:<code>`
 
+### Requirement: A command's exit status tells a refusal from a failure to finish
+
+Every verb SHALL exit 0 where it did what it was asked; 1 where the film or a gate said no, in one line on standard error; and 2 where it could not finish, an owner's exception with its traceback and a tool the host lacks in one line that names it. A command that a request ended SHALL exit with the status that names the request. `filmkit build` SHALL exit 2 where a node failed, else 1 where a node refused or was held, and SHALL never count a node's failure as its refusal.
+
+#### Scenario: Done
+
+- **WHEN** `filmkit supply` finds every supply as its pins state
+- **THEN** it exits 0
+
+#### Scenario: A refusal
+
+- **WHEN** the dictionary that `filmkit supply` finds differs from its pinned SHA-256
+- **THEN** it exits 1 with that one line
+
+#### Scenario: An exception
+
+- **WHEN** an owner that a verb calls raises an exception that is no refusal of its own
+- **THEN** the verb prints the traceback and exits 2
+
+#### Scenario: A missing tool
+
+- **WHEN** a verb needs a tool the host lacks: no `node`, FFmpeg or Vale on the path, or no rsync 3
+- **THEN** it names the tool in one line and exits 2
+
+#### Scenario: A node that fails
+
+- **WHEN** a node's owner raises an exception that is no refusal during `filmkit build all`
+- **THEN** the node's record states the outcome `error`, no node downstream of it runs, the other edition's nodes do, and the command exits 2
+
+#### Scenario: A request to end
+
+- **WHEN** `filmkit build` is sent SIGTERM while a node runs
+- **THEN** it ends the node, says so in one line and exits 143
+
 ### Requirement: One command checks a film's sources at once
 
 `filmkit check` SHALL report at once every problem of the declaration as the loader reads it and, for every edition, every finding of the concept contract, the register, the readings, the anchors and what the picture reads over the edition's derived timeline. It SHALL refuse while one stands, need no model, no browser, no dictionary, no FFmpeg and no build, and write only its record, its verdict and each edition's occurrence plan below `build/`; with `--read-only` it SHALL write no file.

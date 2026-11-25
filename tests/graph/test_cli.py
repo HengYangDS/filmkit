@@ -8,6 +8,7 @@ import re
 import pytest
 import sample_sound
 
+import filmkit.child_processes as child_processes
 import filmkit.delivery.folder as delivery_folder
 import filmkit.delivery.release as release
 import filmkit.delivery.verification as delivery_verification
@@ -158,6 +159,37 @@ def test_a_refusal_is_one_line(argv, patch, line, capsys, monkeypatch, tmp_path)
     status, _ = ended(capsys, *argv)
     assert isinstance(status, str) and "\n" not in status
     assert status.startswith(line)
+
+
+MISSING = "No node on PATH; run the tools in the film's Mise environment"
+
+
+@pytest.mark.parametrize(
+    ("error", "status", "said"),
+    [
+        (None, child_processes.FINISHED, ""),
+        (supply.SupplyError("The CMUdict differs"), child_processes.REFUSED, ""),
+        (child_processes.MissingToolError(MISSING), child_processes.UNFINISHED, f"{MISSING}\n"),
+        (RuntimeError("the disk is gone"), child_processes.UNFINISHED, "Traceback"),
+    ],
+)
+def test_the_exit_status_tells_a_refusal_from_a_failure_to_finish(
+    error, status, said, capsys, monkeypatch
+):
+    # Done is 0; a refusal, one line that Python prints as it exits, is 1; an owner's exception
+    # is 2, with its traceback, and a tool the host lacks is 2, named in one line.
+    monkeypatch.setattr(supply, "supply", stand_in(error) if error else dict)
+    try:
+        cli.main(["supply"])
+        code = child_processes.FINISHED
+    except SystemExit as stopped:
+        code = stopped.code
+    assert (child_processes.REFUSED if isinstance(code, str) else code) == status
+    err = capsys.readouterr().err
+    if said == "Traceback":
+        assert err.startswith(said) and err.endswith("RuntimeError: the disk is gone\n")
+    else:
+        assert err == said
 
 
 @pytest.mark.ffmpeg

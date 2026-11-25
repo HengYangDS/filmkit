@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import filmkit.child_processes as child_processes
 import filmkit.picture.browser as picture_browser
 import filmkit.picture.renderer as picture_renderer
 import filmkit.repository as repository
@@ -15,7 +16,6 @@ import filmkit.tools as tools
 from filmkit.film import FILM
 from filmkit.picture.metrics import TABLE, VARIABLE
 from filmkit.picture.rendering import STYLE, PictureError
-from filmkit.tools import ToolError
 
 # The engine's npm packages, found before a test rebinds the film root; they hold the renderer
 # version the engine supports.
@@ -148,9 +148,9 @@ def test_another_renderer_version_refuses_before_any_tool_runs(tmp_path, monkeyp
     assert not (root / "build").exists()
 
 
-def test_a_film_without_node_on_its_path_is_refused(film, monkeypatch):
+def test_a_film_without_node_on_its_path_cannot_run_its_tools(film, monkeypatch):
     monkeypatch.setenv("PATH", str(film))
-    with pytest.raises(ToolError, match="No node on PATH"):
+    with pytest.raises(child_processes.MissingToolError, match="No node on PATH"):
         tools.run("geometry-check", [])
 
 

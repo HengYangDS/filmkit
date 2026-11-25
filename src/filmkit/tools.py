@@ -70,7 +70,8 @@ MEASURING = ("frame-audit", "motion-audit", "detail-audit", "caption-equivalence
 
 
 class ToolError(RuntimeError):
-    """The film's tools cannot run."""
+    """A tool refused the film, in its own words or by its exit status; a tool the host lacks
+    is `child_processes.MissingToolError`."""
 
 
 # The folder the tools are copied into while `outside_the_film` holds.
@@ -130,7 +131,7 @@ def run(
     node = shutil.which("node")
     if node is None:
         msg = "No node on PATH; run the tools in the film's Mise environment"
-        raise ToolError(msg)
+        raise child_processes.MissingToolError(msg)
     script = stage_tools() / TOOLS[tool]
     variables = {
         **os.environ,

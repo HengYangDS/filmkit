@@ -17,6 +17,7 @@ from release_build import (
     unchanged_refusal,
 )
 
+import filmkit.child_processes as child_processes
 import filmkit.delivery.release as release
 import filmkit.delivery.reproduction as reproduction
 import filmkit.repository as repository
@@ -438,7 +439,7 @@ def test_a_release_or_sibling_path_that_is_no_real_folder_refuses_naming_the_pat
 
 
 def test_a_run_that_stops_before_the_staged_set_is_in_place_is_completed_by_the_next(
-    built, monkeypatch
+    built, monkeypatch, capsys
 ):
     cli.main(["release"])
     tracked = built.manifest.read_bytes()
@@ -449,8 +450,11 @@ def test_a_run_that_stops_before_the_staged_set_is_in_place_is_completed_by_the_
 
     with monkeypatch.context() as patch:
         patch.setattr(Path, "rename", interrupted)
-        with pytest.raises(OSError, match="interrupted"):
+        with pytest.raises(SystemExit) as failed:
             cli.main(["release", "--replace"])
+    # A fault that is no refusal: the command could not finish, and says why with its traceback.
+    assert failed.value.code == child_processes.UNFINISHED
+    assert capsys.readouterr().err.endswith("OSError: interrupted\n")
     # No release folder stands: the sibling holds the whole set, and the manifest what it held.
     assert not built.release.exists()
     assert len(list((built.root / release.STAGING).iterdir())) == 21
@@ -476,8 +480,9 @@ def test_a_run_that_stops_before_the_manifest_is_written_is_completed_by_the_nex
 
     with monkeypatch.context() as patch:
         patch.setattr(repository, "write_text", unwritable)
-        with pytest.raises(PermissionError):
+        with pytest.raises(SystemExit) as failed:
             cli.main(["release", "--replace"])
+    assert failed.value.code == child_processes.UNFINISHED
     # The folder holds the new record's assets beside the manifest of the record before, so the
     # comparison refuses the pair until the next run.
     assert built.manifest.read_bytes() == tracked

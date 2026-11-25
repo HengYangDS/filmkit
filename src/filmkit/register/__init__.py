@@ -47,6 +47,7 @@ from importlib import metadata
 from pathlib import Path, PurePosixPath
 from typing import NamedTuple
 
+import filmkit.child_processes as child_processes
 import filmkit.concepts as concepts
 import filmkit.languages as languages
 import filmkit.released as released
@@ -162,7 +163,7 @@ def _pinned(pinned: str) -> str:
     found = shutil.which("vale")
     if found is None:
         message = f"No vale on the path; {runs}"
-        raise RegisterError(message)
+        raise child_processes.MissingToolError(message)
     answered = _run([found, "--version"])
     if answered.returncode != 0:
         message = f"{found} --version ended with status {answered.returncode}; {runs}"

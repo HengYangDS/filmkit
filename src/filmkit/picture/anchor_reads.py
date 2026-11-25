@@ -96,7 +96,7 @@ def _draw(code: str, folder: Path) -> dict:
     )
     try:
         status = tools.run("anchor-reads", [str(timeline), str(STEP)], stdout=report)
-    except (tools.ToolError, PictureError) as error:
+    except PictureError as error:
         reason = str(error)
     else:
         drawn = repository.read(report) if report.stat().st_size else {}

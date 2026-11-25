@@ -27,7 +27,7 @@ A film is the folder that holds `content/film.toml`. The engine builds the film 
 
 ## The verbs
 
-Run in a film's folder. A refusal is one line on standard error, and the command exits 1.
+Run in a film's folder. A refusal is one line on standard error, and the command exits 1. A command that cannot finish exits 2: a tool the host lacks is named in one line, any other fault shows its traceback.
 
 | Verb                                                             | What it does                                                                                                                              |
 | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |

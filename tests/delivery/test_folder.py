@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from still_records import REQUIRE_FILM_SCAN
 
+import filmkit.child_processes as child_processes
 import filmkit.delivery.folder as delivery_folder
 import filmkit.picture.still_scan as still_scan
 import filmkit.repository as repository
@@ -237,9 +238,9 @@ def test_the_readback_refuses_an_entry_beside_the_members(film):
         delivery_folder.readback(root, destination)
 
 
-def test_an_rsync_other_than_rsync_3_is_refused(film, monkeypatch):
+def test_an_rsync_other_than_rsync_3_is_a_missing_tool(film, monkeypatch):
     monkeypatch.setattr(delivery_folder, "rsync_version", lambda: "openrsync 2.6.9")
-    with pytest.raises(DeliveryRefusedError, match="rsync 3 is required"):
+    with pytest.raises(child_processes.MissingToolError, match="rsync 3 is required"):
         delivery_folder.deliver(*film)
     assert not film.destination.exists()
 
@@ -299,12 +300,12 @@ def test_a_player_that_fails_its_readback_refuses_delivery_before_any_change(fil
 def test_a_player_check_that_cannot_run_refuses_delivery(film, monkeypatch):
     root, destination = film
 
-    def absent(binding, receipt):
-        raise delivery_folder.tools.ToolError("No node on PATH")
+    def refused(binding, receipt):
+        raise PictureError("The film installs no @napi-rs/canvas")
 
-    monkeypatch.setattr(delivery_folder, "check_players", absent)
+    monkeypatch.setattr(delivery_folder, "check_players", refused)
     monkeypatch.setattr(delivery_folder, "rsync_version", lambda: "rsync  version 3.4.1")
-    with pytest.raises(DeliveryRefusedError, match="No node on PATH"):
+    with pytest.raises(DeliveryRefusedError, match="cannot run, so nothing is delivered: The film"):
         delivery_folder.deliver(root, destination)
     assert not destination.exists()
 

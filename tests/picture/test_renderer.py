@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import filmkit.child_processes as child_processes
 import filmkit.media as media
 import filmkit.picture.browser as picture_browser
 import filmkit.picture.derivation as derivation
@@ -240,9 +241,9 @@ def test_no_render_reads_the_declared_capture(film_root, monkeypatch, capture):
     assert "capture" not in draft and draft["command"][3:5] == [str(film_root.renderer), "render"]
 
 
-def test_a_render_without_node_is_refused(monkeypatch):
+def test_a_render_without_node_cannot_finish(monkeypatch):
     monkeypatch.setattr(picture_renderer.shutil, "which", lambda _name: None)
-    with pytest.raises(PictureError, match="No node on PATH"):
+    with pytest.raises(child_processes.MissingToolError, match="No node on PATH"):
         picture_renderer.launcher()
 
 

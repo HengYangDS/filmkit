@@ -57,6 +57,11 @@ narration's shares, and `filmkit.narration.narrate` for each of its steps (`run`
 A process that is killed outright (SIGKILL) runs none of this, and its children outlive it. A
 child that leads its own session is not reached by a signal to its parent's process group
 either, so a caller that must end such a command asks it to end and waits.
+
+A command's exit status says how it ended (design decision 19 of build-a-film-by-its-verbs):
+`FINISHED` where it did what it was asked, `REFUSED` where the film or a gate said no, in one
+line, and `UNFINISHED` where it could not finish, by an exception or by a tool the host lacks
+(`MissingToolError`); a request to end exits with the status that names it, as above.
 """
 
 from __future__ import annotations
@@ -89,6 +94,13 @@ REQUESTS = {
     signal.SIGTERM: "a request to end (SIGTERM)",
     signal.SIGHUP: "a hang-up (SIGHUP)",
 }
+# A command's exit statuses: it finished, it refused, or it could not finish.
+FINISHED, REFUSED, UNFINISHED = 0, 1, 2
+
+
+class MissingToolError(RuntimeError):
+    """A tool the engine runs is not on this host as its owner installs it, so the command
+    cannot finish: no refusal of the film's, and its status is `UNFINISHED`."""
 
 
 class Terminated(BaseException):

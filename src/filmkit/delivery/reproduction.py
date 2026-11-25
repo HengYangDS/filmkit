@@ -49,6 +49,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, NonNegativeInt, PositiveFloat, StringConstraints, ValidationError
 
+import filmkit.child_processes as child_processes
 import filmkit.delivery.packaging as packaging
 import filmkit.delivery.verification as verification
 import filmkit.graph.runs as seam
@@ -239,11 +240,11 @@ def drawn(edition: production.Edition) -> dict[str, str]:
 
 
 def running_ffmpeg() -> str:
-    """The first line of the running FFmpeg's `ffmpeg -version`, refused where none runs."""
+    """The first line of the running FFmpeg's `ffmpeg -version`; a missing tool where none runs."""
     version = seam.encoder("FFmpeg")
     if version == seam.ABSENT:
         msg = "FFmpeg cannot be run here: install it as Homebrew does (brew install ffmpeg)"
-        raise ReproductionError(msg)
+        raise child_processes.MissingToolError(msg)
     return version
 
 

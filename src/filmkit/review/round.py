@@ -56,7 +56,6 @@ import filmkit.review.record as review_record
 import filmkit.review.set_aside as set_aside
 import filmkit.soundtrack.level as soundtrack_level
 import filmkit.sources as sources
-import filmkit.tools as tools
 from filmkit.film import MATERIAL
 from filmkit.graph import verify as graph_verify
 from filmkit.narration.spoken_units import AlignmentError
@@ -78,7 +77,6 @@ CHANGES, DISPOSITIONS = "changes.md", "dispositions.json"
 # a fault and shows in full. So this tuple is where a new owner's refusal is admitted.
 OWNER_REFUSALS = (
     delivery_folder.DeliveryRefusedError,
-    tools.ToolError,
     PictureError,
     media.MediaError,
     soundtrack_level.LevelError,

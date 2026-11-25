@@ -45,13 +45,12 @@ from filmkit.media import MediaError
 from filmkit.picture import renderer
 from filmkit.picture.errors import PictureError
 from filmkit.production import CODES, Edition, UnassembledError
-from filmkit.tools import ToolError
 
 # The attempts of one run, unless it is given another number, and the command that compares the
 # two pictures again once an attempt stopped.
 ATTEMPTS = 2
 # What a render or comparison inside an attempt refuses with.
-REFUSALS = (PictureError, MediaError, ToolError)
+REFUSALS = (PictureError, MediaError)
 
 
 def current_record(edition: Edition) -> dict:

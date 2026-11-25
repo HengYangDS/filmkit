@@ -45,8 +45,10 @@ does:
 - `release` records the release of the reviewed, delivered build and stages its assets, its
   sources from the declaration (`filmkit.delivery.release`).
 
-A refusal is one line on standard error, and the command exits 1. A target that names no node is
-refused in one line that names the nodes.
+A refusal is one line on standard error, and the command exits 1. A command that cannot finish
+exits 2: a tool the host lacks is named in one line, any other exception printed with its
+traceback; an interrupted one exits with the status that names its request (design decision
+19). A target that names no node is refused in one line that names the nodes.
 """
 
 from __future__ import annotations
@@ -54,7 +56,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import traceback
 from typing import TYPE_CHECKING
+
+import filmkit.child_processes as child_processes
 
 if TYPE_CHECKING:
     from filmkit.graph import plan
@@ -279,7 +284,6 @@ def narrated(asked: str, rounds: int, takes: int) -> int:
     refusals = unready(codes)
     if refusals:
         sys.exit("\n".join(refusals))
-    import filmkit.child_processes as child_processes
     from filmkit.narration import converge
 
     with child_processes.ending(converge.STOPPED):
@@ -290,8 +294,8 @@ def narrated(asked: str, rounds: int, takes: int) -> int:
 
 
 def built(targets: list[str]) -> int:
-    """`filmkit build`: each node it ran and held, and each refusal on standard error."""
-    import filmkit.child_processes as child_processes
+    """`filmkit build`: each node it ran and held, each refusal and failure on standard error,
+    and the build's status (`build.Built.status`)."""
     from filmkit.graph import build, chain
 
     stopped = "The build was stopped by {request}; the node it was running was ended with it"
@@ -304,8 +308,8 @@ def built(targets: list[str]) -> int:
         print(f"ran {key}")
     if done.held:
         print(f"held, behind a node that did not pass: {' '.join(done.held)}")
-    if done.refused:
-        sys.exit("\n".join(done.refused))
+    for said in (*done.refused, *done.failed):
+        print(said, file=sys.stderr)
     return done.status
 
 
@@ -351,13 +355,29 @@ def released(replace: bool, dry_run: bool) -> int:
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Run the verb asked and exit with the status that says how it ended
+    (`child_processes.FINISHED`, `REFUSED`, `UNFINISHED`)."""
     options = arguments().parse_args(argv)
+    try:
+        status = ran(options)
+    except child_processes.MissingToolError as error:
+        print(error, file=sys.stderr)
+        sys.exit(child_processes.UNFINISHED)
+    except Exception:
+        traceback.print_exc(file=sys.stderr)
+        sys.exit(child_processes.UNFINISHED)
+    if status:
+        sys.exit(status)
+
+
+def ran(options: argparse.Namespace) -> int:
+    """Run the verb the options name: its status, where it returns one."""
     verb = options.verb
     if verb == "review":
         from filmkit.review import round as review_round
 
         review_round.run([options.command, *options.options], prog="filmkit review")
-        return
+        return child_processes.FINISHED
     done = {
         "supply": supplied,
         "check": lambda: checked(options.read_only),
@@ -369,10 +389,7 @@ def main(argv: list[str] | None = None) -> None:
         "release": lambda: released(options.replace, options.dry_run),
     }.get(verb)
     if done is not None:
-        status = done()
-        if status:
-            sys.exit(status)
-        return
+        return done()
     from filmkit.graph import plan
 
     try:
@@ -382,10 +399,11 @@ def main(argv: list[str] | None = None) -> None:
     if options.json:
         stated = [entry.stated() for entry in planned.entries]
         print(json.dumps({"nodes": stated, "hashed": planned.hashed}, indent=2))
-        return
+        return child_processes.FINISHED
     for entry in planned.entries:
         print(line(entry))
     print("\n".join(filter(None, [timed(planned.entries), f"{planned.hashed} files hashed"])))
+    return child_processes.FINISHED
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 from placing import placed, refused, refused_lines
 
+import filmkit.child_processes as child_processes
 import filmkit.concepts as concepts
 import filmkit.languages as languages
 import filmkit.register as register
@@ -241,4 +242,7 @@ def test_another_vale_on_the_path_refuses_before_any_word_is_read(tmp_path, monk
     assert str(refused()) == f"{other} reports Vale 9.9.9; {runs}: {pin}"
     assert (other.parent / "calls").read_text() == "--version"
     monkeypatch.setenv("PATH", str(tmp_path / "nothing"))
-    assert str(refused()) == f"No vale on the path; {runs}"
+    # No Vale at all is a tool the host lacks: the check cannot finish, and refuses nothing.
+    with pytest.raises(child_processes.MissingToolError) as missing:
+        register.check()
+    assert str(missing.value) == f"No vale on the path; {runs}"

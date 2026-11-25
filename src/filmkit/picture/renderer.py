@@ -216,7 +216,7 @@ def launcher() -> list[str]:
     node = shutil.which("node")
     if node is None:
         msg = "No node on PATH; render in the film's Mise environment"
-        raise PictureError(msg)
+        raise child_processes.MissingToolError(msg)
     return [node, str(tools.stage_tools() / MODULE)]
 
 

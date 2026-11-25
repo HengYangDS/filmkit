@@ -258,10 +258,11 @@ def narrate(code: str) -> None:
 
 
 # A node's run in a process of its own, as `filmkit build` runs it once its plan holds it stale
-# (`build.run_node`): the run's refusal or failure is its one line and exit status 1.
+# (`build.run_node`): the run's refusal or failure is its one line, and its status the run's.
 RUN_NODE = (
     "import sys; from filmkit.graph import build, chain; "
-    "sys.exit(build.run_node(chain.table(), sys.argv[1]))"
+    "status, said = build.run_node(chain.table(), sys.argv[1]); "
+    "said and print(said, file=sys.stderr); sys.exit(status)"
 )
 
 

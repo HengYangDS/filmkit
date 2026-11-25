@@ -9,6 +9,7 @@ import wave
 import pytest
 from converging import converge, counts, record_of, refused
 
+import filmkit.child_processes as child_processes
 import filmkit.narration.converge as narration_converge
 import filmkit.narration.fitting as fitting
 import filmkit.repository as repository
@@ -158,11 +159,14 @@ def test_a_recording_that_is_no_wav_is_the_editions_refusal(count, fault, words)
     ],
 )
 def test_an_error_of_the_host_is_a_fault_and_no_refusal_of_the_edition(
-    count, where, kind, named, words
+    count, where, kind, named, words, capsys
 ):
     setattr(count, where, kind(*named))
-    with pytest.raises(kind):
+    # The command cannot finish: it exits 2 with the fault's traceback, and refuses nothing.
+    with pytest.raises(SystemExit) as failed:
         converge()
+    assert failed.value.code == child_processes.UNFINISHED
+    assert capsys.readouterr().err.endswith(f"{words}\n")
     record = record_of()
     assert (record["state"], record["unsettled"]) == ("ended", {})
     assert record["fit"] == {
@@ -193,11 +197,13 @@ def test_an_edition_whose_clips_cannot_be_designed_is_refused_with_that_reason(c
     assert record_of()["fit"]["verdict"] == "refused"
 
 
-def test_a_fault_of_the_count_keeps_its_traceback_and_the_record_is_ended_first(count):
+def test_a_fault_of_the_count_keeps_its_traceback_and_the_record_is_ended_first(count, capsys):
     # A selection that lacks a segment is no refusal of the count's owners.
     count.binding = KeyError("27")
-    with pytest.raises(KeyError):
+    with pytest.raises(SystemExit) as failed:
         converge()
+    assert failed.value.code == child_processes.UNFINISHED
+    assert capsys.readouterr().err.endswith("KeyError: '27'\n")
     record = record_of()
     assert (record["state"], record["unsettled"]) == ("ended", {})
     assert record["fit"] == {
