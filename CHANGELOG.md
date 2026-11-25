@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.34.1] - 2026-11-26
+
 ### Added
 
 - The capability `engine-verification` states where the engine is checked: on Apple-silicon macOS alone, by one check projected to each forge from one declaration, and with the same check and proof in a checkout with no remote, with one or with both.
@@ -753,7 +755,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.34.0...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.34.1...HEAD
+[0.34.1]: https://github.com/HengYangDS/filmkit/compare/v0.34.0...v0.34.1
 [0.34.0]: https://github.com/HengYangDS/filmkit/compare/v0.33.0...v0.34.0
 [0.33.0]: https://github.com/HengYangDS/filmkit/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/HengYangDS/filmkit/compare/v0.31.0...v0.32.0
