@@ -11,7 +11,7 @@ The release runs these checks, unchanged, on every planned commit and at the arc
 
 ## 1. The base
 
-- [ ] 1.1 Confirm on the lane's base, `00549d3` (tag `v0.34.0`) or a later released head, every site the design's Context cites: the live files that name Windows or a runner tag, whether `.config/mise/config.toml` sets `lockfile_platforms`, each locked tool's platform tables, and the Windows entries of `uv.lock` and `package-lock.json`. Done when `research.md` names the base and states each site as found, with any line that moved.
+- [x] 1.1 Confirm on the lane's base, `00549d3` (tag `v0.34.0`) or a later released head, every site the design's Context cites: the live files that name Windows or a runner tag, whether `.config/mise/config.toml` sets `lockfile_platforms`, each locked tool's platform tables, and the Windows entries of `uv.lock` and `package-lock.json`. Done when `research.md` names the base and states each site as found, with any line that moved.
 
 ## 2. The supply
 
