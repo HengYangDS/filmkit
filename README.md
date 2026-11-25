@@ -87,3 +87,7 @@ A film's tests import only `filmkit.api` and one Node module, `filmkit.api.TEST_
 ## Specifications and changes
 
 What the engine guarantees is specified in [`openspec/specs/`](openspec/specs/); each change is proposed, designed and archived in [`openspec/changes/`](openspec/changes/). The [Changelog](CHANGELOG.md) states what each release changes and what a film changes to adopt it, and [CONTRIBUTING.md](CONTRIBUTING.md) how the engine is developed.
+
+## License
+
+The code is licensed under the [MIT License](LICENSE). [NOTICE](NOTICE) names the sample film's reference recordings, under CC BY 4.0, its fonts, under the SIL Open Font License, and the third-party software and models that a build installs.
