@@ -197,10 +197,17 @@ def test_plan_prints_each_node_of_the_sound_chain_as_json(sound_chain, capsys):
     cli.main(["plan", "check-sound:zh", "--json"])
     planned = json.loads(capsys.readouterr().out)
     found = {entry["node"]: entry for entry in planned["nodes"]}
-    assert list(found) == ["narrate:zh", *(f"{name}:zh" for name in sample_sound.SOUND)]
-    for entry in found.values():
-        assert set(entry) == {"node", "state", "reasons", "class", "expected", "seconds", "ready"}
-        assert (entry["state"], entry["reasons"], entry["ready"]) == ("fresh", [], True)
+    chain = ["narrate:zh", *(f"{name}:zh" for name in sample_sound.SOUND)]
+    # The narration waits for the source check, which the light suite does not run: each node
+    # of the chain is fresh by its own record and waits for it.
+    assert list(found) == ["check", *chain]
+    fields = {"node", "state", "reasons", "class", "expected", "seconds", "ready", "waits"}
+    assert all(set(entry) == fields for entry in found.values())
+    assert (found["check"]["state"], found["check"]["class"]) == ("stale", "unmeasured")
+    for key in chain:
+        entry = found[key]
+        assert (entry["state"], entry["reasons"], entry["ready"]) == ("waiting", [], False)
+        assert entry["waits"] == [{"node": "check", "state": "stale"}]
         assert entry["seconds"] > 0
     assert (found["narrate:zh"]["class"], found["narrate:zh"]["expected"]) == ("gpu", "gpu")
     assert found["check-sound:zh"]["class"] == "light"
