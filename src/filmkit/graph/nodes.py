@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, NamedTuple
 
 import filmkit.repository as repository
-from filmkit.graph.records import Folder, HostClass
+from filmkit.graph.records import DeclarationTable, Folder, HostClass
 from filmkit.production import CODES, Edition
 
 if TYPE_CHECKING:
@@ -107,7 +107,7 @@ class TableError(ValueError):
     node's places to two places."""
 
 
-class Places(dict[str, "Path | Folder"]):
+class Places(dict[str, "Path | Folder | DeclarationTable"]):
     """A node's places by name; a union that binds one name to two places is refused."""
 
     def __or__(self, other: dict) -> Places:
@@ -141,8 +141,10 @@ def split(named: str) -> tuple[str, str | None]:
     return (name, code) if colon else (named, None)
 
 
-def place(path: Path | Folder) -> Path:
-    """The file or folder a declared path names, resolved."""
+def place(path: Path | Folder | DeclarationTable) -> Path:
+    """The file or folder a declared path names, resolved; a table as `<declaration>#<table>`."""
+    if isinstance(path, DeclarationTable):
+        return Path(f"{path.path}#{path.name}").resolve()
     return Path(path.path if isinstance(path, Folder) else path).resolve()
 
 

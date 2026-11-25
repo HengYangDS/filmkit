@@ -1,12 +1,13 @@
 """The run record of schema 1, the partial record, and how one is stated, written and read.
 
 A run record states one run of one build node, for one edition or for the film: each input and
-output by its
-path below the film's root, its size, its modification time (`mtime_ns`) and its SHA-256, a
-folder by the digest of the members its pattern names; the engine that ran, its `released.json`
-digest and the node's model pins; the outcome and the line the command ended with; the run's
-start, seconds, phases, settings and 1-minute load at both ends, as the seam measured them
-(`filmkit.graph.runs.Run`); and the host class as measured (`filmkit.graph.host`). A partial
+output by its path below the film's root, its size, its modification time (`mtime_ns`) and its
+SHA-256, a folder by the digest of the members its pattern names, a top-level table of the
+film's declaration by the digest of its canonical JSON (`DeclarationTable`); the engine that
+ran, its `released.json` digest and the node's model pins; the outcome and the line the command
+ended with; the run's start, seconds, phases, settings and 1-minute load at both ends, as the
+seam measured them (`filmkit.graph.runs.Run`); and the host class as measured
+(`filmkit.graph.host`). A partial
 record states a run of part of a node: its outputs as they stand after it, its outcome and its
 time, and no inputs, so it accounts for what it wrote and never makes its node fresh.
 
@@ -22,6 +23,8 @@ import contextlib
 import contextvars
 import hashlib
 import json
+import tomllib
+import typing
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, NamedTuple
 
@@ -147,6 +150,92 @@ class Folder(NamedTuple):
     pattern: str
 
 
+class DeclarationTable(NamedTuple):
+    """A top-level table of the film's declaration as an input: the declaration's file and the
+    table's name as the file names it, `identity` for the declaration's own values (design
+    decision 12 of build-a-film-by-its-verbs). A record states it at `<file>#<table>`, with the
+    file's size and time and the digest of the table's canonical JSON."""
+
+    path: Path
+    name: str
+
+
+# The table of the declaration's own values, which no table of the file holds.
+IDENTITY = "identity"
+
+
+def table_names(model: type[BaseModel]) -> dict[str, str]:
+    """Each top-level field of the declaration's model by the table it belongs to: a field that
+    holds a table (a model or a mapping) is the table of its name in the file, every other field
+    is of `identity`."""
+    found = {}
+    for name, field in model.model_fields.items():
+        kind = typing.get_origin(field.annotation) or field.annotation
+        holds = kind is dict or isinstance(kind, type) and issubclass(kind, BaseModel)
+        found[name] = (field.alias or name) if holds else IDENTITY
+    return found
+
+
+def canonical(value: object) -> str:
+    """The SHA-256 of a value's JSON with sorted keys."""
+    return repository.content_sha(json.dumps(value, sort_keys=True, ensure_ascii=False))
+
+
+def table_digests(declaration: BaseModel) -> dict[str, str]:
+    """Each table of a loaded declaration by the digest of its canonical JSON
+    (`model_dump(mode="json")`, sorted keys)."""
+    dumped = declaration.model_dump(mode="json", by_alias=True)
+    grouped: dict[str, dict] = {}
+    for name, table in table_names(type(declaration)).items():
+        field = type(declaration).model_fields[name].alias or name
+        if table == IDENTITY:
+            grouped.setdefault(IDENTITY, {})[field] = dumped[field]
+        else:
+            grouped[table] = dumped[field]
+    return {table: canonical(value) for table, value in grouped.items()}
+
+
+# Each declaration's table digests, by its path, size and time.
+_TABLES: dict[tuple[str, int, int], dict[str, str]] = {}
+
+
+def tables_of(path: Path, found: os.stat_result) -> dict[str, str]:
+    """The table digests of the declaration at a path, at the size and time it has: of the film it
+    loads, or, for one that does not load, of its TOML's tables, so that a change still shows."""
+    named = (str(path), found.st_size, found.st_mtime_ns)
+    if named not in _TABLES:
+        import filmkit.film as film
+
+        root = Path(path).parents[len(Path(repository.DECLARATION).parts) - 1]
+        loaded, _ = film.read(root)
+        if loaded is not None:
+            _TABLES[named] = table_digests(loaded)
+        else:
+            raw = tomllib.loads(Path(path).read_text(encoding="utf-8"))
+            own = {k: v for k, v in raw.items() if not isinstance(v, dict)}
+            tables = {k: v for k, v in raw.items() if isinstance(v, dict)}
+            _TABLES[named] = {k: canonical(v) for k, v in {**tables, IDENTITY: own}.items()}
+    return _TABLES[named]
+
+
+def table_state(table: DeclarationTable, known: FileState | None = None) -> FileState:
+    """A table of the declaration as it stands: the file's size and time, the table's digest
+    taken from `known` where they are the ones `known` states."""
+    found = table.path.stat()
+    same = known is not None and (known.size, known.mtime_ns) == (found.st_size, found.st_mtime_ns)
+    return FileState(
+        path=f"{below_root(table.path)}#{table.name}",
+        size=found.st_size,
+        mtime_ns=found.st_mtime_ns,
+        sha256=known.sha256 if same and known else tables_of(table.path, found).get(table.name, ""),
+    )
+
+
+def file_of(place: Path | Folder | DeclarationTable) -> Path:
+    """The file or folder a declared place names, a table's declaration for a table."""
+    return Path(place.path if isinstance(place, (Folder, DeclarationTable)) else place)
+
+
 def digest(path: Path) -> str:
     """The SHA-256 of a file's bytes, read in blocks."""
     with path.open("rb") as stream:
@@ -223,10 +312,13 @@ def folder_state(folder: Folder, known: FolderState | None = None) -> FolderStat
     )
 
 
-def stated(path: Path | Folder, known: State | None = None) -> State:
-    """A file or a folder as it stands, digests taken from `known` where they still hold."""
+def stated(path: Path | Folder | DeclarationTable, known: State | None = None) -> State:
+    """A file, a folder or a table as it stands, digests taken from `known` where they still
+    hold."""
     if isinstance(path, Folder):
         return folder_state(path, known if isinstance(known, FolderState) else None)
+    if isinstance(path, DeclarationTable):
+        return table_state(path, known if isinstance(known, FileState) else None)
     return state(path, known if isinstance(known, FileState) else None)
 
 
@@ -296,8 +388,18 @@ SAYS = {
 
 
 def at(recorded: State) -> Path:
-    """The file or folder a record states, below the film's root."""
-    return Path(repository.ROOT) / recorded.path
+    """The file or folder a record states, below the film's root; a table's declaration for a
+    table."""
+    return Path(repository.ROOT) / recorded.path.partition("#")[0]
+
+
+def placed(recorded: State) -> Path | Folder | DeclarationTable:
+    """What a record states, as a place to state again."""
+    path = at(recorded)
+    if isinstance(recorded, FolderState):
+        return Folder(path, recorded.pattern)
+    _, mark, name = recorded.path.partition("#")
+    return DeclarationTable(path, name) if mark else path
 
 
 def standing(recorded: State) -> tuple[tuple[int, int], ...] | None:
@@ -327,8 +429,7 @@ def compare(side: str, name: str, recorded: State, *, full: bool) -> Compared:
     )
     if stats == held and not full:
         return Compared(side, name, recorded.path, "same")
-    path = at(recorded)
-    now = stated(Folder(path, recorded.pattern) if isinstance(recorded, FolderState) else path)
+    now = stated(placed(recorded))
     if now.sha256 == recorded.sha256:
         return Compared(side, name, recorded.path, "same" if stats == held else "touched")
     return Compared(side, name, recorded.path, "blind" if stats == held else "changed")

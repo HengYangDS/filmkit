@@ -11,7 +11,8 @@ import sample_sound
 
 import filmkit.repository as repository
 import filmkit.tools as tools
-from filmkit.graph import chain, nodes, opens
+from filmkit.film import FILM, named_files
+from filmkit.graph import chain, nodes, opens, records
 
 # A Node child that reads a declared and an undeclared file, writes in the temporary folder,
 # opens a socket to a closed port and runs to its end.
@@ -350,3 +351,41 @@ def test_a_read_in_a_module_body_passes_only_for_a_file_the_engine_reads_at_star
     python_child(root, log, code, node="check-sound:zh")
     (finding,) = opens.check(log).findings
     assert "read picture/film.js, which its declaration does not name" in finding
+
+
+@pytest.fixture
+def declared_film(tmp_path, monkeypatch):
+    """A copy of the sample's declaration and every file it names, below a new root, with a
+    stand-in table whose one node reads the declaration's `picture` table."""
+    root = (tmp_path / "film").resolve()
+    for path in (repository.DECLARATION, *(named for _, named in named_files(FILM))):
+        (root / path).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(repository.ROOT / path, root / path)
+    monkeypatch.setattr(repository, "ROOT", root)
+    picture = records.DeclarationTable(root / repository.DECLARATION, "picture")
+    reader = nodes.Node(
+        "reader", {"default": lambda e: {"declaration.picture": picture}}, lambda e: {}, "light"
+    )
+    return root, tmp_path / "opens.jsonl", nodes.load([reader], {}, ("zh",))
+
+
+def tables_named(report) -> list[str]:
+    """The tables a check's findings name as read without a declaration."""
+    said = "read the declaration's table "
+    return sorted(f.split(said)[1].split(",")[0] for f in report.findings if said in f)
+
+
+def test_a_read_of_a_table_the_node_does_not_declare_fails_naming_the_table(declared_film):
+    root, log, table = declared_film
+    python_child(root, log, "from filmkit.film import FILM\nFILM.picture.fonts\n", "reader:zh")
+    assert opens.check(log, table).ok
+    python_child(root, log, "from filmkit.film import FILM\nFILM.review\n", "reader:zh")
+    report = opens.check(log, table)
+    assert tables_named(report) == ["review"]
+    assert "reader:zh" in report.findings[0]
+
+
+def test_a_read_of_the_whole_declaration_is_a_read_of_every_table(declared_film):
+    root, log, table = declared_film
+    python_child(root, log, "from filmkit.film import FILM\nFILM.model_dump()\n", "reader:zh")
+    assert tables_named(opens.check(log, table)) == sorted(set(chain.TABLES) - {"picture"})

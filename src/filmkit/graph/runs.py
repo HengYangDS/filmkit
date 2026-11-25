@@ -220,8 +220,7 @@ def stated(places: nodes.Places, known: dict[str, records.State]) -> dict[str, r
     """Each place that stands, by name, digests taken from `known` where they still hold."""
     found = {}
     for name, path in places.items():
-        where = Path(path.path if isinstance(path, records.Folder) else path)
-        if where.exists():
+        if records.file_of(path).exists():
             found[name] = records.stated(path, known.get(name))
     return found
 

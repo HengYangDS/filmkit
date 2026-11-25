@@ -2,11 +2,13 @@
 
 import json
 import os
+import shutil
 
 import pytest
 
+import filmkit.film as film
 import filmkit.repository as repository
-from filmkit.graph import records
+from filmkit.graph import nodes, opens, plan, records, runs
 
 
 @pytest.fixture
@@ -184,3 +186,61 @@ def test_a_change_that_keeps_size_and_time_is_fresh_until_every_file_is_hashed(r
         "input script changed while keeping its size and time: content/zh/film-script.json",
     )
     assert [f.result for f in full.files if f.name == "script"] == ["blind"]
+
+
+HEARD = f"""
+[[narration.heard]]
+edition = "en"
+thought = "13.2"
+take = "{"a" * 64}"
+lines = ["units"]
+listener = "Yang HENG"
+date = "2026-11-24"
+note = "He heard labelled said as written."
+"""
+
+
+@pytest.fixture
+def declared(tmp_path, monkeypatch):
+    """A copy of the sample's declaration and every file it names below a new root, and a
+    stand-in table of two nodes, one that reads the declaration's `picture` table and one that
+    reads its `narration` table, each run once; the declaration and the table."""
+    root = tmp_path.resolve()
+    for path in (repository.DECLARATION, *(named for _, named in film.named_files(film.FILM))):
+        (root / path).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(repository.ROOT / path, root / path)
+    monkeypatch.setattr(repository, "ROOT", root)
+    declaration = root / repository.DECLARATION
+
+    def reader(name):
+        table = records.DeclarationTable(declaration, name)
+        places = {f"declaration.{name}": table}
+        return nodes.Node(name, {"default": lambda e: places}, lambda e: {}, "light")
+
+    readers = (reader("picture"), reader("narration"))
+    monkeypatch.setattr(runs, "table", lambda: {node.name: node for node in readers})
+    monkeypatch.delenv(opens.NODE, raising=False)
+    for node in readers:
+        with runs.run("zh", node.name):
+            pass
+    return declaration, nodes.load(readers, {}, ("zh",))
+
+
+def test_a_hearing_recorded_leaves_a_node_that_reads_only_the_picture_fresh(declared, monkeypatch):
+    declaration, table = declared
+    loaded, read = [], film.read
+    monkeypatch.setattr(film, "read", lambda root: loaded.append(root) or read(root))
+    # An unchanged declaration is judged by its size and time: no table is hashed.
+    states = {entry.key: entry.state for entry in plan.plan(table).entries}
+    assert (states, loaded) == ({"picture:zh": "fresh", "narration:zh": "fresh"}, [])
+    stated = records.read(records.place("narration", "zh")).inputs["declaration.narration"]
+    assert stated.path == "content/film.toml#narration"
+    declaration.write_text(declaration.read_text() + HEARD)
+    found = {entry.key: entry for entry in plan.plan(table).entries}
+    assert found["picture:zh"].state == "fresh"
+    assert found["narration:zh"].state == "stale"
+    assert [reason.text for reason in found["narration:zh"].reasons] == [
+        "input declaration.narration changed: content/film.toml#narration"
+    ]
+    # The changed declaration was loaded once to state both nodes' tables.
+    assert loaded == [declaration.parents[1]]

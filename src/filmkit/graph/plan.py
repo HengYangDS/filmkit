@@ -369,7 +369,7 @@ def wanted(table: nodes.Table, targets: Iterable[str]) -> set[str]:
 
 
 def exists(path: object) -> bool:
-    return os.path.lexists(nodes.place(path))
+    return os.path.lexists(records.file_of(path))
 
 
 def plan(

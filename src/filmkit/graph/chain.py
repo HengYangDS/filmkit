@@ -2,8 +2,10 @@
 outputs as functions of an edition, the paths that several of them write, and the reads each
 makes aside (design decisions 1, 4 and 5 of record-every-run; `filmkit.graph.nodes` loads it).
 
-Where an owner binds its inputs, the node takes that owner's function (design decision 4); every
-node reads the film's declaration, which every command loads, and binds it whole.
+Where an owner binds its inputs, the node takes that owner's function (design decision 4). Every
+node reads the film's declaration, which every command loads, and binds each top-level table of it
+that the node may read, by the table's digest (design decision 12 of build-a-film-by-its-verbs):
+every table, but the narration's for the nodes that make and deliver the pictures.
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ import filmkit.repository as repository
 import filmkit.soundtrack.gates as sound_gates
 from filmkit.film import FILM
 from filmkit.graph.nodes import REPLACES, REWRITES, Node, Places, Table, Writer, load, stands
-from filmkit.graph.records import Folder
+from filmkit.graph.records import DeclarationTable, Folder, table_names
 from filmkit.narration import alignment_records, transcript_records
 from filmkit.narration.narrate import evidence_paths
 from filmkit.production import CODES, Edition
@@ -33,6 +35,14 @@ if TYPE_CHECKING:
 
 # The tools whose reads the check of each run's opens sees only through their arguments.
 MEDIA, BROWSER = ("FFmpeg", "ffprobe"), ("Chrome",)
+# The declaration's tables, each bound by its digest.
+TABLES = tuple(dict.fromkeys(table_names(film.Film).values()))
+# The tables no node that makes or delivers the pictures reads: no module of `filmkit.picture` or
+# `filmkit.delivery` reaches a reader of the narration's table (`narration.audition`,
+# `judgment`, `readings` and `selection`, `review.listening_plan` and `measurement`,
+# `soundtrack.assembly`; read 2026-11-25), so a hearing recorded there leaves them fresh; the
+# check of each run's opens holds each node to it.
+PICTURED = tuple(t for t in TABLES if t != "narration")
 
 
 def root(path: str | Path) -> Path:
@@ -45,10 +55,17 @@ def named(bindings: dict[str, Path]) -> Places:
     return Places({name.removesuffix("_sha256"): path for name, path in bindings.items()})
 
 
-def declared(edition: Edition) -> Places:
-    """What every command reads: the film's declaration, which it loads."""
+def declared(edition: Edition | None, tables: tuple[str, ...] = TABLES) -> Places:
+    """What every command reads: the film's declaration, which it loads, as the tables it may read,
+    every one by default."""
     del edition
-    return Places({"declaration": root(repository.DECLARATION)})
+    path = root(repository.DECLARATION)
+    return Places({f"declaration.{t}": DeclarationTable(path, t) for t in tables})
+
+
+def pictured(edition: Edition | None) -> Places:
+    """What a node that makes or delivers the pictures reads of the declaration (`PICTURED`)."""
+    return declared(edition, PICTURED)
 
 
 def sources(edition: Edition) -> Places:
@@ -126,7 +143,7 @@ def staging(edition: Edition) -> Places:
         "composition": root(rendering.COMPOSITION_SCRIPT),
         "template": root(rendering.TEMPLATE),
     }
-    return declared(edition) | found | faces()
+    return pictured(edition) | found | faces()
 
 
 def stage(edition: Edition, captions: bool = True) -> Places:
@@ -173,13 +190,13 @@ def derived_from(edition: Edition) -> Places:
     stage's sources."""
     found = {f"captioned_{name}": path for name, path in rendered(edition).items()}
     found |= {"composition": root(rendering.COMPOSITION_SCRIPT), "timeline": edition.timeline}
-    return declared(edition) | found | staged_picture(edition)
+    return pictured(edition) | found | staged_picture(edition)
 
 
 def compared(edition: Edition) -> Places:
     """What the comparison of the two pictures reads: the equivalence's list and both pictures,
     with the stage of each picture that was rendered."""
-    found = declared(edition) | named(equivalence.bound_inputs(edition)) | staged_picture(edition)
+    found = pictured(edition) | named(equivalence.bound_inputs(edition)) | staged_picture(edition)
     for captions, side in ((True, "captioned"), (False, "uncaptioned")):
         found |= {f"{side}_{name}": path for name, path in rendered(edition, captions).items()}
     if not derived_uncaptioned(edition):
@@ -199,7 +216,7 @@ def metadata_inputs(edition: Edition) -> Places:
     kept = ("srt", "vtt", "chapters", "transcript", "chapter_metadata")
     found |= {name: path for name, path in documents(edition).items() if name in kept}
     found |= {f"timeline_{code}": Edition(code).timeline for code in CODES}
-    return declared(edition) | found
+    return pictured(edition) | found
 
 
 def metadata(edition: Edition) -> Places:
@@ -330,21 +347,21 @@ TABLE = (
     ),
     Node(
         "geometry-check",
-        {"default": lambda e: declared(e) | stage(e)},
+        {"default": lambda e: pictured(e) | stage(e)},
         only("picture_geometry", lambda e: e.picture_geometry),
         "heavy",
         tools=BROWSER,
     ),
     Node(
         "player-check-cover",
-        {"default": lambda e: declared(e) | stage(e) | {"cover": root(e.cover)}},
+        {"default": lambda e: pictured(e) | stage(e) | {"cover": root(e.cover)}},
         only("painted_cover", work("cover-{code}.png")),
         "light",
         tools=BROWSER,
     ),
     Node(
         "check-picture",
-        {"default": lambda e: declared(e) | named(picture_gates.bound_inputs(e)) | faces()},
+        {"default": lambda e: pictured(e) | named(picture_gates.bound_inputs(e)) | faces()},
         lambda e: {
             "picture_gates": e.picture_gates,
             "reports": Folder(work("picture-gates/{code}")(e), "*"),
@@ -445,7 +462,7 @@ TABLE = (
     ),
     Node(
         "scan-film",
-        {"default": lambda e: declared(e) | still_scan.subject_places(e)},
+        {"default": lambda e: pictured(e) | still_scan.subject_places(e)},
         only("film_stills", lambda e: e.film_stills),
         "heavy",
         tools=MEDIA,

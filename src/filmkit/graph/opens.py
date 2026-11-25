@@ -11,16 +11,20 @@ reading of a path that does not stand as a `probe`, each `os.rename` (which `os.
 with its source marked, each hard link, each removal (a tree that `shutil.rmtree` removes as
 one, since it names the members through a folder's descriptor), and each `subprocess.Popen` with
 the paths in its arguments and environment that exist; a read made while the engine starts, as
-an engine module loads or the film loader (`filmkit.film.read`) runs, is a `load`. What the
-recorder and the seam read themselves, such as the node table's places, they read with the hook
-quiet (`quiet`). Node records each file access outside its allowances on the channel
+an engine module loads or the film loader (`filmkit.film.read`) runs, is a `load`. Python also
+records each top-level table of the film's declaration that a run reads outside that start, as a
+`table` at `<declaration>#<table>` (`watch`): an attribute of the loaded declaration, and every
+table for a read of it whole (`model_dump`, `model_dump_json`, iteration), which binds more, not
+less. What the recorder and the seam read themselves, such as the node table's places, they read
+with the hook quiet (`quiet`). Node records each file access outside its allowances on the channel
 `node:permission-model:fs` (`opens.cjs`): reads of the node's inputs and outputs,
 `build/runtime/`, the engine's package and the film's packages, writes of its outputs and
 `build/runtime/`, so every other access below the root is in the log. Network use and paths
 outside the root are judged by nothing.
 
 `check` compares a log with the table: it fails a read outside the inputs and outputs of the way
-a node's run took, a probe of a path that the node would not declare were it to stand, and a
+a node's run took, a read of a table of the declaration that the node does not declare (or the
+whole declaration), a probe of a path that the node would not declare were it to stand, and a
 write outside its outputs, names each node whose tools are seen only through their arguments,
 and reports each exemption with its reason and the nodes it covered. It fails closed: nothing
 below the root is let through without a declaration or a named exemption: a read at start-up is
@@ -32,6 +36,7 @@ from __future__ import annotations
 
 import contextlib
 import fnmatch
+import importlib.machinery
 import json
 import os
 import shutil
@@ -75,6 +80,10 @@ EXEMPT = {
 }
 _installed = threading.Event()
 _inside = threading.local()
+# The log's descriptor, once the recorder is installed.
+_log: list[int] = []
+# The module whose model is the film's declaration, watched once it loads (`watch`).
+DECLARED = "filmkit.film"
 
 
 def label() -> str:
@@ -180,6 +189,7 @@ def install() -> None:
         return
     _installed.set()
     descriptor = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+    _log.append(descriptor)
 
     def hook(event: str, args: tuple) -> None:
         # Only while a node's run is open; never into itself, and never raising into the engine.
@@ -209,6 +219,81 @@ def install() -> None:
             _inside.busy = False
 
     sys.addaudithook(hook)
+    sys.meta_path.insert(0, _Declaration())
+
+
+class _Declaration:
+    """A finder that watches the film's declaration once its module has loaded (`watch`)."""
+
+    def find_spec(self, name: str, path=None, target=None):
+        if name != DECLARED:
+            return None
+        spec = importlib.machinery.PathFinder.find_spec(name, path)
+        if spec is None or spec.loader is None:
+            return spec
+        execute = spec.loader.exec_module
+
+        def exec_module(module) -> None:
+            execute(module)
+            watch(module.Film)
+
+        spec.loader.exec_module = exec_module
+        return spec
+
+
+def _tables_read(tables: Iterable[str]) -> None:
+    """Record reads of the declaration's tables by the open run, outside the engine's start."""
+    if not _log or not label() or getattr(_inside, "busy", False) or _starting():
+        return
+    _inside.busy = True
+    try:
+        tops = _root()
+        repository = sys.modules.get("filmkit.repository")
+        if not tops or repository is None:
+            return
+        declaration = os.path.join(tops[0], repository.DECLARATION)
+        for table in tables:
+            line = {
+                "node": label(),
+                "process": Path(sys.argv[0] or "python").name,
+                "pid": os.getpid(),
+                "kind": "table",
+                "path": f"{declaration}#{table}",
+            }
+            os.write(_log[0], (json.dumps(line) + "\n").encode())
+    except (OSError, ValueError, TypeError):
+        return
+    finally:
+        _inside.busy = False
+
+
+def watch(model: type) -> None:
+    """Record each top-level table of a loaded declaration that a node's run reads: an attribute
+    of a field by its table, and every table for a read of the declaration whole; once."""
+    if model.__dict__.get("_watched_tables"):
+        return
+    from filmkit.graph import records
+
+    names = records.table_names(model)
+    every = tuple(dict.fromkeys(names.values()))
+    getting = model.__getattribute__
+
+    def __getattribute__(self, name: str):
+        if name in names:
+            _tables_read((names[name],))
+        return getting(self, name)
+
+    def whole(method):
+        def read_whole(self, *args, **options):
+            _tables_read(every)
+            return method(self, *args, **options)
+
+        return read_whole
+
+    type.__setattr__(model, "__getattribute__", __getattribute__)
+    for method in ("model_dump", "model_dump_json", "__iter__"):
+        type.__setattr__(model, method, whole(getattr(model, method)))
+    type.__setattr__(model, "_watched_tables", True)
 
 
 def node_options() -> dict[str, str]:
@@ -347,9 +432,18 @@ class _Judged:
 
 
 def real(places: Iterable[object]) -> list[tuple[Path, str | None]]:
-    """Each declared place by its real path and, for a folder, its pattern."""
+    """Each declared place by its real path and, for a folder, its pattern; a table of the
+    declaration as `<declaration>#<table>`."""
+    from filmkit.graph import records
+
     return [
-        (Path(os.path.realpath(place(item))), getattr(item, "pattern", None)) for item in places
+        (
+            Path(os.path.realpath(f"{item.path}#{item.name}"))
+            if isinstance(item, records.DeclarationTable)
+            else Path(os.path.realpath(place(item))),
+            getattr(item, "pattern", None),
+        )
+        for item in places
     ]
 
 
@@ -418,6 +512,14 @@ def check(log: Path, table=None) -> Report:
         kind = "remove" if kind == "source" else kind
         path, writes = Path(os.path.realpath(access.path)), kind in WRITES
         if covered(path, judging.writes if writes else judging.reads):
+            continue
+        if kind == "table":
+            declaration, _, read = str(path).partition("#")
+            if not covered(Path(declaration), judging.reads):
+                report.findings.append(
+                    f"{access.node}: {access.process} (pid {access.pid}) read the declaration's "
+                    f"table {read}, which its declaration does not name"
+                )
             continue
         if kind == "probe" and covered(path, judging.probes):
             continue
