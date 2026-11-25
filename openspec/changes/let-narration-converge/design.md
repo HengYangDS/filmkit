@@ -1,3 +1,5 @@
+Its mentions of `preflight` and `durations` describe the engine before `build-a-film-by-its-verbs`, whose design decisions 9 and 10 make `filmkit narrate` the convergence and state its seconds in `convergence.json`; this draft's intent, narration that settles by itself, stays R4's.
+
 ## Context
 
 What the engine does today, read at `v0.23.0`. A mark such as [S2] names an entry under Sources at the end.
