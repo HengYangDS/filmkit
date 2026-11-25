@@ -4,6 +4,33 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- A film builds by one console command and its verbs (OpenSpec Change `build-a-film-by-its-verbs`, the derivation's R2b-1): `filmkit supply`, `check`, `edit`, `narrate`, `plan`, `build`, `verify`, `review prepare|record|set-aside`, `deliver` and `release`. A refusal is one line on standard error with status 1, and a refusal that names a step names the verb that runs it, as `filmkit build <node>:<code>`.
+- `filmkit check` asks every question of the film's sources at once, as the run of the film-wide node `check`, and writes its verdict and each edition's occurrence plan; `--read-only` writes no file. Every heavy or GPU node waits for it.
+- `filmkit build [TARGET...]` makes the targets fresh from the run records, one node at a time in the derived order. Before it runs anything it refuses a stale narration, naming `filmkit narrate --edition <code>`; heavy work while light work that can run now is stale, naming the light `filmkit build` to run first, outside any host ticket; and heavy work of several kinds that is not measured within 1,800 s together, printing one invocation for each kind, each the child of its own ticket.
+- `filmkit narrate [--edition CODE|all]` converges each edition asked, and is refused, before any model loads, while the plan calls its narration not ready; `convergence.json` states the convergence's seconds and phases.
+- `filmkit verify --technical-only` checks the delivered films after the records, and `--release` compares the build with the release record; neither writes a file.
+- `release.json` states each film's FFmpeg and each drawn UHD picture's drawn-frame digest. Under another FFmpeg the comparison holds the audio to the soundtrack's bytes and each drawn picture to its digest, naming both versions; a derived picture, and every picture of a record that states no version, is compared by decoded frames against the floor.
+- The declaration's `[picture] gate_row_gaps` and `native_uncaptioned`, and `[release] sources`, which no node binds.
+- `filmkit.api`, the names a film's own tests and tools import, and one Node entry for its tests, `filmkit/picture/testing.mjs` (`filmkit.api.TEST_ENTRY`): `openComposition(code, timeline)`, whose handle renders and evaluates in the composition's context, `openModules(code, timeline, entry)` and `derivedTimeline(code)`.
+
+### Changed
+
+- **The plan has a new state, `waiting`:** a node fresh by its own record held by a gate it waits for that is not fresh and passed. It is not ready, `filmkit verify` refuses it, and a reader that does not know the state treats it as not ready. Each render now waits for its edition's sound gate and cover check and for every edition's picture gate, geometry check and draft, the packaging of a film for its edition's sound gate and cover check, and every heavy or GPU node for `check`.
+- A node binds each top-level table of the declaration it reads (`declaration.<table>`), not the whole file. Until `key-outputs-by-their-inputs`, a hearing recorded in the declaration still makes the picture gate and both pictures of each edition run again, since the picture gate's own record binds the declaration whole.
+- A node that runs FFmpeg, ffprobe or ExifTool pins each one's version: **after an FFmpeg upgrade every UHD picture of every edition is rendered again**, 190 to 220 s each on the films' lengths, before the films are packaged again.
+- A re-recording of one edition runs the other edition's packaging again (`package-metadata` light, `package-film` and `scan-film` heavy), since the viewing package and the entry page list both editions.
+- `filmkit verify` refuses, beside bytes no declared writer accounts for, a node without a record and one that is stale, behind, waiting or did not pass.
+- **A film that adopts this release** rebuilds with `filmkit check`, `filmkit narrate --edition all` and `filmkit build all` and compares under its own reproduction standard; then it deletes its build chain's task lines and the tasks `film:verify`, `film:deliver` and `film:compare`, keeping `bootstrap`, `check` and `fix`; moves `content/release.json` to `release.json` with `git mv`, its bytes unchanged, and rewrites the two links to it in `README.md` and `CONTRIBUTING.md`; declares `[picture] gate_row_gaps = true` and its film-bound sources in `[release] sources`; changes its gates `film-media` to `filmkit verify --technical-only` and `film-reproduction` to `filmkit verify --release`; adds `film-sources` (`filmkit check --read-only`) to `default` and `full` once its first hosted run passes; and rewrites its tests to import `filmkit.api` and the test entry alone. The loader refuses `content/release.json`, naming the move.
+- A film at 0.22.3, as the three films pin, also takes what 0.23 to 0.33 ask, listed under each release below: 0.23.0 renames `documents_folder` to `delivery_folder`; 0.23.1 narrates every take anew with mlx-audio 0.6.6; 0.24.0 draws on the native canvas; 0.25.0 prepares a review round in one command; 0.26.0 scans each packaged film for still pictures; 0.27.0 asks the register check, with Vale pinned in the film's Mise configuration; 0.28.0 asks a term for each respelled Latin name; 0.29.0 lets the runtime follow the narration, with `credits_duration` once in the declaration; 0.30.0 draws each edition's picture before narration; 0.31.0 places each edition's files by its code and splits the pronunciation by edition; 0.32.0 records every run; 0.33.0 hears English words by their pronunciation, with the CMUdict the supply places.
+- To roll back, a film pins 0.33.0: its records stand, and its build chain is restored from Git.
+
+### Removed
+
+- The production command, the pre-render check and its readiness receipts, the duration records, the adoption command, the media server, and the module commands of the supply, the concept and register checks, the script edits, the convergence, the verifier, the reproduction, the release, the delivery, the review round and the tools: the verbs call their owners. `python -m filmkit.soundtrack.fit` and `python -m filmkit.picture.repair` keep a command until R4 and R3; the narration's own processes and tools, the still scan, the sync audit, the listening plan, the measurement and `filmkit.released` keep theirs.
+- The anchors command's `--timeline` and `--place`, which `filmkit.api.derived_timeline` and `place_anchors` replace.
+
 ## [0.33.0] - 2026-11-24
 
 ### Added
