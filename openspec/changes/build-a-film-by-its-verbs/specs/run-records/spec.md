@@ -40,7 +40,7 @@ A narration of chosen segments or of its checks alone SHALL write, in place of t
 #### Scenario: A change reaches its readers alone
 
 - **WHEN** a hearing is recorded in the declaration's `narration` table after a whole build and `filmkit build all` runs
-- **THEN** `check` and the nodes that read the `narration` table run again and pass, `check-sound` among them, all light, and no render and no package runs, since none reads that table and the gates they wait for pass
+- **THEN** `check` and the nodes that read the `narration` table run again and pass, `check-sound` among them, all light; until `key-outputs-by-their-inputs` retires the picture gate's own binding of the whole declaration, `check-picture` of each edition runs again too, and both pictures of each edition after it
 
 #### Scenario: A refusal stops what follows it
 
@@ -115,7 +115,7 @@ A render of either picture and a package of an edition SHALL wait for that editi
 
 #### Scenario: A gate run again leaves the render fresh
 
-- **WHEN** a hearing is recorded after a whole build, and `check` and `check-sound:zh` run again and pass with changed records
+- **WHEN** `check` and `check-sound:zh` run again after a whole build and pass with records that differ from their last, and no input of `render-picture:zh` or `package-film:zh` changed
 - **THEN** `render-picture:zh` and `package-film:zh` are fresh and do not run
 
 #### Scenario: No draft declared
@@ -160,10 +160,10 @@ A node SHALL state whether it runs once for the film or once for each edition it
 
 A node SHALL bind each top-level table of the film's declaration that its run reads, each by the SHA-256 of its canonical JSON, and no other part of the declaration. When `FILMKIT_OPENS` names a file, the check of what each run opens SHALL also fail a read of a table that the node does not declare.
 
-#### Scenario: A hearing recorded leaves the pictures fresh
+#### Scenario: A hearing recorded reaches the readers of the narration table
 
 - **WHEN** a record of the owner's hearing is added to the declaration's `narration` table after a whole build
-- **THEN** the nodes that read `narration` are stale, and every render and package node stays fresh
+- **THEN** the nodes that declare the `narration` table are stale, no render and no package is stale by a table of the declaration, and until `key-outputs-by-their-inputs` `check-picture` is stale through its owner's binding of the whole declaration
 
 #### Scenario: An undeclared table
 
