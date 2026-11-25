@@ -90,10 +90,6 @@ WORK = Path("build/runtime/work/derivation")
 ENCODER = encoder(FPS)  # the pictures' encoding, at the films' frame rate
 # Seconds a derivation's encode may take.
 DEADLINE = 7200
-NATIVE = (
-    "from its own stage: declare {code} in [picture] native_uncaptioned and run "
-    "filmkit build render-picture-uncaptioned:{code}"
-)
 # The proofs a derivation's receipt records, each with its verdict.
 PROOFS = ("band_audit", "ground_check", "edge_check", "band_scan")
 
@@ -101,6 +97,15 @@ PROOFS = ("band_audit", "ground_check", "edge_check", "band_scan")
 class BandFault(PictureError):
     """The captioned picture's caption band changes for one frame: a fault of that render, which
     no derivation repairs."""
+
+
+def from_its_stage(code: str) -> str:
+    """How an edition's uncaptioned picture is rendered from its own stage instead of derived:
+    the declaration's key and the build that renders it (`filmkit.graph.target`)."""
+    return (
+        f"from its own stage: declare {code} in [picture] native_uncaptioned and run "
+        f"{target('render-picture-uncaptioned', code)}"
+    )
 
 
 def uncaptioned_way(edition: Edition | None = None, *, native: bool = False) -> dict:
@@ -182,7 +187,7 @@ def band_audit(edition: Edition, rows: tuple[int, int], work: Path) -> dict:
             f"The {edition.code} caption band holds more than captions on the ground: {shown} "
             f"({audit.get('escaping_instants', 0)} instants with an escape, "
             f"{audit.get('intruding_instants', 0)} with an intrusion); render the uncaptioned "
-            f"picture with {NATIVE.format(code=edition.code)}"
+            f"picture with {from_its_stage(edition.code)}"
         )
         raise PictureError(msg)
     return audit
@@ -351,7 +356,7 @@ def derive_uncaptioned(edition: Edition, deadline: float = DEADLINE) -> dict:
     work.mkdir(parents=True, exist_ok=True)
     with seam.phase("composition"):
         composition = equivalence.composition_report(edition, work)
-    native = NATIVE.format(code=edition.code)
+    native = from_its_stage(edition.code)
     if composition["differing_instants"] or composition["band"] is None:
         why = (
             "paints no caption"
