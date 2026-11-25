@@ -1,0 +1,129 @@
+## Context
+
+The owner's rules of 25 November 2026 (proposal, Why) reach filmkit late in their rollout. The ETHOS session wrote the common pattern and applied it to DDWG first, in two releases that serve as the worked example [S4]: DDWG 10.1.0 (`run-ci-on-arm-macos`) moved its runners to the one label and retired its Linux and Windows jobs, and DDWG 10.1.1 (`drop-windows-from-the-supply`) removed ETHOS's Windows rows from its pin and the Windows tables from its lock, keeping the Linux ones. Both regenerated their CI files through `ethos lane project` and changed no CI file by hand.
+
+filmkit starts nearer the target than DDWG did. `.config/ci/verification.toml` declares `[github] runners = ["macos-latest"]` (line 14) and a single GitLab runner table, `[gitlab.runners.macos]` (lines 22-25); `.config/ci/runners.toml` names only `mise` and `mkdir` for each forge [S2]. There is no Linux job, container image or registry download to retire. What names Windows, read with `git grep -n -i -w windows 00549d3`, is:
+
+- the ETHOS pin's two rows (`.config/mise/config.toml:93-94`) and the five `platforms.windows-x64` tables of `.config/mise/mise.lock` (lines 40, 71, 100, 134 and 174);
+- in `uv.lock`, 174 Windows wheels and the package `colorama` (line 220), which enters only under `sys_platform == 'win32'` (lines 1018, 1377 and 1424);
+- in `package-lock.json`, the canvas package's two optional builds `@napi-rs/canvas-win32-arm64-msvc` and `-win32-x64-msvc` (lines 241 and 261), each with `"os": ["win32"]`;
+- the template comment at `openspec/config.yaml:9`.
+
+The other matches are the analysis windows of the narration, review and picture measures (`narration/flow.py`, `narration/terms.py:32`, `review/measurement.py`, `picture/slivers.py:38, 56`) and history: a CHANGELOG entry and three archived Changes, which stay as written. No engine code tests for Windows: `sys.platform == "darwin"` at `delivery/folder.py:138` and `delivery/release.py:377` chooses between macOS and other platforms, and the renderer records `platform.system()` (`picture/renderer.py:196`).
+
+The Mise configuration sets no `lockfile_platforms`, so Mise keeps whatever platforms the lock already holds: "When unset, mise keeps the platforms already recorded in the lockfile" [S5]. The lock holds, for each of its five tools, `linux-arm64`, `linux-arm64-musl`, `linux-x64`, `linux-x64-musl`, `macos-arm64` and `windows-x64` (no `windows-arm64` table, though the ETHOS pin lists that archive).
+
+Line references are to the engine at `00549d3` (tag `v0.34.0`), where every site above was read on 2026-11-26; task 1.1 confirms them on the lane's base.
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- One platform, Apple-silicon macOS, on both forges, selected by one label; nothing the repository declares names Windows, and npm's lock keeps the two optional win32 entries that npm writes (decision 8).
+- The two CI files stay one projection of one declaration: the same locked supply, bootstrap, proof command, deadline and kept report on both forges.
+- The whole check and the full proof pass in a checkout with no remote, and ETHOS's status and the proof's readiness report no required gap for an absent peer, shown on scratch clones.
+- A requirement states all three, so that a later change that breaks one fails against a specification, not only against a reader's memory.
+
+**Non-Goals:**
+
+- **Runner registrations.** Adding and dropping tags on filmkit's two GitLab runners is the ETHOS session's, as is unregistering any runner (Migration Plan).
+- **The kit's release tool.** It is the films session's tool, not part of the engine; decision 6 states what it owes and who changes it.
+- **Code paths that serve Linux.** The delivery folder's XDG branch and the release copy's fallback (`delivery/folder.py:138`, `delivery/release.py:377`) serve platforms other than macOS; the design that added them names Windows as not covered [S6]. C-11 removes Windows, not Linux, so they stay; no engine code serves Windows, so none goes [S1, C-11].
+- **npm's optional win32 entries** (decision 8).
+- **The lock format.** Mise suggests `mise lock --upgrade` for the lock's format version 3; DDWG left it to a separate change, and so does this one [S4].
+
+## Decisions
+
+### 1. One label, `macos-latest`, with GitLab's trust tag beside it
+
+- **Rests on:** the owner's answer of 13:54, relayed at 13:55: `macos-latest` on both forges, GitLab adding `review` or `protected` [S1, D-63]. GitHub's hosted runners for ARM64 macOS carry the labels `macos-latest`, `macos-15`, `macos-26` and `xcode-27`, on 3 M1 cores and 7 GB of memory; the Intel images carry only `-intel` labels [S7, read on 2026-11-25].
+- **Options:** (a) the owner's label, the two tag lists edited in `.config/ci/verification.toml` and both files regenerated; (b) the same labels written into `.gitlab-ci.yml` by hand.
+- **Chosen because:** (a). The CI files are projections of the declaration: `ethos lane project --check` refuses a file that differs from it [S12]. A hand edit would fail that check, as DDWG's design noted [S4].
+- **Applies to:** `[gitlab.runners.macos]` `review_tags = ["macos-latest", "review"]` and `protected_tags = ["macos-latest", "protected"]`, with a comment that names the owner's decision of 2026-11-25, as DDWG's declaration carries. `[github] runners` stays `["macos-latest"]`; its job keeps the name `verify (macos-latest)`. The regenerated `.github/workflows/ci.yml` is expected byte-identical; a difference there is a finding for the ETHOS session, not a change to accept.
+
+### 2. Windows leaves the Mise supply through `lockfile_platforms`
+
+- **Rests on:** the owner approved at 10:39 a recommendation that carried "ARM macOS only" by the supply lock, `lockfile_platforms = ["macos-arm64"]`, to be tested first by the ETHOS session [S1, D-63]. That session's answer of about 15:08, relayed at 15:09 and common to every governed repository, replaced that reading: take out only the `windows-*` rows of the pin and the `windows-*` tables of the lock, and keep the Linux ones, since the lock also serves contributors' local installs and the 13:45 words remove Windows, not Linux [S1, C-11 at 15:09; S3]. DDWG 10.1.1 applies it [S4]. Mise writes the platforms `lockfile_platforms` names, plus the current one, and accepts qualified names such as `linux-x64-musl` [S5].
+- **Assumption:** the 15:09 answer states what the owner wants. If he meant ARM macOS only in the lock too, `lockfile_platforms` becomes `["macos-arm64"]` and one more `mise lock` drops the Linux tables; nothing else in this Change moves.
+- **Options:** (a) delete the Windows tables from the lock by hand; (b) DDWG's list, `["linux-arm64", "linux-x64", "macos-arm64"]`; (c) every platform the lock holds besides Windows.
+- **Chosen because:** (c). (a) edits a generated file, and the next `mise lock` keeps the platforms recorded in it, so the declaration would still say nothing [S5]. (b) is right for DDWG, whose only locked tool is ETHOS's `http:` archive with no musl table [S4], but in filmkit it would also drop the ten musl tables of Node, Python, uv, Vale and ETHOS: more than Windows, which the 15:09 answer rules out. (c) declares what the lock holds, so `mise lock` removes exactly the five `windows-x64` tables and leaves every other byte; task 2.1 reads the diff to show it.
+- **Applies to:** `.config/mise/config.toml`: the two rows `windows-arm64` and `windows-x64` under `[tools."http:ethos".platforms]` deleted; `[settings]` gains `lockfile_platforms` listing the lock's other platforms (`linux-arm64`, `linux-arm64-musl`, `linux-x64`, `linux-x64-musl`, `macos-arm64`) with one comment line that names the 15:09 answer. `.config/mise/mise.lock` regenerated by `mise lock`. `openspec/config.yaml` loses the four commented lines of the template's `context` example (lines 7-10), the only text in it that names a platform; its heading comment stays. The specification states only that no Windows table remains and every other stays; the list is the configuration's.
+
+### 3. filmkit is macOS-only, and no Linux job is added
+
+- **Rests on:** the owner's 13:45 words, 「部分项目仅支持 MacOS，则只跑 arm 版 MacOS」, and Linux only 「如需」 [S1, C-11]. The engine builds only on Apple silicon: `AGENTS.md` says a film's build needs it; the README says the speech models run on MLX; the renderer loads `@napi-rs/canvas-darwin-arm64` (`picture/renderer.py:63`); the checks' browser is `chrome-headless-shell-mac-arm64` (`picture/browser.py:20`); the sample film's specification builds it "on Apple-silicon macOS".
+- **Options:** (a) ARM macOS alone; (b) add an ARM Linux job for the portable proof, which hides FFmpeg and needs no model or browser.
+- **Chosen because:** (a). A Linux job would prove that the portable suite passes on a platform where the engine cannot build a film, which no film or contributor uses; it would cost a hosted run for each push and an image to maintain on GitLab, the very things DDWG 10.1.0 retired [S4].
+- **Applies to:** both forges, every ref. The lock's Linux tables stay by decision 2.
+
+### 4. One declaration, projected to each forge
+
+- **Rests on:** the owner's 13:47 words, 「多远端情况下，重合的部分应该是镜像关系，追求对称性和可复用性」 [S1, C-11]. ETHOS compiles each forge's CI from one gate declaration through `.config/ci/pipeline.cue`, "each Forge's CI is a projection of the same gates" [S12].
+- **Options:** (a) keep the projection and state in the specification the part both forges share; (b) write each forge's file to its own pattern.
+- **Chosen because:** (a). Both forges' jobs install the locked supply, run `mise run bootstrap` (`[supply.checks]` names it once for each forge), prepare `build/evidence/ci`, run `mise exec --locked -- ethos prove --host --execute --full --json` and keep its report for 14 days, under one deadline of 45 minutes [S2]. Everything else is each forge's projection of the same declaration: its triggers (`pull_request` and `workflow_dispatch` on GitHub; workflow rules with `ETHOS_OFFLINE_CANDIDATE` and merge requests on GitLab), its checkout (`actions/checkout` with `fetch-depth: 0`, or `GIT_DEPTH: "0"`), its Mise setup (`jdx/mise-action`, or the runner's Mise with its directories set to the job's checkout), `permissions` and `interruptible`, the way it keeps an artifact, and GitLab's split of a review job from a protected job by trust. The specification states the shared part, so that a drift between forges in it is a defect against it.
+- **Applies to:** the requirement "Both forges run one check from one declaration".
+
+### 5. Local first: no gate contacts a remote
+
+- **Rests on:** the owner's 13:47 words, 「仅 local, local + 单远端，local + 双远端，都成立；即本地优先，各远端独立，该基本原则不可动摇」 [S1, C-11]. ETHOS at 0.2.0-beta.11, the release filmkit pins, declares zero or more peers, treats a publication with none as valid, observes and updates each declared peer by itself, and keeps a missing remote or a failed probe advisory for local readiness [S9]. Its paradigm report judges each declared peer's remote name, not whether the remote exists (`_peer_remote_gaps` in `repository/paradigm/report.py`) [S9]. filmkit's `.ethos/release.toml` declares two peers, `gitlab` and `github`, by those Git remote names. Every gate of `system/gates.toml` declares `network_policy = "offline"`, and filmkit declares no `commit-ranges` gate, the ETHOS gate that reads `refs/remotes/<peer>/<branch>` and refuses a configured peer without a tip (`adapters/gates/commit_ranges.py`) [S9]. No file below `src/`, `tests/`, `system/` or `.config/` runs `git remote`, `ls-remote` or `fetch` (read with `git grep` at `00549d3`). The bootstrap reaches the package registries, which are not Git remotes.
+- **Reasoning:** no gate of the repository's proof sets contacts a remote, so a clone with no remote is the strictest test of the check and the proof. That ETHOS's status and the proof's readiness behave the same with one remote as with two rests on ETHOS's source above and its specification [S9], not on a run; I judge it likely, and task 4.1 shows it.
+- **Options for showing it:** (a) the whole check and the full proof in each of three scratch clones (no remote, `gitlab` only, `github` only): six host tickets, about 29 minutes of the host's slot by the last measured times (whole check about 400 s, proof 173 to 182 s, 18 and 19 November [S10]); (b) the whole check and the full proof once, in the clone with no remote, and in all three clones ETHOS's status and the proof's readiness tier, which ran ten gates in 55 s at 1.3 cores on 19 November [S10] and needs no ticket.
+- **Chosen because:** (b). The canonical checkout, which has both remotes, proves every release, so the case of both needs no clone. (b) costs two tickets instead of six. The requirement states what (b) shows: the full check and proof with no remote, and no required gap of status or readiness for an absent peer.
+- **Applies to:** tasks 4.1 and 4.2, and the requirement "The engine is checked and proved whatever remotes a checkout has". If ETHOS refuses in a clone for a reason unrelated to remotes (for example hooks not installed), the task stays open and the refusal goes to the ETHOS session; it is not worked around.
+
+### 6. What the kit's release tool owes
+
+The kit's release tool, in the canonical checkout's `build/runtime/work/kit/tools/fkrel/` with `tools/pubrefb10.sh`, publishes filmkit's releases; it is the films session's, outside the engine and outside this Change [S11]. Read on 2026-11-25, it assumes both remotes, named `github` and `gitlab`, in every step that leaves the host:
+
+- `slug()` reads `git remote get-url github` (`fkrel.sh:34`); `runs_at()` reads GitHub's runs and GitLab's pipelines at a commit (`fkrel.sh:38`), and `wait_runs()` waits for both by default (`WAIT_FORGES`, `fkrel.sh:49`). With GitHub absent, its wait finds no completed run, polls for 45 minutes and fails.
+- `proposal` and `publish` read each ref back from both remotes (`fkrel.sh:195`, `213`); `pubrefb10.sh:11` counts a ref published only when both hold it.
+- `tag` creates and reads back a Release page on both forges (`fkrel.sh:242-244`); `tag-runs` and `drain` read GitLab alone.
+- `pipelines` holds a host ticket for each GitLab pipeline (`fkrel.sh:76`, `90`), which host rule 6 asks only of pipelines on this host's guests.
+- `verify-release.sh` reads both remotes, both Release pages and both forges' runs (lines 7, 11, 14).
+
+What it owes, so that a release works with no remote, one or both: take the set of forges once, from the peers that `.ethos/release.toml` declares and the checkout has as remotes (or from the peers that `ethos publish --json` reports in `remote_observations`), and run each forge's steps only for a forge in that set. With no peer, a release ends at the signed local tag that `ethos land --release` cuts, which ETHOS admits as a release with no forge [S9]; with GitLab absent, no guest ticket is queued; with GitHub absent, no hosted run is waited for. The steps are ETHOS-shaped and the same for every governed repository, so their lasting home is ETHOS's publication surface, which the shared rules ask to sink common work into; that move is not this Change's. Owner: the films session. Next action: derive the forge set in `fkrel.sh`, `pubrefb10.sh` and `verify-release.sh` before the first release made from a checkout without both remotes. Review: at the release that carries this Change.
+
+### 7. Edition
+
+- **Rests on:** filmkit's Semantic Versioning (`CONTRIBUTING.md`, Release); DDWG cut 10.1.0 for its CI contract and 10.1.1 for its supply [S4].
+- **Chosen because:** nothing a film declares, runs or receives changes, and the engine never built on Windows: a patch, 0.34.1, if it lands alone. CHANGELOG: under `Changed`, the runner labels and the statement of where the engine is checked; under `Removed`, ETHOS's Windows archives from the Mise pin and lock, and, through `[tool.uv] environments = ["sys_platform != 'win32'"]`, the 174 Windows wheels and `colorama` from uv's lock.
+
+### 8. The resolver locks: uv narrows by its own setting, npm stays as npm writes it
+
+- **Rests on:** the ETHOS session's measurements on scratch copies of filmkit, relayed and run by that session, not by the films session [S8]. On 2026-11-26 at about 02:44: with `[tool.uv] environments = ["sys_platform != 'win32'"]` in `pyproject.toml`, `uv lock --offline` (uv 0.13.10) removed only the 174 Windows wheels and `colorama` 0.4.6, and moved no version; `httpx2-jsfetch` stays, since it enters under `sys_platform == 'emscripten'` (`uv.lock:463`), not Windows. This is uv's documented "limited resolution environments" (`required-environments` is the opposite, forcing wheels to exist). On 2026-11-25 at about 20:48: npm 12.2.3 records every platform's optional packages in the lock and selects at install time; `--package-lock-only --os=darwin --cpu=arm64` left the two `@napi-rs/canvas-win32-*` entries in, also on a fresh lock, and a fresh lock moved `typed-query-selector` from 2.12.3 to 2.12.4.
+- **Options:** (a) both locks as the tools write them; (b) uv narrowed by `environments = ["sys_platform != 'win32'"]`, npm as written; (c) uv narrowed to darwin and linux, npm as written; (d) both narrowed, npm by hand or by regeneration.
+- **Chosen because:** (b). It removes exactly Windows, which is what the 13:45 words remove. (c) also drops emscripten and every other platform and may rewrite the `sys_platform != 'emscripten'` markers of `anyio`, `httpcore2` and `truststore` (`uv.lock:461-465`): a support set larger than the owner's words. npm has no setting that leaves an optional platform package out of its lock; editing the lock by hand is what decision 2 refuses for Mise, and a regenerated lock moves an unrelated package, so (d) is refused. The two npm entries are inert on macOS: npm installs only the package whose `os` and `cpu` match.
+- **Applies to:** `pyproject.toml` `[tool.uv]` gains `environments = ["sys_platform != 'win32'"]` with one comment line; `uv.lock` regenerated by the pinned uv, `mise exec -- uv lock --python 3.12 --offline` (uv 0.13.9 in Mise, where the ETHOS session measured 0.13.10), and accepted only as task 2.3 states; `package-lock.json` unchanged, the reason in the evidence's `research.md`.
+
+## Risks / Trade-offs
+
+- [GitHub moves `macos-latest` to a newer macOS when it decides] → each job's log names its image; the guest runs macOS 27 while GitHub's newest hosted macOS label is `macos-26` [S4, S7], so the forges may differ by a macOS version, and a fault that only one version shows appears on one forge first.
+- [A job is pushed before its runner carries the new tags, and waits for ever] → the ETHOS session adds the tags before the proposal push and keeps the old ones until `main` is published (Migration Plan); the films session tells it before the push and reads the runners' tags through it.
+- [`mise lock` or `uv lock` changes more than Windows] → tasks 2.1 and 2.3 accept only a diff that removes Windows; any other change stops the task and goes to the ETHOS session, as DDWG's trial did [S3].
+- [The pinned uv writes another lock than the ETHOS session's 0.13.10] → task 2.3 runs the pinned uv and judges its own diff.
+- [A contributor on Windows can no longer install the locked ETHOS from this repository] → the owner chose it; the engine never built there.
+- [One platform hides faults of others] → the engine supports no other.
+
+## Migration Plan
+
+1. Before the proposal is pushed, the films session tells the ETHOS session, which adds `macos-latest` and `review` to filmkit's review runner and `macos-latest` and `protected` to its protected runner and keeps the old tags. Both runners are locked to filmkit alone (read by the ETHOS session, relayed [S3]).
+2. The Change is built in its lane, proved, landed and published as `ethos status` directs. Each push that starts a GitLab pipeline on this host's guests, the proposal's first, runs with the wait for that pipeline as the child of one host ticket, held until its last guest job ends (host rule 6), as the kit's `pipelines` step does; when no pipeline exists ten minutes after the push, the ticket is released and the keeper told. GitHub's hosted run is read outside any ticket. The proposal's pipelines run on the new tags (task 5.1 reads them).
+3. GitHub: no required check names the job, so nothing changes there; the ETHOS session confirmed at about 15:08 that it knows of no organization ruleset beyond the two the films session read [S3].
+4. After `main` is published, the films session tells the ETHOS session again, which drops `ci-macos-arm64-review` and `ci-macos-arm64-shell`.
+
+To roll back, the CI declaration's old tags return while the runners still carry them, the pin's rows and the Mise lock's tables return with `lockfile_platforms` removed and `mise lock` run again, and `environments` leaves `[tool.uv]` with `uv lock` run again.
+
+## Sources
+
+- **[S1]** `build/evidence/owner-words.md` in the engine's canonical checkout, read on 2026-11-25 at about 20:20 and again on 2026-11-26: D-63 (10:39, its recommendation, and the label of 13:54) and C-11 (the owner's words of 13:45 and 13:47, relayed, and the ETHOS session's answers added at 14:59, 15:06 and 15:09).
+- **[S2]** The engine at `00549d3` (tag `v0.34.0`), read on 2026-11-26: `.config/ci/verification.toml`, `.config/ci/runners.toml`, `.github/workflows/ci.yml`, `.gitlab-ci.yml`, `.config/mise/config.toml`, `.config/mise/mise.lock`, `pyproject.toml`, `uv.lock`, `package-lock.json`, `.ethos/release.toml`, `system/gates.toml`, `openspec/config.yaml`.
+- **[S3]** `build/runtime/work/ci-windows-inventory.md` beside the drafts, written on 2026-11-25 from 14:12: the Windows inventory, GitHub's branch protection and rulesets read through the API at about 14:50, and the ETHOS session's messages of 14:57, about 15:06, about 15:08, 16:18 and about 18:09 (relayed; their readings were not run by the films session).
+- **[S4]** DDWG at `v10.1.0` and `v10.1.1`, read on 2026-11-25: commits `3a1c5618` and `9295d349` and the archived Changes `2026-11-25-run-ci-on-arm-macos` and `2026-11-25-drop-windows-from-the-supply` (proposal, design, tasks, deltas).
+- **[S5]** Mise's documentation, read on 2026-11-25: <https://mise.jdx.dev/configuration/settings.html> (`lockfile_platforms`) and <https://mise.jdx.dev/dev-tools/mise-lock.html> ("Without --platform, mise lock uses lockfile_platforms plus the current platform when that setting is set").
+- **[S6]** The archived Change `2026-11-17-deliver-to-the-videos-folder`, `design.md` decision 1.
+- **[S7]** GitHub's documentation, "GitHub-hosted runners reference", <https://docs.github.com/en/actions/reference/runners/github-hosted-runners>, read on 2026-11-25: the table of standard runners.
+- **[S8]** The ETHOS session's messages to the films session of 2026-11-25 at about 20:48 and 2026-11-26 at about 02:44 (relayed; their measurements were run on scratch copies of filmkit by that session, not by the films session), and uv's documentation, concepts/resolution, "Limited resolution environments", as that session cited it.
+- **[S9]** ETHOS at `v0.2.0-beta.11`: `openspec/specs/repository-governance/spec.md`, requirements "Declared publication peer topology" and "Publish Falls Back To Local CI When Remote Is Unavailable"; `openspec/specs/distribution/spec.md`, scenario "Local-only release is admitted"; `src/ethos/repository/paradigm/report.py` (`_peer_remote_gaps`); `src/ethos/adapters/gates/commit_ranges.py`.
+- **[S10]** The kit's `tools/fkrel/fkrel.sh` (steps `host-gates` and `prove`) and `tools/fkrel/release.sh` (header), the films session's measurements of 18 and 19 November 2026 as their comments record them.
+- **[S11]** The kit's `tools/fkrel/fkrel.sh`, `tools/fkrel/verify-release.sh` and `tools/pubrefb10.sh`, read on 2026-11-25.
+- **[S12]** ETHOS at `v0.2.0-beta.11`: `docs/reference/ci-operations.md` ("Native CI Projection") and `docs/architecture/gate-runner.md`.
