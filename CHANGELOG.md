@@ -4,6 +4,15 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+
+- CI runs on Apple-silicon macOS alone and selects its runners by one label on both forges, as the owner decided on 25 November 2026: GitHub's job stays on its hosted runner `macos-latest`, and GitLab's review and protected jobs select runners tagged `macos-latest` with `review` or `protected`, where they selected `ci-macos-arm64-review` and `ci-macos-arm64-shell`. Both CI files are generated from `.config/ci/`, and GitHub's comes out unchanged. The new capability `engine-verification` states where the engine is checked: on Apple-silicon macOS alone, by one check projected to each forge from one declaration, and with the same check and proof in a checkout with no remote, with one or with both.
+
+### Removed
+
+- ETHOS's Windows archives from the Mise supply: the pin's `windows-arm64` and `windows-x64` rows, and the five `windows-x64` tables of the lock, which `mise lock` removed once the configuration declared `lockfile_platforms` as every other platform the lock held. Its Linux tables stay.
+- Windows from uv's lock, through `[tool.uv] environments = ["sys_platform != 'win32'"]`: its 174 Windows wheels, and `colorama`, which only Windows needs. The engine's record of what it was released on loses `colorama` with it, so `filmkit check` no longer compares a film's `colorama`. npm's lock keeps the canvas's two optional win32 builds, which npm installs only on Windows.
+
 ## [0.34.0] - 2026-11-25
 
 ### Added
