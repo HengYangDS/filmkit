@@ -3,7 +3,7 @@ min_version = "2026.10.14"
 [settings]
 locked = true
 minimum_release_age = "24h"
-# The lock's platforms but Windows (owner, 2026-11-25); Linux stays by the ETHOS session at 15:09.
+# Apple-silicon macOS (owner, 2026-11-25) and the lock's Linux ones (the ETHOS session, 15:09).
 lockfile_platforms = ["linux-arm64", "linux-arm64-musl", "linux-x64", "linux-x64-musl", "macos-arm64"]
 
 # npm reads this repository's own configuration, which holds npm's release age. npm treats
