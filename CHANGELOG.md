@@ -4,6 +4,10 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+
+- The hosted GitHub job installs Mise 2026.11.14, Mise's latest stable release, instead of 2026.11.11, as the owner decided on 26 November 2026; the CI declaration's `[supply] mise_version` names it. The Mise configuration's `min_version` stays at 2026.10.14, and the Mise lock does not change.
+
 ## [0.34.1] - 2026-11-26
 
 ### Added
