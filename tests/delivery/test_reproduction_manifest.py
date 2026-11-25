@@ -7,6 +7,7 @@ import json
 import pytest
 from reproducing import RECORDED
 
+import filmkit.child_processes as child_processes
 import filmkit.delivery.packaging as packaging
 import filmkit.delivery.reproduction as reproduction
 import filmkit.picture.rendering as picture_rendering
@@ -183,3 +184,10 @@ def test_a_record_of_a_film_of_three_editions_names_the_edition_it_misses(releas
     with pytest.raises(ReproductionError) as refusal:
         reproduction.load()
     assert "records the editions ['en', 'zh']: no record of the xb edition" in str(refusal.value)
+
+
+def test_a_comparison_where_no_ffmpeg_runs_names_it_as_a_missing_tool(monkeypatch):
+    monkeypatch.setattr(reproduction.seam, "encoder", lambda tool: reproduction.seam.ABSENT)
+    with pytest.raises(child_processes.MissingToolError) as missing:
+        reproduction.running_ffmpeg()
+    assert str(missing.value) == str(child_processes.absent("ffmpeg"))

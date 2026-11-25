@@ -240,7 +240,7 @@ def test_the_readback_refuses_an_entry_beside_the_members(film):
 
 def test_an_rsync_other_than_rsync_3_is_a_missing_tool(film, monkeypatch):
     monkeypatch.setattr(delivery_folder, "rsync_version", lambda: "openrsync 2.6.9")
-    with pytest.raises(child_processes.MissingToolError, match="rsync 3 is required"):
+    with pytest.raises(child_processes.MissingToolError, match=r"rsync 3 .*\(brew install rsync\)"):
         delivery_folder.deliver(*film)
     assert not film.destination.exists()
 

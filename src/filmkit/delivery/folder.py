@@ -450,7 +450,8 @@ def deliver(root: Path, destination: Path, *, dry_run: bool = False, rule: str =
         raise DeliveryRefusedError(str(error)) from error
     version = rsync_version()
     if not version.startswith(RSYNC_3):
-        msg = f"rsync 3 is required to deliver, as Homebrew installs it; PATH holds {version}"
+        install = child_processes.HOST_TOOLS["rsync"].install
+        msg = f"rsync 3 is required to deliver ({install}); PATH holds {version}"
         raise child_processes.MissingToolError(msg)
     paths = [path for _, path in members]
     for place, text in (

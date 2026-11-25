@@ -243,8 +243,7 @@ def running_ffmpeg() -> str:
     """The first line of the running FFmpeg's `ffmpeg -version`; a missing tool where none runs."""
     version = seam.encoder("FFmpeg")
     if version == seam.ABSENT:
-        msg = "FFmpeg cannot be run here: install it as Homebrew does (brew install ffmpeg)"
-        raise child_processes.MissingToolError(msg)
+        raise child_processes.absent("ffmpeg")
     return version
 
 
