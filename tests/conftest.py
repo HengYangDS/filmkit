@@ -7,6 +7,7 @@ in one process (FILMKIT_NARRATION_PROCESSES).
 """
 
 import hashlib
+import ipaddress
 import json
 import os
 import shutil
@@ -148,10 +149,12 @@ host_skipped: dict[str, list[str]] = {marker: [] for marker in HOST_TOOLS}
 
 
 # The only step of the engine that reaches the network is a film's supply (`filmkit supply`),
-# which every test stubs; any other test that connects beyond this host is refused, in this
-# process, rather than reaching it. A test's child processes are the engine's own commands, none
-# of which connects.
+# which every test stubs. In the test process a connection to, and a lookup of, a host other than
+# this one is refused rather than made, so that a download a stub misses fails. A test's child
+# processes, the engine's own commands, the Node tools and `node --test`, are not guarded; none
+# of them connects.
 LOCAL = ("127.0.0.1", "::1", "localhost")
+REFUSED = "the test process reaches no network"
 
 
 def local(address) -> bool:
@@ -162,18 +165,40 @@ def local(address) -> bool:
 def refused_beyond_this_host(connect):
     def guarded(self, address, *rest):
         if not local(address):
-            message = f"the engine's tests reach no network: a connection to {address}"
-            raise ConnectionRefusedError(message)
+            raise ConnectionRefusedError(f"{REFUSED}: a connection to {address}")
         return connect(self, address, *rest)
 
     return guarded
 
 
+def numeric(host) -> bool:
+    """Whether a host is an address, which a lookup resolves with no query."""
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return True
+
+
+def looked_up_on_this_host(lookup):
+    """A lookup that refuses another host's name; an address is resolved as it is, and its
+    connection refused (`refused_beyond_this_host`)."""
+
+    def guarded(host, *rest, **options):
+        if isinstance(host, str) and host not in LOCAL and not numeric(host):
+            raise socket.gaierror(socket.EAI_NONAME, f"{REFUSED}: a lookup of {host}")
+        return lookup(host, *rest, **options)
+
+    return guarded
+
+
 def pytest_configure(config) -> None:
-    """Register the markers of the tests that run a host tool, and refuse every connection
-    beyond this host (`refused_beyond_this_host`)."""
+    """Register the markers of the tests that run a host tool, and refuse, in the test process,
+    every connection to and lookup of a host other than this one (`refused_beyond_this_host`,
+    `looked_up_on_this_host`)."""
     socket.socket.connect = refused_beyond_this_host(socket.socket.connect)
     socket.socket.connect_ex = refused_beyond_this_host(socket.socket.connect_ex)
+    socket.getaddrinfo = looked_up_on_this_host(socket.getaddrinfo)
     for marker, tool in HOST_TOOLS.items():
         config.addinivalue_line("markers", f"{marker}: runs {tool.runs}")
     config.addinivalue_line(

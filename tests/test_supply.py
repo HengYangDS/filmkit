@@ -149,8 +149,13 @@ def test_a_download_that_fails_is_refused_in_one_line_that_names_the_file(root, 
     assert not list((folder / cmudict.PLACE).parent.iterdir())
 
 
-def test_no_test_reaches_the_network():
-    # The suite refuses a connection beyond this host (`conftest.refused_beyond_this_host`), so a
-    # download that a stub does not catch fails rather than reaching the network.
-    with pytest.raises(ConnectionRefusedError, match="the engine's tests reach no network"):
+def test_the_test_process_neither_connects_to_nor_looks_up_another_host():
+    # The suite refuses, in its own process, a connection to an address beyond this host and a
+    # lookup of another host's name (`conftest`), so a download that a stub does not catch fails
+    # before any packet leaves. Child processes are not guarded; the engine's start none that
+    # connects.
+    with pytest.raises(ConnectionRefusedError, match="the test process reaches no network"):
         socket.create_connection(("192.0.2.1", 443), timeout=1)
+    with pytest.raises(socket.gaierror, match="the test process reaches no network"):
+        socket.create_connection(("example.invalid", 443), timeout=1)
+    assert socket.getaddrinfo("localhost", 443)
