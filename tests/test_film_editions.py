@@ -55,6 +55,7 @@ def test_a_film_of_one_edition_loads(declared):
         "clarity_minimum_db = { zh = 18.0, en = 16.0 }",
         "clarity_minimum_db = { en = 16.0 }",
     )
+    rewrite(declared, 'native_uncaptioned = ["zh"]\n', "")
     # Its entry page links its one edition alone.
     page = declared / film.FILM.entry
     lines = page.read_text(encoding="utf-8").splitlines(keepends=True)

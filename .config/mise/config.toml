@@ -41,96 +41,36 @@ run = [
   "uv run --python 3.12 --frozen --offline python -m filmkit.released",
 ]
 
-# The sample film's pipeline, run in its folder, where the engine finds the film; its npm packages
-# are this repository's. Only sample:supply reaches the network; HF_ENDPOINT names a Hugging Face
-# mirror where the hub is unreachable. sample:build runs every stage in order, and `filmkit plan`
-# prints what each node took.
+# The sample film's build by the engine's verbs, run in its folder, where the engine finds the film;
+# its npm packages are this repository's. Only sample:supply reaches the network; HF_ENDPOINT names
+# a Hugging Face mirror where the hub is unreachable. sample:narrate is GPU work, and sample:build
+# runs `filmkit build all`, which names the light build to run first, outside any ticket, and then
+# each heavy invocation, each the child of its host ticket; `filmkit plan` prints what each node
+# took.
 [tasks."sample:supply"]
 description = "Install the pinned browser build, CMUdict and speech models below the sample film's tool cache"
 dir = "{{config_root}}/examples/sample-film"
-run = "uv run --python 3.12 --frozen --offline python -m filmkit.supply"
+run = "uv run --python 3.12 --frozen --offline filmkit supply"
+
+[tasks."sample:check"]
+description = "Ask every question of the sample film's sources at once, the source check's run"
+dir = "{{config_root}}/examples/sample-film"
+run = "uv run --python 3.12 --frozen --offline filmkit check"
 
 [tasks."sample:narrate"]
-description = "Narrate both editions of the sample film from their casts' seeds, then align and transcribe them"
+description = "Narrate both editions of the sample film until every thought holds an accepted take"
 dir = "{{config_root}}/examples/sample-film"
-run = [
-  "uv run --python 3.12 --frozen --offline python -m filmkit.narration.narrate --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.narration.narrate --language en",
-]
-
-[tasks."sample:sound"]
-description = "Select each sample edition's recordings, assemble its soundtrack, write its captions and pass the sound gate"
-dir = "{{config_root}}/examples/sample-film"
-run = [
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce select --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce assemble --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce refresh-captions --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce check-sound --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce select --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce assemble --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce refresh-captions --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce check-sound --language en",
-]
-
-[tasks."sample:picture"]
-description = "Stage both of each sample edition's pictures, check the geometry, the cover and the audits, render and scan its draft and pass the pre-render check; render each captioned picture and validate it; render the Chinese captioned stage a second time and require the same frames, render its uncaptioned picture natively and compare the pair at every frame; derive the English uncaptioned picture and compare the pair by the derivation's record; and check that both readiness receipts still admit their editions"
-dir = "{{config_root}}/examples/sample-film"
-run = [
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language zh --uncaptioned",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.tools geometry-check build/runtime/work/final-delivery-zh-uhd build/evidence/editions/zh/picture-geometry.json 2",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.tools player-check cover build/runtime/work/final-delivery-zh-uhd assets/cover/sample-reel-cover-zh.png build/runtime/work/cover-zh.png",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce check-picture --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-draft --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce preflight --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce stage-picture --language en --uncaptioned",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.tools geometry-check build/runtime/work/final-delivery-en-uhd build/evidence/editions/en/picture-geometry.json 2",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.tools player-check cover build/runtime/work/final-delivery-en-uhd assets/cover/sample-reel-cover-en.png build/runtime/work/cover-en.png",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce check-picture --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-draft --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce preflight --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce qualify-renderer --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language zh --uncaptioned --native",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language zh --uncaptioned",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce compare-pictures --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce render-picture --language en --uncaptioned",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce validate-picture --language en --uncaptioned",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce compare-pictures --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce admitted --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce admitted --language en",
-]
-
-[tasks."sample:package"]
-description = "Package each sample edition's viewing members and its four films, and scan its 1080p captioned film for still pictures under speech"
-dir = "{{config_root}}/examples/sample-film"
-run = [
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce package-metadata --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce package-film --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce scan-film --language zh",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce package-metadata --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce package-film --language en",
-  "uv run --python 3.12 --frozen --offline python -m filmkit.produce scan-film --language en",
-]
-
-[tasks."sample:verify"]
-description = "Verify both sample editions' films and every input they bind; a rebuild carries no review"
-dir = "{{config_root}}/examples/sample-film"
-run = "uv run --python 3.12 --frozen --offline python -m filmkit.delivery.verification --technical-only --language all"
+run = "uv run --python 3.12 --frozen --offline filmkit narrate --edition all"
 
 [tasks."sample:build"]
-description = "Build and verify both sample editions from their sources and the supplied inputs"
-run = [
-  { task = "sample:narrate" },
-  { task = "sample:sound" },
-  { task = "sample:picture" },
-  { task = "sample:package" },
-  { task = "sample:verify" },
-]
+description = "Build both sample editions from their narration, as the run records ask"
+dir = "{{config_root}}/examples/sample-film"
+run = "uv run --python 3.12 --frozen --offline filmkit build all"
+
+[tasks."sample:verify"]
+description = "Verify the sample's run records and both editions' films; a rebuild carries no review"
+dir = "{{config_root}}/examples/sample-film"
+run = "uv run --python 3.12 --frozen --offline filmkit verify --technical-only"
 
 # The ETHOS gates resolve these only from this lock, never from PATH: Node for the picture checks,
 # Python and uv for the suite. Python stays on the 3.12 line that the films select. Vale applies

@@ -191,18 +191,16 @@ def test_a_film_makes_drafts_only_when_it_declares_them(declared):
 
 
 def test_the_geometry_s_row_gaps_and_the_native_uncaptioned_editions_are_declared(declared):
+    # The sample renders its Chinese uncaptioned picture natively and keeps the row gaps' default.
     loaded = film.load(declared).picture
-    assert (loaded.gate_row_gaps, loaded.native_uncaptioned) == (False, ())
-    rewrite(
-        declared,
-        "drafts = true\n",
-        'drafts = true\ngate_row_gaps = true\nnative_uncaptioned = ["zh"]\n',
-    )
+    assert (loaded.gate_row_gaps, loaded.native_uncaptioned) == (False, ("zh",))
+    rewrite(declared, 'native_uncaptioned = ["zh"]\n', "")
+    rewrite(declared, "drafts = true\n", "drafts = true\ngate_row_gaps = true\n")
     loaded = film.load(declared).picture
-    assert (loaded.gate_row_gaps, loaded.native_uncaptioned) == (True, ("zh",))
+    assert (loaded.gate_row_gaps, loaded.native_uncaptioned) == (True, ())
 
 
 def test_a_native_uncaptioned_edition_the_film_does_not_declare_is_refused(declared):
-    rewrite(declared, "drafts = true\n", 'drafts = true\nnative_uncaptioned = ["fr"]\n')
+    rewrite(declared, 'native_uncaptioned = ["zh"]', 'native_uncaptioned = ["fr"]')
     with pytest.raises(film.FilmError, match="picture.native_uncaptioned"):
         film.load(declared)

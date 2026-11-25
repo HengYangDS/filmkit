@@ -41,6 +41,8 @@ drafts = true
 # uncaptioned picture is made, and `software` is the one under which it is derived from the
 # captioned picture, as the films this engine builds make theirs.
 capture = "software"
+# The Chinese uncaptioned picture is rendered from its own stage; the English one is derived.
+native_uncaptioned = ["zh"]
 fonts = [
   "assets/fonts/noto-sans-cjk-sc-subset-regular.otf",
   "assets/fonts/noto-sans-cjk-sc-subset-bold.otf",

@@ -23,16 +23,17 @@ def declaring(monkeypatch, capture: str) -> None:
     monkeypatch.setattr(picture_rendering, "FILM", FILM.model_copy(update={"picture": picture}))
 
 
-def declared_native(film, code: str):
-    """The film with the edition's uncaptioned picture declared native."""
-    picture = film.picture.model_copy(update={"native_uncaptioned": (code,)})
+def declared_native(film, *codes: str):
+    """The film with the editions' uncaptioned pictures declared native, and no other."""
+    picture = film.picture.model_copy(update={"native_uncaptioned": codes})
     return film.model_copy(update={"picture": picture})
 
 
 @pytest.fixture
 def edition(film_root, monkeypatch):
     """The Chinese edition staged and checked, with media checks that pass and derivations
-    recorded instead of encoded."""
+    recorded instead of encoded, of a film that declares no uncaptioned picture native."""
+    monkeypatch.setattr(bindings, "FILM", declared_native(bindings.FILM))
     edition = Edition("zh")
     film_root.staged(edition)
     monkeypatch.setattr(media, "probe", lambda path: {})
