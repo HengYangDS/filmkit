@@ -1,3 +1,5 @@
+Delivered in part by `build-a-film-by-its-verbs`, whose design decisions 4 to 7 give the waits, the light work first, `filmkit check` and the plan's readiness in place of `preflight`; this draft's first gap, a gate that passes while it records findings nobody disposed of, stays open for R3.
+
 ## Context
 
 What the engine holds today, read in 0.22.3 on 15 November 2026:
