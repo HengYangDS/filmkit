@@ -297,22 +297,14 @@ def test_a_film_of_schema_version_1_is_not_checked(film):
     assert not (root / readings.plan_path("zh")).exists()
 
 
-def test_the_cli_refuses_with_every_edition_failure(film, capsys):
-    _root, edit = film
-    readings.main(["--language", "zh"])
-    assert json.loads(capsys.readouterr().out)[0]["edition"] == "zh"
-
-    def drop_a_word(pronunciation):
-        pronunciation["languages"]["Chinese"]["targets"] = [
-            target
-            for target in pronunciation["languages"]["Chinese"]["targets"]
-            if target["term"] != "参考"
-        ]
-        pronunciation["languages"]["English"]["targets"] = []
-
-    edit(drop_a_word)
-    with pytest.raises(SystemExit, match="readings: zh: zh 01.2 at 9: 参"):
+def test_the_command_checks_nothing_without_propose_and_writes_no_plan(film):
+    root, _edit = film
+    with pytest.raises(SystemExit, match="^readings: the readings are checked by filmkit check"):
         readings.main([])
+    with pytest.raises(SystemExit):
+        readings.main(["--language", "zh"])
+    assert not (root / readings.plan_path("zh")).exists()
+    assert not (root / readings.plan_path("en")).exists()
 
 
 def test_dictionary_readings_match_pypinyin():

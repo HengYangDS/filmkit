@@ -57,3 +57,35 @@ tool_adapter = "ethos"
 writes_files = false
 network_policy = "offline"
 version_source = "product"
+
+# The sample film's sources, as a film's gate `film-sources` checks its own: `filmkit check
+# --read-only` in the sample's folder, which writes no file and needs no model, browser,
+# dictionary or FFmpeg. It joins `default` and `full` once one hosted run of it has passed.
+[[gates]]
+id = "sample-sources"
+kind = "test"
+command = [
+  "uv",
+  "run",
+  "--directory",
+  "examples/sample-film",
+  "--python",
+  "3.12",
+  "--frozen",
+  "--offline",
+  "filmkit",
+  "check",
+  "--read-only",
+]
+policy = "required"
+profile = "repository"
+toolchain = "uv-python"
+asset_classes = ["film-sources"]
+dimensions = ["declaration", "concepts", "register", "readings", "anchors", "pins"]
+execution_mode = "adapter"
+evidence_class = "proof"
+trust_bearing = true
+tool_adapter = "check-sample-film"
+writes_files = false
+network_policy = "offline"
+version_source = "locked-toolchain"

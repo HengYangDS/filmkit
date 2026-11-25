@@ -31,16 +31,18 @@ edition says and that its normalization respells in other letters must be such a
 the schema version: its takes are compared and said as the term's.
 
 The check writes each edition's occurrence plan, a view derived on every check, below
-build/evidence/readings/. Every failure is reported at once, and thoughts are numbered from 1
-within their segment.
+build/evidence/readings/; the film-wide node `check` runs it (`filmkit check`, `filmkit.check`),
+and nothing else writes the plan. Every failure is reported at once, and thoughts are numbered
+from 1 within their segment.
 
-With --propose, the check instead writes proposed declarations for the narration of each edition
+With --propose, the command writes proposed declarations for the narration of each edition
 whose language declares `pinyin-readings`, as `<code>-proposals.json`: for each
 watched occurrence that no declaration resolves, the dictionary's word around it, widened to two
 characters for a word character, with the dictionary's contextual reading. A proposal declares
 nothing; the author reads it and declares what the narration means.
 
-Usage: python -m filmkit.narration.readings [--language <code> | --propose]
+Usage: python -m filmkit.narration.readings --propose
+Without --propose it refuses in one line, naming `filmkit check`, and writes nothing.
 """
 
 from __future__ import annotations
@@ -470,26 +472,18 @@ def check(code: str, *, write: bool = True) -> dict:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Check every declared reading and name.")
-    choice = parser.add_mutually_exclusive_group()
-    choice.add_argument("--language", choices=CODES)
-    choice.add_argument(
+    parser = argparse.ArgumentParser(description="Propose declarations of Han readings.")
+    parser.add_argument(
         "--propose", action="store_true", help="Propose declarations of Han characters' readings"
     )
     options = parser.parse_args(argv)
-    if options.propose:
-        print(json.dumps(propose(), ensure_ascii=False))
-        return
-    reports, failures = [], []
-    for code in (options.language,) if options.language else CODES:
-        try:
-            reports.append(check(code))
-        except ReadingError as error:
-            failures.append(f"{code}: {error}")
-    if failures:
-        message = "readings: " + "\n".join(failures)
+    if not options.propose:
+        message = (
+            "readings: the readings are checked by filmkit check, which writes each edition's "
+            "occurrence plan; this command proposes declarations with --propose"
+        )
         raise SystemExit(message)
-    print(json.dumps(reports, ensure_ascii=False))
+    print(json.dumps(propose(), ensure_ascii=False))
 
 
 if __name__ == "__main__":
