@@ -1,14 +1,13 @@
 """`filmkit verify`: every input and output of every standing record hashed, partial records
-included, and a refusal only where the plan's shortcut cannot be trusted (design decision 6 of
-record-every-run).
+included, and the build refused unless every node of the table is fresh and passed and every
+byte is accounted for (design decision 6 of record-every-run, 11 of build-a-film-by-its-verbs).
 
-It refuses for two things only, each named with its path and every node whose record binds it:
-bytes that no record of a declared writer accounts for, which a writer the table does not know
-left, and a file whose size and time held while its digest changed, which the plan's comparison
-by size and time cannot see. Every other node that is stale or behind is listed and refuses
-nothing: no command refuses on staleness in this release, and each owner keeps refusing what it
-refuses. Nodes without a record are listed together, so that a build made before this release
-verifies as it did. It writes nothing.
+It refuses, each named in one line: bytes that no record of a declared writer accounts for,
+which a writer the table does not know left, and a file whose size and time held while its
+digest changed, which the plan's comparison by size and time cannot see, each with every node
+whose record binds it; the nodes of the table without a record, together; and each other node
+that is not fresh, stale with its reasons (a run that did not pass among them), behind, or
+waiting with the gates that hold it. It writes nothing.
 
 A review round's preparation and a release's record run `check` before they write anything.
 """
@@ -32,11 +31,19 @@ class VerifyError(ValueError):
 
 @dataclass(frozen=True)
 class Verified:
-    """What `verify` found: its refusals, the nodes it lists, and how many files it hashed."""
+    """What `verify` found: its refusals, each in one line, and how many files it hashed."""
 
     refusals: tuple[str, ...]
-    listed: tuple[str, ...]
     hashed: int
+
+
+def unfinished(entry: plan.Entry) -> str:
+    """A node that is not fresh, in one line: its state and why."""
+    if entry.state == plan.WAITING:
+        held = ", ".join(f"{gate} ({state})" for gate, state in entry.held.items())
+        return f"{entry.key}: waiting for {held}"
+    why = "; ".join(reason.text for reason in entry.reasons)
+    return f"{entry.key}: {entry.state}" + (f": {why}" if why else "")
 
 
 def verify(table: nodes.Table | None = None) -> Verified:
@@ -53,14 +60,12 @@ def verify(table: nodes.Table | None = None) -> Verified:
         binders = {e.key for e in planned.entries for r in e.reasons if r.path == path}
         refusals.append(f"{path}: {SAYS[kind]}; it is bound by {', '.join(sorted(binders))}")
     unrecorded = [e.key for e in planned.entries if [r.text for r in e.reasons] == ["no record"]]
-    listed = [
-        f"{e.key}: {e.state}" + (": " + "; ".join(r.text for r in e.reasons) if e.reasons else "")
-        for e in planned.entries
-        if e.state != plan.FRESH and e.key not in unrecorded
-    ]
     if unrecorded:
-        listed.append(f"no record: {', '.join(unrecorded)}")
-    return Verified(tuple(refusals), tuple(listed), planned.hashed)
+        refusals.append(f"no record: {', '.join(unrecorded)}")
+    refusals += [
+        unfinished(e) for e in planned.entries if e.state != plan.FRESH and e.key not in unrecorded
+    ]
+    return Verified(tuple(refusals), planned.hashed)
 
 
 def check(table: nodes.Table | None = None) -> Verified:
@@ -74,13 +79,13 @@ def check(table: nodes.Table | None = None) -> Verified:
 def run(table: nodes.Table | None = None) -> int:
     """Print what `verify` found and return the command's exit status: 1 where it refuses."""
     verified = verify(table)
-    for line in verified.listed:
-        print(line)
     for line in verified.refusals:
         print(f"refused: {line}")
     files = f"{verified.hashed} files hashed"
     if verified.refusals:
-        print(f"filmkit verify refuses {len(verified.refusals)} files; {files}")
+        print(f"filmkit verify refuses the build ({len(verified.refusals)} refusals); {files}")
         return 1
-    print(f"filmkit verify passes: every file a record states is accounted for; {files}")
+    print(
+        f"filmkit verify passes: every node is fresh and passed, every byte accounted for; {files}"
+    )
     return 0

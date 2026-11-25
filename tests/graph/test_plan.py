@@ -205,7 +205,7 @@ def test_a_node_of_one_edition_is_asked_of_that_edition_alone(stand_in_table, mo
     _, found = judged(table, "qualify:all", "stage:all")
     assert list(found) == ["stage:zh", "stage:en", "qualify:zh"]
     assert {entry.state for entry in found.values()} == {"fresh"}
-    lines = verify.verify(table).listed
+    lines = verify.verify(table).refusals
     assert not any("qualify:en" in line for line in lines), lines
 
 

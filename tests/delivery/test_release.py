@@ -209,19 +209,23 @@ def test_a_link_that_leads_outside_the_films_root_is_no_source(built):
 # The record is written only after `filmkit verify` passes (record-every-run).
 
 
-def test_a_soundtrack_changed_by_no_declared_writer_refuses_the_release_and_its_dry_run(built):
+def test_a_soundtrack_changed_by_no_declared_writer_refuses_the_release_and_its_dry_run(
+    built, table_of
+):
+    table_of("assemble")
     with runs.run("zh", "assemble"):
         pass
     soundtrack = built.editions["zh"].edition.soundtrack
     soundtrack.write_bytes(soundtrack.read_bytes() + b"changed by hand")
     for arguments in (["--dry-run", *STATED], STATED):
-        assert unchanged_refusal(built, arguments) == (
+        assert unchanged_refusal(built, arguments).startswith(
             f"filmkit verify refuses: {repository.relative(soundtrack)}: its bytes are "
             "accounted for by no record of a declared writer; it is bound by assemble:zh"
         )
 
 
-def test_a_release_is_recorded_after_both_editions_wrote_the_entry_page(built):
+def test_a_release_is_recorded_after_both_editions_wrote_the_entry_page(built, table_of):
+    table_of("package-metadata")
     # One package writes the page first and the other replaces it whole, with the bytes the
     # build holds, which the viewing packages bind.
     page = repository.ROOT / packaging.LANGUAGE_INDEX

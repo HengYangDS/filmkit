@@ -248,11 +248,12 @@ def recorded(*named):
             pass
 
 
-def test_a_preparation_is_refused_for_a_film_changed_by_no_declared_writer(put, ready):
+def test_a_preparation_is_refused_for_a_film_changed_by_no_declared_writer(put, ready, table_of):
+    table_of("package-film")
     recorded(*(("package-film", code) for code in CODES))
     film = Edition("zh").film("1080p-captioned")
     put(film, "a film changed by hand\n")
-    assert refusal() == (
+    assert refusal().startswith(
         f"prepare: filmkit verify refuses: {repository.relative(film)}: its bytes are "
         "accounted for by no record of a declared writer; it is bound by package-film:zh"
     )
@@ -260,15 +261,18 @@ def test_a_preparation_is_refused_for_a_film_changed_by_no_declared_writer(put, 
     assert "prompts" not in [step for step, _ in ready]
 
 
-def test_a_preparation_after_a_repair_writes_the_round(ready):
-    recorded(("render-picture", "zh"), ("compare-pictures", "zh"))
+def test_a_preparation_after_a_repair_writes_the_round(ready, table_of):
+    # A build of the three nodes alone, whole for `filmkit verify` (`table_of`).
+    table_of("render-picture", "compare-pictures", "package-film")
+    for code in CODES:
+        recorded(("render-picture", code), ("compare-pictures", code))
     edition = Edition("zh")
     with runs.run("zh", "repair-pictures"):
         with runs.node("zh", "render-picture"):
             edition.rendered(True).file.write_bytes(b"the repaired picture")
         with runs.node("zh", "compare-pictures"):
             repository.write(edition.caption_equivalence, {"verdict": "pass", "findings": []})
-    recorded(("package-film", "zh"))
+    recorded(*(("package-film", code) for code in CODES))
     assert verify.verify().refusals == ()
     prepare()
     assert "prompts" in [step for step, _ in ready]

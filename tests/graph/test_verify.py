@@ -1,16 +1,19 @@
-"""`filmkit verify` on stand-in nodes and files: a refusal only for bytes no declared writer
-accounts for and for a change that kept a file's size and time, every other stale node listed,
-and nothing written (design decision 6 of record-every-run)."""
+"""`filmkit verify` on stand-in nodes and files: a refusal for bytes no declared writer accounts
+for, for a change that kept a file's size and time, and for every node that is not fresh and
+passed, and nothing written (design decision 6 of record-every-run, 11 of
+build-a-film-by-its-verbs)."""
 
 import json
 import os
 import shutil
+from dataclasses import replace
 
 import pytest
 import sample_sound
 import stand_ins
 from stand_ins import CODES, chain, ran, read, wrote
 
+import filmkit.graph.nodes as nodes
 import filmkit.repository as repository
 from filmkit.graph import plan, runs, verify
 from filmkit.production import Edition
@@ -20,6 +23,14 @@ def verified(table, capsys):
     """The command's exit status and its lines."""
     status = verify.run(table)
     return status, capsys.readouterr().out.splitlines()
+
+
+def whole():
+    """Run every stand-in node of both editions, in an order the table allows."""
+    chain(*CODES)
+    for code in CODES:
+        for name in ("package-metadata", "stage", "render", "compare", "narrate"):
+            ran(name, code)
 
 
 def listing():
@@ -48,11 +59,7 @@ def test_a_change_that_kept_size_and_time_is_fresh_to_the_plan_and_refused(stand
 
 
 def test_rewrites_replacements_repairs_and_retakes_pass(stand_in_table, capsys):
-    chain(*CODES)
-    ran("package-metadata", "zh")
-    ran("package-metadata", "en")
-    for name in ("stage", "render", "compare", "narrate"):
-        ran(name)
+    whole()
     # A repair renders the picture again and compares again, each as its node.
     with runs.run("zh", "repair"):
         with runs.node("zh", "render"):
@@ -63,25 +70,27 @@ def test_rewrites_replacements_repairs_and_retakes_pass(stand_in_table, capsys):
     with runs.run("zh", "narrate", whole=False):
         (repository.ROOT / "zh/takes.txt").write_text("a retaken thought")
     status, lines = verified(stand_in_table, capsys)
-    assert status == 0, lines
-    assert "narrate:zh: stale: changed by a partial run" in lines
-    assert lines[-1].startswith("filmkit verify passes")
+    assert status == 1
+    # The retake leaves the narration stale, which a whole build may not be; no byte is refused.
+    assert [line for line in lines if line.startswith("refused: ")] == [
+        "refused: narrate:zh: stale: changed by a partial run"
+    ]
 
 
-def test_an_earlier_writer_run_again_and_an_edited_script_are_listed(stand_in_table, capsys):
-    chain()
+def test_an_earlier_writer_run_again_and_an_edited_script_are_refused(stand_in_table, capsys):
+    whole()
     ran("assemble")
     status, lines = verified(stand_in_table, capsys)
-    assert status == 0
+    assert status == 1
     assert (
-        "refresh-captions:zh: stale: its output timeline replaced by an earlier writer's run "
-        "(assemble:zh)"
+        "refused: refresh-captions:zh: stale: its output timeline replaced by an earlier "
+        "writer's run (assemble:zh)"
     ) in lines
-    assert "check-sound:zh: behind" in lines
+    assert "refused: check-sound:zh: behind" in lines
     (repository.ROOT / "zh/script.txt").write_text("the zh script, edited")
     status, lines = verified(stand_in_table, capsys)
-    assert status == 0
-    assert "assemble:zh: stale: input script changed: zh/script.txt" in lines
+    assert status == 1
+    assert "refused: assemble:zh: stale: input script changed: zh/script.txt" in lines
 
 
 def test_a_hand_edit_that_a_rewriter_carried_forward_is_refused(stand_in_table, capsys):
@@ -110,14 +119,42 @@ def test_a_hand_edit_of_the_entry_page_is_refused(stand_in_table, capsys):
     ) in lines
 
 
-def test_a_build_with_no_record_passes_and_verify_writes_nothing(stand_in_table, capsys):
+def test_a_build_without_records_is_refused_and_verify_writes_nothing(stand_in_table, capsys):
     status, lines = verified(stand_in_table, capsys)
-    assert status == 0
-    assert lines[0].startswith("no record: assemble:zh, ")
+    assert status == 1
+    assert lines[0].startswith("refused: no record: assemble:zh, ")
     chain()
     before = listing()
     verified(stand_in_table, capsys)
     assert listing() == before
+
+
+def test_a_whole_build_passes_and_writes_nothing(stand_in_table, capsys):
+    whole()
+    before = listing()
+    status, lines = verified(stand_in_table, capsys)
+    assert (status, len(lines)) == (0, 1)
+    assert lines[0].startswith("filmkit verify passes")
+    assert listing() == before
+
+
+def test_a_refused_run_and_a_waiting_render_are_refused_naming_the_node(
+    stand_in_table, capsys, monkeypatch
+):
+    held = [
+        replace(node, waits=(nodes.Wait("check-sound"),)) if node.name == "render" else node
+        for node in stand_ins.TABLE
+    ]
+    monkeypatch.setattr(runs, "table", lambda: {node.name: node for node in held})
+    table = nodes.load(held, stand_ins.SHARED, CODES)
+    whole()
+    with pytest.raises(SystemExit):
+        ran("check-sound", refuse="check-sound: a gated finding")
+    status, lines = verified(table, capsys)
+    assert status == 1
+    refused = "refused: check-sound:zh: stale: its run ended with the outcome refuse"
+    assert any(line.startswith(refused) for line in lines), lines
+    assert "refused: render:zh: waiting for check-sound:zh (stale)" in lines
 
 
 def refreshing(monkeypatch):
@@ -133,9 +170,10 @@ def refreshing(monkeypatch):
 
 def test_a_rewriter_run_again_on_its_own_output_passes(stand_in_table, capsys, monkeypatch):
     refreshing(monkeypatch)
-    chain()
+    whole()
     ran("refresh-captions")
     ran("check-sound")
+    ran("package-metadata")
     status, lines = verified(stand_in_table, capsys)
     assert status == 0, lines
 
@@ -164,5 +202,7 @@ def test_two_caption_edits_each_refreshed_verify_on_the_sample(built, tmp_path, 
         script.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
         for command in ("refresh-captions", "check-sound"):
             sample_sound.run(root, command, "zh")
-    verified = verify.verify()
-    assert verified.refusals == (), verified.refusals
+    # The light suite builds part of the sample: no byte is refused, though nodes it did not
+    # build are.
+    refused = [r for r in verify.verify().refusals if "its bytes" in r or "keeping its size" in r]
+    assert refused == []

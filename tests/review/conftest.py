@@ -77,11 +77,13 @@ def review(put):
 
 
 @pytest.fixture
-def ready(root, put, monkeypatch):
+def ready(root, put, monkeypatch, table_of):
     """A build that is ready for round 19: every delivery member and the records the prompts
     and the sentences read, with stand-ins for the register check, the listening plan, the
     measurement and the player check. Returns each step that ran with the names the round held
-    when it began."""
+    when it began. Its run records are no subject here: the engine's table is held to no node,
+    so `filmkit verify` judges none (`table_of`)."""
+    table_of()
     from preparing import REGISTER_REPORT, ROUND, names, passing_players
     from test_levels import timeline_of
     from test_prompts import round_inputs

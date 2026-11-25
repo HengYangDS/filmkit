@@ -409,10 +409,12 @@ def editions(inputs, monkeypatch) -> dict[str, Inputs]:
 
 
 @pytest.fixture
-def built(editions, tmp_path_factory, monkeypatch) -> Built:
+def built(editions, tmp_path_factory, monkeypatch, table_of) -> Built:
     """A reviewed, delivered build. The staging's check of a stage is a stand-in that records
     what it was asked and refuses, in the staging's words, a document other than the one the
-    fixture's sources stage; the real check has its own tests."""
+    fixture's sources stage; the real check has its own tests. Its run records are no subject
+    here: the engine's table is held to no node, so `filmkit verify` judges none (`table_of`)."""
+    table_of()
     folder = tmp_path_factory.mktemp("host").resolve() / FILM.delivery_folder
     monkeypatch.setenv(delivery_folder.ROOT_VARIABLE, str(folder.parent))
     current = Built(repository.ROOT, folder, editions, VERSION)

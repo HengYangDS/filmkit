@@ -496,3 +496,39 @@ def test_editions(test_languages, monkeypatch):
         monkeypatch.setitem(FILM.editions, code, FILM.editions[source])
     monkeypatch.setattr(production, "CODES", (*production.CODES, "xa", "xb"))
     return test_languages
+
+
+@pytest.fixture
+def table_of(monkeypatch):
+    """Hold the engine's node table to the nodes named, each declaring only the inputs that stand
+    when it is asked, so that `filmkit verify` judges a fixture's build of those nodes alone as
+    whole: a fixture stages no picture and writes no declaration's every file. Give the names,
+    and get the table."""
+    from dataclasses import replace
+
+    from filmkit.graph import chain, nodes, records, runs
+
+    def standing(way):
+        def inputs(edition):
+            found = way(edition)
+            return nodes.Places({k: v for k, v in found.items() if records.file_of(v).exists()})
+
+        return inputs
+
+    def only(*names: str):
+        held = [
+            replace(node, ways={name: standing(way) for name, way in node.ways.items()})
+            for node in chain.TABLE
+            if node.name in names
+        ]
+        shared = {
+            output: kept
+            for output, writers in chain.SHARED.items()
+            if (kept := tuple(w for w in writers if w.node in names))
+        }
+        table = nodes.load(held, shared, chain.CODES)
+        monkeypatch.setattr(chain, "table", lambda: table)
+        monkeypatch.setattr(runs, "table", lambda: {node.name: node for node in held})
+        return table
+
+    return only
