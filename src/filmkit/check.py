@@ -24,12 +24,14 @@ It asks, in one run and whatever an earlier question found:
 The verdict is `build/evidence/check/verdict.json`: the outcome, each question's findings and what
 the picture reads did not judge, with no digest and no time, so that a passing run after an edit
 elsewhere writes the same bytes. Each edition's occurrence plan is the readings check's. With
-`write` false nothing is written: the findings go to the caller alone. It needs no model, no
-browser, no dictionary, no FFmpeg and no build.
+`write` false nothing is written below the film's root, the tools that draw the pictures copied
+outside it (`filmkit.tools.outside_the_film`): the findings go to the caller alone. It needs no
+model, no browser, no dictionary, no FFmpeg and no build.
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import string
@@ -288,6 +290,7 @@ def words(write: bool) -> tuple[dict[str, list[str]], object]:
     import filmkit.concepts as concepts
     import filmkit.register as register
     import filmkit.sources as sources
+    import filmkit.tools as tools
     from filmkit.narration import anchors, readings
     from filmkit.picture import anchor_reads
     from filmkit.production import CODES
@@ -304,7 +307,8 @@ def words(write: bool) -> tuple[dict[str, list[str]], object]:
         "picture_reads": [],
     }
     try:
-        reads = anchor_reads.check(rules=False)
+        with contextlib.nullcontext() if write else tools.outside_the_film():
+            reads = anchor_reads.check(rules=False)
     except anchors.AnchorError as error:
         found["picture_reads"], reads = str(error).splitlines(), "refuse"
     return found, reads

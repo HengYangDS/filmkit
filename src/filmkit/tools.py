@@ -10,6 +10,10 @@ motion and detail audits, the caption equivalence and the band audit measure tex
 widths of the film's declared faces (`filmkit.picture.metrics`), which a run names to them in
 `FILMKIT_TEXT_METRICS` unless the caller names its own table.
 
+Inside `outside_the_film` the modules are copied into a temporary folder outside the film instead,
+beside a link to the film's npm packages, so that a run writes nothing below the film's root, as
+`filmkit check --read-only` asks.
+
 A run waits for its tool. When the wait is cut short, as by an interrupt of the command, the
 tool is asked to end (SIGTERM) and waited for, so that it ends what it started itself, as a tool
 that drives a browser closes it, and it is killed only when it has not ended after
@@ -29,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import contextvars
 import os
 import re
 import shutil
@@ -93,13 +98,31 @@ class ToolError(RuntimeError):
     """The film's tools cannot run."""
 
 
+# The folder the tools are copied into while `outside_the_film` holds.
+_OUTSIDE: contextvars.ContextVar[Path | None] = contextvars.ContextVar("outside", default=None)
+
+
+@contextlib.contextmanager
+def outside_the_film():
+    """Copy the tools into a temporary folder outside the film while the block runs, beside a
+    link to the film's npm packages, from which their imports resolve; the folder is removed
+    after it."""
+    with tempfile.TemporaryDirectory(prefix="filmkit-tools-") as folder:
+        (Path(folder) / "node_modules").symlink_to(repository.node_modules())
+        token = _OUTSIDE.set(Path(folder) / "tools")
+        try:
+            yield
+        finally:
+            _OUTSIDE.reset(token)
+
+
 def stage_tools() -> Path:
-    """Copy the engine's Node modules and the data they read into the film's tool cache and
-    return the copies' folder.
+    """Copy the engine's Node modules and the data they read into the film's tool cache, or into
+    the folder `outside_the_film` holds, and return the copies' folder.
 
     A copy whose bytes equal the package's stays untouched; any other is replaced whole.
     """
-    cache = repository.ROOT / CACHE / released.version()
+    cache = _OUTSIDE.get() or repository.ROOT / CACHE / released.version()
     for module in sorted({path for named in COPIED for path in PACKAGE.glob(named)}):
         copy = cache / module.relative_to(PACKAGE)
         if copy.is_file() and copy.read_bytes() == module.read_bytes():

@@ -1,9 +1,15 @@
-"""The `filmkit` console command, with two verbs (design decision 10 of record-every-run).
+"""The `filmkit` console command (design decision 10 of record-every-run, 17 of
+build-a-film-by-its-verbs).
 
-Usage: filmkit plan [TARGET...] [--json]
+Usage: filmkit check [--read-only]
+       filmkit plan [TARGET...] [--json]
        filmkit verify
 
-Run in a film's folder, where the engine finds the film. `plan` prints, for the nodes a target
+Run in a film's folder, where the engine finds the film. `check` asks every question of the
+film's sources at once (`filmkit.check`) as the run of the film-wide node `check`, which writes
+its record, its verdict and each edition's occurrence plan; with `--read-only` it prints each
+finding and writes no file. Either exits 1 where a question found anything. `plan` prints, for
+the nodes a target
 names (`<node>:<code>` or `<node>:all`, every node where none is named) and every node upstream of
 them, each node's state and reasons, its host class as measured and as expected, its last seconds
 and whether it is ready (`filmkit.graph.plan`); it writes nothing. `verify` hashes every file a run
@@ -16,15 +22,23 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from typing import TYPE_CHECKING
 
-from filmkit.graph import plan, verify
+if TYPE_CHECKING:
+    from filmkit.graph import plan
 
 
 def arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="filmkit", description="Plan and verify a film's build from its run records."
     )
-    verbs = parser.add_subparsers(dest="verb", required=True, metavar="{plan,verify}")
+    verbs = parser.add_subparsers(dest="verb", required=True, metavar="{check,plan,verify}")
+    checking = verbs.add_parser(
+        "check", help="ask every question of the film's sources at once; exit 1 on a finding"
+    )
+    checking.add_argument(
+        "--read-only", action="store_true", help="print the findings and write no file"
+    )
     planning = verbs.add_parser(
         "plan",
         help="each node's state, reasons, class, last seconds and readiness; writes nothing",
@@ -68,8 +82,37 @@ def timed(entries: list[plan.Entry]) -> str:
     )
 
 
+def checked(read_only: bool) -> int:
+    """`filmkit check`: the node's run, which records it, or with `read_only` the findings
+    printed and no file written; the exit status, 1 where a question found anything. The
+    declaration is read before the node table loads, so that its problems are findings."""
+    import filmkit.check as source_check
+    import filmkit.repository as repository
+
+    if read_only:
+        verdict = source_check.asked(repository.ROOT, write=False)
+        for name, texts in verdict["findings"].items():
+            print("\n".join(f"{name}: {text}" for text in texts), end="\n" if texts else "")
+        count = sum(map(len, verdict["findings"].values()))
+        if count:
+            print(f"filmkit check refuses the sources: {count} finding{'s' * (count != 1)}")
+            return 1
+    else:
+        from filmkit.graph import runs
+
+        source_check.loaded(repository.ROOT)
+        with runs.run(None, "check"):
+            source_check.run()
+    print("filmkit check passes: no question of the film's sources found anything")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> None:
     options = arguments().parse_args(argv)
+    if options.verb == "check":
+        sys.exit(checked(options.read_only))
+    from filmkit.graph import plan, verify
+
     if options.verb == "verify":
         sys.exit(verify.run())
     try:

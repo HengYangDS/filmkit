@@ -9,12 +9,12 @@ import sample_sound
 from filmkit.graph import cli
 
 
-def test_the_help_lists_two_verbs(capsys):
+def test_the_help_lists_its_verbs(capsys):
     with pytest.raises(SystemExit) as ended:
         cli.main(["--help"])
     assert ended.value.code == 0
     said = capsys.readouterr().out
-    assert "{plan,verify}" in said
+    assert "{check,plan,verify}" in said
     assert [verb for verb in ("plan", "verify") if f"    {verb} " in said] == ["plan", "verify"]
 
 

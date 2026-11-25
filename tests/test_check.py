@@ -4,6 +4,7 @@ the occurrence plans it writes (design decision 6 of build-a-film-by-its-verbs).
 import os
 import shutil
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -13,6 +14,7 @@ import filmkit.film as film
 import filmkit.register as register
 import filmkit.released as released
 import filmkit.repository as repository
+from filmkit.graph import cli
 from filmkit.narration import anchors, readings
 from filmkit.picture import anchor_reads
 from filmkit.production import Edition
@@ -37,10 +39,8 @@ def copied(tmp_path, monkeypatch):
             shutil.copy2(source, root / name)
     (root / "node_modules").symlink_to(repository.node_modules())
     monkeypatch.setattr(repository, "ROOT", root)
-    for name in ("npm_packages", "picture_template", "runtime"):
-        ask = getattr(check, name)
-        monkeypatch.setattr(check, name, lambda _root, ask=ask: ask(SAMPLE))
-    lock = check.python_lock
+    npm, lock = check.npm_packages, check.python_lock
+    monkeypatch.setattr(check, "npm_packages", lambda _root: npm(SAMPLE))
     monkeypatch.setattr(check, "python_lock", lambda _root, not_read: lock(SAMPLE, not_read))
     return root
 
@@ -125,3 +125,31 @@ def test_a_passing_run_writes_the_same_verdict_after_an_edit_of_one_script(copie
     script.write_text(script.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     check.run()
     assert (copied / check.VERDICT).read_bytes() == written
+
+
+def listing(root) -> dict[str, bytes]:
+    """Every file below a film's root with its bytes, `build/` included, the npm packages' link
+    not followed."""
+    found = {}
+    for folder, _, files in os.walk(root):
+        for name in files:
+            path = os.path.join(folder, name)
+            found[os.path.relpath(path, root)] = Path(path).read_bytes()
+    return found
+
+
+def test_a_read_only_check_writes_no_file_whether_it_passes_or_refuses(copied, capsys):
+    before = listing(copied)
+    with pytest.raises(SystemExit) as passed:
+        cli.main(["check", "--read-only"])
+    assert passed.value.code == 0
+    assert "filmkit check passes" in capsys.readouterr().out
+    assert listing(copied) == before
+    (copied / "picture/index.html").unlink()
+    before = listing(copied)
+    with pytest.raises(SystemExit) as refused:
+        cli.main(["check", "--read-only"])
+    assert refused.value.code == 1
+    said = capsys.readouterr().out.splitlines()
+    assert said[0].startswith("template: no ") and said[-1].startswith("filmkit check refuses")
+    assert listing(copied) == before
