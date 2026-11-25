@@ -149,6 +149,22 @@ def test_a_check_only_run_is_recorded_as_a_partial_run_and_leaves_the_narrations
     ]
 
 
+def test_a_narration_by_hand_is_refused_before_any_step_while_the_plan_holds_it(
+    commands, monkeypatch
+):
+    line = "narrate:zh is not ready, so it is not narrated: check: stale (filmkit build check)"
+    asked = []
+    monkeypatch.setattr(narration_narrate, "judged", lambda code: asked.append(code) or line)
+    with pytest.raises(SystemExit) as refused:
+        narration_narrate.main(["--language", "zh", "--ids", "06,07"])
+    assert (refused.value.code, commands, asked) == (line, [], ["zh"])
+    # The convergence's narration, which `filmkit narrate` asked the plan for, and a dry run,
+    # which loads no model, do not ask again.
+    narration_narrate.main(["--language", "zh", "--converging"])
+    narration_narrate.main(["--language", "zh", "--dry-run"])
+    assert (asked, len(commands)) == (["zh"], 4)
+
+
 def test_a_dry_run_writes_no_record(commands):
     narration_narrate.main(["--language", "zh", "--dry-run"])
     assert not (repository.ROOT / "build/evidence").exists()

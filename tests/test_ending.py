@@ -68,7 +68,8 @@ import filmkit.graph.chain  # what reads the sample film at import, before the r
 import filmkit.narration.narrate as narrate
 narrate.repository.ROOT = pathlib.Path(sys.argv[1])
 narrate.steps = lambda code, ids, scope: [("narration", [sys.executable, "-B", *sys.argv[2:]])]
-narrate.main(["--language", "zh"])
+# As the convergence runs it, which asked the plan before its first model loaded.
+narrate.main(["--language", "zh", "--converging"])
 """
 # What a node's run does with a request to end, around the engine's own run of a stand-in
 # renderer; `filmkit build` is this around the node's run (BUILD).

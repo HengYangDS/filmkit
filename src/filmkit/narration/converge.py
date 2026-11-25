@@ -150,6 +150,8 @@ def narrate(code: str) -> None:
     """
     started = time.monotonic()
     command = [sys.executable, "-B", "-m", "filmkit.narration.narrate", "--language", code]
+    # The verb asked the plan before the convergence's first model loaded (`narrate.judged`).
+    command.append("--converging")
     with seam.phase("narration"):
         child_processes.run(command, cwd=repository.ROOT, seconds=4 * child_processes.STOP_SECONDS)
     report(code, step="narration", seconds=round(time.monotonic() - started, 1))

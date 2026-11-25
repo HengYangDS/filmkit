@@ -5,10 +5,13 @@ the repository root on the edition's ear-first evidence. With --ids only those s
 are narrated, into a receipt, alignment and transcript named after them, such as
 narration-receipt-06-07.json, alignment-06-07.json and asr-06-07.json.
 
-The film's sources are checked by the film-wide node `check` (`filmkit.check`), not here.
+The film's sources are checked by the film-wide node `check` (`filmkit.check`), not here: a run
+that loads models is refused, before any step, while the plan calls the edition's narration not
+ready (`judged`), as while the source check is stale or refused, unless the convergence of
+`filmkit narrate` runs it (--converging), which asked the plan before its first model loaded.
 
 Usage: python -m filmkit.narration.narrate
-    --language <code> [--ids 06,07] [--dry-run | --skip-generation]
+    --language <code> [--ids 06,07] [--dry-run | --skip-generation] [--converging]
 --dry-run prints the narration plan without writing; --skip-generation aligns and
 transcribes the existing receipt. Each step runs under this tool's interpreter, and none
 outlives a narration that is interrupted, asked to end (SIGTERM) or hung up on. A run that is
@@ -115,6 +118,25 @@ def steps(code: str, ids: str = "", scope: Scope = Scope.ALL) -> list[tuple[str,
     return checks if scope is Scope.CHECKS else [("narration", narration), *checks]
 
 
+def judged(code: str) -> str | None:
+    """How the plan judges an edition's narration (design decision 9 of
+    build-a-film-by-its-verbs): the line that refuses it while the plan calls it not ready,
+    naming each node before it that is not fresh with the verb that builds it, else None."""
+    from filmkit.graph import nodes, plan, target, verify
+
+    key = nodes.key("narrate", code)
+    entries = plan.plan(targets=[key]).entries
+    if next(entry for entry in entries if entry.key == key).ready:
+        return None
+    before = [
+        f"{verify.unfinished(entry)} ({target(*nodes.split(entry.key))})"
+        for entry in entries
+        if entry.key != key and entry.state != plan.FRESH
+    ]
+    why = "; ".join(before) or "an input it reads is missing"
+    return f"{key} is not ready, so it is not narrated: {why}"
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Narrate, align and transcribe one edition.")
     parser.add_argument("--language", choices=CODES, required=True)
@@ -126,12 +148,21 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Align and transcribe the existing receipt",
     )
+    parser.add_argument(
+        "--converging",
+        action="store_true",
+        help="Run by filmkit narrate, which asked the plan before any model loaded",
+    )
     options = parser.parse_args(argv)
     scope = Scope.ALL
     if options.dry_run:
         scope = Scope.PLAN
     elif options.skip_generation:
         scope = Scope.CHECKS
+    if scope is not Scope.PLAN and not options.converging:
+        refused = judged(options.language)
+        if refused:
+            raise SystemExit(refused)
     stopped = "The narration was stopped by {request}; its running step was ended with it"
     with child_processes.ending(stopped):
         narrate(options.language, options.ids, scope)

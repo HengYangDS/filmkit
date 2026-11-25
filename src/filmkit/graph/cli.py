@@ -253,35 +253,16 @@ def editions(asked: str) -> tuple[str, ...]:
     return (asked,)
 
 
-def unready(codes: tuple[str, ...]) -> list[str]:
-    """Each edition asked whose narration the plan calls not ready, in one line that names each
-    node before it that is not fresh, with the verb that builds it (design decision 9)."""
-    from filmkit.graph import nodes, plan, target, verify
-
-    found = []
-    for code in codes:
-        key = nodes.key("narrate", code)
-        entries = plan.plan(targets=[key]).entries
-        if next(entry for entry in entries if entry.key == key).ready:
-            continue
-        before = [
-            f"{verify.unfinished(entry)} ({target(*nodes.split(entry.key))})"
-            for entry in entries
-            if entry.key != key and entry.state != plan.FRESH
-        ]
-        why = "; ".join(before) or "an input it reads is missing"
-        found.append(f"{key} is not ready, so it is not narrated: {why}")
-    return found
-
-
 def narrated(asked: str, rounds: int, takes: int) -> int:
     """`filmkit narrate`: refused, before any model loads, while the plan calls an edition's
     narration not ready; else each edition asked converged in turn, as one run each, and every
     edition's refusal, in lines, once all have run."""
     if rounds < 0 or takes < 1:
         sys.exit("filmkit narrate: --rounds is 0 or more and --takes is 1 or more")
+    from filmkit.narration import narrate
+
     codes = editions(asked)
-    refusals = unready(codes)
+    refusals = [line for line in map(narrate.judged, codes) if line]
     if refusals:
         sys.exit("\n".join(refusals))
     from filmkit.narration import converge

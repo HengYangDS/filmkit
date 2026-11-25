@@ -19,6 +19,7 @@ from converging import (
 import filmkit.child_processes as child_processes
 import filmkit.narration.converge as narration_converge
 import filmkit.narration.group_generation as narration_group_generation
+import filmkit.narration.narrate as narration_narrate
 import filmkit.narration.synthesis as narration_synthesis
 import filmkit.repository as repository
 from filmkit.graph import cli, runs
@@ -27,7 +28,7 @@ from filmkit.production import Edition
 # The convergence's own narration, which runs a child and which the bench replaces (`studio`).
 NARRATE = narration_converge.narrate
 # The plan's own question whether a narration is ready, which the narration's fixtures answer.
-UNREADY = cli.unready
+JUDGED = narration_narrate.judged
 
 
 def test_a_convergence_of_two_narrations_records_its_seconds_with_its_phases(
@@ -65,7 +66,7 @@ def test_filmkit_narrate_is_refused_before_any_model_loads_while_the_plan_holds_
 ):
     # Below the studio's root the source check has no record, so the plan calls the narration,
     # which waits for the check, not ready.
-    monkeypatch.setattr(cli, "unready", UNREADY)
+    monkeypatch.setattr(narration_narrate, "judged", JUDGED)
     studio.begin([voiced(), voiced(natural=False)])
     with pytest.raises(SystemExit) as refused:
         cli.main(["narrate", "--edition", "en"])

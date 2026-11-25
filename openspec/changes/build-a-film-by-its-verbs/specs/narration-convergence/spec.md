@@ -1,3 +1,14 @@
+## ADDED Requirements
+
+### Requirement: A narration asks the plan before any model loads
+
+`filmkit narrate`, and the narration `python -m filmkit.narration.narrate` run to narrate or to check, SHALL refuse before any model loads while the plan calls the edition's narration not ready, naming each node before it that is not fresh with the verb that builds it. The narrations that the convergence of `filmkit narrate` runs SHALL not ask again.
+
+#### Scenario: A retake before the source check
+
+- **WHEN** the Chinese cast is edited for a retake and `python -m filmkit.narration.narrate --language zh --ids 24` runs before the source check has run again
+- **THEN** it exits 1 before any step, in one line that names `check` and `filmkit build check`
+
 ## MODIFIED Requirements
 
 ### Requirement: A take's clarity is judged only by a line the film declares for a single thought

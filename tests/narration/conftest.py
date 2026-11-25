@@ -26,9 +26,9 @@ from filmkit.production import Edition
 def narration_ready(monkeypatch):
     """The plan calls every narration ready, so that `filmkit narrate` converges the stand-in
     edition as asked; its refusal while one is not has its own test (`test_converge.py`)."""
-    from filmkit.graph import cli
+    import filmkit.narration.narrate as narration_narrate
 
-    monkeypatch.setattr(cli, "unready", lambda _codes: [])
+    monkeypatch.setattr(narration_narrate, "judged", lambda _code: None)
 
 
 @pytest.fixture

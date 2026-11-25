@@ -243,6 +243,6 @@ def test_the_narration_is_given_twice_the_time_it_may_itself_wait_for_its_childr
     )
     narration_converge.narrate("en")
     ((command, options),) = waits
-    assert command[-4:] == ["-m", "filmkit.narration.narrate", "--language", "en"]
+    assert command[-5:] == ["-m", "filmkit.narration.narrate", "--language", "en", "--converging"]
     assert options["seconds"] == 4 * child_processes.STOP_SECONDS
     assert json.loads(capsys.readouterr().out)["step"] == "narration"
