@@ -311,6 +311,12 @@ def declaring(monkeypatch, **picture):
         monkeypatch.setattr(module, "FILM", declared)
 
 
+def test_the_geometry_check_binds_the_timeline_whose_runtime_its_record_must_cover():
+    # Task 10.2's recorder found the check reading the timeline, which it did not declare.
+    node, edition = chain.table().node("geometry-check:zh")
+    assert node.inputs(edition)["timeline"] == edition.timeline
+
+
 @pytest.mark.parametrize("gaps", [False, True])
 def test_the_geometry_check_gates_row_gaps_only_where_the_film_declares_it(
     gaps, monkeypatch, tmp_path

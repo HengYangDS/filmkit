@@ -280,7 +280,8 @@ TABLE = (
     ),
     Node(
         "geometry-check",
-        {"default": lambda e: pictured(e) | stage(e)},
+        # The timeline states the runtime a record must cover (`verification.geometry_gaps`).
+        {"default": lambda e: pictured(e) | stage(e) | {"timeline": e.timeline}},
         only("picture_geometry", lambda e: e.picture_geometry),
         "heavy",
         tools=BROWSER,
