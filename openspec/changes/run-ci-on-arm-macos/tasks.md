@@ -37,5 +37,5 @@ Shown by `local-first.md`, which names for each clone its head, what `git remote
 
 ## 6. The words
 
-- [ ] 6.1 Say in `CONTRIBUTING.md`, under "Verify a change", that GitHub and GitLab run the same proof on Apple-silicon macOS alone, GitHub on `macos-latest` and GitLab on runners tagged `macos-latest` with `review` or `protected`, and that a checkout with no remote, with one or with both checks and proves the same. Done when `mise run check`'s Markdown check passes and the section names no other platform.
+- [x] 6.1 Say in `CONTRIBUTING.md`, under "Verify a change", that GitHub and GitLab run the same proof on Apple-silicon macOS alone, GitHub on `macos-latest` and GitLab on runners tagged `macos-latest` with `review` or `protected`, and that a checkout with no remote, with one or with both checks and proves the same. Done when `mise run check`'s Markdown check passes and the section names no other platform.
 - [ ] 6.2 Add the release's entries under `Unreleased` in `CHANGELOG.md` as design decision 7 states them: under `Changed`, the runner labels and where the engine is checked; under `Removed`, ETHOS's Windows archives from the Mise pin and lock, and the Windows wheels and `colorama` from uv's lock through `[tool.uv] environments`, and `colorama` from the engine's record. Done when `mise run check`'s Markdown check passes.

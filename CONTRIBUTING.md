@@ -47,7 +47,9 @@ The check confirms that the locks are current, runs the Node and Python suites a
 ethos prove --host --execute --full --json
 ```
 
-GitHub Actions and GitLab CI run the same portable proof. Building the sample film is a local acceptance, because it needs the speech models and the browser build:
+GitHub Actions and GitLab CI run the same portable proof, generated from one declaration in [`.config/ci/`](.config/ci/), on Apple-silicon macOS alone: GitHub on its hosted runner `macos-latest`, GitLab on runners tagged `macos-latest` with `review` for proposals and merge requests or `protected` for `dev`, `main` and the version tags. No gate of the proof contacts a remote, so a checkout with no remote, with one or with both checks and proves the same.
+
+Building the sample film is a local acceptance, because it needs the speech models and the browser build:
 
 ```sh
 mise run sample:supply
