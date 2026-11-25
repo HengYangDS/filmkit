@@ -4,8 +4,9 @@ The engine carries its Node tools as package data. A run copies every module, ke
 folder, into build/runtime/tool-cache/filmkit/<version>/ below the film, replacing any copy whose
 bytes differ from the package's, and runs the named tool from that copy with Node at the film's
 root: its imports resolve from the film's npm packages and its paths from the film. The tools
-check the film's picture and players, so each first refuses a renderer version other than the one
-the engine renders with, and a browser check runs the browser the supply installs. The frame,
+check the film's picture and players, so each first stops where the film installs another renderer
+version than the one the engine renders with, and a browser check runs the browser the supply
+installs. The frame,
 motion and detail audits, the caption equivalence and the band audit measure text by the advance
 widths of the film's declared faces (`filmkit.picture.metrics`), which a run names to them in
 `FILMKIT_TEXT_METRICS` unless the caller names its own table.
@@ -14,7 +15,15 @@ Inside `outside_the_film` the modules are copied into a temporary folder outside
 beside a link to the film's npm packages, so that a run writes nothing below the film's root, as
 `filmkit check --read-only` asks.
 
-A run waits for its tool. When the wait is cut short, as by an interrupt of the command, the
+A run waits for its tool and gives its status where the tool finished: 0 where it passed and 1
+where it found what it checks for, which its caller reads as a refusal. Every tool is started
+after the module `unfinished.mjs` (`--import` in `NODE_OPTIONS`), which ends one that cannot
+finish, by an error that nothing catches, with status 2: that status, any other, and a signal
+are no finding, and the run raises them as the failure of a child
+(`subprocess.CalledProcessError`), which no node may record as a refusal (design decision 19 of
+build-a-film-by-its-verbs).
+
+When the wait is cut short, as by an interrupt of the command, the
 tool is asked to end (SIGTERM) and waited for, so that it ends what it started itself, as a tool
 that drives a browser closes it, and it is killed only when it has not ended after
 `STOP_SECONDS` (`filmkit.child_processes.stop`).
@@ -72,6 +81,9 @@ TOOLS = {
     "whole-turns": Tool("picture/whole-turns.mjs", browses=True),
     "anchor-reads": Tool("picture/anchor-reads.mjs"),
 }
+# What every tool is started after: the end of a tool that cannot finish, from the engine's own
+# package, which no test's stand-in package replaces.
+UNFINISHED = Path(__file__).resolve().parent / "unfinished.mjs"
 # The copies, below the film's root, in a folder for each engine version.
 CACHE = picture_browser.TOOL_CACHE / released.ENGINE
 # Seconds a tool has to end, once the command's wait for it was cut short and it was asked to,
@@ -127,7 +139,9 @@ def run(
     environment: dict | None = None,
     stdout: Path | None = None,
 ) -> int:
-    """Run a tool from its copy at the film's root and return its exit status.
+    """Run a tool from its copy at the film's root and return its exit status, 0 or 1; any other
+    status, or a signal, is the tool's failure to finish and raises
+    `subprocess.CalledProcessError`.
 
     `environment` adds variables to the tool's environment, and `stdout` names a file that
     receives the tool's standard output instead of the caller's. A tool that runs the
@@ -153,6 +167,8 @@ def run(
         "FILM_CHROMIUM_PATH": str(browser),
         **opens.node_options(),
     }
+    ending = f"--import={UNFINISHED.as_uri()}"
+    variables["NODE_OPTIONS"] = " ".join(filter(None, [variables.get("NODE_OPTIONS"), ending]))
     if TOOLS[tool].measures and metrics.VARIABLE not in variables:
         variables[metrics.VARIABLE] = str(metrics.current_table())
     with contextlib.ExitStack() as stack:
@@ -168,13 +184,16 @@ def run(
                     stdin=subprocess.DEVNULL,
                     stdout=output,
                 )
-            return tool_process.wait()
+            status = tool_process.wait()
         except BaseException:
             # The tool ends what it started, a browser it drives, from its own handling of the
             # request; it is killed only when that has not ended it.
             if tool_process is not None:
                 child_processes.stop([tool_process], signal.SIGTERM, seconds=STOP_SECONDS)
             raise
+    if status not in (0, 1):
+        raise subprocess.CalledProcessError(status, [tool, *arguments])
+    return status
 
 
 if __name__ == "__main__":

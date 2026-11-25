@@ -2,6 +2,7 @@
 
 import json
 import re
+import subprocess
 from itertools import pairwise
 
 import pytest
@@ -424,7 +425,10 @@ def test_an_unmarked_id_a_scene_reads_before_it_throws_is_refused(drawing, tmp_p
 def test_the_reads_tool_takes_its_step_from_the_check(drawing, editions, tmp_path):
     put(tmp_path / "zh.json", anchors.derived_timeline(editions["zh"], "zh"))
     out = tmp_path / "reads.json"
-    assert tools.run("anchor-reads", [str(tmp_path / "zh.json")], stdout=out) == 2
+    # Without its step the tool refuses its invocation with status 2, a failure to finish.
+    with pytest.raises(subprocess.CalledProcessError) as failed:
+        tools.run("anchor-reads", [str(tmp_path / "zh.json")], stdout=out)
+    assert failed.value.returncode == 2
 
 
 def test_a_composition_that_does_not_load_is_not_judged_and_refuses_nothing(drawing, tmp_path):

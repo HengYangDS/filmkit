@@ -289,10 +289,10 @@ def test_a_player_that_fails_its_readback_refuses_delivery_before_any_change(fil
         delivery_folder.deliver(root, destination)
     assert not destination.exists()
     assert calls == [(root / delivery_folder.PLAYERS_BINDING, root / delivery_folder.PLAYERS)]
-    # A player check that stops without a receipt refuses too, by its status.
-    monkeypatch.setattr(delivery_folder, "check_players", lambda binding, receipt: 2)
+    # A player check that finds a fault and writes no receipt refuses too, by its status.
+    monkeypatch.setattr(delivery_folder, "check_players", lambda binding, receipt: 1)
     (root / delivery_folder.PLAYERS).unlink()
-    with pytest.raises(DeliveryRefusedError, match="The player check exited with status 2"):
+    with pytest.raises(DeliveryRefusedError, match="The player check exited with status 1"):
         delivery_folder.deliver(root, destination)
     assert not destination.exists()
 

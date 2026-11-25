@@ -3,6 +3,7 @@
 import ast
 import importlib
 import json
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -13,7 +14,7 @@ import filmkit.film as film
 import filmkit.picture.derivation as derivation
 import filmkit.repository as repository
 import filmkit.tools as tools
-from filmkit.graph import bindings, chain, nodes, opens, plan, records, runs
+from filmkit.graph import bindings, build, chain, nodes, opens, plan, records, runs
 from filmkit.graph.records import Folder
 from filmkit.narration import converge, readings
 from filmkit.narration import narrate as narration_narrate
@@ -361,6 +362,20 @@ def test_the_geometry_check_gates_row_gaps_only_where_the_film_declares_it(
     monkeypatch.setattr(tools, "run", lambda tool, arguments, stdout=None: 1)
     with pytest.raises(tools.ToolError, match="geometry-check exited with status 1"):
         chain.geometry_check(Edition("zh"))
+
+
+@pytest.mark.parametrize("node", ["geometry-check", "player-check-cover"])
+def test_a_check_whose_tool_cannot_finish_fails_and_does_not_refuse(monkeypatch, node):
+    # A tool that crashes ends with status 2 (`unfinished.mjs`), which `tools.run` raises as a
+    # failure to finish: the build reads the node's run as failed, never as its refusal.
+    def crashed(tool, arguments, stdout=None):
+        raise subprocess.CalledProcessError(2, [tool, *arguments])
+
+    monkeypatch.setattr(tools, "run", crashed)
+    owner, edition = chain.table().node(f"{node}:zh")
+    with pytest.raises(subprocess.CalledProcessError) as failed:
+        owner.run(edition)
+    assert not isinstance(failed.value, build.REFUSALS)
 
 
 @pytest.mark.parametrize(("native", "way"), [(("zh",), "native"), ((), "derived")])

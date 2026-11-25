@@ -3,6 +3,7 @@
 import json
 import re
 import shutil
+import subprocess
 from importlib.metadata import version
 from pathlib import Path
 
@@ -50,9 +51,11 @@ def cached(root, path):
 
 
 def test_a_tool_runs_from_its_copy_with_the_films_packages(film, capfd):
-    # Without arguments the player check refuses its invocation, after loading the browser
-    # driver that it imports from the film's packages.
-    assert tools.run("player-check", []) == 2
+    # Without arguments the player check refuses its invocation with status 2, after loading the
+    # browser driver that it imports from the film's packages: no finding, so the run raises it.
+    with pytest.raises(subprocess.CalledProcessError) as failed:
+        tools.run("player-check", [])
+    assert failed.value.returncode == 2
     copy = cached(film, "delivery/player-check.mjs")
     assert copy.read_bytes() == (tools.PACKAGE / "delivery/player-check.mjs").read_bytes()
     assert "Usage: node player-check.mjs players" in capfd.readouterr().err
@@ -93,6 +96,34 @@ def test_a_tool_runs_at_the_film_root_with_the_renderers_browser(
     monkeypatch.setenv("FILM_CHROMIUM_PATH", str(named))
     assert tools.run("geometry-check", []) == 0
     assert json.loads(capfd.readouterr().out)["browser"] == str(named)
+
+
+@pytest.mark.parametrize(
+    ("body", "status"),
+    [
+        ("process.exitCode = 1;", 1),
+        ('throw new Error("the tool crashed");', 2),
+        ('await Promise.reject(new Error("the tool crashed"));', 2),
+        ('Promise.reject(new Error("the tool crashed")); setTimeout(() => {}, 50);', 2),
+        ('process.kill(process.pid, "SIGKILL");', -9),
+    ],
+)
+def test_a_tool_that_cannot_finish_is_a_failure_and_a_finding_its_status(
+    film, tmp_path, monkeypatch, capfd, body, status
+):
+    # A finding is 1, which the caller reads as a refusal; a tool that crashes or a signal ends is
+    # no finding, and the run raises it as a failure to finish.
+    package = tmp_path / "package"
+    (package / "picture").mkdir(parents=True)
+    (package / "picture/geometry-check.mjs").write_text(body)
+    monkeypatch.setattr(tools, "PACKAGE", package)
+    if status == 1:
+        assert tools.run("geometry-check", []) == 1
+        return
+    with pytest.raises(subprocess.CalledProcessError) as failed:
+        tools.run("geometry-check", [])
+    assert failed.value.returncode == status
+    assert ("the tool crashed" in capfd.readouterr().err) is (status == 2)
 
 
 def test_a_tool_takes_added_variables_and_may_write_its_output_to_a_file(
