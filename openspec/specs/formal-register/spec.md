@@ -195,7 +195,7 @@ in one line.
 #### Scenario: A page that is no text
 
 - **WHEN** the entry page's bytes are not UTF-8
-- **THEN** the check refuses in one line that names the page, and the pre-render check writes a refused receipt
+- **THEN** the check refuses in one line that names the page, and `filmkit check` records the outcome `refuse`
 
 ### Requirement: A fixed idiom keeps a listed form's characters
 
@@ -236,3 +236,17 @@ The register check SHALL check each place by the rules of every language whose w
 
 - **WHEN** the entry page holds 你们 and "you"
 - **THEN** the check refuses both, naming the entry page
+
+### Requirement: The source check asks the register
+
+`filmkit check` SHALL ask the register beside the concept contract and SHALL refuse, with every other finding of the sources, while the film's words hold an error-level form that the film does not excuse or the check cannot be run.
+
+#### Scenario: An address of the audience before a render
+
+- **WHEN** a thought holds 你们 and every other source passes
+- **THEN** the check names the thought and the form, records the outcome `refuse` and exits 1
+
+#### Scenario: A checker that is not the pinned one
+
+- **WHEN** the Vale on the path reports another version than the engine's release record
+- **THEN** the check names both versions and the line `mise use github:vale-cli/vale@<version>` that pins the engine's, and records the outcome `refuse`

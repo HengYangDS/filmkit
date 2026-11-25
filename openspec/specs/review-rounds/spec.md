@@ -79,7 +79,7 @@ Assembling a soundtrack, and refreshing an edition's captions, SHALL refuse whil
 #### Scenario: Assembling over a reviewed build
 
 - **WHEN** round 7's prompts bind the edition's current films and round 7 has not been set aside
-- **THEN** assembly refuses before it writes anything and names round 7 and `review.round set-aside --round 7`
+- **THEN** assembly refuses before it writes anything and names round 7 and `filmkit review set-aside --round 7`
 
 #### Scenario: A set-aside round
 
@@ -116,12 +116,12 @@ For a film that declares levels, a round's preparation SHALL fill `{levels}` wit
 
 ### Requirement: A review passes level by level
 
-For a film that declares levels, each review SHALL give every level a verdict, pass or fail, with the findings in it, and each finding SHALL name its level. `review.round record` and the verifier SHALL refuse a review that misses a level, whose level fails, or whose level passes while a dimension it holds is below the floor or a material finding remains in it, besides today's floors.
+For a film that declares levels, each review SHALL give every level a verdict, pass or fail, with the findings in it, and each finding SHALL name its level. `filmkit review record` and the verifier SHALL refuse a review that misses a level, whose level fails, or whose level passes while a dimension it holds is below the floor or a material finding remains in it, besides today's floors.
 
 #### Scenario: A level passed by averaging
 
 - **WHEN** the overall score is 96 but a dimension of 雅 scores 93 and the review passes 雅
-- **THEN** `review.round record` refuses and names 雅 and the dimension
+- **THEN** `filmkit review record` refuses and names 雅 and the dimension
 
 #### Scenario: A level that fails
 
@@ -149,12 +149,12 @@ A round's preparation SHALL write, for each edition, every sentence of every tho
 
 ### Requirement: A review judges every sentence
 
-For a film that declares levels, each review SHALL give every sentence id of its edition a verdict, `ok` or the ids of the findings that concern it. `review.round record` and the verifier SHALL refuse a review that misses a sentence, names an unknown one or names a finding the review does not hold.
+For a film that declares levels, each review SHALL give every sentence id of its edition a verdict, `ok` or the ids of the findings that concern it. `filmkit review record` and the verifier SHALL refuse a review that misses a sentence, names an unknown one or names a finding the review does not hold.
 
 #### Scenario: A sentence left out
 
 - **WHEN** a review gives verdicts for all but sentence 05.2.1
-- **THEN** `review.round record` refuses and names 05.2.1
+- **THEN** `filmkit review record` refuses and names 05.2.1
 
 ### Requirement: A set-aside moves the films its build made
 
@@ -167,7 +167,7 @@ A set-aside, reviewed or not, SHALL move each edition's films with captions, its
 
 ### Requirement: A round is prepared by one command
 
-`review.round prepare` SHALL write a round's directory: the register report, the binding of the members a delivery would hold, the readback of their players with its screenshots, the listening plan, the measurements, each edition's sentences and prompt, and the changes note and dispositions it was given. It SHALL check what it reads before it derives anything, write the note and the dispositions first, the register report next and the prompts last, and refuse a round's number below zero.
+`filmkit review prepare` SHALL write a round's directory: the register report, the binding of the members a delivery would hold, the readback of their players with its screenshots, the listening plan, the measurements, each edition's sentences and prompt, and the changes note and dispositions it was given. It SHALL check what it reads before it derives anything, write the note and the dispositions first, the register report next and the prompts last, and refuse a round's number below zero.
 
 #### Scenario: A build that is ready
 
@@ -339,7 +339,7 @@ The review's measurement SHALL take an edition's sound-picture sync from the syn
 
 ### Requirement: The record derives a review's overall
 
-`review.round record` SHALL record the mean of a review's scores, rounded to one decimal as the engine rounds, as its overall, and SHALL neither require nor compare an overall that the review states.
+`filmkit review record` SHALL record the mean of a review's scores, rounded to one decimal as the engine rounds, as its overall, and SHALL neither require nor compare an overall that the review states.
 
 #### Scenario: A stated overall that rounds another way
 
@@ -353,17 +353,17 @@ The review's measurement SHALL take an edition's sound-picture sync from the syn
 
 ### Requirement: A film declares the severities a review may hold
 
-A film MAY declare `[review] accepted_severities`, a list that does not hold `material`, however it is cased or padded, and names no severity twice; an empty list accepts no finding. For a film that declares the list, `review.round record` and the verifier SHALL refuse a review that holds a finding of any other severity or of none. A film that does not declare it SHALL keep the verdicts it has.
+A film MAY declare `[review] accepted_severities`, a list that does not hold `material`, however it is cased or padded, and names no severity twice; an empty list accepts no finding. For a film that declares the list, `filmkit review record` and the verifier SHALL refuse a review that holds a finding of any other severity or of none. A film that does not declare it SHALL keep the verdicts it has.
 
 #### Scenario: A minor finding in a film that accepts notes
 
 - **WHEN** a film declares `accepted_severities = ["note"]`, and a review scores every dimension at the floor or above and holds one minor finding
-- **THEN** `review.round record` refuses and names the finding and its severity
+- **THEN** `filmkit review record` refuses and names the finding and its severity
 
 #### Scenario: A severity nobody declared
 
 - **WHEN** the same film's review holds a finding whose severity is `minro`
-- **THEN** `review.round record` refuses and names the finding and its severity
+- **THEN** `filmkit review record` refuses and names the finding and its severity
 
 #### Scenario: A film that does not declare the list
 
@@ -373,7 +373,7 @@ A film MAY declare `[review] accepted_severities`, a list that does not hold `ma
 #### Scenario: A material finding in a film without the list and without levels
 
 - **WHEN** such a film's review holds one material finding
-- **THEN** `review.round record` records it and the verifier refuses the record, as before
+- **THEN** `filmkit review record` records it and the verifier refuses the record, as before
 
 #### Scenario: A declaration that accepts material findings
 
@@ -387,7 +387,7 @@ A film MAY declare `[review] accepted_severities`, a list that does not hold `ma
 
 ### Requirement: A round is prepared only for films that passed the still scan
 
-`review.round prepare` SHALL ask, among the checks that only read and before it derives or writes anything, that each edition's film record meets what the delivery's verification requires of it, and SHALL refuse in one line with that requirement's own reason, so that no round reviews a film the verifier would refuse for a still picture.
+`filmkit review prepare` SHALL ask, among the checks that only read and before it derives or writes anything, that each edition's film record meets what the delivery's verification requires of it, and SHALL refuse in one line with that requirement's own reason, so that no round reviews a film the verifier would refuse for a still picture.
 
 #### Scenario: An edition that was never scanned
 
@@ -481,7 +481,7 @@ A round's preparation SHALL fill `{editions}` with every edition's script, timel
 
 ### Requirement: A round is prepared only on records that verify
 
-A round's preparation SHALL run `filmkit verify` before it writes anything, and SHALL refuse with each of its lines when it refuses. A node that is only stale SHALL refuse nothing here.
+A round's preparation SHALL run `filmkit verify` before it writes anything, and SHALL refuse with each of its lines when it refuses. A node that is stale, behind or without a record SHALL refuse it too.
 
 #### Scenario: A package changed by no declared writer
 

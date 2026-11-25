@@ -8,7 +8,7 @@ Draw a film's pictures on a native canvas from the composition the film already 
 
 ### Requirement: A render draws the staged composition on a native canvas
 
-`render-picture`, `render-picture --uncaptioned --native`, `render-draft` and `qualify-renderer` SHALL draw a stage with the engine's own Node module on a canvas of the `@napi-rs/canvas` package that the film's npm packages install, running the staged composition unchanged, with the canvas's text renderer set to `system` and each face the stage's record names registered from the staged fonts. No render SHALL start a browser.
+`render-picture`, `render-picture-uncaptioned` in its native way, `render-draft` and `qualify-renderer` SHALL draw a stage with the engine's own Node module on a canvas of the `@napi-rs/canvas` package that the film's npm packages install, running the staged composition unchanged, with the canvas's text renderer set to `system` and each face the stage's record names registered from the staged fonts. No render SHALL start a browser.
 
 #### Scenario: A picture is rendered
 
@@ -28,7 +28,7 @@ Draw a film's pictures on a native canvas from the composition the film already 
 #### Scenario: Another canvas version
 
 - **WHEN** the film's npm packages install another version of the canvas package than the engine draws with, or none
-- **THEN** staging and rendering refuse before the renderer starts, naming both versions
+- **THEN** staging, rendering and the engine's tools stop before the renderer or a tool starts, naming both versions as a tool the host lacks, and the command exits 2
 
 ### Requirement: The stylesheet's faces have one reader
 

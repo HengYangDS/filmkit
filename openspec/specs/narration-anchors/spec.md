@@ -35,7 +35,7 @@ An id SHALL be kebab-case (lowercase ASCII letters and digits, single hyphens, a
 #### Scenario: An anchor that is never closed
 
 - **WHEN** a Chinese thought holds `{order}有先后` and no `{/order}`
-- **THEN** `produce assemble` refuses before it writes anything and names the Chinese edition, the segment, the thought and `order`
+- **THEN** `assemble` refuses before it writes anything and names the Chinese edition, the segment, the thought and `order`
 
 #### Scenario: Plain thoughts edited by hand
 
@@ -59,7 +59,7 @@ An id SHALL be kebab-case (lowercase ASCII letters and digits, single hyphens, a
 
 ### Requirement: The timeline gives each anchor the times of its words
 
-When an edition's script marks any anchor, `produce assemble` SHALL give every segment of its timeline `anchors`, empty where it marks none, each id in the order of its open mark: `start`, the start of the aligned word holding its first unit; `end`, the end of the word holding its last; `units`, its first unit's index among the units of the segment's text and the index after its last; `thought`, counted from 1. A timeline whose script marks none SHALL carry no `anchors`.
+When an edition's script marks any anchor, `assemble` SHALL give every segment of its timeline `anchors`, empty where it marks none, each id in the order of its open mark: `start`, the start of the aligned word holding its first unit; `end`, the end of the word holding its last; `units`, its first unit's index among the units of the segment's text and the index after its last; `thought`, counted from 1. A timeline whose script marks none SHALL carry no `anchors`.
 
 #### Scenario: An anchor on three characters
 
@@ -78,7 +78,7 @@ When an edition's script marks any anchor, `produce assemble` SHALL give every s
 
 ### Requirement: A timeline of other words takes its anchors from the engine
 
-`python -m filmkit.narration.anchors --place <timeline> --language <code>` SHALL give a timeline that other code built of its own words the anchors its marks take from those words, as `produce assemble` gives them.
+`filmkit.api.place_anchors(timeline, code)` SHALL give a timeline that other code built of its own words the anchors its marks take from those words, as `assemble` gives them.
 
 #### Scenario: A timeline of a test's own words
 
@@ -87,22 +87,22 @@ When an edition's script marks any anchor, `produce assemble` SHALL give every s
 
 ### Requirement: A change of anchors alone keeps the soundtrack
 
-`produce refresh-captions` SHALL adopt a script whose segments differ from the timeline's only in `anchored_groups` and in the caption fields it already adopts. It SHALL give each timeline segment the script's `anchored_groups`, or remove them where the script holds none, with the `anchors` they take from the timeline's words, and SHALL record a presentation revision that keeps the soundtrack, the words and the narration selection. A changed word of the text SHALL still be refused.
+`refresh-captions` SHALL adopt a script whose segments differ from the timeline's only in `anchored_groups` and in the caption fields it already adopts. It SHALL give each timeline segment the script's `anchored_groups`, or remove them where the script holds none, with the `anchors` they take from the timeline's words, and SHALL record a presentation revision that keeps the soundtrack, the words and the narration selection. A changed word of the text SHALL still be refused.
 
 #### Scenario: An anchor added to a narrated edition
 
-- **WHEN** an anchor is added to a segment of an edition whose soundtrack is assembled, `produce refresh-captions` runs and the edition is staged
+- **WHEN** an anchor is added to a segment of an edition whose soundtrack is assembled, `refresh-captions` runs and the edition is staged
 - **THEN** the timeline's segment holds the script's `anchored_groups` and the anchor's times, the soundtrack's SHA-256 is unchanged, the receipt records the presentation revision, and `stage-picture` accepts the timeline as following its script
 
 #### Scenario: Anchors removed from a segment
 
-- **WHEN** a script drops a segment's `anchored_groups` and `produce refresh-captions` runs
+- **WHEN** a script drops a segment's `anchored_groups` and `refresh-captions` runs
 - **THEN** the timeline's segment holds no `anchored_groups`, and `stage-picture` accepts the timeline
 
 #### Scenario: A word changed with an anchor
 
 - **WHEN** a script changes a word of a thought besides its marks
-- **THEN** `produce refresh-captions` refuses as it refuses a changed word today
+- **THEN** `refresh-captions` refuses as it refuses a changed word today
 
 ### Requirement: Script edits work on the anchored thoughts
 
@@ -211,12 +211,12 @@ An `anchor` edit SHALL name a thought, a span of units of the thought's text, th
 
 ### Requirement: The engine derives a timeline from a script for its checks
 
-The engine SHALL derive, from an edition's script alone, a timeline for the checks that draw the picture before narration: the script's fields; for each segment one word per Han character and per run of Latin letters and digits of its text, each 0.2 s long, with 0.5 s between thoughts and 1.0 s before each segment; its anchors as `assemble` resolves them; and no captions. `python -m filmkit.narration.anchors --timeline <path>` SHALL write it, so that a film's own tests draw the same timeline.
+The engine SHALL derive, from an edition's script alone, a timeline for the checks that draw the picture before narration: the script's fields; for each segment one word per Han character and per run of Latin letters and digits of its text, each 0.2 s long, with 0.5 s between thoughts and 1.0 s before each segment; its anchors as `assemble` resolves them; and no captions. `filmkit.api.derived_timeline(code)` SHALL give it, so that a film's own tests draw the same timeline.
 
 #### Scenario: The same script twice
 
-- **WHEN** the derived timeline of one script is written twice
-- **THEN** both files hold the same bytes, and each anchor's times are those of its words in it
+- **WHEN** the derived timeline of one script is asked twice
+- **THEN** both answers are equal, and each anchor's times are those of its words in it
 
 ### Requirement: Narration refuses a script that does not mark what its picture reads
 
@@ -253,7 +253,7 @@ A scene that throws while the check before narration draws it SHALL be named as 
 
 ### Requirement: The picture gate refuses an anchor that the edition does not mark
 
-`produce check-picture` SHALL record every id that the composition reads from a segment's anchors while its audits draw the edition's timeline and that the edition does not mark there, with its segment and edition, giving the composition a stand-in so that the scene goes on. It SHALL refuse by those ids while one remains, also when an audit fails for another reason, and `render-picture` SHALL then refuse the edition.
+`check-picture` SHALL record every id that the composition reads from a segment's anchors while its audits draw the edition's timeline and that the edition does not mark there, with its segment and edition, giving the composition a stand-in so that the scene goes on. It SHALL refuse by those ids while one remains, also when an audit fails for another reason, and `render-picture` SHALL then refuse the edition.
 
 #### Scenario: Two unmarked ids in one scene
 

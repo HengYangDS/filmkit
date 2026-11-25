@@ -113,7 +113,7 @@ A take SHALL be refused when a unit of its transcript differs from its text by r
 
 ### Requirement: A take's clarity is judged only by a line the film declares for a single thought
 
-Where a film declares a clarity floor and a thought margin, a take that reads under the floor, or under the floor less the margin for a thought the film declares as kept, SHALL be named for the ear and not refused for its clarity, unless the owner's hearing settles its clarity. Where a film declares a floor and no margin, a take's clarity SHALL be recorded and not judged, and the record SHALL say so. Without a floor, clarity SHALL NOT be measured. The rule SHALL be the one `preflight` asks.
+Where a film declares a clarity floor and a thought margin, a take that reads under the floor, or under the floor less the margin for a thought the film declares as kept, SHALL be named for the ear and not refused for its clarity, unless the owner's hearing settles its clarity. Where a film declares a floor and no margin, a take's clarity SHALL be recorded and not judged, and the record SHALL say so. Without a floor, clarity SHALL NOT be measured. The rule SHALL be the one the sound gate asks.
 
 #### Scenario: A film with a floor and no thought line
 
@@ -175,7 +175,7 @@ Where the narration's alignment of the receipt's recordings stands beside the re
 
 ### Requirement: A refused thought gets candidates without a person's input
 
-`python -m filmkit.narration.converge` SHALL, for each thought a line refuses, generate a round's candidates at the audition's seeds, counted on across rounds, and judge each by the same lines. It SHALL take no targets file, phrase or seed. It SHALL bind each choice into the cast's retakes, narrate and judge again, for the rounds asked for or until no thought is refused.
+`filmkit narrate` SHALL, for each thought a line refuses, generate a round's candidates at the audition's seeds, counted on across rounds, and judge each by the same lines. It SHALL take no targets file, phrase or seed. It SHALL bind each choice into the cast's retakes, narrate and judge again, for the rounds asked for or until no thought is refused.
 
 #### Scenario: One refused thought of two
 
@@ -374,7 +374,7 @@ Where a declared term's reference occurrence shows no two formants on its take, 
 
 ### Requirement: A settled edition is counted for its runtime
 
-When its rounds end with no thought refused, the convergence SHALL count the edition by the functions that `produce select` and `produce fit` run, and the record's fit SHALL state, as counted, the runtime the assembly would give and the seconds of the rounding's fraction that the gaps and the credits take. An edition whose allocation the assembly accepts SHALL be recorded as `fits`, with exit 0. No count SHALL be said as a miss, nor a thought pause named to reach a runtime.
+When its rounds end with no thought refused, the convergence SHALL count the edition by the functions of the node `select` and of the assembly's dry run, and the record's fit SHALL state, as counted, the runtime the assembly would give and the seconds of the rounding's fraction that the gaps and the credits take. An edition whose allocation the assembly accepts SHALL be recorded as `fits`, with exit 0. No count SHALL be said as a miss, nor a thought pause named to reach a runtime.
 
 #### Scenario: An edition counted
 
@@ -402,12 +402,12 @@ An edition whose clips or gaps cannot be designed under the script's pause polic
 
 ### Requirement: The count changes nothing and keeps nothing
 
-The count SHALL replace no take, change no pause policy and write no tracked file. Below `build/` it SHALL write only what `produce select` and `produce fit` write for the edition: the selection's two records and the assembly's decode work files. A run SHALL keep nothing of the count for the next: a second run SHALL say the same lines and write the same record. `produce fit` SHALL print and refuse as the runtime fit states.
+The count SHALL replace no take, change no pause policy and write no tracked file. Below `build/` it SHALL write only what the node `select` and the assembly's dry run write for the edition: the selection's two records and the assembly's decode work files. A run SHALL keep nothing of the count for the next: a second run SHALL say the same lines and write the same record. The dry run SHALL print and refuse as the runtime fit states.
 
 #### Scenario: The files written
 
 - **WHEN** a settled edition is counted
-- **THEN** the cast, the script and every recording are byte for byte as they were, and the files written, duration records apart, are the judgment's and the convergence's records, the selection's two records and the decode work files
+- **THEN** the cast, the script and every recording are byte for byte as they were, and the files written, run records apart, are the judgment's and the convergence's records, the selection's two records and the decode work files
 
 #### Scenario: A second run on a counted edition
 
@@ -517,7 +517,7 @@ For an edition whose language declares its Latin-script words heard by CMUdict's
 #### Scenario: No dictionary in place
 
 - **WHEN** the supplied dictionary file is missing, or holds other bytes than its pinned SHA-256, and `judge` is asked about an English edition
-- **THEN** the command exits 1 before any model loads, with one line that names `python -m filmkit.supply`
+- **THEN** the command exits 1 before any model loads, with one line that names `filmkit supply`
 
 #### Scenario: A language that reads no dictionary
 
@@ -604,3 +604,26 @@ A thought for the ear SHALL get no candidate and SHALL wait for the owner's hear
 
 - **WHEN** `judge` judges an edition in which no line refuses a thought and one take, heard by no one, reads under its thought line
 - **THEN** the command exits 1 and names that thought for the ear, apart from the refused thoughts, with its take's path, audio SHA-256, clarity and line
+
+### Requirement: A narration asks the plan before any model loads
+
+`filmkit narrate`, and the narration `python -m filmkit.narration.narrate` run to narrate or to check, SHALL refuse before any model loads while the plan calls the edition's narration not ready, naming each node before it that is not fresh with the verb that builds it. The narrations that the convergence of `filmkit narrate` runs SHALL not ask again.
+
+#### Scenario: A retake before the source check
+
+- **WHEN** the Chinese cast is edited for a retake and `python -m filmkit.narration.narrate --language zh --ids 24` runs before the source check has run again
+- **THEN** it exits 1 before any step, in one line that names `check` and `filmkit build check`
+
+### Requirement: The verb narrates a stale narration though no take is due
+
+Where the plan calls `narrate:<code>` stale, `filmkit narrate` SHALL narrate the edition once, reusing every take whose request is unchanged, so that the node is fresh after it, even where every take the cast asks for stands.
+
+#### Scenario: The next engine
+
+- **WHEN** a build made by one engine version is read by the next, every take standing
+- **THEN** the plan calls each narration stale, no take's request has changed, and once `filmkit narrate` has narrated with every take reused, the narration is fresh
+
+#### Scenario: A chapter's title
+
+- **WHEN** the title of a chapter of the Chinese script is edited after a whole build
+- **THEN** the plan calls the Chinese narration stale, no take's request has changed, and once `filmkit narrate` has narrated with every take reused, the narration is fresh

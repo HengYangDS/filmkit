@@ -124,7 +124,7 @@ Each caption cue the engine writes into a timeline SHALL hold as its text its ph
 #### Scenario: A timeline built before
 
 - **WHEN** an English timeline's cue reads the film's data beside the display copy the film’s data
-- **THEN** verification refuses it until `produce refresh-captions` rewrites the cue as the film’s data
+- **THEN** verification refuses it until `refresh-captions` rewrites the cue as the film’s data
 
 ### Requirement: The chapter metadata keeps every character of its values
 

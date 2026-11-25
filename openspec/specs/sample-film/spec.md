@@ -68,32 +68,18 @@ The sample film's build SHALL make and validate each edition's picture with and 
 - **WHEN** the sample film is built and its players are read back
 - **THEN** each edition's comparison passes, its four films verify, and each player's captions control switches between its films
 
-### Requirement: The sample film renders its drafts before its pictures
-
-The sample film SHALL declare its drafts. Its picture task SHALL stage both pictures of each edition, render the edition's draft with `render-draft` and pass `preflight` before it renders the edition's pictures, and SHALL end by asking `admitted` of both editions.
-
-#### Scenario: The sample's picture task
-
-- **WHEN** the sample film's picture task runs on a build without packaged films
-- **THEN** `render-draft` writes each edition's draft record and `preflight` reports every input of each edition current before `render-picture` runs
-
-#### Scenario: Both editions still admitted after their renders
-
-- **WHEN** both editions' pictures are rendered, validated and compared
-- **THEN** `admitted` reports each edition admitted on the receipts its `preflight` wrote
-
 ### Requirement: The sample film prints its build's durations
 
-The repository SHALL carry a task that prints the duration records of the sample film's build with each edition's sum and the time of the build.
+`filmkit plan` SHALL print, for the sample film's build, each node's last seconds, their sum and their span.
 
 #### Scenario: After a sample build
 
-- **WHEN** the durations task runs after the sample film was built
-- **THEN** it lists each edition's commands from narration to verification with their seconds, the geometry check and the cover check among them, and prints the time of the build
+- **WHEN** `filmkit plan` runs after the sample film was built
+- **THEN** it lists each edition's nodes from narration to the still scan with their seconds, the geometry check and the cover check among them, and prints the sum and the span
 
 ### Requirement: The sample build qualifies the canvas the engine pins
 
-The sample film SHALL declare `software` capture. Its picture task SHALL render the Chinese captioned stage a second time with `qualify-renderer`, in another count of spans than the first, and refuse unless the two renders state one digest of their drawn frames and pass the comparison of a rendered pair with no row left out, and SHALL render the Chinese uncaptioned picture with `--native` and compare that pair at every frame. A release of the engine requires this qualification to pass.
+The sample film SHALL declare `software` capture. Its build SHALL render the Chinese captioned stage a second time with `qualify-renderer`, in another count of spans than the first, and refuse unless the two renders state one digest of their drawn frames and pass the comparison of a rendered pair with no row left out, and SHALL render the Chinese uncaptioned picture natively and compare that pair at every frame. A release of the engine requires this qualification to pass.
 
 #### Scenario: Two renders of one stage
 
@@ -147,17 +133,17 @@ The sample film SHALL declare `software` capture. Its picture task SHALL render 
 
 ### Requirement: The sample build scans its packaged films
 
-The sample film's package task SHALL run `scan-film` for each edition after it packages that edition's films, so that the sample's verification reads a film record of each edition.
+The sample's build SHALL run `scan-film` for each edition after it packages that edition's films, so that the sample's verification reads a film record of each edition.
 
 #### Scenario: The sample's package task
 
-- **WHEN** the sample film's package task runs after both editions' pictures are rendered
+- **WHEN** `filmkit build package:all` runs after both editions' pictures are rendered
 - **THEN** `scan-film` writes each edition's film record with no still run at the limit, and the technical verification of both editions passes
 
 #### Scenario: The sample's durations
 
-- **WHEN** the durations task runs after the sample film was built
-- **THEN** each edition's list holds `scan-film` between `package-film` and the verification, with its seconds
+- **WHEN** `filmkit plan` runs after the sample film was built
+- **THEN** each edition's list holds `scan-film` after `package-film`, with its seconds
 
 ### Requirement: The sample film lays out its editions as equals
 
@@ -171,5 +157,28 @@ Each of the sample's editions SHALL keep its files in the folder of its code, an
 
 #### Scenario: The sample holds what its engine asks
 
-- **WHEN** the engine loads the sample and `python -m filmkit.adoption` runs at it
-- **THEN** the engine refuses nothing, and the command's questions `declaration` and `editions` report no finding
+- **WHEN** the engine loads the sample and `filmkit check` runs at it
+- **THEN** the engine refuses nothing and the check reports no finding of the declaration
+
+### Requirement: The sample's renders wait for its drafts
+
+The sample film SHALL declare its drafts, so that its build renders each edition's draft with `render-draft` before it renders the edition's pictures.
+
+#### Scenario: The sample's picture build
+
+- **WHEN** `filmkit plan render-picture:all --json` runs on a build of the sample without packaged films
+- **THEN** `render-picture` of each edition waits for `render-draft` of every edition and is not ready until each draft's record passed
+
+#### Scenario: Both editions fresh after their renders
+
+- **WHEN** both editions' pictures are rendered, validated and compared
+- **THEN** `filmkit plan --json` reports every node of both editions up to the comparison fresh
+
+### Requirement: The sample builds by the engine's verbs
+
+The sample film's build SHALL be `filmkit check`, `filmkit narrate --edition all`, the light `filmkit build` that `filmkit build all` names, and `filmkit build all`, and its verification `filmkit verify --technical-only`; the repository's tasks SHALL state no other command of the sample's build.
+
+#### Scenario: A rebuild with its records kept
+
+- **WHEN** every output below the sample's `build/` but its narration and its run records is removed, and the light invocation that `filmkit build all` names has run
+- **THEN** `filmkit build all` runs every heavy node in one invocation, since the plan states their measured seconds under 1,800 s, and writes the bytes of the build before
