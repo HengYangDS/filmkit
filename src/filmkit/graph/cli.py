@@ -47,7 +47,8 @@ does:
 
 A refusal is one line on standard error, and the command exits 1, a declaration that the loader
 refuses among them (`declaration_refused`). A command that cannot finish exits 2: a tool the
-host lacks is named in one line, any other exception printed with its traceback; an interrupted
+host lacks, or no film where it runs, is named in one line, any other exception printed with its
+traceback; an interrupted
 one exits with the status that names its request (design decision 19). A target that names no
 node is refused in one line that names the nodes.
 """
@@ -353,9 +354,9 @@ def main(argv: list[str] | None = None) -> None:
         if refused is not None:
             print(refused, file=sys.stderr)
             sys.exit(child_processes.REFUSED)
-        tool = child_processes.missing(error)
-        if tool is not None:
-            print(tool, file=sys.stderr)
+        cause = child_processes.unfinished(error)
+        if cause is not None:
+            print(cause, file=sys.stderr)
         else:
             traceback.print_exc(file=sys.stderr)
         sys.exit(child_processes.UNFINISHED)

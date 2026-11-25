@@ -60,8 +60,9 @@ either, so a caller that must end such a command asks it to end and waits.
 
 A command's exit status says how it ended (design decision 19 of build-a-film-by-its-verbs):
 `FINISHED` where it did what it was asked, `REFUSED` where the film or a gate said no, in one
-line, and `UNFINISHED` where it could not finish, by an exception or by a tool the host lacks
-(`MissingToolError`); a request to end exits with the status that names it, as above.
+line, and `UNFINISHED` where it could not finish, by an exception, or by a cause outside the
+film's sources that one line names (`UnfinishedError`): a tool the host lacks, or no film where
+the command runs; a request to end exits with the status that names it, as above.
 """
 
 from __future__ import annotations
@@ -99,9 +100,14 @@ REQUESTS = {
 FINISHED, REFUSED, UNFINISHED = 0, 1, 2
 
 
-class MissingToolError(RuntimeError):
+class UnfinishedError(RuntimeError):
+    """The command cannot finish for a cause outside the film's sources, which its one line names:
+    no refusal of the film's, and its status is `UNFINISHED`."""
+
+
+class MissingToolError(UnfinishedError):
     """A tool the engine runs is not on this host as its owner installs it, so the command
-    cannot finish: no refusal of the film's, and its status is `UNFINISHED`."""
+    cannot finish."""
 
 
 class HostTool(NamedTuple):
@@ -138,11 +144,11 @@ def required(program: str) -> str:
     return found
 
 
-def missing(error: BaseException) -> MissingToolError | None:
-    """The tool the host lacks that an error says: a `MissingToolError`, or the
-    `FileNotFoundError` that starting one of `HOST_TOOLS` raises where it is not on the path;
-    None for any other error."""
-    if isinstance(error, MissingToolError):
+def unfinished(error: BaseException) -> UnfinishedError | None:
+    """What an error says the command could not finish for, in one line: an `UnfinishedError`, as
+    a tool the host lacks or a command run outside any film, or the `FileNotFoundError` that
+    starting one of `HOST_TOOLS` raises where it is not on the path; None for any other error."""
+    if isinstance(error, UnfinishedError):
         return error
     named = error.filename if isinstance(error, FileNotFoundError) else None
     return absent(named) if named in HOST_TOOLS else None

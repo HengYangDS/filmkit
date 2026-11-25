@@ -16,6 +16,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import filmkit.child_processes as child_processes
+
 # The film's declaration, below its root.
 DECLARATION = "content/film.toml"
 # The film's release record, at its root (design decision 15 of build-a-film-by-its-verbs).
@@ -30,8 +32,10 @@ EVIDENCE = Path("build/evidence/editions")
 ROOT_VARIABLE = "FILMKIT_ROOT"
 
 
-class FilmRootError(LookupError):
-    """No film declaration where the engine looked, or no npm packages above the film."""
+class FilmRootError(child_processes.UnfinishedError, LookupError):
+    """No film declaration where the engine looked, or no npm packages above the film: no
+    refusal of a film's, since none was read, and the command could not start where it ran
+    (`child_processes.UnfinishedError`)."""
 
 
 def film_root(start: Path | None = None) -> Path:

@@ -43,6 +43,11 @@ Every verb SHALL exit 0 where it did what it was asked; 1 where the film or a ga
 - **WHEN** a verb or a node it runs needs a tool the host lacks: no `node`, `ffmpeg`, `ffprobe`, `exiftool` or Vale on the path, no rsync 3, no browser build where a tool drives the browser, or another canvas build than the engine draws with in the film's npm packages
 - **THEN** it names the tool in one line and exits 2
 
+#### Scenario: Outside any film
+
+- **WHEN** a verb runs where no film's declaration stands, as with `FILMKIT_ROOT` naming an empty folder
+- **THEN** it says so in one line and exits 2: no film was read, so nothing is refused
+
 #### Scenario: A tool that crashes
 
 - **WHEN** an engine tool that a node runs, as the geometry check's, ends with an error that nothing catches, or a signal ends it

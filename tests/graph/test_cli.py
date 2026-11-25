@@ -231,6 +231,29 @@ def test_a_declaration_the_loader_refuses_is_a_refusal_of_every_verb(moved_too_l
     assert not (moved_too_late / "build/evidence/records").exists()
 
 
+# Each verb but supply, the one step that reaches the network, which no test runs unstubbed.
+OUTSIDE = (["plan"], ["build", "all"], ["check"], ["verify"], ["narrate"], ["deliver", "--dry-run"])
+OUTSIDE += (["release", "--dry-run"], ["review", "prepare"], ["edit", "--edits", "edits.json"])
+
+
+@pytest.mark.parametrize("argv", OUTSIDE, ids=lambda argv: argv[0])
+def test_a_verb_outside_any_film_says_so_in_one_line_and_exits_2(tmp_path, argv):
+    # No film is read, so nothing is refused: the command could not start where it ran.
+    environment = {**os.environ, repository.ROOT_VARIABLE: str(tmp_path)}
+    ran = subprocess.run(
+        [sys.executable, "-I", "-B", "-c", f"from filmkit.graph import cli; cli.main({argv!r})"],
+        env=environment,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    (line,) = ran.stderr.splitlines()
+    assert ran.returncode == child_processes.UNFINISHED
+    assert line == f"No film declaration content/film.toml in {tmp_path}, which FILMKIT_ROOT names"
+
+
 @pytest.mark.ffmpeg
 def test_plan_prints_each_node_of_the_sound_chain_as_json(sound_chain, capsys):
     cli.main(["plan", "check-sound:zh", "--json"])
