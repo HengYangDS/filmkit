@@ -80,8 +80,8 @@ GEOMETRY_STEP = "2"
 
 
 def ran(tool: str, arguments: list[str]) -> None:
-    """Run one of the engine's Node tools as a node's owner, refused where it exits with another
-    status than 0."""
+    """Run one of the engine's Node tools as a node's owner, refused where it exits with 1, its
+    finding; any other status, or a signal, `tools.run` raises as a failure to finish."""
     status = tools.run(tool, arguments)
     if status != 0:
         message = f"{tool} exited with status {status}"
