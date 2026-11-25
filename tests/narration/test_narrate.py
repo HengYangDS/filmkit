@@ -7,11 +7,8 @@ import pytest
 
 import filmkit.narration.narrate as narration_narrate
 import filmkit.repository as repository
-from filmkit.concepts import Place
 from filmkit.graph import records
 
-# The register check itself, kept before a fixture stands in for it.
-REGISTER_CHECK = narration_narrate.register.check
 BASE = "build/evidence/editions/zh/ear-first"
 RECEIPT = f"{BASE}/narration-receipt-06-07.json"
 PYTHON = [sys.executable, "-B"]
@@ -77,20 +74,7 @@ def test_narrate_edition_plans_receipts_named_after_the_selected_segments(scope,
 
 
 @pytest.fixture
-def gates(monkeypatch) -> list:
-    """The editions the narration gate checked, through checks that pass."""
-    checked = []
-    monkeypatch.setattr(narration_narrate.concepts, "check", lambda: {"concepts": 2})
-    monkeypatch.setattr(narration_narrate.register, "check", lambda: {"warnings": ["我们"]})
-    monkeypatch.setattr(
-        narration_narrate.readings, "check", lambda code: checked.append(code) or {"edition": code}
-    )
-    monkeypatch.setattr(narration_narrate.anchors, "require_editions", dict)
-    return checked
-
-
-@pytest.fixture
-def commands(monkeypatch, gates, tmp_path) -> list:
+def commands(monkeypatch, tmp_path) -> list:
     """The commands a run starts, below a root of its own, where the run's duration record goes."""
     monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
     calls = []
@@ -116,21 +100,10 @@ def test_narrate_edition_runs_the_whole_edition_from_the_root(commands, capsys):
     assert run[1][-3:] == [f"{base}/alignment.json", "--language", "English"]
     assert run[2][-3:] == [f"{base}/asr.json", "--language", "English"]
     assert [options for _, options in commands] == [{"cwd": repository.ROOT}] * 3
-    out = capsys.readouterr().out
-    # A Chinese form reaches the author as written.
-    assert "我们" in out.splitlines()[0]
-    printed = [json.loads(line) for line in out.splitlines()]
-    assert printed[0] == {
-        "edition": "en",
-        "gate": {
-            "concepts": {"concepts": 2},
-            "register": {"warnings": ["我们"]},
-            "readings": {"edition": "en"},
-            # A film without a composition is not asked what its picture reads of its anchors.
-            "picture_reads": "not asked: the film has no composition",
-        },
-    }
-    assert [line["step"] for line in printed[1:]] == ["narration", "alignment", "transcription"]
+    # The film's sources are no question of the narration's (`filmkit check`): it prints its
+    # steps alone.
+    printed = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert [line["step"] for line in printed] == ["narration", "alignment", "transcription"]
 
 
 @pytest.mark.parametrize(
@@ -149,33 +122,6 @@ def test_narrate_edition_runs_the_whole_edition_from_the_root(commands, capsys):
 def test_a_mode_flag_runs_only_its_steps(commands, flag, expected):
     narration_narrate.main(["--language", "zh", flag])
     assert [(command[3], command[-1]) for command, _ in commands] == expected
-
-
-def test_the_gate_runs_before_narration_and_its_plan_but_not_before_the_checks(commands, gates):
-    narration_narrate.main(["--language", "zh", "--dry-run"])
-    narration_narrate.main(["--language", "zh", "--skip-generation"])
-    narration_narrate.main(["--language", "en"])
-    assert gates == ["zh", "en"]
-
-
-def test_a_refused_gate_stops_narration_before_any_step(commands, monkeypatch):
-    def refuse(code):
-        message = f"zh 04.2 at 9: 重 in “代码和日期去重。” has no declared reading ({code})"
-        raise narration_narrate.readings.ReadingError(message)
-
-    monkeypatch.setattr(narration_narrate.readings, "check", refuse)
-    with pytest.raises(SystemExit, match="Narration refused before synthesis:\nzh 04.2 at 9"):
-        narration_narrate.main(["--language", "zh", "--dry-run"])
-    assert commands == []
-
-    def contract_refuses():
-        message = "zh 03 declares rebuild but says none of: 重建"
-        raise narration_narrate.concepts.ConceptError(message)
-
-    monkeypatch.setattr(narration_narrate.concepts, "check", contract_refuses)
-    with pytest.raises(SystemExit, match="declares rebuild but says none of"):
-        narration_narrate.main(["--language", "en"])
-    assert commands == []
 
 
 def test_a_retake_is_recorded_as_a_partial_run_with_each_step_as_a_phase(commands):
@@ -207,18 +153,3 @@ def test_a_dry_run_writes_no_record(commands):
     narration_narrate.main(["--language", "zh", "--dry-run"])
     assert not (repository.ROOT / "build/evidence").exists()
     assert len(commands) == 1
-
-
-def test_a_form_the_register_refuses_stops_narration_before_any_step(commands, monkeypatch):
-    monkeypatch.setattr(narration_narrate.register, "check", REGISTER_CHECK)
-    held = {"zh": [Place("zh 01.1", "你们先看。")]}
-    monkeypatch.setattr(narration_narrate.concepts, "places", lambda: held)
-    with pytest.raises(SystemExit) as refusal:
-        narration_narrate.main(["--language", "zh", "--dry-run"])
-    assert str(refusal.value) == (
-        "Narration refused before synthesis:\nzh 01.1: '你们' addresses the audience (R1)\n"
-        "A film keeps a standard word or a quotation at its place by declaring it in "
-        "[[register.exceptions]]: its place, its form, the text the form stands within there "
-        "(within) and a reason"
-    )
-    assert commands == []

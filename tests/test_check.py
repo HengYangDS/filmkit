@@ -153,3 +153,25 @@ def test_a_read_only_check_writes_no_file_whether_it_passes_or_refuses(copied, c
     said = capsys.readouterr().out.splitlines()
     assert said[0].startswith("template: no ") and said[-1].startswith("filmkit check refuses")
     assert listing(copied) == before
+
+
+def test_a_form_the_register_refuses_is_named_with_its_place(copied, monkeypatch):
+    # Narration's gate asked this before synthesis until the source check took it over.
+    held = {"zh": [concepts.Place("zh 01.1", "你们先看。")], "en": []}
+    monkeypatch.setattr(concepts, "places", lambda *_: held)
+    verdict = check.asked(repository.ROOT, write=False)
+    assert verdict["findings"]["register"] == ["zh 01.1: '你们' addresses the audience (R1)"]
+    assert verdict["outcome"] == "refuse"
+
+
+def test_a_reading_the_edition_does_not_declare_is_named_with_its_edition(copied, monkeypatch):
+    def refuse(code, *, write):
+        message = f"{code} 04.2 at 9: 重 in “代码和日期去重。” has no declared reading"
+        raise readings.ReadingError(message)
+
+    monkeypatch.setattr(readings, "check", refuse)
+    found = check.asked(repository.ROOT, write=False)["findings"]["readings"]
+    assert found == [
+        "zh: zh 04.2 at 9: 重 in “代码和日期去重。” has no declared reading",
+        "en: en 04.2 at 9: 重 in “代码和日期去重。” has no declared reading",
+    ]

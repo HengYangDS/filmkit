@@ -7,13 +7,16 @@ from itertools import pairwise
 import pytest
 
 import filmkit.captions.refresh as refresh
+import filmkit.check as check
+import filmkit.concepts as concepts
 import filmkit.narration.anchors as anchors
-import filmkit.narration.narrate as narrate
+import filmkit.narration.readings as readings
 import filmkit.narration.script_edits as script_edits
 import filmkit.picture.gates as gates
 import filmkit.picture.renderer as renderer
 import filmkit.picture.rendering as rendering
 import filmkit.preflight as preflight
+import filmkit.register as register
 import filmkit.repository as repository
 import filmkit.soundtrack.assembly as assembly
 import filmkit.tools as tools
@@ -161,9 +164,6 @@ def broken(tmp_path, monkeypatch):
     each command reads before its anchors; the words checks of narration pass."""
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
-    for check in ("concepts", "register"):
-        monkeypatch.setattr(getattr(narrate, check), "check", lambda: {})
-    monkeypatch.setattr(narrate.readings, "check", lambda code: {})
     unclosed = segment("01", "依据{order}有先后。")
     english = {"id": "01", "utterance_groups": ["One."], "text": "One."}
     for code, scripted in (("zh", unclosed), ("en", english)):
@@ -184,7 +184,6 @@ def broken(tmp_path, monkeypatch):
         lambda zh: rendering.stage_picture(zh, None, 9, 3840, 2160),
         lambda zh: gates.check_picture(zh),
         lambda zh: preflight.preflight(zh),
-        lambda zh: narrate.gate("zh"),
         lambda zh: script_edits.main(["--edits", "edits.json"]),
         lambda zh: anchors.main(["--timeline", "build/derived"]),
     ],
@@ -194,7 +193,6 @@ def broken(tmp_path, monkeypatch):
         "stage-picture",
         "check-picture",
         "preflight",
-        "narration",
         "script_edits",
         "report",
     ],
@@ -375,68 +373,56 @@ window.renderFrame = (t) => {
 
 @pytest.fixture
 def drawing(editions, tmp_path, monkeypatch):
-    """The two editions with a composition and the canvas package, narration's words checks
-    passing, and a model loader that records each step it would start."""
-    for check in ("concepts", "register"):
-        monkeypatch.setattr(getattr(narrate, check), "check", lambda: {})
-    monkeypatch.setattr(narrate.readings, "check", lambda code: {})
+    """The two editions with a composition and the canvas package, and the source check's other
+    questions of the words passing; what the check finds of the pictures' reads (`check.words`)."""
+    monkeypatch.setattr(concepts, "check", lambda: {})
+    monkeypatch.setattr(register, "check", lambda: {})
+    monkeypatch.setattr(readings, "check", lambda code, **_: {})
     package = {"name": renderer.RENDERER_NAME, "version": renderer.RENDERER_VERSION}
     put(tmp_path / "node_modules" / renderer.RENDERER_PACKAGE, package)
     (tmp_path / "picture").mkdir()
     (tmp_path / "picture/film.js").write_text(COMPOSITION.replace("THROWS", ""))
-    started = []
-    monkeypatch.setattr(
-        narrate.child_processes, "run", lambda command, **_: started.append(command)
-    )
-    return started
+
+    def drawn() -> tuple[list[str], object]:
+        found, reads = check.words(write=False)
+        return found["picture_reads"], reads
+
+    return drawn
 
 
-@pytest.mark.parametrize("mode", [["--dry-run"], []])
-def test_narration_refuses_an_anchor_the_english_picture_reads_and_its_script_lacks(
-    drawing, editions, tmp_path, mode
+def test_the_source_check_refuses_an_anchor_the_english_picture_reads_and_its_script_lacks(
+    drawing, editions, tmp_path
 ):
     english = editions["en"]
     english["segments"][0] = segment("03", "There is an order.")
     put(tmp_path / Edition("en").script, english)
-    with pytest.raises(SystemExit, match="Narration refused before synthesis") as refused:
-        narrate.main(["--language", "zh", *mode])
-    assert "en 03 order: the en picture reads it from segment 03" in str(refused.value)
-    assert "zh 03" not in str(refused.value) and "26" not in str(refused.value)
-    assert drawing == []
+    refused = "\n".join(drawing()[0])
+    assert "en 03 order: the en picture reads it from segment 03" in refused
+    assert "zh 03" not in refused and "26" not in refused
 
 
-def test_an_anchor_one_editions_picture_reads_is_asked_of_that_edition_alone(drawing, capsys):
+def test_an_anchor_one_editions_picture_reads_is_asked_of_that_edition_alone(drawing):
     # Only the Chinese script marks `fails`, which only the Chinese picture reads.
-    narrate.main(["--language", "en", "--dry-run"])
-    gate = json.loads(capsys.readouterr().out.splitlines()[0])["gate"]
-    assert gate["picture_reads"] == {
-        "verdict": "pass",
-        "not_judged": {"zh": [], "en": []},
-        "not_loaded": {},
-    }
-    assert len(drawing) == 1
+    assert drawing() == (
+        [],
+        {"verdict": "pass", "not_judged": {"zh": [], "en": []}, "not_loaded": {}},
+    )
 
 
-def test_a_scene_that_throws_is_named_as_not_judged_and_narration_goes_on(
-    drawing, tmp_path, capsys
-):
+def test_a_scene_that_throws_is_named_as_not_judged_and_refuses_nothing(drawing, tmp_path):
     thrown = COMPOSITION.replace("THROWS", 'throw Error("Missing spoken cue 03:依据");')
     (tmp_path / "picture/film.js").write_text(thrown)
-    narrate.main(["--language", "zh", "--dry-run"])
-    judged = json.loads(capsys.readouterr().out.splitlines()[0])["gate"]["picture_reads"]
+    refused, judged = drawing()
     scene = {"scene": "03", "segment": "03", "error": "Missing spoken cue 03:依据", "from": 0}
     scene["reads"] = ["order"]
     assert judged["not_judged"]["zh"] == [scene]
-    assert judged["verdict"] == "not judged"
-    assert len(drawing) == 1
+    assert (judged["verdict"], refused) == ("not judged", [])
 
 
 def test_an_unmarked_id_a_scene_reads_before_it_throws_is_refused(drawing, tmp_path):
     thrown = 's.anchors.missing.start; throw Error("Missing spoken cue 03:依据");'
     (tmp_path / "picture/film.js").write_text(COMPOSITION.replace("THROWS", thrown))
-    with pytest.raises(SystemExit, match="zh 03 missing: the zh picture reads it"):
-        narrate.main(["--language", "zh", "--dry-run"])
-    assert drawing == []
+    assert any("zh 03 missing: the zh picture reads it" in line for line in drawing()[0])
 
 
 def test_the_reads_tool_takes_its_step_from_the_check(drawing, editions, tmp_path):
@@ -445,29 +431,24 @@ def test_the_reads_tool_takes_its_step_from_the_check(drawing, editions, tmp_pat
     assert tools.run("anchor-reads", [str(tmp_path / "zh.json")], stdout=out) == 2
 
 
-def test_a_composition_that_does_not_load_is_not_judged_and_narration_goes_on(
-    drawing, tmp_path, capsys
-):
+def test_a_composition_that_does_not_load_is_not_judged_and_refuses_nothing(drawing, tmp_path):
     # Both editions' scripts mark anchors; the composition throws as it loads.
     (tmp_path / "picture/film.js").write_text('throw Error("broken\\nwhile it loads");')
-    narrate.main(["--language", "zh", "--dry-run"])
-    judged = json.loads(capsys.readouterr().out.splitlines()[0])["gate"]["picture_reads"]
-    assert judged["verdict"] == "not judged"
+    refused, judged = drawing()
+    assert (judged["verdict"], refused) == ("not judged", [])
     loaded = "The composition does not load: broken"
     assert judged["not_loaded"] == {"zh": loaded, "en": loaded}
-    assert len(drawing) == 1
 
 
 def test_a_check_whose_packages_are_missing_refuses_with_its_reason(drawing, tmp_path):
     (tmp_path / "node_modules" / renderer.RENDERER_PACKAGE).unlink()
-    with pytest.raises(SystemExit, match=f"cannot draw it: .*no {renderer.RENDERER_NAME}"):
-        narrate.main(["--language", "zh", "--dry-run"])
-    assert drawing == []
+    refused = "\n".join(drawing()[0])
+    assert re.search(f"cannot draw it: .*no {renderer.RENDERER_NAME}", refused)
 
 
 def test_a_film_without_a_composition_is_not_asked(drawing, tmp_path):
     (tmp_path / "picture/film.js").unlink()
-    assert narrate.gate("zh")["picture_reads"] == anchor_reads.NOT_ASKED
+    assert drawing() == ([], anchor_reads.NOT_ASKED)
 
 
 # The sample film's composition, which every engine test draws.

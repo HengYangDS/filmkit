@@ -64,9 +64,9 @@ synthesis.main([])
 # The narration command itself, its one step the script given.
 NARRATE = """
 import pathlib, sys
+import filmkit.graph.chain  # what reads the sample film at import, before the root moves
 import filmkit.narration.narrate as narrate
 narrate.repository.ROOT = pathlib.Path(sys.argv[1])
-narrate.gate = lambda code: {}
 narrate.steps = lambda code, ids, scope: [("narration", [sys.executable, "-B", *sys.argv[2:]])]
 narrate.main(["--language", "zh"])
 """

@@ -5,10 +5,7 @@ the repository root on the edition's ear-first evidence. With --ids only those s
 are narrated, into a receipt, alignment and transcript named after them, such as
 narration-receipt-06-07.json, alignment-06-07.json and asr-06-07.json.
 
-Before any speech model loads, and with --dry-run too, the edition must pass the concept
-check (`filmkit.concepts`), the register check (`filmkit.register`), its readings check
-(`filmkit.narration.readings`) and the check of what every edition's picture reads of its
-scripts' anchors (`filmkit.picture.anchor_reads`); a refusal stops the run and names every failure.
+The film's sources are checked by the film-wide node `check` (`filmkit.check`), not here.
 
 Usage: python -m filmkit.narration.narrate
     --language <code> [--ids 06,07] [--dry-run | --skip-generation]
@@ -30,13 +27,10 @@ import sys
 import time
 
 import filmkit.child_processes as child_processes
-import filmkit.concepts as concepts
 import filmkit.graph.runs as seam
-import filmkit.register as register
 import filmkit.repository as repository
-from filmkit.narration import anchors, processes, readings
+from filmkit.narration import processes
 from filmkit.narration.snapshots import ALIGNER as ALIGNER_SNAPSHOT
-from filmkit.picture import anchor_reads
 from filmkit.production import CODES, Edition
 
 ALIGNER = ALIGNER_SNAPSHOT.folder
@@ -121,33 +115,6 @@ def steps(code: str, ids: str = "", scope: Scope = Scope.ALL) -> list[tuple[str,
     return checks if scope is Scope.CHECKS else [("narration", narration), *checks]
 
 
-def gate(code: str) -> dict:
-    """Refuse an edition whose words depart from the concept contract or the formal register, or
-    leave a reading open, and a film whose scripts break an anchor's rule or do not mark what its
-    picture reads.
-
-    Returns:
-        The concept check's, the register check's and the edition's readings check's reports,
-        and the scenes the check of what the pictures read could not judge.
-    """
-    try:
-        checked = {
-            "concepts": concepts.check(),
-            "register": register.check(),
-            "readings": readings.check(code),
-        }
-        checked["picture_reads"] = anchor_reads.check()
-    except (
-        concepts.ConceptError,
-        register.RegisterError,
-        readings.ReadingError,
-        anchors.AnchorError,
-    ) as error:
-        message = f"Narration refused before synthesis:\n{error}"
-        raise SystemExit(message) from None
-    return checked
-
-
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Narrate, align and transcribe one edition.")
     parser.add_argument("--language", choices=CODES, required=True)
@@ -165,9 +132,6 @@ def main(argv: list[str] | None = None) -> None:
         scope = Scope.PLAN
     elif options.skip_generation:
         scope = Scope.CHECKS
-    if scope is not Scope.CHECKS:
-        checked = {"edition": options.language, "gate": gate(options.language)}
-        print(json.dumps(checked, ensure_ascii=False), flush=True)
     stopped = "The narration was stopped by {request}; its running step was ended with it"
     with child_processes.ending(stopped):
         narrate(options.language, options.ids, scope)

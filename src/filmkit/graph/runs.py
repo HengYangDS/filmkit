@@ -379,8 +379,13 @@ def open_node(
     """The run of the node a command names, opened: an edition's node for an edition it applies
     to, a film-wide node for no edition. None for a command that names no node or names one
     otherwise, which is measured and writes nothing, and for one whose opening failed, which is
-    named (`unwritten`)."""
-    node = table().get(command)
+    named (`unwritten`), the loading of the node table among it."""
+    try:
+        node = table().get(command)
+    except Exception as error:
+        # A failure of the seam is never the command's.
+        unwritten(nodes.key(command, code), error)
+        return None
     if node is None:
         return None
     film = node.per == nodes.FILM
