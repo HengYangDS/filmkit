@@ -22,7 +22,7 @@ The release runs these checks, unchanged, on every planned commit and at the arc
 
 ## 3. The CI
 
-- [ ] 3.1 Set `[gitlab.runners.macos]` `review_tags = ["macos-latest", "review"]` and `protected_tags = ["macos-latest", "protected"]` in `.config/ci/verification.toml`, with a comment naming the owner's decision of 2026-11-25, and apply the patch that `ethos lane project --json` previews. Done when `ethos lane project --check --json` passes, the diff of `.gitlab-ci.yml` changes only the two jobs' `tags` lists, and `.github/workflows/ci.yml` is byte-identical.
+- [x] 3.1 Set `[gitlab.runners.macos]` `review_tags = ["macos-latest", "review"]` and `protected_tags = ["macos-latest", "protected"]` in `.config/ci/verification.toml`, with a comment naming the owner's decision of 2026-11-25, and apply the patch that `ethos lane project --json` previews. Done when `ethos lane project --check --json` passes, the diff of `.gitlab-ci.yml` changes only the two jobs' `tags` lists, and `.github/workflows/ci.yml` is byte-identical.
 
 ## 4. Local first
 

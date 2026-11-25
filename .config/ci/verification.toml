@@ -19,7 +19,10 @@ MISE_CEILING_PATHS = "$CI_PROJECT_DIR/.."
 MISE_TRUSTED_CONFIG_PATHS = "$CI_PROJECT_DIR/.config/mise/config.toml"
 MISE_YES = "1"
 
+# CI runs only on Apple-silicon macOS, and both forges select it by one label: GitHub's hosted
+# `macos-latest`, and on GitLab the project-locked macOS guest's runners, which carry the same
+# label beside `review` or `protected` (the owner's decision of 2026-11-25).
 [gitlab.runners.macos]
 system = "macos"
-review_tags = ["ci-macos-arm64-review"]
-protected_tags = ["ci-macos-arm64-shell"]
+review_tags = ["macos-latest", "review"]
+protected_tags = ["macos-latest", "protected"]
