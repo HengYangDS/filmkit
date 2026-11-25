@@ -1,6 +1,6 @@
 """The draft render: the edition's captioned picture staged afresh at 1080p, drawn at 10 fps in
-one process at a lower scheduling priority, and scanned into the record the pre-render check
-reads."""
+one process at a lower scheduling priority, and scanned into the draft's still record, whose
+node every render waits for."""
 
 import json
 import os
@@ -109,7 +109,7 @@ def test_the_draft_renders_at_niceness_10_or_the_callers_with_its_input_closed_i
 
 
 @pytest.mark.ffmpeg
-def test_the_draft_scan_lands_where_preflight_reads_it(film_root, tmp_path):
+def test_the_draft_scan_lands_in_the_draft_s_still_record(film_root, tmp_path):
     edition = Edition("zh")
     film_root.timeline(edition, words=[{"text": "先看", "start": 1.0, "end": 2.0}])
     # The stand-in draft holds the film's seconds, as the timeline it is scanned against states

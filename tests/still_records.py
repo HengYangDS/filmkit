@@ -1,7 +1,6 @@
 """What tests of several folders share of the still scan. A draft's record as the scan writes
-it, for the tests that need one standing without a scan: the pre-render check reads a draft's
-record by the reader of the film's record, which takes no record on less than the scan's shape.
-And the scan's own requirement, for a test that asks it where a fixture stands in for it."""
+it, for the tests that need one standing without a scan, in the scan's whole shape. And the
+scan's own requirement, for a test that asks it where a fixture stands in for it."""
 
 import filmkit.picture.renderer as renderer
 import filmkit.picture.rendering as rendering
