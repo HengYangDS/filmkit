@@ -388,6 +388,38 @@ def test_a_hearing_reruns_the_picture_gate_and_the_renders_until_outputs_are_key
             assert found[f"{name}:{code}"].state == "behind", (name, code)
 
 
+def test_an_edit_the_renders_do_not_bind_holds_them_until_the_picture_gate_has_judged_it(judging):
+    # The review of `68e0cc6..b1467a2`, finding 5: an edit of the release's sources, a table no
+    # node binds, makes stale only the nodes that bind the declaration whole, the picture gate
+    # among them. Each render reads the declaration aside, to hold the gate's record to it, and
+    # binds no part of it, yet is held while the gate has not judged the edit: before the gate
+    # runs again it is not fresh and not ready, and after it, its input, the gate's record, has
+    # changed.
+    table, stale = judging
+    whole = set()
+    for key in table.edges:
+        node, edition = table.node(key)
+        if "declaration" in node.inputs(edition):
+            whole.add(key)
+    assert {"check", "check-sound:zh", "check-picture:zh", "check-picture:en"} <= whole
+    stale |= whole
+    found = entries(table)
+    for code in table.codes:
+        for name in ("render-picture", "render-picture-uncaptioned"):
+            node, edition = table.node(f"{name}:{code}")
+            assert "declaration" not in node.inputs(edition), name
+            assert engine_chain.aside(name, edition) == {"declaration": node_declaration()}
+            # The gate's record, or for a derived picture the captioned one, rendered after it.
+            assert {"picture_gates", "captioned_picture"} & set(node.inputs(edition)), name
+            render = found[f"{name}:{code}"]
+            assert (render.state != "fresh", render.ready) == (True, False), (name, code)
+
+
+def node_declaration():
+    """The film's declaration as a node's places name it."""
+    return repository.ROOT / repository.DECLARATION
+
+
 def test_a_group_s_target_lists_its_nodes_and_every_node_upstream_by_path_and_wait(judging):
     table, _ = judging
     listed = set(entries(table, "picture:zh"))

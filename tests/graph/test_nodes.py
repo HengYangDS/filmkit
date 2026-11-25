@@ -317,6 +317,16 @@ def test_the_geometry_check_binds_the_timeline_whose_runtime_its_record_must_cov
     assert node.inputs(edition)["timeline"] == edition.timeline
 
 
+@pytest.mark.parametrize("name", ["render-picture", "render-picture-uncaptioned"])
+def test_a_render_reads_the_declaration_aside_and_does_not_bind_it(name):
+    # Task 10.2's recorder found each render reading content/film.toml: it holds the picture
+    # gate's record to it, which the gate binds whole; the render's own inputs stay its tables.
+    node, edition = chain.table().node(f"{name}:zh")
+    declaration = repository.ROOT / repository.DECLARATION
+    assert chain.aside(name, edition) == {"declaration": declaration}
+    assert declaration not in node.inputs(edition).values()
+
+
 @pytest.mark.parametrize("gaps", [False, True])
 def test_the_geometry_check_gates_row_gaps_only_where_the_film_declares_it(
     gaps, monkeypatch, tmp_path

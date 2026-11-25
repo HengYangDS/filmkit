@@ -438,14 +438,27 @@ SHARED = {
         ("cover_png", "cover_jpg", "player", "shot_plan", "viewing_package", "entry"), _PACKAGE
     ),
 }
-# Reads a node makes that are no input of it, each with its reason: a read of a later node's
-# output, which as an input would close a cycle (build/evidence/record-every-run/research.md).
-# The check of each run's opens allows them and reports each as an exemption.
+# Reads a node makes that are no input of it, each with its reason, of two kinds: a read of a later
+# node's output, which as an input would close a cycle (build/evidence/record-every-run/
+# research.md); and a read that holds a gate's record to what the gate binds, which the node
+# binds through the gate's record and its wait for the gate, not by the bytes. The check of each
+# run's opens allows them and reports each as an exemption.
+# A render holds the picture gate's record to the declaration as it stands
+# (`rendering.require_passing_gates`); the gate binds the declaration whole, the render binds the
+# gate's record and waits for it, so the declaration's bytes are no input of the render. Once
+# `key-outputs-by-their-inputs` drops the gate's whole binding, this read narrows with it: the
+# recorder then reports each table the render reads.
+GATE_BINDING = (
+    "a render holds the picture gate's record to the declaration, which the gate binds whole",
+    lambda e: {"declaration": root(repository.DECLARATION)},
+)
 ASIDE: dict[str, tuple[str, Callable[[Edition], Places]]] = {
     "package-metadata": (
         "the player page states the sizes of the films that package-film writes",
         lambda e: {f"film_{kind}": e.film(kind) for kind in packaging.RENDITIONS},
     ),
+    "render-picture": GATE_BINDING,
+    "render-picture-uncaptioned": GATE_BINDING,
 }
 
 
