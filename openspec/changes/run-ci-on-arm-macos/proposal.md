@@ -2,7 +2,7 @@
 
 On 25 November 2026 the owner ruled for every repository that ETHOS governs, as relayed by the session that onboards repositories to ETHOS [S1, C-11, D-63]: Windows support leaves CI and every other part, and a macOS-only project runs only ARM macOS (13:45); every project works with no remote, one or both, local first, the shared parts mirrored (13:47); and the label is `macos-latest`, GitLab adding `review` or `protected` (13:54).
 
-filmkit already runs CI only on ARM macOS [S2]. Left: GitLab's old runner tags, ETHOS's Windows archives in the Mise pin and lock, Windows wheels in uv's lock, a Windows example in `openspec/config.yaml`, and no requirement that states where the engine is checked or that it checks the same with no remote, one or both.
+filmkit already runs CI only on ARM macOS [S2]. Left: GitLab's old runner tags, ETHOS's Windows archives in the Mise pin and a Windows table for each of the five tools in the Mise lock, Windows wheels in uv's lock, a Windows example in `openspec/config.yaml`, and no requirement that states where the engine is checked or that it checks the same with no remote, one or both.
 
 ## What Changes
 

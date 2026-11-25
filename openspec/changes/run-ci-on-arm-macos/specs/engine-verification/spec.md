@@ -6,7 +6,7 @@ Check every head of the engine the same way wherever it is checked: on Apple-sil
 
 ### Requirement: The engine is checked on Apple-silicon macOS alone
 
-The repository SHALL declare hosted verification on Apple-silicon macOS alone: on GitHub one job on the hosted runner `macos-latest`, and on GitLab one review job that selects runners by the tags `macos-latest` and `review` and one protected job that selects them by `macos-latest` and `protected`. It SHALL declare no CI job for another operating system, and neither its tool pins nor the locks its declarations shape SHALL name a Windows archive or a package that only Windows needs.
+The repository SHALL declare hosted verification on Apple-silicon macOS alone: on GitHub one job on the hosted runner `macos-latest`, on GitLab a review job on runners tagged `macos-latest` and `review` and a protected job on runners tagged `macos-latest` and `protected`, and no job for another system. Neither its Mise pins and lock nor uv's lock SHALL name a Windows archive or a package only Windows needs; npm's lock MAY keep the optional builds that npm records for every platform.
 
 #### Scenario: GitHub's job
 
@@ -32,7 +32,7 @@ The repository SHALL declare hosted verification on Apple-silicon macOS alone: o
 
 ### Requirement: Both forges run one check from one declaration
 
-Both forges' CI files SHALL be generated from the repository's CI declaration by ETHOS's projection, and SHALL NOT be edited by hand. Every job of both SHALL install the same locked supply, run `mise run bootstrap`, run the full proof `ethos prove --host --execute --full` under the declaration's one deadline and keep its report for the declaration's days; every other part of a job SHALL be its forge's projection of that declaration.
+Both forges' CI files SHALL be generated from the repository's CI declaration by ETHOS's projection, and SHALL NOT be edited by hand. Every job of both SHALL install the same locked supply, run `mise run bootstrap`, run the full proof `ethos prove --host --execute --full` under the declaration's one deadline and keep its report for the same number of days, which the projection sets; every other part of a job SHALL be its forge's projection of that declaration.
 
 #### Scenario: A hand edit of a CI file
 
@@ -46,11 +46,11 @@ Both forges' CI files SHALL be generated from the repository's CI declaration by
 
 ### Requirement: The engine is checked and proved whatever remotes a checkout has
 
-A checkout with no Git remote SHALL pass the whole check (`mise run check`) and the full proof at a head with the verdicts that the canonical checkout's runs give at that head. In a checkout that has only one of the declared peers' remotes, ETHOS's status and the proof's readiness SHALL report no required gap for the absent peer. No gate of the repository's proof sets SHALL contact a remote; the bootstrap MAY reach the package registries.
+A checkout that differs from the canonical checkout only in having no Git remote SHALL pass the whole check (`mise run check`) and the full proof at a head with the canonical checkout's verdicts there. With only one declared peer's remote, ETHOS's status and the proof's readiness SHALL report no required gap for the absent peer. No gate of the repository's proof sets SHALL contact a remote; the bootstrap MAY reach the package registries.
 
 #### Scenario: A checkout with no remote
 
-- **WHEN** `git remote` prints nothing in a clone of a head and its whole check and full proof run
+- **WHEN** `git remote` prints nothing in a clone of a head, the clone is bound to the canonical checkout's signers' file (`ethos hook bind-trust`), and its whole check and its full proof run, the proof naming the Change where the clone is not a Work Lane
 - **THEN** both pass with the verdicts that the canonical checkout's runs at that head give
 
 #### Scenario: A checkout with one remote
