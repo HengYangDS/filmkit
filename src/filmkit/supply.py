@@ -113,11 +113,17 @@ def supply_models() -> list[dict]:
     return models
 
 
-def main(argv: list[str] | None = None) -> None:
-    argparse.ArgumentParser(description=__doc__.splitlines()[0]).parse_args(argv)
+def supply() -> dict:
+    """Supply the browser build, the dictionary and the models, each checked: the report of
+    what each is and where it stands (`filmkit supply`)."""
     report = {"browser": supply_browser(), "dictionary": supply_dictionary()}
     report["models"] = supply_models()
-    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return report
+
+
+def main(argv: list[str] | None = None) -> None:
+    argparse.ArgumentParser(description=__doc__.splitlines()[0]).parse_args(argv)
+    print(json.dumps(supply(), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

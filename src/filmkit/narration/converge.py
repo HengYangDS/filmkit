@@ -484,26 +484,37 @@ def main(argv: list[str] | None = None) -> None:
     options = parser.parse_args(argv)
     if options.rounds < 0 or options.takes < 1:
         parser.error("--rounds is 0 or more and --takes is 1 or more")
-    code = options.language
-    stopped = "The convergence was stopped by {request}; what it was running was ended with it"
-    # The run is measured inside the block that answers a request to end; an edition that ends
-    # unsettled or refused is a run that did not complete, and a run that a request or a fault
-    # ends states no measurement.
-    with child_processes.ending(stopped):
-        former = admitted(code)
-        with seam.run(code, COMMAND) as run:
-            record = converge(code, former, rounds=options.rounds, takes=options.takes)
-            unsettled = record["unsettled"]
-            refused = said(code, record) if unsettled else fitting.said(code, record["fit"])
-            # The thoughts the last judgment judged, which it records beside the receipt.
-            judged = len(repository.read(Edition(code).ear_first / judge.RECORD)["thoughts"])
-            ear = judgment.waiting(code, record["for_the_ear"], judged)
-            refused = "\n".join(filter(None, [refused, *ear]))
-            if refused:
-                run.fail()
-            stamp(code, record, run.measured(completed=not refused))
+    with child_processes.ending(STOPPED):
+        refused = converged(options.language, rounds=options.rounds, takes=options.takes)
     if refused:
         raise SystemExit(refused)
+
+
+# What a command that converges says when a request ends it.
+STOPPED = "The convergence was stopped by {request}; what it was running was ended with it"
+
+
+def converged(code: str, *, rounds: int = 2, takes: int = 3) -> str:
+    """Converge one edition as one measured run, inside a command's `child_processes.ending`
+    (`filmkit narrate`): what refuses it, in lines, or nothing where it settled and fits.
+
+    The run is measured inside the block that answers a request to end; an edition that ends
+    unsettled or refused is a run that did not complete, and a run that a request or a fault
+    ends states no measurement.
+    """
+    former = admitted(code)
+    with seam.run(code, COMMAND) as run:
+        record = converge(code, former, rounds=rounds, takes=takes)
+        unsettled = record["unsettled"]
+        refused = said(code, record) if unsettled else fitting.said(code, record["fit"])
+        # The thoughts the last judgment judged, which it records beside the receipt.
+        judged = len(repository.read(Edition(code).ear_first / judge.RECORD)["thoughts"])
+        ear = judgment.waiting(code, record["for_the_ear"], judged)
+        refused = "\n".join(filter(None, [refused, *ear]))
+        if refused:
+            run.fail()
+        stamp(code, record, run.measured(completed=not refused))
+    return refused
 
 
 if __name__ == "__main__":

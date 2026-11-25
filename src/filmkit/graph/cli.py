@@ -1,23 +1,50 @@
-"""The `filmkit` console command (design decision 10 of record-every-run, 17 of
-build-a-film-by-its-verbs).
+"""The `filmkit` console command: a film's build by its verbs (design decision 10 of
+record-every-run, 17 of build-a-film-by-its-verbs).
 
-Usage: filmkit check [--read-only]
+Usage: filmkit supply
+       filmkit check [--read-only]
+       filmkit edit --edits FILE [--dry-run]
+       filmkit narrate [--edition CODE|all] [--rounds N] [--takes N]
        filmkit plan [TARGET...] [--json]
+       filmkit build [TARGET...]
        filmkit verify [--technical-only] [--release]
+       filmkit review prepare|record|set-aside ...
+       filmkit deliver [--to DIR] [--dry-run]
+       filmkit release [--replace] [--dry-run]
 
-Run in a film's folder, where the engine finds the film. `check` asks every question of the
-film's sources at once (`filmkit.check`) as the run of the film-wide node `check`, which writes
-its record, its verdict and each edition's occurrence plan; with `--read-only` it prints each
-finding and writes no file. Either exits 1 where a question found anything. `plan` prints, for
-the nodes a target
-names (`<node>:<code>` or `<node>:all`, every node where none is named) and every node upstream of
-them, each node's state and reasons, its host class as measured and as expected, its last seconds
-and whether it is ready (`filmkit.graph.plan`); it writes nothing. `verify` hashes every file a run
-record states and exits 1 where it refuses (`filmkit.graph.verify`); only once the records pass,
-`--technical-only` runs the verifier's technical checks of each edition's delivered films, which
-decode them (`filmkit.delivery.verification`), and `--release` compares the build with the
-published release (`filmkit.delivery.reproduction`). `verify` writes nothing in any mode. A target
-that names no node is refused in one line that names the nodes.
+Run in a film's folder, where the engine finds the film. Each verb calls the owner of what it
+does:
+
+- `supply` installs the browser build, the dictionary and the speech models the engine pins,
+  the one step that reaches the network (`filmkit.supply`).
+- `check` asks every question of the film's sources at once (`filmkit.check`) as the run of the
+  film-wide node `check`, which writes its record, its verdict and each edition's occurrence
+  plan; with `--read-only` it prints each finding and writes no file. Either exits 1 where a
+  question found anything.
+- `edit` applies an edits file's exact edits to the scripts and casts, or with `--dry-run`
+  reports them (`filmkit.narration.script_edits`).
+- `narrate` converges each edition asked, every one by default
+  (`filmkit.narration.converge`): the GPU work that no build runs.
+- `plan` prints, for the nodes a target names (`<node>:<code>`, `<node>:all`, a group, or `all`;
+  every node where none is named) and every node upstream of them, each node's state and
+  reasons, its host class as measured and as expected, its last seconds and whether it is ready
+  (`filmkit.graph.plan`); it writes nothing.
+- `build` makes the targets fresh, `all` where none is named (`filmkit.graph.build`): it prints
+  each node it ran and those it held, and each refusal on standard error.
+- `verify` hashes every file a run record states and exits 1 where it refuses
+  (`filmkit.graph.verify`); only once the records pass, `--technical-only` runs the verifier's
+  technical checks of each edition's delivered films, which decode them
+  (`filmkit.delivery.verification`), and `--release` compares the build with the published
+  release (`filmkit.delivery.reproduction`). It writes nothing in any mode.
+- `review` prepares, records or sets aside a review round (`filmkit.review.round`).
+- `deliver` asks the records, then each edition's films and recorded review, before it fills the
+  film's delivery folder or the one `--to` names, or with `--dry-run` plans the copy
+  (`filmkit.delivery.folder`).
+- `release` records the release of the reviewed, delivered build and stages its assets, its
+  sources from the declaration (`filmkit.delivery.release`).
+
+A refusal is one line on standard error, and the command exits 1. A target that names no node is
+refused in one line that names the nodes.
 """
 
 from __future__ import annotations
@@ -31,16 +58,37 @@ if TYPE_CHECKING:
     from filmkit.graph import plan
 
 
+# The review's commands, whose options `filmkit.review.round` states.
+REVIEW_COMMANDS = ("prepare", "record", "set-aside")
+
+
 def arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="filmkit", description="Plan and verify a film's build from its run records."
+        prog="filmkit", description="Build a film from its sources, verb by verb."
     )
-    verbs = parser.add_subparsers(dest="verb", required=True, metavar="{check,plan,verify}")
+    verbs = parser.add_subparsers(dest="verb", required=True, metavar="VERB")
+    verbs.add_parser(
+        "supply",
+        help="install the browser build, the dictionary and the models the engine pins",
+    )
     checking = verbs.add_parser(
         "check", help="ask every question of the film's sources at once; exit 1 on a finding"
     )
     checking.add_argument(
         "--read-only", action="store_true", help="print the findings and write no file"
+    )
+    editing = verbs.add_parser("edit", help="apply exact edits to the scripts and casts")
+    editing.add_argument("--edits", required=True, metavar="FILE", help="the edits file, JSON")
+    editing.add_argument("--dry-run", action="store_true", help="report the edits, write nothing")
+    narrating = verbs.add_parser(
+        "narrate", help="narrate each edition asked until its takes are accepted"
+    )
+    narrating.add_argument(
+        "--edition", default="all", metavar="CODE|all", help="the edition, or every one (all)"
+    )
+    narrating.add_argument("--rounds", type=int, default=2, help="rounds of candidates")
+    narrating.add_argument(
+        "--takes", type=int, default=3, help="candidates for a refused thought in a round"
     )
     planning = verbs.add_parser(
         "plan",
@@ -53,6 +101,10 @@ def arguments() -> argparse.ArgumentParser:
         help="<node>:<code> or <node>:all, with every node upstream; every node where none",
     )
     planning.add_argument("--json", action="store_true", help="print the plan as JSON")
+    building = verbs.add_parser("build", help="make the targets fresh from the run records")
+    building.add_argument(
+        "targets", nargs="*", metavar="TARGET", help="as plan takes them; all where none"
+    )
     verifying = verbs.add_parser(
         "verify",
         help="hash every file a run record states and judge every node; exit 1 for a node that "
@@ -68,6 +120,23 @@ def arguments() -> argparse.ArgumentParser:
         action="store_true",
         help="then compare the build with the published release under the reproduction standard",
     )
+    reviewing = verbs.add_parser("review", help="prepare, record or set aside a review round")
+    reviewing.add_argument("command", choices=REVIEW_COMMANDS)
+    reviewing.add_argument(
+        "options", nargs=argparse.REMAINDER, help="the command's options; --help lists them"
+    )
+    delivering = verbs.add_parser(
+        "deliver", help="fill the film's delivery folder once the build verifies"
+    )
+    delivering.add_argument("--to", metavar="DIR", help="another folder to fill")
+    delivering.add_argument("--dry-run", action="store_true", help="plan the copy only")
+    releasing = verbs.add_parser(
+        "release", help="record the release of the delivered build and stage its assets"
+    )
+    releasing.add_argument(
+        "--replace", action="store_true", help="replace a release folder that holds other bytes"
+    )
+    releasing.add_argument("--dry-run", action="store_true", help="print the record only")
     return parser
 
 
@@ -139,12 +208,140 @@ def verified(technical: bool, release: bool) -> int:
     return status
 
 
+def supplied() -> int:
+    """`filmkit supply`: what was supplied, or the refusal of what differs from its pin."""
+    import filmkit.supply as supply
+
+    try:
+        report = supply.supply()
+    except supply.SupplyError as error:
+        sys.exit(str(error))
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0
+
+
+def edited(edits: str, dry_run: bool) -> int:
+    """`filmkit edit`: the edits applied, or reported, or the refusal of one that does not
+    apply."""
+    import filmkit.repository as repository
+    from filmkit.narration import script_edits
+
+    try:
+        report = script_edits.apply_edits(repository.read(edits), dry_run=dry_run)
+    except (OSError, ValueError) as error:
+        sys.exit(f"filmkit edit: {error}")
+    print(json.dumps(report, ensure_ascii=False, indent=1))
+    return 0
+
+
+def editions(asked: str) -> tuple[str, ...]:
+    """The editions a verb is asked for: one the film declares, or every one for `all`."""
+    from filmkit.production import CODES
+
+    if asked == "all":
+        return CODES
+    if asked not in CODES:
+        sys.exit(f"The film declares no edition {asked}: it declares {', '.join(CODES)}, or all")
+    return (asked,)
+
+
+def narrated(asked: str, rounds: int, takes: int) -> int:
+    """`filmkit narrate`: each edition asked converged in turn, as one run each; every edition's
+    refusal, in lines, once all have run."""
+    if rounds < 0 or takes < 1:
+        sys.exit("filmkit narrate: --rounds is 0 or more and --takes is 1 or more")
+    import filmkit.child_processes as child_processes
+    from filmkit.narration import converge
+
+    codes = editions(asked)
+    with child_processes.ending(converge.STOPPED):
+        refused = [converge.converged(code, rounds=rounds, takes=takes) for code in codes]
+    if any(refused):
+        sys.exit("\n".join(filter(None, refused)))
+    return 0
+
+
+def built(targets: list[str]) -> int:
+    """`filmkit build`: each node it ran and held, and each refusal on standard error."""
+    import filmkit.child_processes as child_processes
+    from filmkit.graph import build, chain
+
+    stopped = "The build was stopped by {request}; the node it was running was ended with it"
+    with child_processes.ending(stopped):
+        try:
+            done = build.build(chain.table(), targets or ["all"])
+        except ValueError as error:
+            sys.exit(f"filmkit build: {error}")
+    for key in done.ran:
+        print(f"ran {key}")
+    if done.held:
+        print(f"held, behind a node that did not pass: {' '.join(done.held)}")
+    if done.refused:
+        sys.exit("\n".join(done.refused))
+    return done.status
+
+
+def delivered(to: str | None, dry_run: bool) -> int:
+    """`filmkit deliver`: the records, then each edition's films and recorded review, asked
+    before anything is copied or planned; then the delivery, or its plan."""
+    import filmkit.delivery.folder as delivery_folder
+    import filmkit.delivery.verification as delivery_verification
+    import filmkit.repository as repository
+    from filmkit.graph import verify
+    from filmkit.production import UnassembledError
+
+    try:
+        verify.check()
+    except verify.VerifyError as error:
+        sys.exit(str(error))
+    for _ in delivery_verification.qualified(technical_only=False):
+        pass
+    try:
+        folder, rule = delivery_folder.delivery_destination(to)
+        report = delivery_folder.deliver(repository.ROOT, folder, dry_run=dry_run, rule=rule)
+    except (delivery_folder.DeliveryRefusedError, UnassembledError) as error:
+        sys.exit(str(error))
+    if dry_run:
+        print(json.dumps(report, ensure_ascii=False))
+        return 0
+    summary = {key: report[key] for key in ("destination", "destination_rule")}
+    summary |= {key: report[key] for key in ("all_match", "predecessors")}
+    print(json.dumps({"members": len(report["members"]), **summary}, ensure_ascii=False))
+    return 0
+
+
+def released(replace: bool, dry_run: bool) -> int:
+    """`filmkit release`: the record written and its assets staged, or the first refusal."""
+    import filmkit.delivery.release as release
+    from filmkit.delivery.reproduction import ReproductionError
+
+    try:
+        release.write(replace=replace, dry_run=dry_run)
+    except ReproductionError as error:
+        sys.exit(str(error))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> None:
     options = arguments().parse_args(argv)
-    if options.verb == "check":
-        sys.exit(checked(options.read_only))
-    if options.verb == "verify":
-        sys.exit(verified(options.technical_only, options.release))
+    verb = options.verb
+    if verb == "review":
+        from filmkit.review import round as review_round
+
+        review_round.run([options.command, *options.options], prog="filmkit review")
+        return
+    done = {
+        "supply": supplied,
+        "check": lambda: checked(options.read_only),
+        "edit": lambda: edited(options.edits, options.dry_run),
+        "narrate": lambda: narrated(options.edition, options.rounds, options.takes),
+        "build": lambda: built(options.targets),
+        "verify": lambda: verified(options.technical_only, options.release),
+        "deliver": lambda: delivered(options.to, options.dry_run),
+        "release": lambda: released(options.replace, options.dry_run),
+    }.get(verb)
+    if done is not None:
+        sys.exit(done())
     from filmkit.graph import plan
 
     try:

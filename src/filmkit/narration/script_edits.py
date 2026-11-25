@@ -382,7 +382,14 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--edits", required=True, help="Edits JSON file")
     parser.add_argument("--dry-run", action="store_true", help="Report the edits without writing")
     options = parser.parse_args(argv)
-    edits = repository.read(options.edits)
+    report = apply_edits(repository.read(options.edits), dry_run=options.dry_run)
+    print(json.dumps(report, ensure_ascii=False, indent=1))
+
+
+def apply_edits(edits: dict, *, dry_run: bool = False) -> dict:
+    """Apply an edits file's edits to every edition's script and cast, or with `dry_run` only
+    report them (`filmkit edit`): the report of each edition's changed segments. Nothing is
+    written unless every edit of every edition applies; a refused edit raises `ValueError`."""
     if set(edits) - set(KINDS) or any(set(lists) - set(CODES) for lists in edits.values()):
         msg = f"An edits file maps {', '.join(KINDS)} to editions"
         raise ValueError(msg)
@@ -396,18 +403,12 @@ def main(argv: list[str] | None = None) -> None:
             contract, _ = pronunciation(code)
             cast = repository.read(edition.cast)
             edited[code] = edit(script, cast, contract=contract, code=code, **asked)
-    if not options.dry_run:
+    if not dry_run:
         for code, (script, cast, changed) in edited.items():
             if changed:
                 _write(Edition(code), script, cast)
     report = {code: changed for code, (_, _, changed) in edited.items()}
-    print(
-        json.dumps(
-            {"dry_run": options.dry_run, "editions": report},
-            ensure_ascii=False,
-            indent=1,
-        )
-    )
+    return {"dry_run": dry_run, "editions": report}
 
 
 def _write(edition: Edition, script: dict, cast: dict) -> None:

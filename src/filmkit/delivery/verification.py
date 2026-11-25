@@ -26,6 +26,7 @@ import time
 import wave
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import filmkit.captions.timing as captions_timing
 import filmkit.delivery.packaging as packaging
@@ -47,6 +48,9 @@ import filmkit.review.record as review_record
 import filmkit.sources as sources
 import filmkit.specification as specification
 from filmkit.picture.rendering import COMPOSITION_SCRIPT
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class VerificationError(ValueError):
@@ -546,11 +550,11 @@ REFUSALS = (
 )
 
 
-def verify_editions(
+def qualified(
     groups: dict[str, list[Path]] | None = None, *, technical_only: bool = True
-) -> None:
+) -> Iterator[dict]:
     """Qualify each edition as its films, each declared edition's current delivered films where
-    `groups` names none, printing each edition's report as its run ends. An owner's refusal stops
+    `groups` names none, giving each edition's report as its run ends. An owner's refusal stops
     at that edition in one line, "<language>: <reason>"; nothing is written."""
     groups = groups or {code: production.Edition(code).films for code in production.CODES}
     for language, members in groups.items():
@@ -561,6 +565,14 @@ def verify_editions(
         except REFUSALS as error:
             msg = f"{language}: {error}"
             raise SystemExit(msg) from None
+        yield report
+
+
+def verify_editions(
+    groups: dict[str, list[Path]] | None = None, *, technical_only: bool = True
+) -> None:
+    """Qualify each edition (`qualified`), printing each edition's report as its run ends."""
+    for report in qualified(groups, technical_only=technical_only):
         print(json.dumps(report, ensure_ascii=False), flush=True)
 
 

@@ -441,8 +441,8 @@ def set_aside_options(aside: argparse.ArgumentParser) -> None:
     aside.set_defaults(run=run_set_aside)
 
 
-def command_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+def command_parser(prog: str | None = None) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog=prog, description=__doc__.splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
     set_aside_options(
         commands.add_parser("set-aside", help="move the previous build's packages aside")
@@ -479,14 +479,20 @@ def command_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> None:
-    options = command_parser().parse_args(argv)
+def run(argv: list[str] | None = None, prog: str | None = None) -> None:
+    """Run one command of a review round, `prepare`, `record` or `set-aside`, as `filmkit review`
+    does: its result printed, or its refusal in one line."""
+    options = command_parser(prog).parse_args(argv)
     try:
         result = options.run(options)
     except ReviewError as error:
         msg = f"{options.command}: {error}"
         raise SystemExit(msg) from None
     print(json.dumps(result, ensure_ascii=False))
+
+
+def main(argv: list[str] | None = None) -> None:
+    run(argv)
 
 
 if __name__ == "__main__":
