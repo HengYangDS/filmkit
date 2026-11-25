@@ -214,6 +214,13 @@ def test_the_engine_names_each_tool_by_its_module():
         assert (tools.PACKAGE / tool.module).is_file()
 
 
+def test_a_tool_measures_text_where_its_module_reads_the_faces_table():
+    # The field states what the module does: it reads the table the run names to it.
+    for name, tool in tools.TOOLS.items():
+        reads = "readTextMetrics" in (tools.PACKAGE / tool.module).read_text()
+        assert tool.measures is reads, name
+
+
 def test_a_tool_browses_where_its_module_drives_the_supplied_browser():
     # The field states what the module does: it imports the browser driver.
     for name, tool in tools.TOOLS.items():
