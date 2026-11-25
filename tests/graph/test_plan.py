@@ -320,8 +320,8 @@ def test_an_english_retake_leaves_the_chinese_pictures_waiting_not_behind(judgin
         assert found[key].state == "waiting", key
         assert found[key].held["check-picture:en"] == "behind"
     # The Chinese package metadata, films and scan read every edition's timeline by a path (the
-    # entry page and the viewing package name both editions), so they are behind the English
-    # sound, not held by a wait, and will run: an exception to decision 5's English retake.
+    # entry page and the viewing package list both editions), so they are behind the English
+    # sound and will run: a dependency decision 5 accepts, not a wait.
     package = ("package-metadata:zh", "package-film:zh", "scan-film:zh")
     behind = {
         key for key, entry in found.items() if key.endswith(":zh") and entry.state == "behind"
@@ -365,3 +365,24 @@ def test_every_input_the_pre_render_check_read_holds_each_render_and_package():
         for render in ("render-picture", "render-picture-uncaptioned", "package-film"):
             assert own | every | {"check"} <= table.closure(f"{render}:{code}"), (render, code)
         assert f"stage-picture-uncaptioned:{code}" in table.closure(f"package-film:{code}")
+
+
+def test_a_hearing_reruns_the_picture_gate_and_the_renders_until_outputs_are_keyed(judging):
+    # Until key-outputs-by-their-inputs retires it, the picture gate's own record binds the
+    # declaration whole (`picture/gates.py`, `bound_inputs`), so the node `check-picture` binds
+    # it too and a hearing recorded in the declaration makes it stale (design decision 4).
+    table, stale = judging
+    read = set()
+    for key in table.edges:
+        node, edition = table.node(key)
+        if set(node.inputs(edition)) & {"declaration", "declaration.narration"}:
+            read.add(key)
+    assert {"check", "check-sound:zh", "check-picture:zh", "check-picture:en"} <= read
+    pictured = ("render-", "validate-", "qualify-", "compare-", "package-", "scan-")
+    assert not [key for key in read if key.startswith(pictured)]
+    stale |= read
+    found = entries(table)
+    # Each render is after its edition's picture gate by a path: behind it, so it will run.
+    for code in table.codes:
+        for name in ("render-picture", "render-picture-uncaptioned"):
+            assert found[f"{name}:{code}"].state == "behind", (name, code)
