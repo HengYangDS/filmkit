@@ -12,9 +12,10 @@ import filmkit.graph.chain as engine_chain
 from filmkit.graph import build, nodes, plan, records, runs
 
 
-def entry(key, state="stale", expected="light", measured=None, seconds=None):
+def entry(key, state="stale", expected="light", measured=None, seconds=None, refused=None):
     """A node as the plan judged it: unmeasured unless `measured` names its class."""
-    return plan.Entry(key, state, [], measured or plan.UNMEASURED, expected, seconds, True)
+    found = plan.Entry(key, state, [], measured or plan.UNMEASURED, expected, seconds, True)
+    return replace(found, refused=refused)
 
 
 @pytest.fixture
@@ -105,6 +106,20 @@ def test_a_waiting_node_is_not_counted_as_heavy_work_that_will_run(table):
     found = build.refusals(
         table,
         [entry("render:zh", "waiting", "heavy"), entry("compare:zh", "stale", "heavy")],
+    )
+    assert found == []
+
+
+def test_a_refusal_that_stands_and_what_follows_it_are_no_work_that_will_run(table):
+    # The gate refused with nothing it reads changed, and the page reads its output: neither is
+    # light work to run first, so the render alone is the heavy work, in one invocation.
+    found = build.refusals(
+        table,
+        [
+            entry("check-sound:zh", refused="check-sound:zh: 1 gated finding"),
+            entry("package-metadata:zh", "behind"),
+            entry("render:zh", expected="heavy"),
+        ],
     )
     assert found == []
 

@@ -7,14 +7,17 @@ each node's turn it judges the node again against the files as they stand (`plan
 that a node behind only because a node upstream was stale is fresh again once that node has run
 without changing its outputs, and a node held by a gate that ran again and passed is fresh by
 its own inputs: neither is run. It runs a node, its owner's call (`Node.run`) in this process
-inside the seam (`runs.run`), which writes the node's run record, only where the node is stale.
-A node behind a refused or failed node, or waiting on a gate that did not pass, is not run;
-nodes not downstream of it go on. A node with no run, the narration, is never run here.
+inside the seam (`runs.run`), which writes the node's run record, only where the node is stale,
+and not where its last run refused with nothing it reads changed since (`plan.Entry.refused`):
+that refusal stands as the node's, in its own line. A node behind a refused or failed node, or
+waiting on a gate that did not pass, is not run; nodes not downstream of it go on. A node with
+no run, the narration, is never run here.
 
 Before it runs anything it schedules the closure as the host's rules ask (design decision 5;
 `refusals`): it refuses a closure that holds a stale narration, naming `filmkit narrate`; one
 that holds heavy work that will run while light work that can run now is stale, naming the
-light `filmkit build` to run first, outside any ticket; and one whose heavy work that will run
+light `filmkit build` to run first, outside any ticket; a node whose refusal stands, and every
+node downstream of it, is no work that will run; and one whose heavy work that will run
 has more than one name, unless every such node is measured and their last seconds sum to at most
 `host.SHARED_TICKET_SECONDS`, printing the invocations to run in order, one ticket each. Heavy
 work that will run is a heavy or GPU node, by its measured class or else the class the table
@@ -119,6 +122,13 @@ def run_node(table: nodes.Table, key: str) -> tuple[int, str | None]:
     return child_processes.FINISHED, None
 
 
+def standing(key: str, line: str) -> str:
+    """The line of a refusal that stands, which the build does not run again: the node's own
+    line, named by its key, and why it was not run."""
+    named = line if line.startswith(f"{key}: ") else f"{key}: {line}"
+    return f"{named} (its last run's refusal; nothing it reads has changed, so it was not run)"
+
+
 def heavy(entry: plan.Entry) -> bool:
     """Whether a node is heavy or GPU work: by its measured class, or else the one expected."""
     measured = entry.host_class != plan.UNMEASURED
@@ -128,7 +138,19 @@ def heavy(entry: plan.Entry) -> bool:
 def refusals(table: nodes.Table, entries: list[plan.Entry]) -> list[str]:
     """Why a closure, as the plan judged it, must not run as one invocation, each in one line and
     naming what to run instead; none where it may (design decision 5)."""
-    run = [entry for entry in entries if entry.state in (plan.STALE, plan.BEHIND)]
+    # The refusals that stand; the narration's, which no build runs, is the narration's to answer.
+    stands = {
+        entry.key
+        for entry in entries
+        if entry.refused is not None and table.node(entry.key)[0].run is not None
+    }
+    run = [
+        entry
+        for entry in entries
+        if entry.state in (plan.STALE, plan.BEHIND)
+        and entry.key not in stands
+        and not table.closure(entry.key) & stands
+    ]
     found = [
         f"{entry.key} is stale and narration is no build's: "
         f"{narrate_command(nodes.split(entry.key)[1])}"
@@ -190,6 +212,10 @@ def build(table: nodes.Table, targets: Iterable[str] = ()) -> Built:
         if entry.state != plan.STALE:
             stopped.add(key)
             built.held.append(key)
+            continue
+        if entry.refused is not None:
+            stopped.add(key)
+            built.refused.append(standing(key, entry.refused))
             continue
         status, said = run_node(table, key)
         built.ran.append(key)

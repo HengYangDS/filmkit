@@ -30,7 +30,7 @@ A narration of chosen segments or of its checks alone SHALL write, in place of t
 
 ### Requirement: A film is built by its targets
 
-`filmkit build [TARGET…]` SHALL visit each target and every node upstream of it, by its inputs or by what it waits for, one at a time in the derived order, judge each again at its turn and run it only where it is stale. A node that refuses or fails SHALL stop every node downstream of it while the others go on, and the command SHALL then exit 1 with one line for each refusal. It SHALL write no tracked file.
+`filmkit build [TARGET…]` SHALL visit each target and every node upstream of it, by its inputs or by what it waits for, one at a time in the derived order, judge each again at its turn and run it only where it is stale. A node that refuses or fails SHALL stop every node downstream of it while the others go on, and the command SHALL then exit with one line for each refusal and failure, 2 where a node failed and 1 otherwise. It SHALL write no tracked file.
 
 #### Scenario: A second build runs nothing
 
@@ -47,9 +47,18 @@ A narration of chosen segments or of its checks alone SHALL write, in place of t
 - **WHEN** `check-sound:zh` refuses during `filmkit build sound:all`
 - **THEN** no node downstream of it runs, `check-sound:en` runs, and the command exits 1 with the Chinese gate's line
 
+### Requirement: A refusal stands until what its node reads changes
+
+`filmkit build` SHALL not run a node whose last run refused while nothing it reads has changed since, but the narration, which no build runs; that refusal SHALL stand as the node's, in its own line, and hold every node downstream of it.
+
+#### Scenario: A refusal stands until what its node reads changes
+
+- **WHEN** `check-sound:zh` refused, nothing it reads has changed since, and `filmkit build render-picture:zh` runs
+- **THEN** it runs no node, holds the render and exits 1 with the gate's line; once an input of the gate changes, the gate runs again
+
 ### Requirement: Light work that can run now runs first, outside any heavy invocation
 
-Before it runs any node, `filmkit build` SHALL refuse a stale `narrate`, naming `filmkit narrate` with the edition; and heavy work that will run while a light node with no stale heavy or GPU node upstream of it is stale or did not pass, naming `filmkit build` with those light nodes. A closure with no heavy work that will run SHALL run. A node's class is its measured class, else its expected class.
+Before it runs any node, `filmkit build` SHALL refuse a stale `narrate`, naming `filmkit narrate` with the edition; and heavy work that will run while a light node with no stale heavy or GPU node upstream of it is stale or did not pass, naming `filmkit build` with those light nodes. A node whose refusal stands, and every node downstream of it, SHALL count as no work that will run. A closure with no heavy work that will run SHALL run. A node's class is its measured class, else its expected class.
 
 #### Scenario: Narration is not built
 
@@ -68,7 +77,7 @@ Before it runs any node, `filmkit build` SHALL refuse a stale `narrate`, naming 
 
 #### Scenario: Light steps after a heavy node
 
-- **WHEN** `render-picture:zh` is stale and every light node that can run now is fresh and passed
+- **WHEN** `render-picture:zh` is stale, every light node that can run now is fresh and passed, and the heavy nodes of `picture:zh` that will run are measured, their last seconds summing to at most 1,800 s
 - **THEN** `filmkit build picture:zh` runs the render and then `validate-picture:zh`, which follows it
 
 ### Requirement: Heavy nodes of several names share an invocation only when measured
@@ -106,7 +115,7 @@ A render of either picture and a package of an edition SHALL wait for that editi
 #### Scenario: A refused sound gate holds the render
 
 - **WHEN** `check-sound:zh` refused, a thought under the film's thought line that the owner did not hear clear
-- **THEN** the plan reports `render-picture:zh` and `package-film:zh` waiting and not ready, naming `check-sound:zh`, and `filmkit build render-picture:zh` runs nothing and names `filmkit build check-sound:zh`
+- **THEN** the plan reports `render-picture:zh` and `package-film:zh` waiting and not ready, naming `check-sound:zh`, and while nothing the gate reads changes, `filmkit build render-picture:zh` runs nothing and exits 1 with the gate's line
 
 #### Scenario: Another edition's geometry holds the render
 

@@ -78,26 +78,6 @@ def test_a_gate_run_again_with_unchanged_inputs_downstream_leaves_the_waiting_no
     assert build.build(table, ["render:zh"]).ran == []
 
 
-def test_a_refused_gate_holds_what_follows_it_and_the_other_edition_is_built(table, monkeypatch):
-    def refuse(edition):
-        if edition.code == "zh":
-            raise AssemblyError("the soundtrack has 1 gated finding")
-        stand_ins.wrote("check-sound", edition.code)
-
-    gate = replace(table.nodes["check-sound"], run=refuse)
-    held = {**table.nodes, "check-sound": gate}
-    monkeypatch.setattr(runs, "table", lambda: held)
-    table = nodes.load(held.values(), stand_ins.SHARED, CODES)
-    built = build.build(table, ["all"])
-    assert built.refused == ["check-sound:zh: the soundtrack has 1 gated finding"]
-    assert records.read(records.place("check-sound", "zh")).outcome == "refuse"
-    # The render waits for the gate, and the page reads its output: neither runs.
-    assert {"render:zh", "compare:zh", "package-metadata:zh"} <= set(built.held)
-    assert not ({"render:zh", "compare:zh"} & set(built.ran))
-    assert keys(*EVERY, codes=("en",)) <= set(built.ran)
-    assert built.status == 1
-
-
 def failing(table, monkeypatch, name, fault):
     """The table with a node whose owner raises `fault` for the Chinese edition."""
 
@@ -111,6 +91,41 @@ def failing(table, monkeypatch, name, fault):
     loaded = nodes.load(held.values(), stand_ins.SHARED, CODES)
     monkeypatch.setattr(chain, "table", lambda: loaded)
     return loaded
+
+
+GATED = "check-sound:zh: the soundtrack has 1 gated finding"
+
+
+def test_a_refused_gate_holds_what_follows_it_and_the_other_edition_is_built(table, monkeypatch):
+    fault = AssemblyError(GATED.removeprefix("check-sound:zh: "))
+    table = failing(table, monkeypatch, "check-sound", fault)
+    built = build.build(table, ["all"])
+    assert built.refused == [GATED]
+    assert records.read(records.place("check-sound", "zh")).outcome == "refuse"
+    # The render waits for the gate, and the page reads its output: neither runs.
+    assert {"render:zh", "compare:zh", "package-metadata:zh"} <= set(built.held)
+    assert not ({"render:zh", "compare:zh"} & set(built.ran))
+    assert keys(*EVERY, codes=("en",)) <= set(built.ran)
+    assert built.status == 1
+
+
+def test_a_refusal_stands_until_what_its_node_reads_changes(table, monkeypatch):
+    fault = AssemblyError(GATED.removeprefix("check-sound:zh: "))
+    table = failing(table, monkeypatch, "check-sound", fault)
+    build.build(table, ["all"])
+    (gate,) = [e for e in plan.plan(table, ["render:zh"]).entries if e.key == "check-sound:zh"]
+    assert (gate.state, gate.refused) == ("stale", GATED)
+    # Run again it would refuse the same: the build runs nothing and gives the gate's line.
+    again = build.build(table, ["render:zh"])
+    assert (again.ran, again.status) == ([], 1)
+    assert again.refused == [
+        f"{GATED} (its last run's refusal; nothing it reads has changed, so it was not run)"
+    ]
+    assert "render:zh" in again.held
+    # Once what it reads changes, it runs again.
+    (repository.ROOT / "zh/script.txt").write_text("the zh script, edited")
+    edited = build.build(table, ["render:zh"])
+    assert "check-sound:zh" in edited.ran and edited.refused == [GATED]
 
 
 @pytest.mark.parametrize(

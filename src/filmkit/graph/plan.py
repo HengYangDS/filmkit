@@ -8,7 +8,9 @@ digest where either differs), with each reason; `behind` when it is fresh by its
 node upstream of it by a path is stale or behind, so that it will likely run when that node has;
 `waiting` when it is fresh by its own record, nothing upstream of it by a path is stale or
 behind, and a gate it waits for, directly or through a node upstream of it by a path, is not
-fresh (design decision 4 of build-a-film-by-its-verbs); and `fresh` otherwise. The four are
+fresh (design decision 4 of build-a-film-by-its-verbs); and `fresh` otherwise. A node stale only
+because its last run refused, with nothing it reads changed since, is stale and states that run's
+line (`Entry.refused`): run again, it would refuse the same. The four are
 judged in one pass over the order derived over paths and waits together, so every gate is judged
 before every node that waits for it. A node is ready when every node upstream of it by a path is
 fresh, every gate it waits for is fresh, and every input of its way exists; a waiting node names
@@ -79,6 +81,8 @@ class Entry:
     span: tuple[datetime, datetime] | None = None
     # The gates that hold the node, each with its state: none unless it is waiting.
     held: dict[str, str] = field(default_factory=dict)
+    # The line its last run refused with, where that refusal alone makes it stale.
+    refused: str | None = None
 
     def stated(self) -> dict:
         """The entry as `filmkit plan --json` prints it."""
@@ -447,6 +451,9 @@ def judge_all(table: nodes.Table, keys: set[str], full: bool) -> list[Entry]:
         gates = all(states[g] == FRESH for g in table.waits.get(key, ()))
         ready = all(states[up] == FRESH for up in upstream) and gates and all(map(exists, inputs))
         whole = s.whole
+        # A refused run's own reason is its outcome, which no other reason joins while nothing
+        # it reads has changed.
+        refused = whole is not None and whole.outcome == "refuse" and len(reasons) == 1
         entries.append(
             Entry(
                 key,
@@ -458,6 +465,7 @@ def judge_all(table: nodes.Table, keys: set[str], full: bool) -> list[Entry]:
                 ready,
                 (datetime.fromisoformat(whole.started_at), ended(whole)) if whole else None,
                 held[key] if states[key] == WAITING else {},
+                (whole.refusal or f"{key}: its run refused") if refused else None,
             )
         )
     return entries
