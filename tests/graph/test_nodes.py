@@ -347,18 +347,26 @@ def test_the_geometry_check_gates_row_gaps_only_where_the_film_declares_it(
         chain.geometry_check(Edition("zh"))
 
 
-def test_an_edition_the_film_declares_native_renders_its_uncaptioned_picture(monkeypatch):
-    declaring(monkeypatch, native_uncaptioned=("zh",))
-    asked, rendered = [], []
+@pytest.mark.parametrize(("native", "way"), [(("zh",), "native"), ((), "derived")])
+def test_the_uncaptioned_picture_takes_the_way_the_film_declares_for_its_edition(
+    monkeypatch, native, way
+):
+    # The sample declares Chinese native: the undeclared case holds only where the declaration
+    # that the bindings read is the one patched.
+    declaring(monkeypatch, native_uncaptioned=native)
+    asked, made = [], []
     monkeypatch.setattr(
-        derivation, "uncaptioned_way", lambda e, native: asked.append(native) or {"way": "native"}
+        derivation,
+        "uncaptioned_way",
+        lambda e, native: asked.append(native) or {"way": "native" if native else "derived"},
     )
     monkeypatch.setattr(
-        derivation, "render_uncaptioned", lambda e, deadline, asked: rendered.append((e, asked))
+        derivation, "render_uncaptioned", lambda e, deadline, asked: made.append("rendered")
     )
+    monkeypatch.setattr(derivation, "derive_uncaptioned", lambda e, deadline: made.append(way))
     chain.render_uncaptioned(Edition("zh"))
-    assert (asked, rendered) == ([True], [(Edition("zh"), True)])
-    assert bindings.uncaptioned_way(Edition("zh")) == "native"
+    assert (asked, made) == ([bool(native)], ["rendered" if native else "derived"])
+    assert bindings.uncaptioned_way(Edition("zh")) == way
 
 
 def retitled(root, monkeypatch):
