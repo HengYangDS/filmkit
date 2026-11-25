@@ -14,7 +14,7 @@ Usage: python -m filmkit.narration.synthesis --language CODE --script FILE --cas
     --folder DIR --receipt FILE [--ids 06,07] [--dry-run]
 CODE names the edition, whose language the text and the reference must be in
 (`pronunciation.validate_language_reference`), whose name the speech model takes, and whose
-reference recording stands at the place the code derives (`filmkit.film.places`). With
+reference recording stands at the place the code derives (`filmkit.places.places`). With
 --ids only those segments are narrated, and their records replace theirs in an existing receipt.
 --dry-run prints each segment's plan: its fingerprint, its recording path and whether
 it would be reused, generated or refused. Paths are relative to the repository root, and a
@@ -65,7 +65,7 @@ class Request:
     """One run's narration: the cast, the contract, the chosen segments and their places."""
 
     cast: dict
-    # The edition's reference recording, at the place its code derives (`filmkit.film.places`).
+    # The edition's reference recording, at the place its code derives (`filmkit.places.places`).
     reference: str
     language: str
     contract: dict
@@ -171,7 +171,8 @@ def load_request(argv: list[str] | None = None) -> Request:
     cast = repository.read(options.cast)
     # The film is read here, when a request is, and not as the module loads: a command that
     # stands in for the narration imports it with no film below its root.
-    from filmkit.film import FILM, places
+    from filmkit.film import FILM
+    from filmkit.places import places
 
     reference = places(options.language, FILM.slug).reference
     _check_cast(cast, reference)

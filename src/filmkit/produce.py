@@ -64,7 +64,7 @@ from filmkit.picture.repair import ATTEMPTS, repair_pictures
 from filmkit.preflight import PreflightError, admitted, preflight
 from filmkit.production import CODES, Edition, UnassembledError
 from filmkit.review import ReviewError
-from filmkit.review.set_aside import require_set_aside
+from filmkit.review.set_aside import after_set_aside
 from filmkit.soundtrack.assembly import assemble
 from filmkit.soundtrack.fit import REFUSALS as FIT_REFUSALS
 from filmkit.soundtrack.fit import VariantsError, fit, read_variants
@@ -78,16 +78,6 @@ if TYPE_CHECKING:
 def deadline(options: argparse.Namespace, default: float) -> float:
     """The deadline that --deadline gives, or else the owner's own default."""
     return default if options.deadline is None else options.deadline
-
-
-def after_set_aside(edition: Edition, owner: Callable[[Edition], object]) -> object:
-    """Run an owner that rewrites the edition's build in place, unless a round still binds it.
-
-    Refused while a review round's prompts bind the edition's films and that round has not set
-    them aside (`require_set_aside`).
-    """
-    require_set_aside(edition)
-    return owner(edition)
 
 
 def render(edition: Edition, options: argparse.Namespace) -> object:

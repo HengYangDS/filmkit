@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 import filmkit.adoption as adoption
+import filmkit.declared_sources as declared_sources
 import filmkit.film as film
 import filmkit.released as released
 import filmkit.repository as repository
@@ -40,7 +41,7 @@ def project(tmp_path):
     """A film that holds what this release asks: the sample film's declaration, the files it
     names and its picture template, with the engine's own manifests, locks, a task list and
     the release's pin of Vale."""
-    for _field, path in film.named_files(film.FILM):
+    for _field, path in declared_sources.named_files(film.FILM):
         target = tmp_path / path
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(repository.ROOT / path, target)

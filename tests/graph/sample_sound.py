@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 
 import filmkit.repository as repository
-from filmkit.film import FILM, places
+from filmkit.film import FILM
 from filmkit.graph import opens
 from filmkit.narration import thought_groups
 from filmkit.narration.narrate import evidence_paths
@@ -39,6 +39,7 @@ from filmkit.narration.pronunciation import (
 )
 from filmkit.narration.retakes import segment_take
 from filmkit.narration.voice_model import request_fingerprint
+from filmkit.places import places
 from filmkit.production import Edition
 
 SAMPLE = Path(__file__).resolve().parents[2] / "examples/sample-film"
@@ -61,14 +62,11 @@ CHAIN = (
     *((command, "zh") for command in SOUND),
     *((command, "en") for command in SOUND),
     ("stage-picture", "zh"),
-    ("preflight", "zh"),
     ("package-metadata", "zh"),
     ("package-metadata", "en"),
 )
 # The runs that end refused here, each with its reason.
-REFUSED = {
-    ("preflight", "zh"): "the picture's heavy nodes have not run and no browser is supplied",
-}
+REFUSED: dict[tuple[str, str], str] = {}
 
 
 def copy_film(root: Path) -> Path:

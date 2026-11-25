@@ -9,6 +9,7 @@ import sys
 import pytest
 from preparing import ROUND, prepare, refusal
 
+import filmkit.declared_sources as declared_sources
 import filmkit.delivery.verification as delivery_verification
 import filmkit.film as film
 import filmkit.picture.rendering as picture_rendering
@@ -193,7 +194,7 @@ def test_twelve_scores_with_the_mean_99_25_are_recorded_with_the_overall_99_2(
 def test_a_declaration_s_accepted_severities_reach_the_record_through_the_loader(tmp_path, put):
     # A film's own declaration file, read by the engine as a command reads it: nothing here
     # sets the record's constant, so a record that ignored the declaration would fail this.
-    for _field, path in film.named_files(film.FILM):
+    for _field, path in declared_sources.named_files(film.FILM):
         (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(repository.ROOT / path, tmp_path / path)
     declared = (repository.ROOT / film.DECLARATION).read_text(encoding="utf-8")

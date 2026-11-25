@@ -1,5 +1,6 @@
 """The node table: the chain's commands as data, the edges derived from paths, and its refusals."""
 
+import importlib
 import tomllib
 from pathlib import Path
 
@@ -7,13 +8,15 @@ import pytest
 import sample_sound
 
 import filmkit.film as film
+import filmkit.picture.derivation as derivation
 import filmkit.produce as produce
 import filmkit.repository as repository
 import filmkit.tools as tools
-from filmkit.graph import chain, nodes
+from filmkit.graph import chain, nodes, opens, plan, runs
 from filmkit.graph.records import Folder
 from filmkit.narration import converge, readings
 from filmkit.production import Edition
+from filmkit.review import set_aside
 
 
 @pytest.fixture(scope="module")
@@ -232,3 +235,115 @@ def test_a_qualified_edition_the_film_does_not_declare_is_refused():
     declared["picture"]["qualified_edition"] = "fr"
     with pytest.raises(ValueError, match="picture.qualified_edition names the edition fr"):
         film.Film.model_validate(declared)
+
+
+# Each node's owner, as its run calls it, by module and name (design decision 3 of
+# build-a-film-by-its-verbs).
+OWNERS = {
+    "select": ("filmkit.narration.selection", "select"),
+    "assemble": ("filmkit.soundtrack.assembly", "assemble"),
+    "refresh-captions": ("filmkit.captions.refresh", "refresh_captions"),
+    "check-sound": ("filmkit.soundtrack.gates", "check_sound"),
+    "stage-picture": ("filmkit.picture.rendering", "stage_picture"),
+    "stage-picture-uncaptioned": ("filmkit.picture.rendering", "stage_picture"),
+    "check-picture": ("filmkit.picture.gates", "check_picture"),
+    "render-draft": ("filmkit.picture.draft", "render_draft"),
+    "render-picture": ("filmkit.picture.rendering", "render_picture"),
+    "render-picture-uncaptioned": ("filmkit.picture.derivation", "derive_uncaptioned"),
+    "validate-picture": ("filmkit.picture.rendering", "validate_picture"),
+    "validate-picture-uncaptioned": ("filmkit.picture.rendering", "validate_picture"),
+    "qualify-renderer": ("filmkit.picture.qualification", "qualify_renderer"),
+    "compare-pictures": ("filmkit.picture.equivalence", "compare_pictures"),
+    "package-metadata": ("filmkit.delivery.packaging", "package_metadata"),
+    "package-film": ("filmkit.delivery.packaging", "package_film"),
+    "scan-film": ("filmkit.picture.still_scan", "scan_film"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(OWNERS))
+def test_each_node_s_run_calls_its_owner_with_the_edition(name, monkeypatch):
+    module, owner = OWNERS[name]
+    called = []
+    monkeypatch.setattr(importlib.import_module(module), owner, lambda *a, **o: called.append(a))
+    monkeypatch.setattr(set_aside, "require_set_aside", lambda edition: None)
+    # The sample derives its uncaptioned pictures (`capture = "software"`), and a stage is as
+    # long as the runtime its timeline gives.
+    monkeypatch.setattr(derivation, "uncaptioned_way", lambda e, native: {"way": "derived"})
+    monkeypatch.setattr(Edition, "runtime", property(lambda edition: 9))
+    node = {node.name: node for node in chain.TABLE}[name]
+    node.run(Edition("en"))
+    assert [arguments[0] for arguments in called] == [Edition("en")]
+
+
+def test_no_node_runs_preflight_and_only_the_narration_has_no_run():
+    names = {node.name for node in chain.TABLE}
+    assert "preflight" not in names
+    assert [node.name for node in chain.TABLE if node.run is None] == ["narrate"]
+    assert set(OWNERS) | {"check", "narrate", "geometry-check", "player-check-cover"} == names
+
+
+def declaring(monkeypatch, **picture):
+    """The film's declaration with these keys of its `[picture]` table, as the table reads it."""
+    declared = film.FILM.model_copy(
+        update={"picture": film.FILM.picture.model_copy(update=picture)}
+    )
+    monkeypatch.setattr(chain, "FILM", declared)
+
+
+@pytest.mark.parametrize("gaps", [False, True])
+def test_the_geometry_check_gates_row_gaps_only_where_the_film_declares_it(gaps, monkeypatch):
+    ran = []
+    monkeypatch.setattr(tools, "run", lambda tool, arguments: ran.append((tool, arguments)) or 0)
+    declaring(monkeypatch, gate_row_gaps=gaps)
+    chain.geometry_check(Edition("zh"))
+    chain.cover_check(Edition("zh"))
+    stage = "build/runtime/work/final-delivery-zh-uhd"
+    assert ran == [
+        (
+            "geometry-check",
+            [stage, "build/evidence/editions/zh/picture-geometry.json", "2"]
+            + (["--gate-row-gaps"] if gaps else []),
+        ),
+        (
+            "player-check",
+            ["cover", stage, str(Edition("zh").cover), "build/runtime/work/cover-zh.png"],
+        ),
+    ]
+    monkeypatch.setattr(tools, "run", lambda tool, arguments: 1)
+    with pytest.raises(tools.ToolError, match="geometry-check exited with status 1"):
+        chain.geometry_check(Edition("zh"))
+
+
+def test_an_edition_the_film_declares_native_renders_its_uncaptioned_picture(monkeypatch):
+    declaring(monkeypatch, native_uncaptioned=("zh",))
+    asked, rendered = [], []
+    monkeypatch.setattr(
+        derivation, "uncaptioned_way", lambda e, native: asked.append(native) or {"way": "native"}
+    )
+    monkeypatch.setattr(
+        derivation, "render_uncaptioned", lambda e, deadline, asked: rendered.append((e, asked))
+    )
+    chain.render_uncaptioned(Edition("zh"))
+    assert (asked, rendered) == ([True], [(Edition("zh"), True)])
+    assert chain.uncaptioned_way(Edition("zh")) == "native"
+
+
+def test_an_edit_of_the_composition_or_of_the_english_script_leaves_the_chinese_narration_fresh(
+    tmp_path, monkeypatch
+):
+    root = sample_sound.copy_film((tmp_path / "film").resolve())
+    monkeypatch.setattr(repository, "ROOT", root)
+    monkeypatch.delenv(opens.NODE, raising=False)
+    with runs.run("zh", "narrate"):
+        pass
+    table = chain.table()
+
+    def narration():
+        (entry,) = [e for e in plan.plan(table, ["narrate:zh"]).entries if e.key == "narrate:zh"]
+        return entry.reasons
+
+    assert narration() == []
+    (root / "picture/film.js").write_text((root / "picture/film.js").read_text() + "\n// edited")
+    english = root / Edition("en").script
+    english.write_text(english.read_text() + "\n")
+    assert narration() == []

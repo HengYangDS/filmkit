@@ -202,7 +202,7 @@ class Edition:
 
     @property
     def places(self) -> Places:
-        """Where the edition's files stand, each derived from its code (`filmkit.film.places`)."""
+        """Where the edition's files stand, each derived from its code (`filmkit.places.places`)."""
         return places(self.code, FILM.slug)
 
     @property

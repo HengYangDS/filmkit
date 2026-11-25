@@ -46,6 +46,7 @@ import filmkit.graph.runs as seam
 import filmkit.media as media
 import filmkit.repository as repository
 from filmkit.captions.timing import typeset
+from filmkit.declared_sources import copied_players
 from filmkit.delivery.player import (
     COVER_JPEG,
     COVER_PNG,
@@ -58,7 +59,7 @@ from filmkit.delivery.player import (
     version_label,
 )
 from filmkit.delivery.track_language import set_chapter_language
-from filmkit.film import FILM, copied_players
+from filmkit.film import FILM
 from filmkit.picture.derivation import film_source
 from filmkit.picture.equivalence import require_equivalence
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, validate_picture

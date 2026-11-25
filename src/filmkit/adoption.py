@@ -73,7 +73,9 @@ import re
 import subprocess
 from pathlib import Path
 
+import filmkit.declared_sources as declared_sources
 import filmkit.film as film
+import filmkit.places as places
 import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.check import (
@@ -279,13 +281,13 @@ def former_paths(root: Path, declared: dict) -> tuple[dict[str, str], set[str]]:
     }
     slug = str(declared.get("slug"))
     editions = table(declared.get("editions"), f"{film.DECLARATION}: editions")
-    references = {film.places(code, slug).reference for code in editions}
+    references = {places.places(code, slug).reference for code in editions}
     for code, edition in editions.items():
         edition = edition if isinstance(edition, dict) else {}
-        derived = film.places(code, slug)
+        derived = places.places(code, slug)
         sources = edition.get("sources")
         folders = {derived.folder, *([sources] if isinstance(sources, str) else [])}
-        owned |= {*film.edition_files(code, slug)[:3], derived.readings}
+        owned |= {*declared_sources.edition_files(code, slug)[:3], derived.readings}
         owned |= {f"{folder}/{name}" for folder in folders for name in film.EDITION_FILES}
         instead |= {f"{folder}/{NARRATION_COPY}": "this release removes it" for folder in folders}
         moves = [

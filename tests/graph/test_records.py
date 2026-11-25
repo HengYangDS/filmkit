@@ -6,6 +6,7 @@ import shutil
 
 import pytest
 
+import filmkit.declared_sources as declared_sources
 import filmkit.film as film
 import filmkit.repository as repository
 from filmkit.graph import nodes, opens, plan, records, runs
@@ -206,7 +207,8 @@ def declared(tmp_path, monkeypatch):
     stand-in table of two nodes, one that reads the declaration's `picture` table and one that
     reads its `narration` table, each run once; the declaration and the table."""
     root = tmp_path.resolve()
-    for path in (repository.DECLARATION, *(named for _, named in film.named_files(film.FILM))):
+    named = [path for _, path in declared_sources.named_files(film.FILM)]
+    for path in (repository.DECLARATION, *named):
         (root / path).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(repository.ROOT / path, root / path)
     monkeypatch.setattr(repository, "ROOT", root)

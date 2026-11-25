@@ -28,8 +28,9 @@ whole declaration), a probe of a path that the node would not declare were it to
 write outside its outputs, names each node whose tools are seen only through their arguments,
 and reports each exemption with its reason and the nodes it covered. It fails closed: nothing
 below the root is let through without a declaration or a named exemption: a read at start-up is
-let through only for a file the engine reads as it starts (`filmkit.film.start_up_files`), and
-by another path than the two the recorder knows it is judged as a read.
+let through only for a file the engine reads as it starts
+(`filmkit.declared_sources.start_up_files`), and by another path than the two the recorder knows
+it is judged as a read.
 """
 
 from __future__ import annotations
@@ -448,9 +449,11 @@ def real(places: Iterable[object]) -> list[tuple[Path, str | None]]:
 
 
 def starting() -> set[Path]:
-    """The real paths of the files the engine reads as it starts (`film.start_up_files`)."""
+    """The real paths of the files the engine reads as it starts
+    (`declared_sources.start_up_files`)."""
     import filmkit.repository as repository
-    from filmkit.film import FILM, start_up_files
+    from filmkit.declared_sources import start_up_files
+    from filmkit.film import FILM
 
     return {Path(os.path.realpath(repository.ROOT / path)) for path in start_up_files(FILM)}
 

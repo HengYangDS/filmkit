@@ -267,7 +267,7 @@ def test_a_rebuild_over_a_reviewed_build_waits_for_its_set_aside(
         produce.main([action, "--language", "zh"])
     assert stopped.value.code == (
         f"{action}: the current zh films are bound by the prompts of review round 7 and have not "
-        "been set aside; first run python -m filmkit.review.round set-aside --round 7 "
+        "been set aside; first run filmkit review set-aside --round 7 "
         "--purpose <text> --language zh"
     )
     assert calls == []

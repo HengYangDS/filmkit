@@ -28,12 +28,15 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 import filmkit.repository as repository
 from filmkit.production import CODES, RENDITIONS, Edition
 from filmkit.review import ReviewError
 from filmkit.review.files import REVIEWS, edition_review, present, review_files, round_number
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 EXIT_CONDITION = "Retire after the successor delivery is accepted"
 # Below the film's root, the folder each set-aside label holds, with one folder per edition.
@@ -41,9 +44,7 @@ SUPERSEDED = repository.ARTIFACTS / "superseded"
 # A label is a lowercase name of words joined by hyphens, such as round-5 or preview-2026-11-05.
 LABEL = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 # The command that sets one edition of a reviewed round aside, as a refusal names it.
-SET_ASIDE_COMMAND = (
-    "python -m filmkit.review.round set-aside --round {number} --purpose <text> --language {code}"
-)
+SET_ASIDE_COMMAND = "filmkit review set-aside --round {number} --purpose <text> --language {code}"
 
 
 class SetAside(NamedTuple):
@@ -273,3 +274,14 @@ def require_set_aside(edition: Edition) -> None:
             f"been set aside; first run {command}"
         )
         raise ReviewError(msg)
+
+
+def after_set_aside(edition: Edition, owner: Callable[[Edition], object]) -> object:
+    """Run an owner that rewrites the edition's build in place, unless a round still binds it.
+
+    Refused while a review round's prompts bind the edition's films and that round has not set
+    them aside (`require_set_aside`); the nodes `assemble` and `refresh-captions` run their owners
+    through it (design decision 8 of build-a-film-by-its-verbs).
+    """
+    require_set_aside(edition)
+    return owner(edition)

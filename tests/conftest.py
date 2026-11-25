@@ -1,4 +1,5 @@
-"""Fixtures shared by the narration tests, and the speech runtime and host tool gates.
+"""Fixtures shared by the narration tests and the declaration's, and the speech runtime and host
+tool gates.
 
 The engine's tests build the sample film: FILMKIT_ROOT names it here, before any engine module
 loads the declaration of the film it builds, so no test reads another film's sources. They narrate
@@ -234,6 +235,14 @@ def pytest_terminal_summary(terminalreporter) -> None:
         )
         for test in skipped:
             terminalreporter.write_line(f"skipped: {test}")
+
+
+@pytest.fixture
+def declared(tmp_path):
+    """A copy of the sample film's declaration and every file it names, below a new root."""
+    import declaring
+
+    return declaring.copied(tmp_path)
 
 
 @pytest.fixture

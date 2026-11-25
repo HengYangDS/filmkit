@@ -16,20 +16,26 @@ import filmkit.check as source_check
 import filmkit.delivery.packaging as packaging
 import filmkit.film as film
 import filmkit.picture.derivation as derivation
+import filmkit.picture.draft as draft
 import filmkit.picture.equivalence as equivalence
 import filmkit.picture.gates as picture_gates
+import filmkit.picture.qualification as qualification
+import filmkit.picture.renderer as renderer
 import filmkit.picture.rendering as rendering
 import filmkit.picture.still_scan as still_scan
-import filmkit.preflight as preflight
 import filmkit.repository as repository
+import filmkit.soundtrack.assembly as assembly
 import filmkit.soundtrack.gates as sound_gates
+import filmkit.tools as tools
+from filmkit.captions import refresh
 from filmkit.film import FILM
 from filmkit.graph.nodes import FILM as ONCE
 from filmkit.graph.nodes import REPLACES, REWRITES, Node, Places, Table, Writer, load, stands
 from filmkit.graph.records import DeclarationTable, Folder, table_names
-from filmkit.narration import alignment_records, readings, transcript_records
+from filmkit.narration import alignment_records, readings, selection, transcript_records
 from filmkit.narration.narrate import evidence_paths
 from filmkit.production import CODES, Edition
+from filmkit.review import set_aside
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -37,6 +43,8 @@ if TYPE_CHECKING:
 
 # The tools whose reads the check of each run's opens sees only through their arguments.
 MEDIA, BROWSER = ("FFmpeg", "ffprobe"), ("Chrome",)
+# The geometry check's step, which every film's task line passed (design decision 14).
+GEOMETRY_STEP = "2"
 # The declaration's tables, each bound by its digest.
 TABLES = tuple(dict.fromkeys(table_names(film.Film).values()))
 # The tables no node that makes or delivers the pictures reads: no module of `filmkit.picture` or
@@ -45,6 +53,11 @@ TABLES = tuple(dict.fromkeys(table_names(film.Film).values()))
 # `soundtrack.assembly`; read 2026-11-25), so a hearing recorded there leaves them fresh; the
 # check of each run's opens holds each node to it.
 PICTURED = tuple(t for t in TABLES if t != "narration")
+# The tables the narration reads: the film's identity and editions and the pronunciation that
+# the editions share (`narration.synthesis`, `narration.pronunciation`), so that an edit of the
+# composition, of another edition's script or of the narration's table leaves it fresh (design
+# decision 9).
+NARRATED = ("identity", "editions", "pronunciation")
 
 
 def root(path: str | Path) -> Path:
@@ -201,10 +214,16 @@ def derived_uncaptioned(edition: Edition) -> bool:
     return isinstance(found, dict) and derivation.is_derived(found)
 
 
+def native(edition: Edition) -> bool:
+    """Whether the film renders the edition's uncaptioned picture from its own stage
+    (`[picture] native_uncaptioned`)."""
+    return edition.code in FILM.picture.native_uncaptioned
+
+
 def uncaptioned_way(edition: Edition) -> str:
-    """The way the uncaptioned picture takes without `--native`: `derived` or `native`."""
+    """The way the uncaptioned picture takes: `derived` or `native`."""
     try:
-        way = derivation.uncaptioned_way(edition)["way"]
+        way = derivation.uncaptioned_way(edition, native=native(edition))["way"]
     except (OSError, ValueError, KeyError):
         way = "rendered"
     return "derived" if way == "derived" else "native"
@@ -268,21 +287,46 @@ def packaged(edition: Edition) -> Places:
     return compared(edition) | metadata_inputs(edition) | films
 
 
-def readiness(edition: Edition) -> Places:
-    """What the pre-render check reads: its receipt's own list and the records and stages it
-    judges, the selection among them, whose takes the owner's hearings name
-    (`preflight.selected_takes`)."""
-    found = preflight.shared_places() | faces() | preflight.own_places(edition)
-    found |= stage(edition) | {"uncaptioned_stage": stage(edition, captions=False)["stage"]}
-    found |= {
-        "picture_gates": edition.picture_gates,
-        "sound_gates": edition.sound_gates,
-        "picture_geometry": edition.picture_geometry,
-        "cover": root(edition.cover),
-        "narration_selected": edition.narration_selected,
-    }
-    found |= {"draft_stills": edition.draft_stills} if FILM.picture.drafts else {}
-    return checked_words(edition) | found
+def ran(tool: str, arguments: list[str]) -> None:
+    """Run one of the engine's Node tools as a node's owner, refused where it exits with another
+    status than 0."""
+    status = tools.run(tool, arguments)
+    if status != 0:
+        message = f"{tool} exited with status {status}"
+        raise tools.ToolError(message)
+
+
+def geometry_check(edition: Edition) -> None:
+    """Check the geometry of the edition's staged picture at the engine's step, gating the gaps
+    between rows where the film declares it (`[picture] gate_row_gaps`)."""
+    stage_folder = repository.relative(edition.rendered().stage)
+    arguments = [stage_folder, repository.relative(edition.picture_geometry), GEOMETRY_STEP]
+    gaps = ["--gate-row-gaps"] if FILM.picture.gate_row_gaps else []
+    ran("geometry-check", [*arguments, *gaps])
+
+
+def cover_check(edition: Edition) -> None:
+    """Paint the cover the edition's composition draws and compare it with the tracked cover."""
+    painting = repository.relative(work("cover-{code}.png")(edition))
+    stage_folder = repository.relative(edition.rendered().stage)
+    ran("player-check", ["cover", stage_folder, str(edition.cover), painting])
+
+
+def staged(edition: Edition, captions: bool) -> object:
+    """Stage one of the edition's pictures whole: at the picture's size, from 0 to its runtime."""
+    width, height = rendering.PICTURE_SIZE
+    return rendering.stage_picture(
+        edition, None, edition.runtime, width, height, 0, captions=captions
+    )
+
+
+def render_uncaptioned(edition: Edition) -> object:
+    """Make the uncaptioned picture: derived from the captioned one where its way is derived,
+    rendered from its own stage otherwise, and always where the film declares it native."""
+    asked = native(edition)
+    if derivation.uncaptioned_way(edition, native=asked)["way"] == "derived":
+        return derivation.derive_uncaptioned(edition, derivation.DEADLINE)
+    return derivation.render_uncaptioned(edition, renderer.DEADLINE, asked=asked)
 
 
 def only(name: str, path: Callable[[Edition], Path | Folder]) -> Callable[[Edition], Places]:
@@ -306,7 +350,7 @@ TABLE = (
     ),
     Node(
         "narrate",
-        {"default": lambda e: declared(e) | sources(e) | checked_words(e)},
+        {"default": lambda e: declared(e, NARRATED) | sources(e)},
         lambda e: narration(e) | caches(e),
         "gpu",
         gpu=True,
@@ -319,6 +363,7 @@ TABLE = (
             "alignment_selected": e.alignment_selected,
         },
         "light",
+        run=lambda e: selection.select(e),
     ),
     Node(
         "assemble",
@@ -336,6 +381,7 @@ TABLE = (
         documents,
         "light",
         tools=MEDIA,
+        run=lambda e: set_aside.after_set_aside(e, assembly.assemble),
     ),
     Node(
         "refresh-captions",
@@ -359,6 +405,7 @@ TABLE = (
             | {"narration_selected": e.narration_selected}
         ),
         "light",
+        run=lambda e: set_aside.after_set_aside(e, refresh.refresh_captions),
     ),
     Node(
         "check-sound",
@@ -372,13 +419,21 @@ TABLE = (
         only("sound_gates", lambda e: e.sound_gates),
         "light",
         tools=MEDIA,
+        run=lambda e: sound_gates.check_sound(e),
     ),
-    Node("stage-picture", {"default": staging}, stage, "light"),
+    Node(
+        "stage-picture",
+        {"default": staging},
+        stage,
+        "light",
+        run=lambda e: staged(e, captions=True),
+    ),
     Node(
         "stage-picture-uncaptioned",
         {"default": staging},
         lambda e: stage(e, captions=False),
         "light",
+        run=lambda e: staged(e, captions=False),
     ),
     Node(
         "geometry-check",
@@ -386,6 +441,7 @@ TABLE = (
         only("picture_geometry", lambda e: e.picture_geometry),
         "heavy",
         tools=BROWSER,
+        run=geometry_check,
     ),
     Node(
         "player-check-cover",
@@ -393,6 +449,7 @@ TABLE = (
         only("painted_cover", work("cover-{code}.png")),
         "light",
         tools=BROWSER,
+        run=cover_check,
     ),
     Node(
         "check-picture",
@@ -402,6 +459,7 @@ TABLE = (
             "reports": Folder(work("picture-gates/{code}")(e), "*"),
         },
         "heavy",
+        run=lambda e: picture_gates.check_picture(e),
     ),
     Node(
         "render-draft",
@@ -416,16 +474,7 @@ TABLE = (
         tools=MEDIA,
         # Only a film that declares drafts renders them (`[picture] drafts`).
         editions=lambda codes: codes if FILM.picture.drafts else (),
-    ),
-    Node(
-        "preflight",
-        {"default": lambda e: declared(e) | readiness(e)},
-        lambda e: {
-            "readiness": e.readiness,
-            "cover_check": Folder(work("preflight/{code}")(e), "*"),
-        },
-        "light",
-        tools=BROWSER,
+        run=lambda e: draft.render_draft(e, draft.DEADLINE),
     ),
     Node(
         "render-picture",
@@ -433,6 +482,7 @@ TABLE = (
         rendered,
         "heavy",
         tools=MEDIA,
+        run=lambda e: rendering.render_picture(e, renderer.DEADLINE, captions=True),
     ),
     Node(
         "render-picture-uncaptioned",
@@ -446,6 +496,7 @@ TABLE = (
         "heavy",
         default_way=uncaptioned_way,
         tools=MEDIA,
+        run=render_uncaptioned,
     ),
     Node(
         "validate-picture",
@@ -453,6 +504,7 @@ TABLE = (
         lambda e: {},
         "light",
         tools=MEDIA,
+        run=lambda e: rendering.validate_picture(e, captions=True),
     ),
     Node(
         "validate-picture-uncaptioned",
@@ -464,6 +516,7 @@ TABLE = (
         "light",
         default_way=lambda e: "derived" if derived_uncaptioned(e) else "native",
         tools=MEDIA,
+        run=lambda e: rendering.validate_picture(e, captions=False),
     ),
     Node(
         "qualify-renderer",
@@ -474,6 +527,7 @@ TABLE = (
         # Once a build, on the edition the film qualifies (`film.qualified_edition`): every engine
         # release qualifies the canvas build it pins (`picture/qualification.py`).
         editions=lambda codes: tuple(c for c in codes if c == film.qualified_edition(FILM)),
+        run=lambda e: qualification.qualify_renderer(e, renderer.DEADLINE),
     ),
     Node(
         "compare-pictures",
@@ -481,8 +535,15 @@ TABLE = (
         only("caption_equivalence", lambda e: e.caption_equivalence),
         "heavy",
         tools=MEDIA,
+        run=lambda e: equivalence.compare_pictures(e),
     ),
-    Node("package-metadata", {"default": metadata_inputs}, metadata, "light"),
+    Node(
+        "package-metadata",
+        {"default": metadata_inputs},
+        metadata,
+        "light",
+        run=lambda e: packaging.package_metadata(e),
+    ),
     Node(
         "package-film",
         {"default": packaged},
@@ -494,6 +555,7 @@ TABLE = (
         ),
         "heavy",
         tools=(*MEDIA, "ExifTool"),
+        run=lambda e: packaging.package_film(e),
     ),
     Node(
         "scan-film",
@@ -501,6 +563,7 @@ TABLE = (
         only("film_stills", lambda e: e.film_stills),
         "heavy",
         tools=MEDIA,
+        run=lambda e: still_scan.scan_film(e),
     ),
 )
 
@@ -524,10 +587,6 @@ SHARED = {
 # output, which as an input would close a cycle (build/evidence/record-every-run/research.md).
 # The check of each run's opens allows them and reports each as an exemption.
 ASIDE: dict[str, tuple[str, Callable[[Edition], Places]]] = {
-    "preflight": (
-        "it asks whether an earlier film package record would refuse the next packaging",
-        lambda e: {"film_package": e.film_package},
-    ),
     "package-metadata": (
         "the player page states the sizes of the films that package-film writes",
         lambda e: {f"film_{kind}": e.film(kind) for kind in packaging.RENDITIONS},
@@ -545,6 +604,7 @@ def aside(name: str, edition: Edition) -> Places:
 NOT_NODES = {
     "fit": "it reports pause-policy variants and derives nothing a later step reads",
     "admitted": "it reads the readiness receipts and derives nothing",
+    "preflight": "the waits and the plan's readiness replace it; it leaves with produce",
     "repair-pictures": "it redoes the renders and comparisons of other nodes and runs as them",
     "converge": "a search that writes the cast, a tracked source; its narrations are whole runs",
     "verify": "it judges the whole build and derives nothing a later step reads",

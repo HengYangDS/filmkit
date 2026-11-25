@@ -3,34 +3,17 @@ needs a language declaration, and everything the declaration states of an editio
 them."""
 
 import json
-import shutil
 from pathlib import Path
 
 import pytest
+from declaring import rewrite
 
 import filmkit.film as film
+import filmkit.places as places
 import filmkit.production as production
 import filmkit.repository as repository
 import filmkit.withdrawn as withdrawn
 from filmkit.film import FilmError
-
-
-@pytest.fixture
-def declared(tmp_path):
-    """A copy of this film's declaration and every file it names, below a new root."""
-    for _field, path in film.named_files(film.FILM):
-        target = tmp_path / path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(repository.ROOT / path, target)
-    shutil.copy2(repository.ROOT / film.DECLARATION, tmp_path / film.DECLARATION)
-    return tmp_path
-
-
-def rewrite(root: Path, old: str, new: str) -> None:
-    path = root / film.DECLARATION
-    text = path.read_text()
-    assert old in text
-    path.write_text(text.replace(old, new, 1))
 
 
 def table(root: Path, name: str) -> str:
@@ -162,7 +145,7 @@ def test_an_entry_page_that_breaks_its_rule_is_refused_at_load_beside_other_prob
 
 def test_every_place_of_an_edition_comes_from_its_code_alone():
     for code in ("zh", "en"):
-        assert film.places(code, "sample-reel") == (
+        assert places.places(code, "sample-reel") == (
             f"content/{code}",
             f"content/{code}/film-script.json",
             f"content/{code}/voice-reference.json",

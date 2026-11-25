@@ -7,7 +7,7 @@ and may name no edition's files by their path or the declared codes grouped in b
 `{editions}` and `{others}` state for every edition (`filmkit.review.prompts`). The entry page
 must keep its rule (`filmkit.delivery.entry`). No place of the film may declare a key the engine
 has withdrawn (`filmkit.withdrawn`), read where the declaration names an edition's files
-and where their code derives them (`filmkit.film.places`).
+and where their code derives them (`filmkit.places.places`).
 """
 
 from __future__ import annotations
@@ -19,11 +19,13 @@ from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 import filmkit.withdrawn as withdrawn
-from filmkit.places import IDENTITY
-from filmkit.repository import ARTIFACTS, EVIDENCE
+from filmkit.places import IDENTITY, places
+from filmkit.repository import ARTIFACTS, DECLARATION, EVIDENCE
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from filmkit.film import Film
 
 # The prompt's fields the engine fills no longer, and the field that replaces each.
 WITHDRAWN_FIELDS = {"other": "{others}", "other_language": "{others}"}
@@ -147,10 +149,10 @@ def withdrawn_problems(root: Path, declared: dict, withdraw: bool = False) -> li
     pronunciation part declares,
     each in one line with what to do instead. An edition's files are read in the folder its
     declaration still names, and in the folder its code derives where it names none
-    (`filmkit.film.places`), so a film that has not moved them and one that has are read alike.
+    (`filmkit.places.places`), so a film that has not moved them and one that has are read alike.
     With `withdraw`, the declaration's, its review table's and the edition tables' withdrawn keys
     are then set aside, so that they hide none of its other fields' problems."""
-    from filmkit.film import CAST, DECLARATION, SCRIPT, places
+    from filmkit.film import CAST, SCRIPT
 
     found = _held(DECLARATION, declared, "declaration")
     found += _held(f"{DECLARATION} review", declared.get("review"), "review")
@@ -222,7 +224,7 @@ def placement_problems(root: Path, declared: dict) -> list[str]:
     where a cast's derivation cites it, which the same run asks to move there. It reads the
     declaration as declared, so a field's problem hides none of these.
     """
-    from filmkit.film import CAST, DECLARATION, SCRIPT, edition_files, places
+    from filmkit.film import CAST, SCRIPT
 
     editions = declared.get("editions")
     editions = editions if isinstance(editions, dict) else {}
@@ -304,3 +306,62 @@ def placement_problems(root: Path, declared: dict) -> list[str]:
             "version, control boundary and acceptance every edition's pronunciation shares"
         )
     return found
+
+
+# The player template a sources folder once held; the engine renders each edition's player now.
+PLAYER_TEMPLATE = "player.html"
+
+
+def edition_files(code: str, slug: str) -> tuple[str, ...]:
+    """The files every edition holds at the places its code derives: its script, cast and
+    pronunciation, and its reference recording."""
+    edition = places(code, slug)
+    return edition.script, edition.cast, edition.pronunciation, edition.reference
+
+
+def named_files(film: Film, *, editions: bool = True) -> list[tuple[str, str]]:
+    """Each file the declaration names or, unless `editions` is false, its editions derive (their
+    script, cast, pronunciation and reference recording), except the covers, with the field that
+    names it or the edition's table."""
+    named = [
+        ("entry", film.entry),
+        ("source_manifest", film.source_manifest),
+        ("review.prompt", film.review.prompt),
+    ]
+    for code in film.editions if editions else ():
+        named += [(f"editions.{code}", path) for path in edition_files(code, film.slug)]
+    named += [("picture.fonts", font) for font in film.picture.fonts]
+    if film.concepts is not None:
+        named.append(("concepts", film.concepts))
+    return named
+
+
+def start_up_files(film: Film) -> list[str]:
+    """Every file below a film's root that an engine process may read as it starts, before a
+    command's run opens: the declaration, each file it names or its editions derive, each
+    edition's readings, which the loader reads where they stand (`declared_sources`). The scripts
+    whose chapters `filmkit.specification` counts at import come in through `edition_files`, as
+    every edition's script; a module that read another file at import would have it judged as an
+    undeclared read. The recorder of each run's opens exempts a start-up read of these files alone
+    (`filmkit.graph.opens`)."""
+    named = [path for _, path in named_files(film)]
+    readings = [places(code, film.slug).readings for code in film.editions]
+    return [DECLARATION, *named, *readings]
+
+
+def copied_players(root: Path, film: Film) -> str | None:
+    """Why a film's sources may not hold player pages of their own, naming each one and the
+    declarations that replace it, or None when they hold none."""
+    folders = [places(code, film.slug).folder for code in film.editions]
+    pages = [
+        f"{folder}/{PLAYER_TEMPLATE}"
+        for folder in folders
+        if (root / folder / PLAYER_TEMPLATE).is_file()
+    ]
+    if not pages:
+        return None
+    return (
+        f"The engine renders each edition's player and reads no {', '.join(pages)}: declare "
+        "the words each player shows as editions.<code>.summary and its colours in [player] "
+        f"in {DECLARATION}, then remove the page"
+    )

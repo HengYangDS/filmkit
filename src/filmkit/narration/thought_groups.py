@@ -113,7 +113,7 @@ def cast_speech(
     temperature: float,
 ) -> dict:
     """The speech settings a cast narrates one segment with, its reference recording at its
-    place, `reference` (`filmkit.film.places`)."""
+    place, `reference` (`filmkit.places.places`)."""
     speech = {
         "reference_audio": reference,
         "reference_sha256": cast["reference_sha256"],

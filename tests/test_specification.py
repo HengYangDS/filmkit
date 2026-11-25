@@ -6,15 +6,13 @@ import subprocess
 import sys
 
 import pytest
-import test_film
+from declaring import rewrite
 
 import filmkit.film as film
 import filmkit.repository as repository
 import filmkit.specification as specification
 from filmkit.film import FILM, FilmError
 from filmkit.production import CODES, Edition
-
-declared, rewrite = test_film.declared, test_film.rewrite
 
 
 def test_scripts_that_disagree_refuse(tmp_path, monkeypatch):

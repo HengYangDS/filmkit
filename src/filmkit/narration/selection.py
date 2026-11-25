@@ -32,7 +32,7 @@ class SelectionError(ValueError):
 
 def require_reference(reference: str, sha256: str, owner: str) -> None:
     """Refuse unless the edition's reference recording at its place, `reference`
-    (`filmkit.film.places`), holds the SHA-256 that `owner`, the cast or a take, records.
+    (`filmkit.places.places`), holds the SHA-256 that `owner`, the cast or a take, records.
 
     No step opens the path a take recorded: a path is where a recording stood, and its digest
     is what it is. The SHA-256 is computed once for each state of the file, so a run that checks

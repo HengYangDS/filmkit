@@ -6,6 +6,7 @@ import json
 import pytest
 
 import filmkit.film as film
+import filmkit.places as places
 import filmkit.repository as repository
 from filmkit.production import CODES, RENDITIONS, Edition, UnassembledError
 
@@ -13,7 +14,7 @@ from filmkit.production import CODES, RENDITIONS, Edition, UnassembledError
 def test_every_place_of_an_edition_is_derived_from_its_code():
     for code in CODES:
         edition = Edition(code)
-        assert edition.places == film.places(code, film.FILM.slug)
+        assert edition.places == places.places(code, film.FILM.slug)
         assert (edition.sources, edition.script, edition.cast, edition.cover) == (
             f"content/{code}",
             f"content/{code}/film-script.json",

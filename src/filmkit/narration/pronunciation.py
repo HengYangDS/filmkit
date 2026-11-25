@@ -1,6 +1,6 @@
 """Spoken text, pronunciation targets, narration language and the thoughts each segment speaks.
 
-Each edition's pronunciation, `content/<code>/pronunciation.json` (`filmkit.film.places`), owns
+Each edition's pronunciation, `content/<code>/pronunciation.json` (`filmkit.places.places`), owns
 how its display text is spoken: its normalization rules derive every spoken text. Before any
 speech provider loads, its lexical stress targets must agree with their ARPAbet phones, in a
 language that holds its stress to CMUdict, and every source its targets cite must stand in it or
@@ -36,7 +36,8 @@ def pronunciation(code: str) -> tuple[dict, str]:
     """
     # The film is read here, when a pronunciation is, and not as the module loads: a command
     # that stands in for the narration imports it with no film below its root.
-    from filmkit.film import FILM, places
+    from filmkit.film import FILM
+    from filmkit.places import places
 
     path = places(code, FILM.slug).pronunciation
     try:

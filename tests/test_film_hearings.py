@@ -1,12 +1,9 @@
 """The film's records of the owner's hearing (`[[narration.heard]]`): one take each, by its audio,
 heard by the film's author, settling the lines it names and refused where it says less."""
 
-import shutil
-
 import pytest
 
 import filmkit.film as film
-import filmkit.repository as repository
 from filmkit.film import FilmError
 
 TAKE = "a" * 64
@@ -20,17 +17,6 @@ listener = "Yang HENG"
 date = "2026-11-24"
 note = "He heard labelled said as written."
 """
-
-
-@pytest.fixture
-def declared(tmp_path):
-    """A copy of the sample film's declaration and every file it names, below a new root."""
-    for _field, path in film.named_files(film.FILM):
-        target = tmp_path / path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(repository.ROOT / path, target)
-    shutil.copy2(repository.ROOT / film.DECLARATION, tmp_path / film.DECLARATION)
-    return tmp_path
 
 
 def with_records(root, *records: str) -> None:

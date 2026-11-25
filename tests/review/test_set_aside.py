@@ -291,7 +291,7 @@ def test_the_rounds_whose_prompts_bind_an_edition_s_films_hold_them_until_set_as
         review_set_aside.require_set_aside(zh)
     assert str(refusal.value) == (
         "the current zh films are bound by the prompts of review round 9 and round 10 and have "
-        "not been set aside; first run python -m filmkit.review.round set-aside --round 10 "
+        "not been set aside; first run filmkit review set-aside --round 10 "
         "--purpose <text> --language zh"
     )
     # Setting the Chinese edition aside moves its films, and the English stays bound.

@@ -30,7 +30,8 @@ import filmkit.declared_sources as declared_sources
 import filmkit.languages as languages
 import filmkit.narration.hearings as hearings
 import filmkit.repository as repository
-from filmkit.places import CAST, SCRIPT, places
+from filmkit.declared_sources import copied_players, named_files
+from filmkit.places import CAST, SCRIPT
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -46,8 +47,6 @@ CHAPTER_VALUES = ("chapter_index", "chapter_title")
 EDITION_FILES = (SCRIPT, CAST)
 
 
-# The player template a sources folder once held; the engine renders each edition's player now.
-PLAYER_TEMPLATE = "player.html"
 # The key that named the delivery folder through 0.22.3, refused with the key that names it now.
 RENAMED_FOLDER = "documents_folder"
 
@@ -246,8 +245,14 @@ class Picture(Declared):
     renderer captures its frames.
 
     `drafts` says whether the film renders a 10 fps draft of each edition and scans it for still
-    pictures (`filmkit.picture.draft`): `preflight` asks for that scan only of a film that
+    pictures (`filmkit.picture.draft`): every render waits for that scan only in a film that
     declares them, since `check-picture` audits every frame.
+
+    `gate_row_gaps` says whether the geometry check also gates the gaps between rows
+    (`picture/geometry-check.mjs`, `--gate-row-gaps`), and `native_uncaptioned` names the
+    editions whose uncaptioned picture is rendered from its own stage, never derived; both are
+    read by their nodes (design decision 14 of build-a-film-by-its-verbs) and retire with the
+    geometry check and the derived picture.
 
     `qualified_edition` names the edition whose captioned stage the renderer's qualification
     renders again (`filmkit.picture.qualification`), once a build: every engine release qualifies
@@ -268,6 +273,8 @@ class Picture(Declared):
     drafts: bool = False
     qualified_edition: Code | None = None
     capture: Literal["fast", "screenshot", "software"] = "fast"
+    gate_row_gaps: bool = False
+    native_uncaptioned: tuple[Code, ...] = ()
 
     @field_validator("fonts")
     @classmethod
@@ -673,6 +680,7 @@ class Film(Declared):
             "picture.qualified_edition": [
                 self.picture.qualified_edition or next(iter(self.editions))
             ],
+            "picture.native_uncaptioned": list(self.picture.native_uncaptioned),
             "review.clarity_exceptions": [e.edition for e in self.review.clarity_exceptions],
             "review.clarity_minimum_db": list(self.review.clarity_minimum_db or {}),
             "narration.flow.exceptions": [e.edition for e in self.narration.flow.exceptions],
@@ -728,61 +736,6 @@ def timeline_values(script: dict, film: Film) -> dict:
         for s in script["segments"]
     ]
     return {**script, "author": film.author, "fps": FPS, "segments": segments}
-
-
-def edition_files(code: str, slug: str) -> tuple[str, ...]:
-    """The files every edition holds at the places its code derives: its script, cast and
-    pronunciation, and its reference recording."""
-    edition = places(code, slug)
-    return edition.script, edition.cast, edition.pronunciation, edition.reference
-
-
-def named_files(film: Film, *, editions: bool = True) -> list[tuple[str, str]]:
-    """Each file the declaration names or, unless `editions` is false, its editions derive (their
-    script, cast, pronunciation and reference recording), except the covers, with the field that
-    names it or the edition's table."""
-    named = [
-        ("entry", film.entry),
-        ("source_manifest", film.source_manifest),
-        ("review.prompt", film.review.prompt),
-    ]
-    for code in film.editions if editions else ():
-        named += [(f"editions.{code}", path) for path in edition_files(code, film.slug)]
-    named += [("picture.fonts", font) for font in film.picture.fonts]
-    if film.concepts is not None:
-        named.append(("concepts", film.concepts))
-    return named
-
-
-def start_up_files(film: Film) -> list[str]:
-    """Every file below a film's root that an engine process may read as it starts, before a
-    command's run opens: the declaration, each file it names or its editions derive, each
-    edition's readings, which the loader reads where they stand (`declared_sources`). The scripts
-    whose chapters `filmkit.specification` counts at import come in through `edition_files`, as
-    every edition's script; a module that read another file at import would have it judged as an
-    undeclared read. The recorder of each run's opens exempts a start-up read of these files alone
-    (`filmkit.graph.opens`)."""
-    named = [path for _, path in named_files(film)]
-    readings = [places(code, film.slug).readings for code in film.editions]
-    return [DECLARATION, *named, *readings]
-
-
-def copied_players(root: Path, film: Film) -> str | None:
-    """Why a film's sources may not hold player pages of their own, naming each one and the
-    declarations that replace it, or None when they hold none."""
-    folders = [places(code, film.slug).folder for code in film.editions]
-    pages = [
-        f"{folder}/{PLAYER_TEMPLATE}"
-        for folder in folders
-        if (root / folder / PLAYER_TEMPLATE).is_file()
-    ]
-    if not pages:
-        return None
-    return (
-        f"The engine renders each edition's player and reads no {', '.join(pages)}: declare "
-        "the words each player shows as editions.<code>.summary and its colours in [player] "
-        f"in {DECLARATION}, then remove the page"
-    )
 
 
 def read(root: Path) -> tuple[Film | None, list[str]]:
