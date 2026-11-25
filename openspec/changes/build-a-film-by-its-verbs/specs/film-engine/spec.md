@@ -48,10 +48,15 @@ Every verb SHALL exit 0 where it did what it was asked; 1 where the film or a ga
 - **WHEN** a node's owner raises an exception that is no refusal during `filmkit build all`
 - **THEN** the node's record states the outcome `error`, no node downstream of it runs, the other edition's nodes do, and the command exits 2
 
-#### Scenario: A request to end
+#### Scenario: A request to end a render
 
-- **WHEN** `filmkit build` is sent SIGTERM while a node runs
-- **THEN** it ends the node, says so in one line and exits 143
+- **WHEN** `filmkit build` is sent SIGTERM while a node runs a render
+- **THEN** it ends the renderer, says so in one line and exits 143
+
+#### Scenario: A request to end a light node
+
+- **WHEN** `filmkit build` is sent SIGTERM while a node runs that holds no renderer, no narration process and no step of `narrate`
+- **THEN** SIGTERM ends the command by its default action, which a shell reports as 143, with no line and no run record written for the node
 
 ### Requirement: One command checks a film's sources at once
 
