@@ -161,20 +161,37 @@ def verify_narration(edition: production.Edition) -> dict:
     }
 
 
-def require_covering_geometry(edition: production.Edition) -> dict:
-    """The geometry record, refused unless it passed on the whole current staged film."""
-    geometry = repository.read(edition.picture_geometry)
+def geometry_gaps(edition: production.Edition, geometry: dict) -> list[str]:
+    """What a geometry record lacks of having passed on the whole current staged film: each
+    condition it fails, in words; none for a record that covers it."""
+    if geometry.get("format") != "picture-geometry":
+        return ["it is no picture geometry record"]
     step, runtime = geometry.get("step_frames"), edition.runtime
-    if not (
-        geometry.get("format") == "picture-geometry"
-        and geometry.get("passed") is True
-        and geometry["findings"] == geometry["errors"] == []
-        and geometry["index_sha256"] == repository.sha(edition.rendered().page)
-        and (geometry["width"], geometry["height"]) == picture_rendering.PICTURE_SIZE
-        and (geometry["duration"], geometry["fps"]) == (runtime, FPS)
-        and step in (1, 2)
-        and geometry["checked"] == -(-runtime * FPS // step)
-    ):
+    size, wanted = (geometry.get("width"), geometry.get("height")), picture_rendering.PICTURE_SIZE
+    gaps = [] if geometry.get("passed") is True else ["it did not pass"]
+    if geometry.get("findings") or geometry.get("errors"):
+        gaps.append("it holds findings or errors")
+    if geometry.get("index_sha256") != repository.sha(edition.rendered().page):
+        gaps.append("it checked another staged page")
+    if size != wanted:
+        gaps.append(f"it checked {size[0]}x{size[1]}, not {wanted[0]}x{wanted[1]}")
+    if (geometry.get("duration"), geometry.get("fps")) != (runtime, FPS):
+        gaps.append(
+            f"it checked {geometry.get('duration')} s at {geometry.get('fps')} fps, not the "
+            f"runtime of {runtime} s at {FPS} fps"
+        )
+    if step not in (1, 2):
+        gaps.append(f"its step is {step} frames, not 1 or 2")
+    elif geometry.get("checked") != (frames := -(-runtime * FPS // step)):
+        gaps.append(f"it checked {geometry.get('checked')} frames of the {frames} its step must")
+    return gaps
+
+
+def require_covering_geometry(edition: production.Edition) -> dict:
+    """The geometry record, refused unless it passed on the whole current staged film
+    (`geometry_gaps`)."""
+    geometry = repository.read(edition.picture_geometry)
+    if geometry_gaps(edition, geometry):
         msg = "Picture geometry does not cover the current staged film"
         raise VerificationError(msg)
     return geometry

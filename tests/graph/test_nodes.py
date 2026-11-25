@@ -293,9 +293,21 @@ def declaring(monkeypatch, **picture):
 
 
 @pytest.mark.parametrize("gaps", [False, True])
-def test_the_geometry_check_gates_row_gaps_only_where_the_film_declares_it(gaps, monkeypatch):
+def test_the_geometry_check_gates_row_gaps_only_where_the_film_declares_it(
+    gaps, monkeypatch, tmp_path
+):
     ran = []
-    monkeypatch.setattr(tools, "run", lambda tool, arguments: ran.append((tool, arguments)) or 0)
+
+    def run(tool, arguments, stdout=None):
+        ran.append((tool, arguments))
+        if stdout is not None:
+            repository.write(stdout, {"identical": True, "cover_sha256": "0" * 64})
+        return 0
+
+    monkeypatch.setattr(tools, "run", run)
+    monkeypatch.setattr(chain.verification, "geometry_gaps", lambda edition, record: [])
+    monkeypatch.setattr(repository, "ROOT", tmp_path.resolve())
+    repository.write(Edition("zh").picture_geometry, {})
     declaring(monkeypatch, gate_row_gaps=gaps)
     chain.geometry_check(Edition("zh"))
     chain.cover_check(Edition("zh"))
@@ -311,7 +323,7 @@ def test_the_geometry_check_gates_row_gaps_only_where_the_film_declares_it(gaps,
             ["cover", stage, str(Edition("zh").cover), "build/runtime/work/cover-zh.png"],
         ),
     ]
-    monkeypatch.setattr(tools, "run", lambda tool, arguments: 1)
+    monkeypatch.setattr(tools, "run", lambda tool, arguments, stdout=None: 1)
     with pytest.raises(tools.ToolError, match="geometry-check exited with status 1"):
         chain.geometry_check(Edition("zh"))
 

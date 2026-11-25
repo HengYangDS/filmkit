@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 import filmkit.check as source_check
 import filmkit.delivery.packaging as packaging
+import filmkit.delivery.verification as verification
 import filmkit.film as film
 import filmkit.picture.derivation as derivation
 import filmkit.picture.draft as draft
@@ -65,6 +66,7 @@ from filmkit.review import set_aside
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
 # The tools whose reads the check of each run's opens sees only through their arguments.
 MEDIA, BROWSER = ("FFmpeg", "ffprobe"), ("Chrome",)
@@ -83,18 +85,58 @@ def ran(tool: str, arguments: list[str]) -> None:
 
 def geometry_check(edition: Edition) -> None:
     """Check the geometry of the edition's staged picture at the engine's step, gating the gaps
-    between rows where the film declares it (`[picture] gate_row_gaps`)."""
+    between rows where the film declares it (`[picture] gate_row_gaps`), and refuse a record
+    that does not cover the whole current staged film, as the delivery's verification will
+    (`verification.geometry_gaps`), naming the record, what it lacks and the stage to make
+    whole."""
+    record = repository.relative(edition.picture_geometry)
     stage_folder = repository.relative(edition.rendered().stage)
-    arguments = [stage_folder, repository.relative(edition.picture_geometry), GEOMETRY_STEP]
-    gaps = ["--gate-row-gaps"] if FILM.picture.gate_row_gaps else []
-    ran("geometry-check", [*arguments, *gaps])
+    rows = ["--gate-row-gaps"] if FILM.picture.gate_row_gaps else []
+    ran("geometry-check", [stage_folder, record, GEOMETRY_STEP, *rows])
+    try:
+        lacks = verification.geometry_gaps(edition, repository.read(edition.picture_geometry))
+    except (OSError, ValueError):
+        lacks = ["it cannot be read"]
+    if lacks:
+        message = (
+            f"{record} does not cover the current staged film: {'; '.join(lacks)}; stage the "
+            f"whole picture and check it again, filmkit build stage-picture:{edition.code} "
+            f"geometry-check:{edition.code}"
+        )
+        raise tools.ToolError(message)
+
+
+def cover_refusal(status: int, report: Path, cover: str, painting: Path) -> str | None:
+    """Why a tracked cover is not the one the composition paints, by the cover check's exit status
+    and report, naming the painting to track; None where the two are identical."""
+    try:
+        found = repository.read(report)
+    except (OSError, ValueError):
+        return f"the cover check exited with status {status} and no report"
+    if status == 0 and found.get("identical"):
+        return None
+    painted = repository.relative(painting)
+    if found.get("cover_sha256") is None:
+        return f"no tracked cover at {cover}; track the painting {painted}"
+    if found.get("differing_pixels") is None:
+        return f"{cover} is not the size of the painting {painted}"
+    return (
+        f"{cover} differs in {found['differing_pixels']} pixels from the cover the composition "
+        f"paints; track the painting {painted}"
+    )
 
 
 def cover_check(edition: Edition) -> None:
-    """Paint the cover the edition's composition draws and compare it with the tracked cover."""
-    painting = repository.relative(work("cover-{code}.png")(edition))
+    """Paint the cover the edition's composition draws and compare it with the tracked cover,
+    refusing a tracked cover other than the painting (`cover_refusal`)."""
+    painting, report = work("cover-{code}.png")(edition), work("cover-{code}.json")(edition)
     stage_folder = repository.relative(edition.rendered().stage)
-    ran("player-check", ["cover", stage_folder, str(edition.cover), painting])
+    arguments = ["cover", stage_folder, str(edition.cover), repository.relative(painting)]
+    refused = cover_refusal(
+        tools.run("player-check", arguments, stdout=report), report, edition.cover, painting
+    )
+    if refused:
+        raise tools.ToolError(refused)
 
 
 def staged(edition: Edition, captions: bool) -> object:
@@ -238,7 +280,10 @@ TABLE = (
     Node(
         "player-check-cover",
         {"default": lambda e: pictured(e) | stage(e) | {"cover": root(e.cover)}},
-        only("painted_cover", work("cover-{code}.png")),
+        lambda e: {
+            "painted_cover": work("cover-{code}.png")(e),
+            "cover": work("cover-{code}.json")(e),
+        },
         "light",
         tools=BROWSER,
         run=cover_check,

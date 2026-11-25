@@ -116,21 +116,10 @@ def cover(edition: Edition) -> str | None:
         status = tools.run("player-check", arguments, stdout=result)
     except (rendering.PictureError, tools.ToolError) as error:
         return f"not compared: {error}"
-    try:
-        report = json.loads(result.read_text())
-    except ValueError:
-        return f"the cover check exited with status {status} and no report"
-    if status == 0 and report.get("identical"):
-        return None
-    painted = repository.relative(painting)
-    if report.get("cover_sha256") is None:
-        return f"no tracked cover at {edition.cover}; track the painting {painted}"
-    if report.get("differing_pixels") is None:
-        return f"{edition.cover} is not the size of the painting {painted}"
-    return (
-        f"{edition.cover} differs in {report['differing_pixels']} pixels from the cover the "
-        f"composition paints; track the painting {painted}"
-    )
+    # The node `player-check-cover` holds the words (`chain.cover_refusal`).
+    from filmkit.graph import chain
+
+    return chain.cover_refusal(status, result, edition.cover, painting)
 
 
 def package(edition: Edition) -> str | None:
