@@ -167,7 +167,7 @@ A node SHALL state whether it runs once for the film or once for each edition it
 
 ### Requirement: A node binds the tables of the declaration it reads
 
-A node SHALL bind each top-level table of the film's declaration that its run reads, each by the SHA-256 of its canonical JSON, and no other part of the declaration. When `FILMKIT_OPENS` names a file, the check of what each run opens SHALL also fail a read of a table that the node does not declare.
+A node SHALL bind each top-level table of the film's declaration that its run reads, each by the SHA-256 of its canonical JSON, and no other part of the declaration. When `FILMKIT_OPENS` names a file, the check of what each run opens SHALL also fail a read of a table that the node does not declare, and SHALL report each table a node declares that its run did not read, beyond the film's identity and editions, which every run reads as the engine loads.
 
 #### Scenario: A hearing recorded reaches the readers of the narration table
 
@@ -178,6 +178,16 @@ A node SHALL bind each top-level table of the film's declaration that its run re
 
 - **WHEN** a node's run reads the declaration's `review` table and the node does not declare it
 - **THEN** the check fails, naming the node and the table
+
+#### Scenario: A table declared and not read
+
+- **WHEN** a node declares the declaration's `picture` table and its run does not read it
+- **THEN** the check reports the table under the node
+
+#### Scenario: The player's colours
+
+- **WHEN** the declaration's `player` table is edited after a whole build
+- **THEN** of the nodes that bind tables, only the two packages of each edition are stale by a table of the declaration
 
 ### Requirement: A node that encodes binds the host's encoders
 

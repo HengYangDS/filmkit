@@ -188,6 +188,8 @@ def test_every_node_the_light_suite_runs_reads_and_writes_only_what_it_declares(
     # The seam reads and writes the run records with the recorder quiet, so no run reads one
     # under an exemption.
     assert not any(reason.startswith("records") for reason in report.exempted)
+    # Each node binds the tables of the declaration its run reads, and no other.
+    assert report.unread == {}
 
 
 @pytest.mark.ffmpeg
@@ -389,7 +391,48 @@ def test_a_read_of_a_table_the_node_does_not_declare_fails_naming_the_table(decl
 def test_a_read_of_the_whole_declaration_is_a_read_of_every_table(declared_film):
     root, log, table = declared_film
     python_child(root, log, "from filmkit.film import FILM\nFILM.model_dump()\n", "reader:zh")
-    # Every table, the release's too, which no node declares (`chain.UNREAD`).
     every = set(records.table_names(Film).values())
     assert tables_named(opens.check(log, table)) == sorted(every - {"picture"})
-    assert set(bindings.UNREAD) <= every - set(bindings.TABLES)
+
+
+def test_a_table_a_node_declares_and_its_run_does_not_read_is_reported(declared_film):
+    root, log, table = declared_film
+    # The run reads the film's identity, which its node does not declare, and not the picture's
+    # table, which it declares.
+    python_child(root, log, "from filmkit.film import FILM\nFILM.slug\n", "reader:zh")
+    report = opens.check(log, table)
+    assert (tables_named(report), report.unread) == (["identity"], {"reader:zh": ["picture"]})
+    python_child(root, log, "from filmkit.film import FILM\nFILM.picture.fonts\n", "reader:zh")
+    assert opens.check(log, table).unread == {}
+
+
+def bound_tables(table, key) -> set[str]:
+    """The declaration's tables a node of the table binds."""
+    node, edition = table.node(key)
+    places = node.inputs(edition).values()
+    return {place.name for place in places if isinstance(place, records.DeclarationTable)}
+
+
+def test_no_node_binds_the_release_s_sources_and_every_one_its_identity_and_editions():
+    # `filmkit release` reads them, and no node's run (design decision 15); the source check
+    # binds the declaration whole, as a file.
+    table = chain.table()
+    for key in set(table.edges) - {"check"}:
+        assert "release" not in bound_tables(table, key) >= set(bindings.LOADED), key
+
+
+def test_the_sound_gate_binds_the_hearings_only_where_the_film_declares_a_thought_line(
+    monkeypatch,
+):
+    # The sample declares no thought line: its gate reads no hearing (`thought_findings`).
+    assert "narration" not in bound_tables(chain.table(), "check-sound:zh")
+    review = bindings.FILM.review.model_copy(update={"clarity_thought_margin_db": 1.0})
+    monkeypatch.setattr(bindings, "FILM", bindings.FILM.model_copy(update={"review": review}))
+    assert "narration" in bound_tables(chain.table(), "check-sound:zh")
+
+
+def test_an_edit_of_the_player_s_colours_reaches_the_two_packages_alone():
+    table = chain.table()
+    readers = {key for key in table.edges if "player" in bound_tables(table, key)}
+    packages = ("package-metadata", "package-film")
+    assert readers == {f"{name}:{code}" for name in packages for code in table.codes}

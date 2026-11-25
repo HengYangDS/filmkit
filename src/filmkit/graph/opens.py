@@ -26,9 +26,10 @@ outside the root are judged by nothing.
 a node's run took, a read of a table of the declaration that the node does not declare (or the
 whole declaration), a probe of a path that the node would not declare were it to stand, and a
 write outside its outputs, names each node whose tools are seen only through their arguments,
-and reports each exemption with its reason and the nodes it covered. It fails closed: nothing
-below the root is let through without a declaration or a named exemption: a read at start-up is
-let through only for a file the engine reads as it starts
+reports each table a node declares that its run did not read, beyond those every run reads as
+the engine loads (`Report.unread`), and reports each exemption with its reason and the nodes it
+covered. It fails closed: nothing below the root is let through without a declaration or a named
+exemption: a read at start-up is let through only for a file the engine reads as it starts
 (`filmkit.declared_sources.start_up_files`), and by another path than the two the recorder knows
 it is judged as a read.
 """
@@ -357,13 +358,16 @@ class Access:
 class Report:
     """What the check found: each read or write outside a node's declaration; each exemption,
     by its reason, with the nodes it covered; the nodes whose tools are seen only through their
-    arguments; the nodes that ran; and the labels that name no node of the table."""
+    arguments; the nodes that ran; the labels that name no node of the table; and, by node, the
+    tables of the declaration it declares that its run did not read, beyond those every run
+    reads as the engine loads (`bindings.LOADED`)."""
 
     findings: list[str] = field(default_factory=list)
     exempted: dict[str, set[str]] = field(default_factory=dict)
     unseen: dict[str, tuple[str, ...]] = field(default_factory=dict)
     seen: set[str] = field(default_factory=set)
     unjudged: set[str] = field(default_factory=set)
+    unread: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -417,6 +421,9 @@ class _Judged:
         inputs = list(self.node.inputs(self.edition, way).values())
         outputs = list(self.node.outputs(self.edition).values())
         self.reads, self.writes = real([*inputs, *outputs]), real(outputs)
+        # The declaration's tables it declares, and those its run read.
+        self.tables = {item.name for item in inputs if isinstance(item, records.DeclarationTable)}
+        self.read: set[str] = set()
         with nodes.as_if_standing():
             self.probes = real(self.node.inputs(self.edition, way).values())
         self.aside = real(chain.aside(self.node.name, self.edition).values())
@@ -487,7 +494,7 @@ def check(log: Path, table=None) -> Report:
     outputs; a `.partial` sibling renamed over its target is no write, the target is, and a
     rename's source that the same process did not write is a removal from its place."""
     import filmkit.repository as repository
-    from filmkit.graph import chain
+    from filmkit.graph import bindings, chain
 
     table = table or chain.table()
     # The files the engine reads at start-up, read once a check, at its first start-up read.
@@ -510,6 +517,8 @@ def check(log: Path, table=None) -> Report:
         if kind == "source" and named in wrote or kind == "write" and named in renamed:
             continue
         kind = "remove" if kind == "source" else kind
+        if kind == "table":
+            judging.read.add(str(access.path).partition("#")[2])
         path, writes = Path(os.path.realpath(access.path)), kind in WRITES
         if covered(path, judging.writes if writes else judging.reads):
             continue
@@ -541,4 +550,8 @@ def check(log: Path, table=None) -> Report:
             f"{DID.get(kind, 'read')} {repository.relative(access.path)}, which "
             f"{'its outputs do' if writes else 'its declaration does'} not name"
         )
+    for name, judging in judged.items():
+        unread = sorted(judging.tables - judging.read - set(bindings.LOADED))
+        if unread:
+            report.unread[name] = unread
     return report

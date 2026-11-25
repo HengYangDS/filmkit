@@ -1,8 +1,7 @@
 """What each node of the engine's table binds, as functions of an edition: the film's sources and
-the build's outputs it reads and writes by name, and the tables of the declaration it may read,
-each by its digest: every table, but the narration's for the nodes that make and deliver the
-pictures (design decision 12 of build-a-film-by-its-verbs). `filmkit.graph.chain` states the
-nodes over them.
+the build's outputs it reads and writes by name, and the tables of the declaration its run reads,
+each by its digest and no other (design decision 12 of build-a-film-by-its-verbs).
+`filmkit.graph.chain` states the nodes over them.
 
 Where an owner binds its inputs, the node takes that owner's function (design decision 4 of
 record-every-run).
@@ -14,14 +13,13 @@ from typing import TYPE_CHECKING
 
 import filmkit.check as source_check
 import filmkit.delivery.packaging as packaging
-import filmkit.film as film
 import filmkit.picture.derivation as derivation
 import filmkit.picture.equivalence as equivalence
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
 from filmkit.film import FILM
 from filmkit.graph.nodes import Places, stands
-from filmkit.graph.records import DeclarationTable, Folder, table_names
+from filmkit.graph.records import DeclarationTable, Folder
 from filmkit.narration import alignment_records, readings, transcript_records
 from filmkit.narration.narrate import evidence_paths
 from filmkit.production import CODES, Edition
@@ -29,27 +27,34 @@ from filmkit.production import CODES, Edition
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
-# The tables the narration reads: the film's identity and editions and the pronunciation that
-# the editions share (`narration.synthesis`, `narration.pronunciation`), so that an edit of the
-# composition, of another edition's script or of the narration's table leaves it fresh (design
-# decision 9).
-NARRATED = ("identity", "editions", "pronunciation")
-# The declaration's tables, each bound by its digest.
-# The table no node reads: the release's sources, which `filmkit release` reads (design
-# decision 15), so that an edit of them leaves every node fresh; the check of each run's opens
-# holds each node to it.
-UNREAD = ("release",)
 
-
-TABLES = tuple(t for t in dict.fromkeys(table_names(film.Film).values()) if t not in UNREAD)
-
-
-# The tables no node that makes or delivers the pictures reads: no module of `filmkit.picture` or
-# `filmkit.delivery` reaches a reader of the narration's table (`narration.audition`,
-# `judgment`, `readings` and `selection`, `review.listening_plan` and `measurement`,
-# `soundtrack.assembly`; read 2026-11-25), so a hearing recorded there leaves them fresh; the
-# check of each run's opens holds each node to it.
-PICTURED = tuple(t for t in TABLES if t != "narration")
+# The tables of the declaration each node's run reads, each bound by its digest, and no other
+# (design decision 12 of build-a-film-by-its-verbs). The check of each run's opens holds every
+# node the light suite runs to its tables both ways (`opens.Report.unread`); the others are read
+# from their owners' code (2026-11-25). Every run reads the film's identity, by the file prefix
+# that every place takes (`production.Edition`), and its editions, which every engine process
+# derives as it loads (`production.CODES`). No node reads the release's sources, which
+# `filmkit release` reads (decision 15).
+LOADED = ("identity", "editions")
+# The narration's: the pronunciation the editions share (`narration.synthesis`,
+# `narration.pronunciation`), so that an edit of the composition, of another edition's script or
+# of the narration's table leaves it fresh (design decision 9).
+NARRATED = (*LOADED, "pronunciation")
+# The selection's: the pronunciation each recording is held to and the narration's flow and terms
+# (`narration.selection`).
+SELECTED = (*NARRATED, "narration")
+# The assembly's: the narration's flow and terms, which the assembled speech is held to
+# (`soundtrack.assembly`).
+ASSEMBLED = (*LOADED, "narration")
+# The sound gate's: the reading rate's exceptions and the clarity floors, line and exceptions
+# (`soundtrack.gates`, `review.clarity`); the owner's hearings besides where it reads them
+# (`gated`).
+GATED = (*LOADED, "captions", "review")
+# A stage's, a picture's and its checks': the fonts and the picture's exceptions and switches
+# (`picture.rendering`, `picture.gates`, `picture.derivation`, `chain.geometry_check`).
+PICTURED = (*LOADED, "picture")
+# The player page's: its colours (`delivery.player`).
+PLAYED = (*LOADED, "player")
 
 
 def root(path: str | Path) -> Path:
@@ -62,12 +67,20 @@ def named(bindings: dict[str, Path]) -> Places:
     return Places({name.removesuffix("_sha256"): path for name, path in bindings.items()})
 
 
-def declared(edition: Edition | None, tables: tuple[str, ...] = TABLES) -> Places:
-    """What every command reads: the film's declaration, which it loads, as the tables it may read,
-    every one by default."""
+def declared(edition: Edition | None, tables: tuple[str, ...]) -> Places:
+    """What a node reads of the film's declaration, which every command loads: the tables its run
+    reads."""
     del edition
     path = root(repository.DECLARATION)
     return Places({f"declaration.{t}": DeclarationTable(path, t) for t in tables})
+
+
+def gated(edition: Edition) -> Places:
+    """What the sound gate reads of the declaration (`GATED`), with the narration's table, the
+    owner's hearings, where the film declares `review.clarity_thought_margin_db`: only a gate that
+    holds each thought to its line reads them (`soundtrack.gates.thought_findings`)."""
+    heard = ("narration",) if FILM.review.clarity_thought_margin_db is not None else ()
+    return declared(edition, (*GATED, *heard))
 
 
 def pictured(edition: Edition | None) -> Places:
@@ -254,7 +267,7 @@ def metadata_inputs(edition: Edition) -> Places:
     kept = ("srt", "vtt", "chapters", "transcript", "chapter_metadata")
     found |= {name: path for name, path in documents(edition).items() if name in kept}
     found |= {f"timeline_{code}": Edition(code).timeline for code in CODES}
-    return pictured(edition) | found
+    return declared(edition, PLAYED) | found
 
 
 def metadata(edition: Edition) -> Places:

@@ -31,7 +31,10 @@ from filmkit.captions import refresh
 from filmkit.film import FILM
 from filmkit.graph import build_command, key
 from filmkit.graph.bindings import (
+    ASSEMBLED,
+    LOADED,
     NARRATED,
+    SELECTED,
     caches,
     check_outputs,
     checked,
@@ -41,6 +44,7 @@ from filmkit.graph.bindings import (
     derived_uncaptioned,
     documents,
     faces,
+    gated,
     metadata,
     metadata_inputs,
     named,
@@ -191,7 +195,7 @@ TABLE = (
     ),
     Node(
         "select",
-        {"default": lambda e: declared(e) | sources(e) | narration(e)},
+        {"default": lambda e: declared(e, SELECTED) | sources(e) | narration(e)},
         lambda e: {
             "narration_selected": e.narration_selected,
             "alignment_selected": e.alignment_selected,
@@ -203,7 +207,7 @@ TABLE = (
         "assemble",
         {
             "default": lambda e: (
-                declared(e)
+                declared(e, ASSEMBLED)
                 | {k: v for k, v in sources(e).items() if k in ("script", "cast")}
                 | {
                     "narration_selected": e.narration_selected,
@@ -221,7 +225,7 @@ TABLE = (
         "refresh-captions",
         {
             "default": lambda e: (
-                declared(e)
+                declared(e, LOADED)
                 | {
                     "script": root(e.script),
                     "cast": root(e.cast),
@@ -245,7 +249,7 @@ TABLE = (
         "check-sound",
         {
             "default": lambda e: (
-                declared(e)
+                gated(e)
                 | named(sound_gates.bound_inputs(e))
                 | {k: v for k, v in narration(e).items() if k in ("recordings", "receipt")}
                 | {"narration_selected": e.narration_selected}
@@ -280,7 +284,7 @@ TABLE = (
     ),
     Node(
         "player-check-cover",
-        {"default": lambda e: pictured(e) | stage(e) | {"cover": root(e.cover)}},
+        {"default": lambda e: declared(e, LOADED) | stage(e) | {"cover": root(e.cover)}},
         lambda e: {
             "painted_cover": work("cover-{code}.png")(e),
             "cover": work("cover-{code}.json")(e),
@@ -400,7 +404,7 @@ TABLE = (
     ),
     Node(
         "scan-film",
-        {"default": lambda e: pictured(e) | still_scan.subject_places(e)},
+        {"default": lambda e: declared(e, LOADED) | still_scan.subject_places(e)},
         only("film_stills", lambda e: e.film_stills),
         "heavy",
         tools=MEDIA,
