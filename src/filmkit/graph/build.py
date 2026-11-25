@@ -135,22 +135,29 @@ def heavy(entry: plan.Entry) -> bool:
     return (entry.host_class if measured else entry.expected) in ("heavy", "gpu")
 
 
-def refusals(table: nodes.Table, entries: list[plan.Entry]) -> list[str]:
-    """Why a closure, as the plan judged it, must not run as one invocation, each in one line and
-    naming what to run instead; none where it may (design decision 5)."""
-    # The refusals that stand; the narration's, which no build runs, is the narration's to answer.
-    stands = {
-        entry.key
-        for entry in entries
-        if entry.refused is not None and table.node(entry.key)[0].run is not None
-    }
-    run = [
+def stands(table: nodes.Table, entries: list[plan.Entry]) -> list[plan.Entry]:
+    """The nodes whose refusal stands, which no build runs again; the narration's, which no build
+    runs, is the narration's to answer."""
+    return [e for e in entries if e.refused is not None and table.node(e.key)[0].run is not None]
+
+
+def will_run(table: nodes.Table, entries: list[plan.Entry]) -> list[plan.Entry]:
+    """The work a build of the closure will run, as the plan judged it: each node stale or behind,
+    but a node whose refusal stands and every node downstream of it."""
+    standing_keys = {entry.key for entry in stands(table, entries)}
+    return [
         entry
         for entry in entries
         if entry.state in (plan.STALE, plan.BEHIND)
-        and entry.key not in stands
-        and not table.closure(entry.key) & stands
+        and entry.key not in standing_keys
+        and not table.closure(entry.key) & standing_keys
     ]
+
+
+def refusals(table: nodes.Table, entries: list[plan.Entry]) -> list[str]:
+    """Why a closure, as the plan judged it, must not run as one invocation, each in one line and
+    naming what to run instead; none where it may (design decision 5)."""
+    run = will_run(table, entries)
     found = [
         f"{entry.key} is stale and narration is no build's: "
         f"{narrate_command(nodes.split(entry.key)[1])}"

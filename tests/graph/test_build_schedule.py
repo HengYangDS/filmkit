@@ -113,15 +113,14 @@ def test_a_waiting_node_is_not_counted_as_heavy_work_that_will_run(table):
 def test_a_refusal_that_stands_and_what_follows_it_are_no_work_that_will_run(table):
     # The gate refused with nothing it reads changed, and the page reads its output: neither is
     # light work to run first, so the render alone is the heavy work, in one invocation.
-    found = build.refusals(
-        table,
-        [
-            entry("check-sound:zh", refused="check-sound:zh: 1 gated finding"),
-            entry("package-metadata:zh", "behind"),
-            entry("render:zh", expected="heavy"),
-        ],
-    )
-    assert found == []
+    entries = [
+        entry("check-sound:zh", refused="check-sound:zh: 1 gated finding"),
+        entry("package-metadata:zh", "behind"),
+        entry("render:zh", expected="heavy"),
+    ]
+    assert [e.key for e in build.stands(table, entries)] == ["check-sound:zh"]
+    assert [e.key for e in build.will_run(table, entries)] == ["render:zh"]
+    assert build.refusals(table, entries) == []
 
 
 def judging(monkeypatch, stale: set[str]) -> nodes.Table:
