@@ -24,7 +24,9 @@ does:
 - `edit` applies an edits file's exact edits to the scripts and casts, or with `--dry-run`
   reports them (`filmkit.narration.script_edits`).
 - `narrate` converges each edition asked, every one by default
-  (`filmkit.narration.converge`): the GPU work that no build runs.
+  (`filmkit.narration.converge`): the GPU work that no build runs. It is refused, before any
+  model loads, while the plan calls an edition's narration not ready, as while the source check
+  is stale or refused; the convergence's record states its seconds and phases.
 - `plan` prints, for the nodes a target names (`<node>:<code>`, `<node>:all`, a group, or `all`;
   every node where none is named) and every node upstream of them, each node's state and
   reasons, its host class as measured and as expected, its last seconds and whether it is ready
@@ -245,15 +247,40 @@ def editions(asked: str) -> tuple[str, ...]:
     return (asked,)
 
 
+def unready(codes: tuple[str, ...]) -> list[str]:
+    """Each edition asked whose narration the plan calls not ready, in one line that names each
+    node before it that is not fresh, with the verb that builds it (design decision 9)."""
+    from filmkit.graph import nodes, plan, target, verify
+
+    found = []
+    for code in codes:
+        key = nodes.key("narrate", code)
+        entries = plan.plan(targets=[key]).entries
+        if next(entry for entry in entries if entry.key == key).ready:
+            continue
+        before = [
+            f"{verify.unfinished(entry)} ({target(*nodes.split(entry.key))})"
+            for entry in entries
+            if entry.key != key and entry.state != plan.FRESH
+        ]
+        why = "; ".join(before) or "an input it reads is missing"
+        found.append(f"{key} is not ready, so it is not narrated: {why}")
+    return found
+
+
 def narrated(asked: str, rounds: int, takes: int) -> int:
-    """`filmkit narrate`: each edition asked converged in turn, as one run each; every edition's
-    refusal, in lines, once all have run."""
+    """`filmkit narrate`: refused, before any model loads, while the plan calls an edition's
+    narration not ready; else each edition asked converged in turn, as one run each, and every
+    edition's refusal, in lines, once all have run."""
     if rounds < 0 or takes < 1:
         sys.exit("filmkit narrate: --rounds is 0 or more and --takes is 1 or more")
+    codes = editions(asked)
+    refusals = unready(codes)
+    if refusals:
+        sys.exit("\n".join(refusals))
     import filmkit.child_processes as child_processes
     from filmkit.narration import converge
 
-    codes = editions(asked)
     with child_processes.ending(converge.STOPPED):
         refused = [converge.converged(code, rounds=rounds, takes=takes) for code in codes]
     if any(refused):

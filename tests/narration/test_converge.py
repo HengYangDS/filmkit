@@ -21,7 +21,7 @@ import filmkit.narration.converge as narration_converge
 import filmkit.narration.group_generation as narration_group_generation
 import filmkit.narration.synthesis as narration_synthesis
 import filmkit.repository as repository
-from filmkit.graph import runs
+from filmkit.graph import cli, runs
 from filmkit.production import Edition
 
 # The convergence's own narration, which runs a child and which the bench replaces (`studio`).
@@ -56,6 +56,39 @@ def test_a_convergence_of_two_narrations_records_its_seconds_with_its_phases(
     # the runtime are the others, in the order each first ran.
     assert [*record["phases"]] == ["narration", "judgment", "candidates", "count"]
     assert (record["phases"]["narration"], record["seconds"]) == (40.0, 40.0)
+
+
+def test_filmkit_narrate_is_refused_before_any_model_loads_while_the_plan_holds_it(studio, voiced):
+    # Below the studio's root the source check has no record, so the plan calls the narration,
+    # which waits for the check, not ready.
+    studio.begin([voiced(), voiced(natural=False)])
+    with pytest.raises(SystemExit) as refused:
+        cli.main(["narrate", "--edition", "en"])
+    line = refused.value.code
+    assert line.startswith("narrate:en is not ready, so it is not narrated: check: stale")
+    assert line.endswith("(filmkit build check)") and "\n" not in line
+    assert (studio.loads, studio.narrations) == (0, 0)
+    assert not (repository.ROOT / Edition("en").ear_first / narration_converge.RECORD).exists()
+
+
+def test_filmkit_narrate_converges_a_settled_narration_once_and_leaves_its_cast(
+    count, studio, monkeypatch
+):
+    # The stand-in edition was narrated once from its settled cast (`count`): its receipt holds
+    # every take the cast asks for, so the verb narrates nothing again, judges and counts.
+    monkeypatch.setattr(cli, "unready", lambda _codes: [])
+    edition = Edition("en")
+    sources = [repository.ROOT / edition.cast, repository.ROOT / edition.script]
+    held = [path.read_bytes() for path in sources]
+    with pytest.raises(SystemExit) as ended:
+        cli.main(["narrate", "--edition", "en"])
+    assert ended.value.code == 0
+    assert (studio.loads, studio.narrations) == (0, 0)
+    assert [path.read_bytes() for path in sources] == held
+    # The convergence's record states the run's seconds and phases.
+    record = measured_of()
+    assert record["completed"] is True and record["seconds"] >= 0
+    assert [*record["phases"]] == ["judgment", "count"]
 
 
 def test_an_edition_left_unsettled_records_that_its_convergence_did_not_complete(studio, voiced):
