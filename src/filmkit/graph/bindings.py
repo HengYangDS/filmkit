@@ -30,8 +30,10 @@ if TYPE_CHECKING:
 
 # The tables of the declaration each node's run reads, each bound by its digest, and no other
 # (design decision 12 of build-a-film-by-its-verbs). The check of each run's opens holds every
-# node the light suite runs to its tables both ways (`opens.Report.unread`); the others are read
-# from their owners' code (2026-11-25). Every run reads the film's identity, by the file prefix
+# node the light suite runs to its tables both ways (`opens.Report.unread`), but the three that
+# bind the declaration whole as a file, `check`, `check-sound` and `check-picture`, which it holds
+# only to the tables they declare and did not read; the others are read from their owners' code
+# (2026-11-25). Every run reads the film's identity, by the file prefix
 # that every place takes (`production.Edition`), and its editions, which every engine process
 # derives as it loads (`production.CODES`). No node reads the release's sources, which
 # `filmkit release` reads (decision 15).
