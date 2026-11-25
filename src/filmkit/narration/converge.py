@@ -501,3 +501,9 @@ def converged(code: str, *, rounds: int = 2, takes: int = 3) -> str:
             run.fail()
         stamp(code, record, run.measured(completed=not refused))
     return refused
+
+
+if __name__ == "__main__":
+    from filmkit.retired import refuse
+
+    refuse(__spec__.name)

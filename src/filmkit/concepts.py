@@ -544,3 +544,9 @@ def check() -> dict:
         ),
         "number_exceptions": len(contract.number.exceptions),
     }
+
+
+if __name__ == "__main__":
+    from filmkit.retired import refuse
+
+    refuse(__spec__.name)

@@ -30,6 +30,7 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 - The production command, the pre-render check and its readiness receipts, the duration records, the adoption command, the media server, and the module commands of the supply, the concept and register checks, the script edits, the convergence, the verifier, the reproduction, the release, the delivery, the review round and the tools: the verbs call their owners. `python -m filmkit.soundtrack.fit` and `python -m filmkit.picture.repair` keep a command until R4 and R3; the narration's own processes and tools, the still scan, the sync audit, the listening plan, the measurement and `filmkit.released` keep theirs.
 - The anchors command's `--timeline` and `--place`, which `filmkit.api.derived_timeline` and `place_anchors` replace.
+- **Breaking for a film that has not rewritten its gates:** each retired module command, run as `python -m` (the supply, the concept and register checks, the tools, the convergence, the script edits, the verifier, the reproduction, the release, the delivery, the review round and `filmkit.graph.cli`), refuses in one line that names its verb, as `python -m filmkit.delivery.verification is retired: run filmkit verify --technical-only`, and exits 1; so `film-media`, `film-reproduction` and `film:supply` fail until they are rewritten, rather than passing by doing nothing. The modules that left with their commands are refused by Python itself.
 
 ## [0.33.0] - 2026-11-24
 

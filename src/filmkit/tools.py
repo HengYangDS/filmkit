@@ -160,3 +160,9 @@ def run(
             if tool_process is not None:
                 child_processes.stop([tool_process], signal.SIGTERM, seconds=STOP_SECONDS)
             raise
+
+
+if __name__ == "__main__":
+    from filmkit.retired import refuse
+
+    refuse(__spec__.name)

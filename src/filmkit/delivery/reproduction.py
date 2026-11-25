@@ -674,3 +674,9 @@ def judge(report: dict) -> None:
         raise SystemExit(msg)
     if report["verdict"] != "pass":
         raise SystemExit("\n".join(failures(report)))
+
+
+if __name__ == "__main__":
+    from filmkit.retired import refuse
+
+    refuse(__spec__.name)

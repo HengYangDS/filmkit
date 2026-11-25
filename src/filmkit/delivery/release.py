@@ -481,3 +481,9 @@ def write(*, replace: bool, dry_run: bool) -> None:
     repository.write_text(MANIFEST, serialized(written))
     kept = "already held" if whole else "now holds"
     print(f"{RELEASE} {kept} the record's {len(written.assets)} assets. Wrote {MANIFEST}.")
+
+
+if __name__ == "__main__":
+    from filmkit.retired import refuse
+
+    refuse(__spec__.name)

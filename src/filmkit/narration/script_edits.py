@@ -404,3 +404,9 @@ def _write(edition: Edition, script: dict, cast: dict) -> None:
     """Write an edition's edited script and cast, the one copy of its narration."""
     repository.write(edition.script, script)
     repository.write(edition.cast, cast)
+
+
+if __name__ == "__main__":
+    from filmkit.retired import refuse
+
+    refuse(__spec__.name)

@@ -1,7 +1,8 @@
 """The engine's surface (design decision 17 of build-a-film-by-its-verbs): beside the console
 command `filmkit`, the package runs as `python -m` only the modules decision 17 keeps, each until
-its release, and the two commands moved out of the retired production command name their
-options."""
+its release; every retired module command refuses in one line that names its verb and exits 1,
+so that no task or gate passes by doing nothing; and the two commands moved out of the retired
+production command name their options."""
 
 import ast
 import subprocess
@@ -12,6 +13,7 @@ import pytest
 
 import filmkit
 import filmkit.repository as repository
+from filmkit import retired
 
 PACKAGE = Path(filmkit.__file__).resolve().parent
 # The modules decision 17 keeps as `python -m` commands, by the release that retires each.
@@ -53,8 +55,24 @@ def entries() -> set[str]:
     return found
 
 
-def test_every_module_the_package_runs_is_one_that_decision_17_keeps():
-    assert entries() == KEPT
+def test_every_module_the_package_runs_is_one_that_decision_17_keeps_or_one_retired():
+    assert entries() == KEPT | set(retired.VERBS)
+    assert not KEPT & set(retired.VERBS)
+
+
+def test_every_retired_module_command_refuses_naming_its_verb():
+    # With the options the films' gates and tasks pass, so that none of them is read.
+    for module, verb in retired.VERBS.items():
+        done = subprocess.run(
+            [sys.executable, "-I", "-B", "-m", module, "--read-only", "--technical-only"],
+            cwd=repository.ROOT,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        assert (done.returncode, done.stdout) == (1, ""), module
+        assert done.stderr.splitlines() == [f"python -m {module} is retired: run {verb}"]
 
 
 @pytest.mark.parametrize(

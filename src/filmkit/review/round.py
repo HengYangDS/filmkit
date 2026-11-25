@@ -489,3 +489,9 @@ def run(argv: list[str] | None = None, prog: str | None = None) -> None:
         msg = f"{options.command}: {error}"
         raise SystemExit(msg) from None
     print(json.dumps(result, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    from filmkit.retired import refuse
+
+    refuse(__spec__.name)

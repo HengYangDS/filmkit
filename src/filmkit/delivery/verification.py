@@ -547,3 +547,9 @@ def verify_editions(*, technical_only: bool = True) -> None:
     """Qualify each edition (`qualified`), printing each edition's report as its run ends."""
     for report in qualified(technical_only=technical_only):
         print(json.dumps(report, ensure_ascii=False), flush=True)
+
+
+if __name__ == "__main__":
+    from filmkit.retired import refuse
+
+    refuse(__spec__.name)

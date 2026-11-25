@@ -386,3 +386,9 @@ def main(argv: list[str] | None = None) -> None:
     for entry in planned.entries:
         print(line(entry))
     print("\n".join(filter(None, [timed(planned.entries), f"{planned.hashed} files hashed"])))
+
+
+if __name__ == "__main__":
+    from filmkit.retired import refuse
+
+    refuse(__spec__.name)

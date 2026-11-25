@@ -494,3 +494,9 @@ def deliver(root: Path, destination: Path, *, dry_run: bool = False, rule: str =
     report["changes"] = changes
     repository.write(root / READBACK, report)
     return report
+
+
+if __name__ == "__main__":
+    from filmkit.retired import refuse
+
+    refuse(__spec__.name)

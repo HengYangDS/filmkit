@@ -117,3 +117,9 @@ def supply() -> dict:
     report = {"browser": supply_browser(), "dictionary": supply_dictionary()}
     report["models"] = supply_models()
     return report
+
+
+if __name__ == "__main__":
+    from filmkit.retired import refuse
+
+    refuse(__spec__.name)
