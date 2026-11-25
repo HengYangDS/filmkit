@@ -45,10 +45,11 @@ does:
 - `release` records the release of the reviewed, delivered build and stages its assets, its
   sources from the declaration (`filmkit.delivery.release`).
 
-A refusal is one line on standard error, and the command exits 1. A command that cannot finish
-exits 2: a tool the host lacks is named in one line, any other exception printed with its
-traceback; an interrupted one exits with the status that names its request (design decision
-19). A target that names no node is refused in one line that names the nodes.
+A refusal is one line on standard error, and the command exits 1, a declaration that the loader
+refuses among them (`declaration_refused`). A command that cannot finish exits 2: a tool the
+host lacks is named in one line, any other exception printed with its traceback; an interrupted
+one exits with the status that names its request (design decision 19). A target that names no
+node is refused in one line that names the nodes.
 """
 
 from __future__ import annotations
@@ -175,11 +176,12 @@ def timed(entries: list[plan.Entry]) -> str:
 def checked(read_only: bool) -> int:
     """`filmkit check`: the node's run, which records it, or with `read_only` the findings
     printed and no file written; the exit status, 1 where a question found anything. The
-    declaration is read before the node table loads, so that its problems are findings."""
+    declaration is read before the node table loads: where the loader finds a problem in it, the
+    check refuses as the read-only mode does and writes nothing, since no node table loads."""
     import filmkit.check as source_check
     import filmkit.repository as repository
 
-    if read_only:
+    if read_only or source_check.loaded(repository.ROOT):
         verdict = source_check.asked(repository.ROOT, write=False)
         for name, texts in verdict["findings"].items():
             print("\n".join(f"{name}: {text}" for text in texts), end="\n" if texts else "")
@@ -191,7 +193,6 @@ def checked(read_only: bool) -> int:
     else:
         from filmkit.graph import runs
 
-        source_check.loaded(repository.ROOT)
         with runs.run(None, "check"):
             source_check.run()
     print("filmkit check passes: no question of the film's sources found anything")
@@ -348,6 +349,10 @@ def main(argv: list[str] | None = None) -> None:
     try:
         status = ran(options)
     except Exception as error:
+        refused = declaration_refused(error)
+        if refused is not None:
+            print(refused, file=sys.stderr)
+            sys.exit(child_processes.REFUSED)
         tool = child_processes.missing(error)
         if tool is not None:
             print(tool, file=sys.stderr)
@@ -356,6 +361,16 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(child_processes.UNFINISHED)
     if status:
         sys.exit(status)
+
+
+def declaration_refused(error: Exception) -> str | None:
+    """The loader's refusal of the film's declaration (`filmkit.film.FilmError`), its problems
+    in one line; None for any other error. The loader's module stands loaded once it raised one,
+    and is not imported here, since loading it outside a film is itself refused."""
+    loader = sys.modules.get("filmkit.film")
+    if loader is None or not isinstance(error, loader.FilmError):
+        return None
+    return "; ".join(line for line in str(error).splitlines() if line)
 
 
 def ran(options: argparse.Namespace) -> int:

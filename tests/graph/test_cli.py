@@ -3,7 +3,10 @@ one-line refusals, and `plan` on the sample's sound chain (design decision 10 of
 record-every-run, 17 of build-a-film-by-its-verbs)."""
 
 import json
+import os
 import re
+import subprocess
+import sys
 
 import pytest
 import sample_sound
@@ -12,6 +15,7 @@ import filmkit.child_processes as child_processes
 import filmkit.delivery.folder as delivery_folder
 import filmkit.delivery.release as release
 import filmkit.delivery.verification as delivery_verification
+import filmkit.repository as repository
 import filmkit.supply as supply
 from filmkit.delivery.reproduction import ReproductionError
 from filmkit.graph import cli, verify
@@ -195,6 +199,36 @@ def test_the_exit_status_tells_a_refusal_from_a_failure_to_finish(
         assert err.startswith(said) and err.endswith("RuntimeError: the disk is gone\n")
     else:
         assert err == said
+
+
+@pytest.fixture(scope="module")
+def moved_too_late(tmp_path_factory):
+    """A copy of the sample that still holds its release record at `content/release.json`, the
+    place the loader now refuses."""
+    root = sample_sound.copy_film((tmp_path_factory.mktemp("moved") / "film").resolve())
+    (root / "content/release.json").write_text("{}\n")
+    return root
+
+
+@pytest.mark.parametrize("argv", [["plan"], ["build", "check"], ["verify"], ["check"]])
+def test_a_declaration_the_loader_refuses_is_a_refusal_of_every_verb(moved_too_late, argv):
+    environment = {**os.environ, repository.ROOT_VARIABLE: str(moved_too_late)}
+    ran = subprocess.run(
+        [sys.executable, "-I", "-B", "-c", f"from filmkit.graph import cli; cli.main({argv!r})"],
+        env=environment,
+        cwd=moved_too_late,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    (line,) = ran.stderr.splitlines()
+    assert ran.returncode == child_processes.REFUSED
+    # The source check prints each finding and ends with its count, as its read-only mode does;
+    # every other verb refuses with the loader's line.
+    said = ran.stdout if argv == ["check"] else line
+    assert "content/release.json" in said and "release.json at the film's root" in said
+    assert not (moved_too_late / "build/evidence/records").exists()
 
 
 @pytest.mark.ffmpeg

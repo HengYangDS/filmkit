@@ -16,7 +16,7 @@ The engine SHALL offer a film one console command, `filmkit`, with the verbs `su
 
 ### Requirement: A command's exit status tells a refusal from a failure to finish
 
-Every verb SHALL exit 0 where it did what it was asked; 1 where the film or a gate said no, in one line on standard error; and 2 where it could not finish, an owner's exception with its traceback and a tool the host lacks in one line that names it. A command that a request ended SHALL exit with the status that names the request. `filmkit build` SHALL exit 2 where a node failed, else 1 where a node refused or was held, and SHALL never count a node's failure as its refusal.
+Every verb SHALL exit 0 where it did what it was asked; 1 where the film or a gate said no, in one line on standard error, a declaration that the loader refuses among them; and 2 where it could not finish, an owner's exception with its traceback and a tool the host lacks in one line that names it. A command that a request ended SHALL exit with the status that names the request. A node's failure SHALL never count as its refusal.
 
 #### Scenario: Done
 
@@ -27,6 +27,11 @@ Every verb SHALL exit 0 where it did what it was asked; 1 where the film or a ga
 
 - **WHEN** the dictionary that `filmkit supply` finds differs from its pinned SHA-256
 - **THEN** it exits 1 with that one line
+
+#### Scenario: A declaration the loader refuses
+
+- **WHEN** a film still holds `content/release.json`, which the loader refuses, and `filmkit plan`, `filmkit build check`, `filmkit verify` or `filmkit check` runs
+- **THEN** it exits 1 with the loader's problems in one line, `check` after printing each finding as its read-only mode does, and no record is written
 
 #### Scenario: An exception
 
