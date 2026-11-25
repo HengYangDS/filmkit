@@ -92,6 +92,24 @@ def test_filmkit_narrate_converges_a_settled_narration_once_and_leaves_its_cast(
     assert [*record["phases"]] == ["judgment", "count"]
 
 
+def test_filmkit_narrate_narrates_a_node_the_plan_calls_stale_though_no_take_is_due(
+    count, studio, monkeypatch
+):
+    # The plan calls the narration stale, as after the next engine version or an edit of a
+    # chapter's title, while the receipt holds every take the cast asks for: the verb narrates
+    # once, so that the node's record is fresh after it, and leaves the cast as it is.
+    monkeypatch.setattr(narration_narrate, "judged", lambda _code: (None, True))
+    narrated = []
+    monkeypatch.setattr(narration_converge, "narrate", narrated.append)
+    edition = Edition("en")
+    sources = [repository.ROOT / edition.cast, repository.ROOT / edition.script]
+    held = [path.read_bytes() for path in sources]
+    cli.main(["narrate", "--edition", "en"])
+    assert (studio.loads, narrated) == (0, ["en"])
+    assert [path.read_bytes() for path in sources] == held
+    assert measured_of()["completed"] is True
+
+
 def test_an_edition_left_unsettled_records_that_its_convergence_did_not_complete(studio, voiced):
     studio.begin([voiced(), voiced(natural=False)])
     studio.sound = lambda _seed, _text: voiced(natural=False)

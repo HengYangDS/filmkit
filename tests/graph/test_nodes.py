@@ -2,6 +2,7 @@
 
 import ast
 import importlib
+import json
 import tomllib
 from pathlib import Path
 
@@ -12,9 +13,10 @@ import filmkit.film as film
 import filmkit.picture.derivation as derivation
 import filmkit.repository as repository
 import filmkit.tools as tools
-from filmkit.graph import bindings, chain, nodes, opens, plan, runs
+from filmkit.graph import bindings, chain, nodes, opens, plan, records, runs
 from filmkit.graph.records import Folder
 from filmkit.narration import converge, readings
+from filmkit.narration import narrate as narration_narrate
 from filmkit.production import Edition
 from filmkit.review import set_aside
 
@@ -357,6 +359,42 @@ def test_an_edition_the_film_declares_native_renders_its_uncaptioned_picture(mon
     chain.render_uncaptioned(Edition("zh"))
     assert (asked, rendered) == ([True], [(Edition("zh"), True)])
     assert bindings.uncaptioned_way(Edition("zh")) == "native"
+
+
+def retitled(root, monkeypatch):
+    """Edit the title of the Chinese script's first chapter, which no take's request covers."""
+    script = root / Edition("zh").script
+    held = json.loads(script.read_text())
+    held["chapters"][0]["title"] += "（修订）"
+    script.write_text(json.dumps(held, ensure_ascii=False, indent=2) + "\n")
+
+
+def next_engine(root, monkeypatch):
+    """Run as the next engine version would."""
+    monkeypatch.setattr(records.released, "version", lambda: "99.0.0")
+
+
+@pytest.mark.parametrize("change", [next_engine, retitled])
+def test_a_change_no_take_answers_leaves_every_take_reusable_and_the_narration_stale(
+    tmp_path, monkeypatch, change
+):
+    # The plan calls the node stale, so that `filmkit narrate` narrates once; no take is due, so
+    # the narration reuses every one, and its record is fresh after it.
+    root = sample_sound.copy_film((tmp_path / "film").resolve())
+    monkeypatch.setattr(repository, "ROOT", root)
+    monkeypatch.delenv(opens.NODE, raising=False)
+    with runs.run("zh", "narrate"):
+        sample_sound.narrate("zh")
+    receipt = repository.read(converge.evidence_paths("zh")["receipt"])["records"]
+    taken = {record["id"]: record["fingerprint"] for record in receipt}
+    assert narration_narrate.judged("zh")[1] is False
+    change(root, monkeypatch)
+    assert narration_narrate.judged("zh")[1] is True
+    # Every take's request is the one the receipt holds: no take is due.
+    assert {job.segment["id"]: job.fingerprint for job in converge.speech_jobs("zh")} == taken
+    with runs.run("zh", "narrate"):
+        sample_sound.narrate("zh")
+    assert narration_narrate.judged("zh")[1] is False
 
 
 def test_an_edit_of_the_composition_or_of_the_english_script_leaves_the_chinese_narration_fresh(

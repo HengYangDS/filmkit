@@ -24,11 +24,12 @@ from filmkit.production import Edition
 
 @pytest.fixture(autouse=True)
 def narration_ready(monkeypatch):
-    """The plan calls every narration ready, so that `filmkit narrate` converges the stand-in
-    edition as asked; its refusal while one is not has its own test (`test_converge.py`)."""
+    """The plan calls every narration ready and fresh, so that `filmkit narrate` converges the
+    stand-in edition as asked; its refusal while one is not has its own test
+    (`test_converge.py`)."""
     import filmkit.narration.narrate as narration_narrate
 
-    monkeypatch.setattr(narration_narrate, "judged", lambda _code: None)
+    monkeypatch.setattr(narration_narrate, "judged", lambda _code: (None, False))
 
 
 @pytest.fixture

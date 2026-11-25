@@ -154,7 +154,9 @@ def test_a_narration_by_hand_is_refused_before_any_step_while_the_plan_holds_it(
 ):
     line = "narrate:zh is not ready, so it is not narrated: check: stale (filmkit build check)"
     asked = []
-    monkeypatch.setattr(narration_narrate, "judged", lambda code: asked.append(code) or line)
+    monkeypatch.setattr(
+        narration_narrate, "judged", lambda code: asked.append(code) or (line, False)
+    )
     with pytest.raises(SystemExit) as refused:
         narration_narrate.main(["--language", "zh", "--ids", "06,07"])
     assert (refused.value.code, commands, asked) == (line, [], ["zh"])

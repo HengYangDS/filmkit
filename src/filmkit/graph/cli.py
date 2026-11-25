@@ -255,20 +255,25 @@ def editions(asked: str) -> tuple[str, ...]:
 
 def narrated(asked: str, rounds: int, takes: int) -> int:
     """`filmkit narrate`: refused, before any model loads, while the plan calls an edition's
-    narration not ready; else each edition asked converged in turn, as one run each, and every
-    edition's refusal, in lines, once all have run."""
+    narration not ready; else each edition asked converged in turn, as one run each, narrated
+    once where the plan calls its node stale, and every edition's refusal, in lines, once all
+    have run."""
     if rounds < 0 or takes < 1:
         sys.exit("filmkit narrate: --rounds is 0 or more and --takes is 1 or more")
     from filmkit.narration import narrate
 
     codes = editions(asked)
-    refusals = [line for line in map(narrate.judged, codes) if line]
+    judged = {code: narrate.judged(code) for code in codes}
+    refusals = [line for line, _ in judged.values() if line]
     if refusals:
         sys.exit("\n".join(refusals))
     from filmkit.narration import converge
 
     with child_processes.ending(converge.STOPPED):
-        refused = [converge.converged(code, rounds=rounds, takes=takes) for code in codes]
+        refused = [
+            converge.converged(code, rounds=rounds, takes=takes, stale=judged[code][1])
+            for code in codes
+        ]
     if any(refused):
         sys.exit("\n".join(filter(None, refused)))
     return 0

@@ -118,23 +118,26 @@ def steps(code: str, ids: str = "", scope: Scope = Scope.ALL) -> list[tuple[str,
     return checks if scope is Scope.CHECKS else [("narration", narration), *checks]
 
 
-def judged(code: str) -> str | None:
+def judged(code: str) -> tuple[str | None, bool]:
     """How the plan judges an edition's narration (design decision 9 of
     build-a-film-by-its-verbs): the line that refuses it while the plan calls it not ready,
-    naming each node before it that is not fresh with the verb that builds it, else None."""
+    naming each node before it that is not fresh with the verb that builds it, else None; and
+    whether its node is stale, which a narration that reuses every take makes fresh."""
     from filmkit.graph import nodes, plan, target, verify
 
     key = nodes.key("narrate", code)
     entries = plan.plan(targets=[key]).entries
-    if next(entry for entry in entries if entry.key == key).ready:
-        return None
+    own = next(entry for entry in entries if entry.key == key)
+    stale = own.state == plan.STALE
+    if own.ready:
+        return None, stale
     before = [
         f"{verify.unfinished(entry)} ({target(*nodes.split(entry.key))})"
         for entry in entries
         if entry.key != key and entry.state != plan.FRESH
     ]
     why = "; ".join(before) or "an input it reads is missing"
-    return f"{key} is not ready, so it is not narrated: {why}"
+    return f"{key} is not ready, so it is not narrated: {why}", stale
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -160,7 +163,7 @@ def main(argv: list[str] | None = None) -> None:
     elif options.skip_generation:
         scope = Scope.CHECKS
     if scope is not Scope.PLAN and not options.converging:
-        refused = judged(options.language)
+        refused, _ = judged(options.language)
         if refused:
             raise SystemExit(refused)
     stopped = "The narration was stopped by {request}; its running step was ended with it"

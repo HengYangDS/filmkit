@@ -3,7 +3,10 @@
 The command needs no targets file, no phrase and no seed from a person:
 
 1. It narrates what is missing (`filmkit.narration.narrate`): nothing, when the receipt holds
-   every segment's recording for the cast as it stands and both checks' outputs are of it.
+   every segment's recording for the cast as it stands and both checks' outputs are of it,
+   unless the plan calls the node `narrate` stale, as after the next engine version or an edit
+   of the script that no take's request covers (a chapter's title): it then narrates once,
+   reusing every take it can, so that the node's record is fresh after it.
 2. It judges every thought's take by every line the film holds for a take
    (`filmkit.narration.judgment`), and asks the selection's own gates about the narration as
    they will measure it (`filmkit.narration.judge`).
@@ -101,12 +104,18 @@ UNRESOLVED = (
 __all__ = ["FIRST", "STRIDE", "converge", "converged"]
 
 
-def narration_due(code: str) -> bool:
-    """Whether the receipt lacks a recording of the cast as it stands, or a check's output."""
+def speech_jobs(code: str) -> list[synthesis.Job]:
+    """The synthesis's jobs for the edition's script and cast as they stand, one a segment, each
+    with its request's fingerprint."""
     edition, paths = Edition(code), evidence_paths(code)
     sources = ["--language", code, "--script", edition.script, "--cast", edition.cast]
     sources += ["--folder", paths["folder"]]
-    jobs = synthesis.speech_plan(synthesis.load_request([*sources, "--receipt", paths["receipt"]]))
+    return synthesis.speech_plan(synthesis.load_request([*sources, "--receipt", paths["receipt"]]))
+
+
+def narration_due(code: str) -> bool:
+    """Whether the receipt lacks a recording of the cast as it stands, or a check's output."""
+    paths, jobs = evidence_paths(code), speech_jobs(code)
     if any(synthesis.reuse_or_refuse(job) is None for job in jobs):
         return True
     if not all(
@@ -395,12 +404,15 @@ def admitted(code: str) -> dict:
     return left(code)
 
 
-def converge(code: str, former: dict, *, rounds: int = 2, takes: int = 3) -> dict:
+def converge(
+    code: str, former: dict, *, rounds: int = 2, takes: int = 3, stale: bool = False
+) -> dict:
     """Run the rounds and the run-on round, ask the count, and return the record the run ends
-    with. `former` is what the checks gave the caller (`admitted`)."""
+    with. `former` is what the checks gave the caller (`admitted`); `stale`, that the plan calls
+    the node `narrate` stale, which a narration makes fresh whether or not a take is due."""
     asked = {"rounds": rounds, "takes": takes}
     begin(code, asked, former)
-    if narration_due(code):
+    if stale or narration_due(code):
         narrate(code)
     session = Session(code)
     state = session.judge()
@@ -482,9 +494,10 @@ def stamp(code: str, record: dict, measured: dict) -> None:
 STOPPED = "The convergence was stopped by {request}; what it was running was ended with it"
 
 
-def converged(code: str, *, rounds: int = 2, takes: int = 3) -> str:
+def converged(code: str, *, rounds: int = 2, takes: int = 3, stale: bool = False) -> str:
     """Converge one edition as one measured run, inside a command's `child_processes.ending`
     (`filmkit narrate`): what refuses it, in lines, or nothing where it settled and fits.
+    `stale` is the plan's word that the node `narrate` is stale (`narrate.judged`).
 
     The run is measured inside the block that answers a request to end; an edition that ends
     unsettled or refused is a run that did not complete, and a run that a request or a fault
@@ -492,7 +505,7 @@ def converged(code: str, *, rounds: int = 2, takes: int = 3) -> str:
     """
     former = admitted(code)
     with seam.run(code, COMMAND) as run:
-        record = converge(code, former, rounds=rounds, takes=takes)
+        record = converge(code, former, rounds=rounds, takes=takes, stale=stale)
         unsettled = record["unsettled"]
         refused = said(code, record) if unsettled else fitting.said(code, record["fit"])
         # The thoughts the last judgment judged, which it records beside the receipt.

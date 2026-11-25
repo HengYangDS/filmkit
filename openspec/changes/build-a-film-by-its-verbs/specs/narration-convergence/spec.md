@@ -9,6 +9,20 @@
 - **WHEN** the Chinese cast is edited for a retake and `python -m filmkit.narration.narrate --language zh --ids 24` runs before the source check has run again
 - **THEN** it exits 1 before any step, in one line that names `check` and `filmkit build check`
 
+### Requirement: The verb narrates a stale narration though no take is due
+
+Where the plan calls `narrate:<code>` stale, `filmkit narrate` SHALL narrate the edition once, reusing every take whose request is unchanged, so that the node is fresh after it, even where every take the cast asks for stands.
+
+#### Scenario: The next engine
+
+- **WHEN** a build made by one engine version is read by the next, every take standing
+- **THEN** the plan calls each narration stale, no take's request has changed, and once `filmkit narrate` has narrated with every take reused, the narration is fresh
+
+#### Scenario: A chapter's title
+
+- **WHEN** the title of a chapter of the Chinese script is edited after a whole build
+- **THEN** the plan calls the Chinese narration stale, no take's request has changed, and once `filmkit narrate` has narrated with every take reused, the narration is fresh
+
 ## MODIFIED Requirements
 
 ### Requirement: A take's clarity is judged only by a line the film declares for a single thought
