@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import filmkit.check as source_check
 import filmkit.delivery.packaging as packaging
 import filmkit.film as film
 import filmkit.picture.derivation as derivation
@@ -23,9 +24,10 @@ import filmkit.preflight as preflight
 import filmkit.repository as repository
 import filmkit.soundtrack.gates as sound_gates
 from filmkit.film import FILM
+from filmkit.graph.nodes import FILM as ONCE
 from filmkit.graph.nodes import REPLACES, REWRITES, Node, Places, Table, Writer, load, stands
 from filmkit.graph.records import DeclarationTable, Folder, table_names
-from filmkit.narration import alignment_records, transcript_records
+from filmkit.narration import alignment_records, readings, transcript_records
 from filmkit.narration.narrate import evidence_paths
 from filmkit.production import CODES, Edition
 
@@ -91,6 +93,31 @@ def checked_words(edition: Edition) -> Places:
     )
     found |= {f"script_{code}": root(Edition(code).script) for code in CODES}
     return found | ({"concepts": root(FILM.concepts)} if FILM.concepts else {})
+
+
+def checked(edition: None) -> Places:
+    """What the source check reads (`filmkit.check`): the declaration whole, which the loader
+    reads, the words of every edition and its pronunciation and readings, the picture's sources
+    with its template, the entry page and the review prompt, and the film's npm and Python
+    manifests and locks."""
+    del edition
+    found = checked_words(None) | {"declaration": root(repository.DECLARATION)}
+    for code in CODES:
+        places = Edition(code).places
+        found |= {f"cast_{code}": root(places.cast)}
+        found |= {f"pronunciation_{code}": root(places.pronunciation)}
+        if stands(root(places.readings)):
+            found |= {f"readings_{code}": root(places.readings)}
+    found |= {"entry": root(FILM.entry), "prompt": root(FILM.review.prompt)}
+    pins = ("package.json", "package-lock.json", "pyproject.toml", "uv.lock")
+    return found | {name: root(name) for name in pins if stands(root(name))}
+
+
+def check_outputs(edition: None) -> Places:
+    """The source check's verdict and each edition's occurrence plan."""
+    del edition
+    found = Places(verdict=root(source_check.VERDICT))
+    return found | {f"plan_{code}": root(readings.plan_path(code)) for code in CODES}
 
 
 def narration(edition: Edition) -> Places:
@@ -269,6 +296,14 @@ def work(name: str) -> Callable[[Edition], Path]:
 
 
 TABLE = (
+    Node(
+        "check",
+        {"default": checked},
+        check_outputs,
+        "light",
+        per=ONCE,
+        run=lambda _: source_check.run(),
+    ),
     Node(
         "narrate",
         {"default": lambda e: declared(e) | sources(e) | checked_words(e)},

@@ -172,14 +172,18 @@ def test_the_uncaptioned_picture_reads_the_inputs_of_its_way(table):
     assert node.way(edition, "native") == "native"
 
 
-def test_the_occurrence_plan_is_no_output_of_any_node(table):
-    # The readings check writes it before a narration's run opens, a dry run's too (design
-    # decision 8), so no record binds it.
+def test_the_occurrence_plans_are_outputs_of_the_source_check_alone(table):
+    # The film-wide node `check` writes each edition's occurrence plan (design decision 6 of
+    # build-a-film-by-its-verbs), and no other node does.
     for code in table.codes:
         plan = (repository.ROOT / readings.plan_path(code)).resolve()
-        for node in table.nodes.values():
-            outputs = {nodes.place(p) for p in node.outputs(Edition(code)).values()}
-            assert plan not in outputs, node.name
+        writers = [
+            named
+            for node in table.nodes.values()
+            for named, edition in node.instances(table.codes)
+            if plan in {nodes.place(p) for p in node.outputs(edition).values()}
+        ]
+        assert writers == ["check"], code
 
 
 def test_the_derived_picture_reads_what_the_validation_of_the_captioned_picture_reads(table):

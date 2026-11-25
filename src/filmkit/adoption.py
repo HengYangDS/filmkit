@@ -70,16 +70,23 @@ import argparse
 import ast
 import json
 import re
-import string
 import subprocess
-import tomllib
 from pathlib import Path
 
 import filmkit.film as film
 import filmkit.released as released
 import filmkit.repository as repository
-from filmkit.picture import template
-from filmkit.review import RUNTIME_FIELD
+from filmkit.check import (
+    UnreadableError,
+    held,
+    npm_packages,
+    picture_template,
+    python_lock,
+    read_json,
+    read_toml,
+    runtime,
+    table,
+)
 
 QUESTIONS = (
     "declaration",
@@ -101,55 +108,6 @@ MODULE = re.compile(r"""(?<![\w.-])-m\s+["']?(filmkit(?:\.[A-Za-z_]\w*)*)(?=["'\
 # Where one command of a task's text ends.
 COMMAND_END = re.compile(r"\n|&&|\|\||[;|&]")
 RENDER, READINESS = "render-picture", "preflight"
-
-
-class UnreadableError(ValueError):
-    """A file of the film that cannot be read as what it is."""
-
-
-def read_json(path: Path) -> dict:
-    """The JSON object a file of the film holds."""
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        message = f"{path.name} cannot be read: {error}"
-        raise UnreadableError(message) from error
-    if not isinstance(value, dict):
-        message = f"{path.name} cannot be read: it holds no JSON object"
-        raise UnreadableError(message)
-    return value
-
-
-def read_toml(path: Path) -> dict:
-    """The TOML table a file of the film holds."""
-    try:
-        return tomllib.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        message = f"{path.name} cannot be read: {error}"
-        raise UnreadableError(message) from error
-
-
-def table(value: object, where: str) -> dict:
-    """A table one of the film's files holds, none where the file states none, or the refusal
-    that names the place where something else stands."""
-    if value is None:
-        return {}
-    if not isinstance(value, dict):
-        message = f"{where} holds no table where one is read"
-        raise UnreadableError(message)
-    return value
-
-
-def held(root: Path, *names: str) -> Path | None:
-    """The first of the named files at a film's root or above it, no higher than the folder that
-    holds the film's repository; a film outside any repository is asked at its root alone."""
-    folders = [root, *root.parents]
-    top = next((index for index, folder in enumerate(folders) if (folder / ".git").exists()), 0)
-    for folder in folders[: top + 1]:
-        for name in names:
-            if (folder / name).is_file():
-                return folder / name
-    return None
 
 
 def module_path(module: str, package: Path = PACKAGE) -> Path:
@@ -231,142 +189,6 @@ def module_exists(module: str) -> bool:
     return path.with_suffix(".py").is_file() or (path / "__main__.py").is_file()
 
 
-def cited(line: str) -> set[str]:
-    """The fields a line of a `str.format` template cites, by their first names. A line that the
-    format cannot parse is taken to cite every name it holds after a brace, so that it is read,
-    not passed over."""
-    try:
-        fields = [name for _, name, _, _ in string.Formatter().parse(line) if name is not None]
-    except ValueError:
-        return set(re.findall(r"\{([A-Za-z_]\w*)", line))
-    return {re.split(r"[.\[]", name, maxsplit=1)[0] for name in fields}
-
-
-def untied_runtime(root: Path, declared: dict) -> list[str]:
-    """Each line of the film's review prompt that cites the runtime's field and does not say
-    "This edition", in any case: each prompt fills the field with its own edition's runtime."""
-    review = table(declared.get("review"), f"{film.DECLARATION}: review")
-    prompt = review.get("prompt")
-    if not isinstance(prompt, str) or not (root / prompt).is_file():
-        return []
-    try:
-        text = (root / prompt).read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as error:
-        message = f"{Path(prompt).name} cannot be read: {error}"
-        raise UnreadableError(message) from error
-    field = f"{{{RUNTIME_FIELD}}}"
-    return [
-        f'{prompt}:{number} cites {field} in a line that does not say "This edition"; {field} is '
-        "the runtime of the prompt's own edition, and the editions may differ in length: "
-        f'reword the line, as "This edition: exactly {field} s"'
-        for number, line in enumerate(text.splitlines(), 1)
-        if RUNTIME_FIELD in cited(line) and "this edition" not in line.casefold()
-    ]
-
-
-def runtime(root: Path) -> list[str]:
-    """Each line of the review prompt that ties the runtime to no one edition (`untied_runtime`),
-    read as text, so that no declaration need load."""
-    return untied_runtime(root, read_toml(root / film.DECLARATION))
-
-
-def npm_packages(root: Path) -> list[str]:
-    """What the film's npm manifest and lock hold against the engine's record."""
-    record = released.load()["npm"]
-    manifest = held(root, released.MANIFEST)
-    if manifest is None:
-        asked = ", ".join(f"{name} {entry['version']}" for name, entry in record.items())
-        return [f"no package.json at or above the film; the engine runs {asked}"]
-    stated = read_json(manifest)
-    declared = {
-        **table(stated.get("devDependencies"), "package.json: devDependencies"),
-        **table(stated.get("dependencies"), "package.json: dependencies"),
-    }
-    lock = manifest.with_name(released.NPM_LOCK)
-    locked = None
-    if lock.is_file():
-        locked = table(read_json(lock).get("packages"), "package-lock.json: packages")
-    found = [] if locked is not None else ["no package-lock.json beside the film's package.json"]
-    for name, entry in record.items():
-        asked = f"{name} {entry['version']}"
-        if declared.get(name) != entry["version"]:
-            has = f"{name} {declared[name]}" if name in declared else f"no {name}"
-            found.append(f"package.json declares {has}; the engine runs {asked}")
-            continue
-        if locked is None:
-            continue
-        installs = locked.get(f"node_modules/{name}")
-        if not isinstance(installs, dict):
-            found.append(f"package-lock.json holds no {name}; the engine was released on {asked}")
-        elif (installs.get("version"), installs.get("integrity")) != (
-            entry["version"],
-            entry["integrity"],
-        ):
-            found.append(
-                f"package-lock.json holds {name} {installs.get('version')} with the integrity "
-                f"{installs.get('integrity')}; the engine was released on {asked} with the "
-                f"integrity {entry['integrity']}"
-            )
-    return found
-
-
-def pinned(root: Path, engine: str, not_read: list[str]) -> list[str]:
-    """A pin of another release than this engine's, where the film pins the engine by a tag."""
-    project = held(root, "pyproject.toml")
-    if project is None:
-        return []
-    tool = table(read_toml(project).get("tool"), "pyproject.toml: tool")
-    uv = table(tool.get("uv"), "pyproject.toml: tool.uv")
-    pin = table(uv.get("sources"), "pyproject.toml: tool.uv.sources").get(released.ENGINE)
-    if isinstance(pin, dict) and isinstance(pin.get("tag"), str):
-        if pin["tag"] != f"v{engine}":
-            return [f"pyproject.toml pins filmkit {pin['tag']}; this engine is v{engine}"]
-    elif pin is not None:
-        not_read.append(
-            "python_lock: pyproject.toml pins filmkit by something other than one tag, so the "
-            "release it pins was not compared"
-        )
-    return []
-
-
-def python_lock(root: Path, not_read: list[str]) -> list[str]:
-    """The release the film pins and locks, and what its Python lock holds against the engine's
-    record. A lock of another release is named only where the pin is this one: a film that pins
-    another release has locked that one."""
-    record, engine = released.load()["python"], released.version()
-    found = pinned(root, engine, not_read)
-    lock = held(root, released.PYTHON_LOCK)
-    if lock is None:
-        return [*found, "no uv.lock at or above the film; it locks the release it pins"]
-    packages = read_toml(lock).get("package") or []
-    if not isinstance(packages, list) or not all(isinstance(entry, dict) for entry in packages):
-        message = "uv.lock holds no list of package tables"
-        raise UnreadableError(message)
-    holds: dict[str, set[str]] = {}
-    for package in packages:
-        holds.setdefault(package.get("name", ""), set()).add(package.get("version", ""))
-    locked = holds.get(released.ENGINE, set()) - {""}
-    if released.ENGINE not in holds:
-        found.append("uv.lock holds no filmkit; the film locks the release it pins")
-    elif not found and locked and locked != {engine}:
-        stands = "/".join(sorted(locked))
-        found.append(f"uv.lock holds filmkit {stands}; this engine is {engine}: lock again")
-    other = sorted(name for name in record if name in holds and holds[name] != {record[name]})
-    if other:
-        listed = ", ".join(
-            f"{name} {'/'.join(sorted(holds[name]))} (the engine: {record[name]})" for name in other
-        )
-        closing = ", ".join(f'"{name}=={record[name]}"' for name in other)
-        count = "1 package" if len(other) == 1 else f"{len(other)} packages"
-        versions = "another version" if len(other) == 1 else "other versions"
-        found.append(
-            f"uv.lock holds {count} of the engine's runtime at {versions} than the engine was "
-            f"released on: {listed}; hold them under [tool.uv] with "
-            f"constraint-dependencies = [{closing}] and lock again"
-        )
-    return found
-
-
 def named(run: object) -> list[tuple[str, list[str]]]:
     """Each engine module that the text of a task's `run` names after `-m`, with the words that
     follow it in its command: a line with its continuations, up to `&&`, `||`, `;`, `|` or `&`.
@@ -421,17 +243,6 @@ def tasks(root: Path, not_read: list[str]) -> list[str]:
     if RENDER in asked and READINESS not in asked and not unread:
         found.append(f"the tasks render a picture and none asks {PRODUCE} {READINESS}")
     return found
-
-
-def picture_template(root: Path) -> list[str]:
-    """What staging would refuse in the film's picture template, all of it."""
-    path = root / template.TEMPLATE
-    if not path.is_file():
-        return [f"no {template.TEMPLATE}"]
-    try:
-        return template.problems(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        return [f"{path.name} cannot be read: {error}"]
 
 
 def vale(root: Path) -> list[str]:

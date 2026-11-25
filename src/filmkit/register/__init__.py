@@ -170,7 +170,10 @@ def _pinned(pinned: str) -> str:
     answer = answered.stdout.split()
     reported = answer[2] if answer[:2] == ["vale", "version"] and len(answer) == 3 else None
     if reported != pinned:
-        message = f"{found} reports Vale {reported or ' '.join(answer) or 'nothing'}; {runs}"
+        message = (
+            f"{found} reports Vale {reported or ' '.join(answer) or 'nothing'}; {runs}: "
+            f"mise use {released.VALE}@{pinned}"
+        )
         raise RegisterError(message)
     return found
 

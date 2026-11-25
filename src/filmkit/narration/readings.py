@@ -412,8 +412,9 @@ def term_failures(code: str, thoughts: list[Thought], contract: dict) -> list[st
     )
 
 
-def check(code: str) -> dict:
-    """Check one edition's readings and names, write its occurrence plan, refuse every gap.
+def check(code: str, *, write: bool = True) -> dict:
+    """Check one edition's readings and names, write its occurrence plan unless `write` is false,
+    refuse every gap.
 
     Returns:
         The report: the edition's pronunciation, the schema version and the occurrences resolved.
@@ -463,7 +464,8 @@ def check(code: str) -> dict:
         "occurrences": len(rows),
         "plan": plan_path(code),
     }
-    repository.write(plan_path(code), {**report, "rows": rows})
+    if write:
+        repository.write(plan_path(code), {**report, "rows": rows})
     return report
 
 

@@ -237,7 +237,8 @@ def test_another_vale_on_the_path_refuses_before_any_word_is_read(tmp_path, monk
     other.chmod(0o755)
     monkeypatch.setenv("PATH", str(other.parent))
     runs = f"the register check runs Vale {released.vale()}, as this engine's release states"
-    assert str(refused()) == f"{other} reports Vale 9.9.9; {runs}"
+    pin = f"mise use github:vale-cli/vale@{released.vale()}"
+    assert str(refused()) == f"{other} reports Vale 9.9.9; {runs}: {pin}"
     assert (other.parent / "calls").read_text() == "--version"
     monkeypatch.setenv("PATH", str(tmp_path / "nothing"))
     assert str(refused()) == f"No vale on the path; {runs}"

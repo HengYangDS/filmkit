@@ -54,16 +54,18 @@ def recorded(path: Path) -> list[dict]:
     return repository.read(path)["reads"] if path.is_file() else []
 
 
-def check() -> dict | str:
+def check(*, rules: bool = True) -> dict | str:
     """Refuse a film whose scripts break an anchor's rule or do not mark what either edition's
-    picture reads, before narration.
+    picture reads, before narration; with `rules` false the caller asks the anchors' rules
+    itself (`filmkit.check`), and only what the pictures read is asked here.
 
     Returns:
         The verdict, "pass" or "not judged"; for each edition the scenes the check could not
         judge; the editions whose composition does not load, each with its error's one line; or
         `NOT_ASKED`.
     """
-    anchors.require_editions()
+    if rules:
+        anchors.require_editions()
     if not (repository.ROOT / COMPOSITION_SCRIPT).is_file():
         return NOT_ASKED
     refusals, unjudged, unloaded = [], {}, {}
