@@ -184,6 +184,9 @@ def test_a_node_that_cannot_finish_fails_and_the_build_exits_2(
 
 
 def test_a_request_to_end_a_node_ends_the_build_with_its_status(table, monkeypatch, capsys):
+    # A request that a node takes, as a render takes one while its renderer runs
+    # (`child_processes.terminable`); a light node takes none, and SIGTERM ends the build by its
+    # default action (`tests/test_ending.py`).
     failing(table, monkeypatch, "stage", child_processes.Terminated(signal.SIGTERM))
     with pytest.raises(SystemExit) as ended:
         cli.main(["build", "all"])
