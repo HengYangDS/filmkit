@@ -8,11 +8,7 @@ import { join } from "node:path";
 
 import { spanOf } from "../../src/filmkit/picture/frame-audit/marks.mjs";
 import { inspectFilm, instrument, judged } from "../../src/filmkit/picture/geometry-check.mjs";
-import {
-  canvasStandIn,
-  canvasSweep,
-  openComposition,
-} from "../../src/filmkit/picture/headless-composition.mjs";
+import { canvasStandIn, canvasSweep } from "../../src/filmkit/picture/headless-composition.mjs";
 import { analysis } from "../../src/filmkit/picture/rules/frame.mjs";
 import { inkLevel, readingLoad } from "../../src/filmkit/picture/rules/ink.mjs";
 import { faintLabels, listTracker, nameRules } from "../../src/filmkit/picture/rules/names.mjs";
@@ -23,12 +19,13 @@ import {
   RECORD,
   StageError,
 } from "../../src/filmkit/picture/stage-contract.mjs";
+import { openComposition } from "../../src/filmkit/picture/testing.mjs";
 import { authoredTimeline, SAMPLE, scratchFolder } from "./sample-film.mjs";
 
 // Scripts run in a context keep their file name, so coverage attributes them to their sources.
 const COMPOSITION = join(SAMPLE, "picture/film.js");
 // The page program is measured against the film's own palette, as the composition defines it.
-const { palette } = openComposition(await authoredTimeline("zh"));
+const { palette } = openComposition("zh", await authoredTimeline("zh"));
 // Every rule the page program runs, by its source, as the check hands them to the page.
 const RULES = Object.fromEntries(
   [inkLevel, readingLoad, analysis, nameRules, listTracker, faintLabels, rowGaps].map((rule) => [
@@ -106,7 +103,7 @@ test("the stand-in samples every path as the real-browser instrumentation does",
   const film = await authoredTimeline("en"),
     { window } = await headlessPage(film),
     paints = [];
-  const composition = openComposition(film);
+  const composition = openComposition("en", film);
   // Each scene draws rounded cards, outlines, dashed and solid lines, arrows and a tick.
   for (const segment of film.segments)
     for (const q of [0.3, 0.6, 0.9]) {
