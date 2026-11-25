@@ -23,7 +23,7 @@ def table():
 
 def test_the_order_respects_every_derived_edge(table):
     position = {name: index for index, name in enumerate(table.order)}
-    keys = {nodes.key(n.name, c) for n in chain.TABLE for c in n.codes(table.codes)}
+    keys = {named for n in chain.TABLE for named, _ in n.instances(table.codes)}
     assert set(position) == keys
     for name, before in table.edges.items():
         assert all(position[earlier] < position[name] for earlier in before), name
@@ -79,6 +79,29 @@ def stand_in(name, reads=(), writes=()):
         lambda e: {w: root / w for w in writes},
         "light",
     )
+
+
+def test_a_film_wide_node_comes_before_the_edition_nodes_that_read_its_output():
+    root = Path(repository.ROOT)
+    check = nodes.Node(
+        "check",
+        {"default": lambda e: {"script": root / "script.json"}},
+        lambda e: {"verdict": root / "verdict.json"},
+        "light",
+        per=nodes.FILM,
+    )
+    loaded = nodes.load((stand_in("narrate", reads=["verdict.json"]), check), {}, ("zh", "en"))
+    # One run for the film, keyed by its name alone, before each edition's reader.
+    assert set(loaded.edges) == {"check", "narrate:zh", "narrate:en"}
+    assert loaded.edges["narrate:zh"] == loaded.edges["narrate:en"] == {"check"}
+    assert loaded.order[0] == "check"
+    assert loaded.node("check") == (check, None)
+    assert loaded.node("narrate:en")[1] == Edition("en")
+    # A film-wide node has no edition's key, and an edition's node no key without one.
+    for named in ("check:zh", "narrate"):
+        with pytest.raises(KeyError):
+            loaded.node(named)
+    assert (nodes.key("check", None), nodes.split("check")) == ("check", ("check", None))
 
 
 def test_a_table_with_a_cycle_is_refused_naming_its_nodes():

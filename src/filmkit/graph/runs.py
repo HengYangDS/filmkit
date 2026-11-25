@@ -155,7 +155,7 @@ def run(
 
 @contextlib.contextmanager
 def node(
-    code: str,
+    code: str | None,
     name: str,
     *,
     way: str | None = None,
@@ -208,7 +208,7 @@ def pins(node: nodes.Node) -> dict[str, str]:
     return {snapshot.repo: snapshot.revision for snapshot in found}
 
 
-def previous(node: str, code: str) -> records.RunRecord | None:
+def previous(node: str, code: str | None) -> records.RunRecord | None:
     """The node's last whole record, where one stands and can be read."""
     with contextlib.suppress(FileNotFoundError, records.Unreadable):
         found = records.read(records.place(node, code))
@@ -271,9 +271,11 @@ def outcome(
 class NodeRun:
     """One open run of a node of an edition."""
 
-    def __init__(self, node: nodes.Node, code: str, run: Run, *, whole: bool, way: str | None):
+    def __init__(
+        self, node: nodes.Node, code: str | None, run: Run, *, whole: bool, way: str | None
+    ):
         self.node, self.code, self.whole = node, code, whole
-        edition = Edition(code)
+        self.edition = edition = None if code is None else Edition(code)
         # What the seam reads itself is no access of the run, nor of a run it is nested in.
         with opens.quiet():
             self.before = previous(node.name, code)
@@ -321,7 +323,7 @@ class NodeRun:
             "node": self.node.name,
             "edition": self.code,
             "engine": records.engine(pins(self.node)),
-            "outputs": stated(self.node.outputs(Edition(self.code)), known),
+            "outputs": stated(self.node.outputs(self.edition), known),
             "outcome": result,
             "refusal": line,
             "measured": measures,
@@ -345,11 +347,15 @@ def unwritten(label: str, error: Exception) -> None:
 def open_node(
     code: str | None, command: str, run: Run, *, whole: bool = True, way: str | None = None
 ) -> NodeRun | None:
-    """The run of the node a command names, opened; None for a command that names none or an
-    edition the node does not apply to, which is measured and writes nothing, and for one whose
-    opening failed, which is named (`unwritten`)."""
+    """The run of the node a command names, opened: an edition's node for an edition it applies
+    to, a film-wide node for no edition. None for a command that names no node or names one
+    otherwise, which is measured and writes nothing, and for one whose opening failed, which is
+    named (`unwritten`)."""
     node = table().get(command)
-    if code is None or node is None or code not in node.codes(CODES):
+    if node is None:
+        return None
+    film = node.per == nodes.FILM
+    if film != (code is None) or not film and code not in node.codes(CODES):
         return None
     try:
         return NodeRun(node, code, run, whole=whole, way=way)

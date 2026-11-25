@@ -197,7 +197,7 @@ def test_a_node_of_one_edition_is_asked_of_that_edition_alone(stand_in_table, mo
         ran("stage", code)
     with runs.run("zh", "qualify"):
         (repository.ROOT / "zh/q.json").write_text("qualified")
-    # A run of it for another edition writes its duration record and no run record.
+    # A run of it for another edition is measured and writes no run record.
     with runs.run("en", "qualify"):
         pass
     assert not records.place("qualify", "en").exists()
@@ -220,3 +220,34 @@ def test_a_rewriter_run_twice_keeps_its_earlier_writers_fresh(stand_in_table, mo
     _, found = judged(stand_in_table, "check-sound:zh")
     assert found["assemble:zh"].state == found["refresh-captions:zh"].state == "fresh"
     assert texts(found["check-sound:zh"]) == ["input timeline changed: zh/timeline.json"]
+
+
+def test_a_film_wide_node_is_planned_and_asked_for_by_its_name(stand_in_table, monkeypatch):
+    root = repository.ROOT
+    check = nodes.Node(
+        "check",
+        {"default": lambda e: {"scripts": root / "zh/script.txt"}},
+        lambda e: {"verdict": root / "verdict.json"},
+        "light",
+        per=nodes.FILM,
+    )
+    narrate = stand_ins.stand_in(
+        "narrate",
+        {"script": "{code}/script.txt", "verdict": "verdict.json"},
+        {"takes": "{code}/takes.txt"},
+        "gpu",
+    )
+    held = (*(n for n in stand_ins.TABLE if n.name != "narrate"), narrate, check)
+    table = nodes.load(held, stand_ins.SHARED, CODES)
+    monkeypatch.setattr(runs, "table", lambda: {n.name: n for n in held})
+    with runs.run(None, "check"):
+        (root / "verdict.json").write_text("pass")
+    assert records.place("check", None) == root / "build/evidence/records/film/check.json"
+    planned, found = judged(table, "check")
+    assert [entry.stated()["node"] for entry in planned.entries] == ["check"]
+    assert (found["check"].state, found["check"].ready) == ("fresh", True)
+    # Each edition's narration reads the verdict, so the film's check is upstream of it.
+    _, found = judged(table, "narrate:all")
+    assert list(found) == ["check", "narrate:zh", "narrate:en"]
+    with pytest.raises(ValueError, match="check:zh names no node of the plan"):
+        judged(table, "check:zh")

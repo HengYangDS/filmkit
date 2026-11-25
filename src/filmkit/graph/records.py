@@ -1,6 +1,7 @@
 """The run record of schema 1, the partial record, and how one is stated, written and read.
 
-A run record states one run of one build node for one edition: each input and output by its
+A run record states one run of one build node, for one edition or for the film: each input and
+output by its
 path below the film's root, its size, its modification time (`mtime_ns`) and its SHA-256, a
 folder by the digest of the members its pattern names; the engine that ran, its `released.json`
 digest and the node's model pins; the outcome and the line the command ended with; the run's
@@ -9,8 +10,9 @@ start, seconds, phases, settings and 1-minute load at both ends, as the seam mea
 record states a run of part of a node: its outputs as they stand after it, its outcome and its
 time, and no inputs, so it accounts for what it wrote and never makes its node fresh.
 
-A record is written whole through `repository.write`, at
-build/evidence/records/editions/<code>/<node>.json, a partial one beside it as
+A record is written whole through `repository.write`, an edition's node's at
+build/evidence/records/editions/<code>/<node>.json and a film-wide node's, whose record names no
+edition, at build/evidence/records/film/<node>.json; a partial one beside it as
 <node>.partial.json. A record that cannot be read, or one of another schema, is `Unreadable`.
 """
 
@@ -34,8 +36,10 @@ if TYPE_CHECKING:
 
 # The schema this engine writes and reads; a record of any other is unreadable.
 SCHEMA = 1
-# The folder of the run records below the film's root, a folder for each edition by its code.
+# The folder of the run records below the film's root, a folder for each edition by its code, and
+# the folder of the film-wide nodes' records.
 FOLDER = Path("build/evidence/records/editions")
+FILM_FOLDER = Path("build/evidence/records/film")
 # How a run ended: its owner passed, its owner refused with one line, or it failed otherwise.
 Outcome = Literal["pass", "refuse", "error"]
 # A node's host class as host rule 3 measures it, and the plan's word for one never measured.
@@ -107,7 +111,7 @@ class Common(Stated):
 
     schema_: Literal[1] = Field(default=SCHEMA, alias="schema")
     node: str
-    edition: str
+    edition: str | None
     engine: Engine
     outputs: dict[str, State]
     outcome: Outcome
@@ -231,10 +235,12 @@ def engine(pins: dict[str, str]) -> Engine:
     return Engine(version=released.version(), released_sha256=digest(released.RECORD), pins=pins)
 
 
-def place(node: str, code: str, *, partial: bool = False) -> Path:
-    """Where a node's record of an edition stands, or its partial record."""
+def place(node: str, code: str | None, *, partial: bool = False) -> Path:
+    """Where a node's record of an edition stands, or of the film where no edition is named, or
+    its partial record."""
     name = f"{node}.partial.json" if partial else f"{node}.json"
-    return Path(repository.ROOT) / FOLDER / code / name
+    folder = FILM_FOLDER if code is None else FOLDER / code
+    return Path(repository.ROOT) / folder / name
 
 
 def write(record: RunRecord | PartialRecord) -> None:

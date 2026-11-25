@@ -2,10 +2,13 @@
 and writes, and the order from the standard library's `graphlib`. The engine's own table is
 `filmkit.graph.chain`.
 
-A node is one of today's chain commands for one edition (design decision 1 of record-every-run),
-named as the command's run names it. Each of its ways states its inputs as a function of an
-edition that returns paths by name, and its outputs likewise; a folder names its members by a
-pattern (`records.Folder`).
+A node is one of today's chain commands (design decision 1 of record-every-run), named as the
+command's run names it, run once for each edition it applies to or once for the film (`per`,
+design decision 6 of build-a-film-by-its-verbs). An edition's node is keyed `<node>:<code>`, a
+film-wide node by its name alone. Each of its ways states its inputs as a function of an edition,
+None for a film-wide node, that returns paths by name, and its outputs likewise; a folder names
+its members by a pattern (`records.Folder`). `run` is the node's owner call, which `filmkit
+build` makes.
 
 A path that several nodes write is declared in the table's shared paths with each writer and its
 kind: one that
@@ -25,7 +28,7 @@ import graphlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Literal, NamedTuple
 
 import filmkit.repository as repository
 from filmkit.graph.records import Folder, HostClass
@@ -36,6 +39,9 @@ if TYPE_CHECKING:
 
 # The kinds of a writer of a path that several nodes write (design decision 5).
 REWRITES, REPLACES = "rewrites", "replaces"
+# How often a node runs: once for each edition it applies to, or once for the film.
+EDITION, FILM = "edition", "film"
+Per = Literal["edition", "film"]
 # While it holds, a place that a table names only where it stands is named as if it stood, so
 # that the check of each run's opens can ask which absent files a node would read.
 _AS_IF_STANDING: contextvars.ContextVar[bool] = contextvars.ContextVar("as_if", default=False)
@@ -43,32 +49,46 @@ _AS_IF_STANDING: contextvars.ContextVar[bool] = contextvars.ContextVar("as_if", 
 
 @dataclass(frozen=True)
 class Node:
-    """One command of an edition's build chain: its ways, each with its inputs, its outputs,
-    the host class it is expected to measure at, and whether it is model work. A node of several
-    ways takes `default_way` where no run says which; `tools` names the tools it starts whose
-    reads are seen only through their arguments; `editions`, given the film's editions in their
-    declared order, names those the node applies to, every one by default."""
+    """One command of the build chain: its ways, each with its inputs, its outputs, the host
+    class it is expected to measure at, and whether it is model work. A node of several ways
+    takes `default_way` where no run says which; `tools` names the tools it starts whose reads
+    are seen only through their arguments; `editions`, given the film's editions in their
+    declared order, names those an edition's node applies to, every one by default; `per` says
+    whether it runs for each edition or once for the film; `run` is its owner call, given the
+    edition, None for a film-wide node."""
 
     name: str
-    ways: dict[str, Callable[[Edition], Places]]
-    outputs: Callable[[Edition], Places]
+    ways: dict[str, Callable[[Edition | None], Places]]
+    outputs: Callable[[Edition | None], Places]
     expected: HostClass
     gpu: bool = False
-    default_way: Callable[[Edition], str] | None = None
+    default_way: Callable[[Edition | None], str] | None = None
     tools: tuple[str, ...] = ()
     editions: Callable[[tuple[str, ...]], tuple[str, ...]] | None = None
+    per: Per = EDITION
+    run: Callable[[Edition | None], object] | None = None
 
     def codes(self, codes: tuple[str, ...]) -> tuple[str, ...]:
-        """The editions, of the film's, that the node applies to."""
+        """The editions, of the film's, that an edition's node applies to; none for a film-wide
+        node."""
+        if self.per == FILM:
+            return ()
         return tuple(self.editions(codes)) if self.editions else tuple(codes)
 
-    def way(self, edition: Edition, recorded: object = None) -> str:
+    def instances(self, codes: tuple[str, ...]) -> tuple[tuple[str, Edition | None], ...]:
+        """Each run of the node a build makes, by its key, with its edition: one for each edition
+        it applies to, or one for the film, keyed by the node's name and of no edition."""
+        if self.per == FILM:
+            return ((self.name, None),)
+        return tuple((key(self.name, code), Edition(code)) for code in self.codes(codes))
+
+    def way(self, edition: Edition | None, recorded: object = None) -> str:
         """The way a run took, or else the way the node takes by default."""
         if isinstance(recorded, str) and recorded in self.ways:
             return recorded
         return self.default_way(edition) if self.default_way else next(iter(self.ways))
 
-    def inputs(self, edition: Edition, way: object = None) -> Places:
+    def inputs(self, edition: Edition | None, way: object = None) -> Places:
         """The inputs of a way, by default the node's own."""
         return self.ways[self.way(edition, way)](edition)
 
@@ -109,9 +129,16 @@ def joined(first: dict, second: dict) -> dict:
     return {**first, **second}
 
 
-def key(node: str, code: str) -> str:
-    """A node of one edition, as the plan names it: `<node>:<code>`."""
-    return f"{node}:{code}"
+def key(node: str, code: str | None) -> str:
+    """A node's run as the plan names it: `<node>:<code>` for an edition's, the node's name for
+    the film's."""
+    return node if code is None else f"{node}:{code}"
+
+
+def split(named: str) -> tuple[str, str | None]:
+    """A key's node and edition, None for a film-wide node's."""
+    name, colon, code = named.rpartition(":")
+    return (name, code) if colon else (named, None)
 
 
 def place(path: Path | Folder) -> Path:
@@ -137,10 +164,14 @@ class Table:
     edges: dict[str, frozenset[str]]
     order: tuple[str, ...]
 
-    def node(self, named: str) -> tuple[Node, Edition]:
-        """A node of an edition by its key."""
-        name, code = named.rsplit(":", 1)
-        return self.nodes[name], Edition(code)
+    def node(self, named: str) -> tuple[Node, Edition | None]:
+        """A node by its key, with its edition; no edition for a film-wide node, keyed by its
+        name alone."""
+        name, code = split(named)
+        node = self.nodes[name]
+        if (node.per == FILM) != (code is None):
+            raise KeyError(named)
+        return node, None if code is None else Edition(code)
 
     def upstream(self, named: str) -> set[str]:
         """Every node before one, transitively."""
@@ -154,13 +185,13 @@ class Table:
 
 
 def written(nodes: dict[str, Node], codes: Iterable[str]) -> dict[Path, list[tuple[str, str]]]:
-    """Each output path of every node of every edition, with the keys and output names that
-    write it."""
+    """Each output path of every run of every node, with the keys and output names that write
+    it."""
     found: dict[Path, list[tuple[str, str]]] = {}
     for node in nodes.values():
-        for code in node.codes(tuple(codes)):
-            for name, path in node.outputs(Edition(code)).items():
-                found.setdefault(place(path), []).append((key(node.name, code), name))
+        for named, edition in node.instances(tuple(codes)):
+            for name, path in node.outputs(edition).items():
+                found.setdefault(place(path), []).append((named, name))
     return found
 
 
@@ -171,7 +202,7 @@ def undeclared(paths: dict[Path, list[tuple[str, str]]], shared: dict) -> list[s
         if len(by) < 2:
             continue
         names = {name for _, name in by}
-        nodes = sorted({named.rsplit(":", 1)[0] for named, _ in by})
+        nodes = sorted({split(named)[0] for named, _ in by})
         declared = len(names) == 1 and {w.node for w in shared.get(next(iter(names)), ())}
         if declared != set(nodes):
             keys = ", ".join(sorted(named for named, _ in by))
@@ -190,23 +221,22 @@ def edges(nodes: dict[str, Node], shared: dict, codes: tuple[str, ...]) -> dict[
     path have no edge between them."""
     paths = written(nodes, codes)
     before: dict[str, set[str]] = {
-        key(node.name, c): set() for node in nodes.values() for c in node.codes(codes)
+        named: set() for node in nodes.values() for named, _ in node.instances(codes)
     }
     for node in nodes.values():
-        for code in node.codes(codes):
-            reader, edition = key(node.name, code), Edition(code)
+        for reader, edition in node.instances(codes):
             reads = {place(p) for way in node.ways.values() for p in way(edition).values()}
             for out, by in paths.items():
                 if not any(overlaps(read, out) for read in reads):
                     continue
                 for named, output in by:
-                    writer = named.rsplit(":", 1)[0]
+                    writer = split(named)[0]
                     if writer == node.name or follows(writer, output, node.name, shared):
                         continue
                     before[reader].add(named)
     for by in paths.values():
         for named, output in by:
-            name, code = named.rsplit(":", 1)
+            name, code = split(named)
             for writer in shared.get(output, ()):
                 if writer.node == name and writer.kind == REWRITES:
                     before[named].update(

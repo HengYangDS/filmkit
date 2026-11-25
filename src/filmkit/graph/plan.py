@@ -86,11 +86,11 @@ class Entry:
 
 @dataclass(frozen=True)
 class Standing:
-    """What stands for one node of one edition: its record and its partial record, each read or
-    the reason it cannot be, and the way its inputs are judged by."""
+    """What stands for one run of a node, of an edition or of the film: its record and its partial
+    record, each read or the reason it cannot be, and the way its inputs are judged by."""
 
     node: nodes.Node
-    edition: Edition
+    edition: Edition | None
     record: records.RunRecord | records.Unreadable | None
     partial: records.PartialRecord | None
     way: str
@@ -148,10 +148,11 @@ def found(path: Path) -> records.RunRecord | records.PartialRecord | records.Unr
 def standing(table: nodes.Table, key: str) -> Standing:
     """A node's records as they stand, and the way its inputs are judged by: the recorded way."""
     node, edition = table.node(key)
-    whole = found(records.place(node.name, edition.code))
-    partial = found(records.place(node.name, edition.code, partial=True))
+    code = edition.code if edition else None
+    whole = found(records.place(node.name, code))
+    partial = found(records.place(node.name, code, partial=True))
     if isinstance(whole, records.PartialRecord):
-        whole = records.Unreadable(f"{records.place(node.name, edition.code)} is a partial record")
+        whole = records.Unreadable(f"{records.place(node.name, code)} is a partial record")
     recorded = whole.settings.get("way") if isinstance(whole, records.RunRecord) else None
     partial = partial if isinstance(partial, records.PartialRecord) else None
     return Standing(node, edition, whole, partial, node.way(edition, recorded))
@@ -171,8 +172,10 @@ def followed(table: nodes.Table) -> set[tuple[str, Path]]:
         for writer in writers:
             if writer.kind != nodes.REWRITES:
                 continue
-            for code in table.nodes[writer.node].codes(table.codes):
-                path = nodes.place(table.nodes[writer.node].outputs(Edition(code))[output])
+            rewriter = table.nodes[writer.node]
+            for _, edition in rewriter.instances(table.codes):
+                path = nodes.place(rewriter.outputs(edition)[output])
+                code = edition.code if edition else None
                 pairs |= {(nodes.key(a, code), path) for a in writer.after if a not in names}
     return pairs
 
@@ -343,19 +346,21 @@ def changed_by_part(partial: records.PartialRecord, whole: records.RunRecord | N
 
 
 def wanted(table: nodes.Table, targets: Iterable[str]) -> set[str]:
-    """The nodes asked for, `<node>:<code>` or `<node>:all`, and every node upstream of them;
-    every node where none is asked for. An unknown target is refused, naming the nodes."""
+    """The nodes asked for, `<node>:<code>` or `<node>:all` for an edition's node and the node's
+    name for a film-wide one, and every node upstream of them; every node where none is asked
+    for. An unknown target is refused, naming the nodes."""
     asked = set()
     for target in targets:
-        name, _, code = target.rpartition(":")
+        name, code = nodes.split(target)
         node = table.nodes.get(name)
         every = node.codes(table.codes) if node else table.codes
         keys = [nodes.key(name, c) for c in every] if code == "all" else [target]
         unknown = [k for k in keys if k not in table.edges]
-        if unknown or not name:
+        if unknown or not keys:
             known = ", ".join(table.nodes)
             msg = (
-                f"{target} names no node of the plan; its nodes are {known}, each as <node>:<code>"
+                f"{target} names no node of the plan; its nodes are {known}, each as <node>:<code> "
+                "but a film-wide node, which is named alone"
             )
             raise ValueError(msg)
         asked |= set(keys)

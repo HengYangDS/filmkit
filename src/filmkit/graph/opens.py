@@ -319,15 +319,16 @@ def covered(path: Path, places: Iterable[tuple[Path, str | None]]) -> bool:
 class _Judged:
     """One node of the table as the check compares a log with it: what it may read and write,
     what it may look for and not find, what it reads aside, and every place any node of its
-    edition declares."""
+    edition declares, every node's for a film-wide node."""
 
     def __init__(self, table, named: str) -> None:
         from filmkit.graph import chain, nodes, records
 
         self.node, self.edition = table.node(named)
+        code = self.edition.code if self.edition else None
         way = None
         with contextlib.suppress(records.Unreadable, FileNotFoundError):
-            way = records.read(records.place(self.node.name, self.edition.code)).settings.get("way")
+            way = records.read(records.place(self.node.name, code)).settings.get("way")
         inputs = list(self.node.inputs(self.edition, way).values())
         outputs = list(self.node.outputs(self.edition).values())
         self.reads, self.writes = real([*inputs, *outputs]), real(outputs)
@@ -337,9 +338,10 @@ class _Judged:
         everything = [
             item
             for each in table.nodes.values()
-            if self.edition.code in each.codes(table.codes)
+            for _, edition in each.instances(table.codes)
+            if code is None or edition is None or edition.code == code
             for way in each.ways.values()
-            for item in [*way(self.edition).values(), *each.outputs(self.edition).values()]
+            for item in [*way(edition).values(), *each.outputs(edition).values()]
         ]
         self.declared = real(everything)
 

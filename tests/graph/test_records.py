@@ -52,6 +52,16 @@ def run_record(root) -> records.RunRecord:
     )
 
 
+def test_a_film_wide_node_s_record_is_written_and_read_back_at_its_place(root):
+    record = run_record(root).model_copy(update={"node": "check", "edition": None})
+    records.write(record)
+    place = records.place("check", None)
+    assert place == root / "build/evidence/records/film/check.json"
+    assert records.read(place) == record
+    assert json.loads(place.read_text())["edition"] is None
+    assert not (root / records.FOLDER).exists()
+
+
 def test_a_record_and_a_partial_record_are_read_back_equal(root):
     record = run_record(root)
     records.write(record)
