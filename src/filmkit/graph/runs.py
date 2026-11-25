@@ -33,7 +33,9 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
+import functools
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -198,14 +200,42 @@ def table() -> dict[str, nodes.Node]:
     return {node.name: node for node in chain.TABLE}
 
 
+# The host's encoders a node may name among its tools, each with the command that states its
+# version: FFmpeg's and ffprobe's first line of `-version`, ExifTool's `-ver` (design decision 13).
+ENCODERS = {
+    "FFmpeg": ("ffmpeg", "-version"),
+    "ffprobe": ("ffprobe", "-version"),
+    "ExifTool": ("exiftool", "-ver"),
+}
+# What a pin states of an encoder the host does not have.
+ABSENT = "absent"
+
+
+@functools.cache
+def encoder(tool: str) -> str:
+    """The host's version of an encoder, the first line its command prints, or `ABSENT` where it
+    cannot be run; asked once a process."""
+    try:
+        done = subprocess.run(
+            ENCODERS[tool], capture_output=True, text=True, timeout=30, check=False
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ABSENT
+    lines = done.stdout.splitlines()
+    return lines[0].strip() if done.returncode == 0 and lines else ABSENT
+
+
 def pins(node: nodes.Node) -> dict[str, str]:
-    """The model snapshots a node declares, each repository with its revision: model work's."""
+    """What a node's records pin besides the engine: the model snapshots of model work, each
+    repository with its revision, and the version of each encoder the node runs (`ENCODERS`), so
+    that another snapshot or another encoder makes the node stale."""
+    found = {tool: encoder(tool) for tool in node.tools if tool in ENCODERS}
     if not node.gpu:
-        return {}
+        return found
     from filmkit.narration import snapshots
 
-    found = (snapshots.VOICE, snapshots.RECOGNIZER, snapshots.ALIGNER)
-    return {snapshot.repo: snapshot.revision for snapshot in found}
+    models = (snapshots.VOICE, snapshots.RECOGNIZER, snapshots.ALIGNER)
+    return {**{snapshot.repo: snapshot.revision for snapshot in models}, **found}
 
 
 def previous(node: str, code: str | None) -> records.RunRecord | None:

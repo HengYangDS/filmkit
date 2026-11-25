@@ -4,12 +4,12 @@ A run record states one run of one build node, for one edition or for the film: 
 output by its path below the film's root, its size, its modification time (`mtime_ns`) and its
 SHA-256, a folder by the digest of the members its pattern names, a top-level table of the
 film's declaration by the digest of its canonical JSON (`DeclarationTable`); the engine that
-ran, its `released.json` digest and the node's model pins; the outcome and the line the command
-ended with; the run's start, seconds, phases, settings and 1-minute load at both ends, as the
-seam measured them (`filmkit.graph.runs.Run`); and the host class as measured
-(`filmkit.graph.host`). A partial
-record states a run of part of a node: its outputs as they stand after it, its outcome and its
-time, and no inputs, so it accounts for what it wrote and never makes its node fresh.
+ran, its `released.json` digest and the node's pins (model snapshots and encoders); the outcome
+and the line the command ended with; the run's start, seconds, phases, settings and 1-minute
+load at both ends, as the seam measured them (`filmkit.graph.runs.Run`); and the host class as
+measured (`filmkit.graph.host`). A partial record states a run of part of a node: its outputs as
+they stand after it, its outcome and its time, and no inputs, so it accounts for what it wrote
+and never makes its node fresh.
 
 A record is written whole through `repository.write`, an edition's node's at
 build/evidence/records/editions/<code>/<node>.json and a film-wide node's, whose record names no
@@ -90,8 +90,8 @@ State = FileState | FolderState
 
 
 class Engine(Stated):
-    """The engine that ran: its version, its `released.json` digest and the node's model pins,
-    each snapshot by its repository and revision."""
+    """The engine that ran: its version, its `released.json` digest and the node's pins, each
+    model snapshot by its repository and revision and each encoder it runs by its version."""
 
     version: str
     released_sha256: str
@@ -442,8 +442,10 @@ def engine_reasons(recorded: Engine, running: Engine) -> list[str]:
         reasons.append(f"another engine: recorded {recorded.version}, running {running.version}")
     if recorded.released_sha256 != running.released_sha256:
         reasons.append("another released.json: the engine's pins differ")
-    if recorded.pins != running.pins:
-        reasons.append("other model pins")
+    for name in sorted({*recorded.pins, *running.pins}):
+        was, now = recorded.pins.get(name), running.pins.get(name)
+        if was != now:
+            reasons.append(f"another {name}: recorded {was}, running {now}")
     return reasons
 
 

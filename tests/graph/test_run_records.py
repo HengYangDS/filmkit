@@ -8,6 +8,7 @@ import os
 import signal
 import subprocess
 import sys
+from dataclasses import replace
 
 import pytest
 import sample_sound
@@ -19,7 +20,7 @@ import filmkit.picture.repair as picture_repair
 import filmkit.produce as produce
 import filmkit.repository as repository
 import filmkit.soundtrack.gates as sound_gates
-from filmkit.graph import nodes, opens, records, runs
+from filmkit.graph import nodes, opens, plan, records, runs
 from filmkit.production import Edition
 
 SAMPLE_ROOT = repository.ROOT
@@ -254,3 +255,28 @@ def test_a_failure_of_the_seam_reaches_no_command_and_leaves_the_last_record(
         assert "the run record of stand:zh was not written: ValueError: a receipt" in error
         assert read("stand") == before
         assert opens.NODE not in os.environ
+
+
+def test_another_ffmpeg_makes_a_node_that_encodes_stale_naming_both_versions(root, monkeypatch):
+    version = {"FFmpeg": "ffmpeg version 8.0.1", "ffprobe": "ffprobe version 8.0.1"}
+    monkeypatch.setattr(runs, "encoder", lambda tool: version[tool])
+    encode = replace(
+        stand_ins.stand_in("encode", {"in": "in.txt"}, {"film": "film.mp4"}),
+        tools=("FFmpeg", "ffprobe", "Chrome"),
+    )
+    held = {"encode": encode, "stand": runs.table()["stand"]}
+    monkeypatch.setattr(runs, "table", lambda: held)
+    with runs.run("zh", "encode"):
+        (root / "film.mp4").write_text("film")
+    stand_in_run(root)
+    # The encoders the node runs are pinned by their versions; a browser and a node that runs no
+    # encoder pin none.
+    assert read("encode").engine.pins == version
+    assert read("stand").engine.pins == {}
+    version["FFmpeg"] = "ffmpeg version 9.1"
+    found = {e.key: e for e in plan.plan(nodes.load(held.values(), {}, ("zh",))).entries}
+    assert found["stand:zh"].state == "fresh"
+    assert (found["encode:zh"].state, [reason.text for reason in found["encode:zh"].reasons]) == (
+        "stale",
+        ["another FFmpeg: recorded ffmpeg version 8.0.1, running ffmpeg version 9.1"],
+    )

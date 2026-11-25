@@ -389,11 +389,11 @@ def judge_all(table: nodes.Table, keys: set[str], full: bool) -> list[Entry]:
     stand = {key: standing(table, key) for key in table.order}
     settled = settle(bound(table, stand), full)
     states: dict[str, str] = {}
-    engines = {gpu: records.engine(runs.pins(n)) for n in table.nodes.values() for gpu in [n.gpu]}
+    engines = {name: records.engine(runs.pins(node)) for name, node in table.nodes.items()}
     entries = []
     for key in (k for k in table.order if k in keys):
         s = stand[key]
-        reasons = judged(s, settled, key, engines[s.node.gpu], full)
+        reasons = judged(s, settled, key, engines[s.node.name], full)
         upstream = table.upstream(key)
         behind = any(states[up] != FRESH for up in table.edges[key])
         states[key] = STALE if reasons else BEHIND if behind else FRESH
