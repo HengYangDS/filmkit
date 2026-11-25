@@ -259,6 +259,10 @@ TABLE = (
         "light",
         tools=MEDIA,
         run=lambda e: sound_gates.check_sound(e),
+        judges=(
+            "its verdict measures the soundtrack, timeline, assembly and selected takes it reads "
+            "against the declaration it binds, by the engine and the FFmpeg its record states"
+        ),
     ),
     Node(
         "stage-picture",

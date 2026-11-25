@@ -8,9 +8,12 @@ digest where either differs), with each reason; `behind` when it is fresh by its
 node upstream of it by a path is stale or behind, so that it will likely run when that node has;
 `waiting` when it is fresh by its own record, nothing upstream of it by a path is stale or
 behind, and a gate it waits for, directly or through a node upstream of it by a path, is not
-fresh (design decision 4 of build-a-film-by-its-verbs); and `fresh` otherwise. A node stale only
-because its last run refused, with nothing it reads changed since, is stale and states that run's
-line (`Entry.refused`): run again, it would refuse the same. The four are
+fresh (design decision 4 of build-a-film-by-its-verbs); and `fresh` otherwise. A node that the
+table declares a gate whose verdict depends only on what its record states (`Node.judges`),
+stale only because its last run refused with nothing it reads changed since, and with every node
+upstream of it by a path fresh, so that nothing will change what it reads before its turn, is
+stale and not ready, and states that run's line (`Entry.standing`): run again, it would refuse
+the same. The four are
 judged in one pass over the order derived over paths and waits together, so every gate is judged
 before every node that waits for it. A node is ready when every node upstream of it by a path is
 fresh, every gate it waits for is fresh, and every input of its way exists; a waiting node names
@@ -81,8 +84,9 @@ class Entry:
     span: tuple[datetime, datetime] | None = None
     # The gates that hold the node, each with its state: none unless it is waiting.
     held: dict[str, str] = field(default_factory=dict)
-    # The line its last run refused with, where that refusal alone makes it stale.
-    refused: str | None = None
+    # The line its last run refused with, for a node whose refusal stands (`Node.judges`) where
+    # that refusal alone makes it stale.
+    standing: str | None = None
 
     def stated(self) -> dict:
         """The entry as `filmkit plan --json` prints it."""
@@ -95,6 +99,7 @@ class Entry:
             "seconds": self.seconds,
             "ready": self.ready,
             "waits": [{"node": gate, "state": state} for gate, state in self.held.items()],
+            "standing": self.standing,
         }
 
 
@@ -449,11 +454,17 @@ def judge_all(table: nodes.Table, keys: set[str], full: bool) -> list[Entry]:
         states[key] = STALE if reasons else BEHIND if behind else WAITING if held[key] else FRESH
         inputs = s.node.inputs(s.edition, s.way).values()
         gates = all(states[g] == FRESH for g in table.waits.get(key, ()))
-        ready = all(states[up] == FRESH for up in upstream) and gates and all(map(exists, inputs))
         whole = s.whole
         # A refused run's own reason is its outcome, which no other reason joins while nothing
-        # it reads has changed.
-        refused = whole is not None and whole.outcome == "refuse" and len(reasons) == 1
+        # it reads has changed; its refusal stands where the table says the node's does and no node
+        # upstream of it will run first and change what it reads.
+        quiet = all(states[up] == FRESH for up in upstream)
+        refused = s.node.judges is not None and whole is not None and whole.outcome == "refuse"
+        refusal = None
+        if refused and len(reasons) == 1 and quiet:
+            refusal = whole.refusal or f"{key}: its run refused"
+        ready = quiet and gates and all(map(exists, inputs))
+        ready = ready and refusal is None
         entries.append(
             Entry(
                 key,
@@ -465,7 +476,7 @@ def judge_all(table: nodes.Table, keys: set[str], full: bool) -> list[Entry]:
                 ready,
                 (datetime.fromisoformat(whole.started_at), ended(whole)) if whole else None,
                 held[key] if states[key] == WAITING else {},
-                (whole.refusal or f"{key}: its run refused") if refused else None,
+                refusal,
             )
         )
     return entries

@@ -69,7 +69,9 @@ class Node:
     are seen only through their arguments; `editions`, given the film's editions in their
     declared order, names those an edition's node applies to, every one by default; `per` says
     whether it runs for each edition or once for the film; `run` is its owner call, given the
-    edition, None for a film-wide node."""
+    edition, None for a film-wide node. `judges` is, for a gate whose verdict depends only on what
+    its record states, why: its refusal stands while nothing it reads changes; every other node,
+    None, runs again when a build asks it (design decision 3 of build-a-film-by-its-verbs)."""
 
     name: str
     ways: dict[str, Callable[[Edition | None], Places]]
@@ -82,6 +84,7 @@ class Node:
     per: Per = EDITION
     run: Callable[[Edition | None], object] | None = None
     waits: tuple[Wait, ...] = ()
+    judges: str | None = None
 
     def codes(self, codes: tuple[str, ...]) -> tuple[str, ...]:
         """The editions, of the film's, that an edition's node applies to; none for a film-wide

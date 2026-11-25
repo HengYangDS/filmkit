@@ -47,14 +47,29 @@ A narration of chosen segments or of its checks alone SHALL write, in place of t
 - **WHEN** `check-sound:zh` refuses during `filmkit build sound:all`
 - **THEN** no node downstream of it runs, `check-sound:en` runs, and the command exits 1 with the Chinese gate's line
 
-### Requirement: A refusal stands until what its node reads changes
+### Requirement: A gate's refusal stands until what it reads changes
 
-`filmkit build` SHALL not run a node whose last run refused while nothing it reads has changed since, but the narration, which no build runs; that refusal SHALL stand as the node's, in its own line, and hold every node downstream of it.
+`filmkit build` SHALL not run a node that the table declares a gate whose verdict depends only on what its record states, `check-sound`, while its last run refused, nothing it reads has changed since and every node upstream of it by a path is fresh; that refusal SHALL stand as the node's, in its own line, and hold every node downstream of it, and `filmkit plan --json` SHALL state it and call the node not ready. Every other node that refused SHALL run again when a build asks for it.
 
 #### Scenario: A refusal stands until what its node reads changes
 
 - **WHEN** `check-sound:zh` refused, nothing it reads has changed since, and `filmkit build render-picture:zh` runs
-- **THEN** it runs no node, holds the render and exits 1 with the gate's line; once an input of the gate changes, the gate runs again
+- **THEN** it runs no node, holds the render and exits 1 with the gate's line, the plan states that line for the gate and calls it not ready; once an input of the gate changes, the gate runs again
+
+#### Scenario: A gate behind a node that will run
+
+- **WHEN** `check-sound:zh` refused, the Chinese script is then edited, and `filmkit build all` is asked
+- **THEN** the gate's refusal does not stand, since the assembly will run first and change what the gate reads, and the build schedules the gate and the heavy work behind it as if the gate had not refused
+
+#### Scenario: A refusal answered outside the node's inputs
+
+- **WHEN** `assemble:zh` refused because a review round binds the Chinese films, and that round is then set aside
+- **THEN** `filmkit build all` runs `assemble:zh` again
+
+#### Scenario: A tool's version answered
+
+- **WHEN** `check` refused another Vale than the engine pins, and the pinned Vale is then on the path
+- **THEN** `filmkit build check` runs `check` again, and it passes
 
 ### Requirement: Light work that can run now runs first, outside any heavy invocation
 

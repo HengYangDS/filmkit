@@ -153,7 +153,8 @@ def line(entry: plan.Entry) -> str:
     ready = "ready" if entry.ready else "not ready"
     measured = f"{entry.host_class} (expected {entry.expected})"
     text = f"{entry.key}: {entry.state}, {ready}, {measured}, {seconds}"
-    return "\n".join([text, *(f"  {reason.text}" for reason in entry.reasons)])
+    stands = [f"  its refusal stands, so no build runs it: {entry.standing}"] * bool(entry.standing)
+    return "\n".join([text, *(f"  {reason.text}" for reason in entry.reasons), *stands])
 
 
 def timed(entries: list[plan.Entry]) -> str:

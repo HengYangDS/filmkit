@@ -12,6 +12,7 @@ from stand_ins import CODES
 import filmkit.child_processes as child_processes
 import filmkit.repository as repository
 from filmkit.graph import build, chain, cli, nodes, plan, records, runs
+from filmkit.review import set_aside
 from filmkit.soundtrack.assembly import AssemblyError
 
 
@@ -78,15 +79,16 @@ def test_a_gate_run_again_with_unchanged_inputs_downstream_leaves_the_waiting_no
     assert build.build(table, ["render:zh"]).ran == []
 
 
-def failing(table, monkeypatch, name, fault):
-    """The table with a node whose owner raises `fault` for the Chinese edition."""
+def failing(table, monkeypatch, name, fault, judges=None):
+    """The table with a node whose owner raises `fault` for the Chinese edition, and whose refusal
+    stands where `judges` says why the node's verdict depends only on its record."""
 
     def fails(edition):
         if edition.code == "zh":
             raise fault
         stand_ins.wrote(name, edition.code)
 
-    held = {**table.nodes, name: replace(table.nodes[name], run=fails)}
+    held = {**table.nodes, name: replace(table.nodes[name], run=fails, judges=judges)}
     monkeypatch.setattr(runs, "table", lambda: held)
     loaded = nodes.load(held.values(), stand_ins.SHARED, CODES)
     monkeypatch.setattr(chain, "table", lambda: loaded)
@@ -109,12 +111,15 @@ def test_a_refused_gate_holds_what_follows_it_and_the_other_edition_is_built(tab
     assert built.status == 1
 
 
-def test_a_refusal_stands_until_what_its_node_reads_changes(table, monkeypatch):
+def test_a_gate_s_refusal_stands_until_what_it_reads_changes(table, monkeypatch):
     fault = AssemblyError(GATED.removeprefix("check-sound:zh: "))
-    table = failing(table, monkeypatch, "check-sound", fault)
+    table = failing(table, monkeypatch, "check-sound", fault, judges="a verdict on its inputs")
     build.build(table, ["all"])
     (gate,) = [e for e in plan.plan(table, ["render:zh"]).entries if e.key == "check-sound:zh"]
-    assert (gate.state, gate.refused) == ("stale", GATED)
+    # The plan states the refusal that stands, and does not call the gate ready.
+    assert (gate.state, gate.standing, gate.ready) == ("stale", GATED, False)
+    assert gate.stated()["standing"] == GATED
+    assert cli.line(gate).endswith(f"its refusal stands, so no build runs it: {GATED}")
     # Run again it would refuse the same: the build runs nothing and gives the gate's line.
     again = build.build(table, ["render:zh"])
     assert (again.ran, again.status) == ([], 1)
@@ -126,6 +131,28 @@ def test_a_refusal_stands_until_what_its_node_reads_changes(table, monkeypatch):
     (repository.ROOT / "zh/script.txt").write_text("the zh script, edited")
     edited = build.build(table, ["render:zh"])
     assert "check-sound:zh" in edited.ran and edited.refused == [GATED]
+
+
+def test_a_refusal_answered_outside_a_node_s_inputs_runs_again_once_answered(table, monkeypatch):
+    # The assembly refuses while a review round binds the edition's films; the set-aside that
+    # answers it is no input of the node, so its refusal does not stand.
+    rounds = {"zh": [7]}
+    monkeypatch.setattr(set_aside, "binding_rounds", lambda edition: rounds.get(edition.code, []))
+    guarded = replace(
+        table.nodes["assemble"], run=lambda e: set_aside.after_set_aside(e, owner("assemble"))
+    )
+    held = {**table.nodes, "assemble": guarded}
+    monkeypatch.setattr(runs, "table", lambda: held)
+    table = nodes.load(held.values(), stand_ins.SHARED, CODES)
+    (line,) = build.build(table, ["all"]).refused
+    assert line.startswith("assemble:zh: the current zh films are bound by the prompts of review")
+    assert "first run filmkit review set-aside --round 7" in line
+    (entry,) = [e for e in plan.plan(table, ["assemble:zh"]).entries if e.key == "assemble:zh"]
+    assert (entry.state, entry.standing) == ("stale", None)
+    # The round is set aside: the next build runs the assembly again.
+    rounds.clear()
+    again = build.build(table, ["all"])
+    assert "assemble:zh" in again.ran and (again.refused, again.status) == ([], 0)
 
 
 @pytest.mark.parametrize(

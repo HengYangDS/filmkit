@@ -15,7 +15,7 @@ import filmkit.film as film
 import filmkit.register as register
 import filmkit.released as released
 import filmkit.repository as repository
-from filmkit.graph import bindings, cli, nodes, opens, plan, records
+from filmkit.graph import bindings, build, chain, cli, nodes, opens, plan, records
 from filmkit.narration import anchors, readings
 from filmkit.picture import anchor_reads
 from filmkit.production import Edition
@@ -105,6 +105,25 @@ def test_another_vale_is_refused_naming_both_versions_and_the_pin(copied, tmp_pa
     assert f"runs Vale {released.vale()}" in line
     assert line.endswith(f"mise use github:vale-cli/vale@{released.vale()}")
     assert verdict["outcome"] == "refuse"
+
+
+def test_a_check_refused_for_another_vale_runs_again_once_the_pinned_vale_is_back(
+    copied, tmp_path, monkeypatch
+):
+    # Vale is no input of the node `check`, so its refusal does not stand: the build that asks
+    # for the check after the fixed tool runs it again.
+    table = chain.table()
+    other = tmp_path / "bin/vale"
+    other.parent.mkdir()
+    other.write_text(f"#!{sys.executable}\nprint('vale version 9.9.9')\n")
+    other.chmod(0o755)
+    path = os.environ["PATH"]
+    monkeypatch.setenv("PATH", f"{other.parent}:{path}")
+    (line,) = build.build(table, ["check"]).refused
+    assert "reports Vale 9.9.9" in line
+    monkeypatch.setenv("PATH", path)
+    again = build.build(table, ["check"])
+    assert (again.ran, again.refused, again.status) == (["check"], [], 0)
 
 
 def test_a_picture_that_does_not_load_is_not_judged_and_refuses_nothing(copied):

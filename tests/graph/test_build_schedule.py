@@ -9,13 +9,14 @@ import stand_ins
 from stand_ins import CODES
 
 import filmkit.graph.chain as engine_chain
+import filmkit.repository as repository
 from filmkit.graph import build, nodes, plan, records, runs
 
 
-def entry(key, state="stale", expected="light", measured=None, seconds=None, refused=None):
+def entry(key, state="stale", expected="light", measured=None, seconds=None, standing=None):
     """A node as the plan judged it: unmeasured unless `measured` names its class."""
     found = plan.Entry(key, state, [], measured or plan.UNMEASURED, expected, seconds, True)
-    return replace(found, refused=refused)
+    return replace(found, standing=standing)
 
 
 @pytest.fixture
@@ -114,13 +115,57 @@ def test_a_refusal_that_stands_and_what_follows_it_are_no_work_that_will_run(tab
     # The gate refused with nothing it reads changed, and the page reads its output: neither is
     # light work to run first, so the render alone is the heavy work, in one invocation.
     entries = [
-        entry("check-sound:zh", refused="check-sound:zh: 1 gated finding"),
+        entry("check-sound:zh", standing="check-sound:zh: 1 gated finding"),
         entry("package-metadata:zh", "behind"),
         entry("render:zh", expected="heavy"),
     ]
-    assert [e.key for e in build.stands(table, entries)] == ["check-sound:zh"]
+    assert [e.key for e in build.standing(entries)] == ["check-sound:zh"]
     assert [e.key for e in build.will_run(table, entries)] == ["render:zh"]
     assert build.refusals(table, entries) == []
+
+
+def test_a_gate_behind_a_node_that_will_run_is_scheduled_as_if_it_had_not_refused(
+    table, monkeypatch
+):
+    # The review of `68e0cc6..b1467a2`, finding 1: the sound gate refused, and the render waits for
+    # it. The Chinese script is then edited, so the assembly upstream of the gate will run first
+    # and change what the gate reads: the gate's refusal cannot stand, since the build would run it
+    # at its turn and, were it to pass, the render behind it in the same invocation. The stage
+    # reads a source of its own here, so that the render is held by the gate alone.
+    def refuse(edition):
+        if edition.code == "zh":
+            raise build.REFUSALS[0]("the soundtrack has 1 gated finding")
+        stand_ins.wrote("check-sound", edition.code)
+
+    staging = stand_ins.stand_in(
+        "stage", {"source": "{code}/source.txt"}, {"stage": "{code}/stage.txt"}
+    )
+    held = {
+        **table.nodes,
+        "check-sound": replace(table.nodes["check-sound"], run=refuse, judges="its inputs alone"),
+        "stage": replace(staging, run=stand_in_owner("stage")),
+        "render": replace(table.nodes["render"], waits=(nodes.Wait("check-sound"),)),
+    }
+    monkeypatch.setattr(runs, "table", lambda: held)
+    table = nodes.load(held.values(), stand_ins.SHARED, CODES)
+    for code in CODES:
+        (repository.ROOT / code / "source.txt").write_text(f"the {code} picture's source")
+    (line,) = build.build(table, ["all"]).refused
+    light = line.removeprefix("light work can run now and runs first, outside any ticket: ")
+    lit = build.build(table, light.removeprefix("filmkit build ").split())
+    assert lit.refused == ["check-sound:zh: the soundtrack has 1 gated finding"]
+    # The English render runs; the Chinese one is held by the gate, which stands.
+    assert "render:en" in build.build(table, ["all"]).ran
+    (gate,) = [e for e in plan.plan(table, ["render:zh"]).entries if e.key == "check-sound:zh"]
+    assert gate.standing is not None
+    (repository.ROOT / "zh/script.txt").write_text("the zh script, edited")
+    judged = plan.plan(table, ["all"]).entries
+    (gate,) = [e for e in judged if e.key == "check-sound:zh"]
+    assert (gate.state, gate.standing) == ("stale", None)
+    assert {"check-sound:zh", "render:zh"} <= {e.key for e in build.will_run(table, judged)}
+    (line,) = build.refusals(table, judged)
+    named = line.removeprefix("light work can run now and runs first, outside any ticket: ")
+    assert {"assemble:zh", "refresh-captions:zh", "check-sound:zh"} <= set(named.split()[2:])
 
 
 def judging(monkeypatch, stale: set[str]) -> nodes.Table:

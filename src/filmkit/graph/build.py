@@ -8,8 +8,9 @@ that a node behind only because a node upstream was stale is fresh again once th
 without changing its outputs, and a node held by a gate that ran again and passed is fresh by
 its own inputs: neither is run. It runs a node, its owner's call (`Node.run`) in this process
 inside the seam (`runs.run`), which writes the node's run record, only where the node is stale,
-and not where its last run refused with nothing it reads changed since (`plan.Entry.refused`):
-that refusal stands as the node's, in its own line. A node behind a refused or failed node, or
+and not where its refusal stands (`plan.Entry.standing`): a gate whose verdict depends only on what
+its record states, stale only by a refusal with nothing it reads changed since, would refuse the
+same, so that refusal is the node's, in its own line. A node behind a refused or failed node, or
 waiting on a gate that did not pass, is not run; nodes not downstream of it go on. A node with
 no run, the narration, is never run here.
 
@@ -123,7 +124,7 @@ def run_node(table: nodes.Table, key: str) -> tuple[int, str | None]:
     return child_processes.FINISHED, None
 
 
-def standing(key: str, line: str) -> str:
+def standing_line(key: str, line: str) -> str:
     """The line of a refusal that stands, which the build does not run again: the node's own
     line, named by its key, and why it was not run."""
     named = line if line.startswith(f"{key}: ") else f"{key}: {line}"
@@ -136,16 +137,15 @@ def heavy(entry: plan.Entry) -> bool:
     return (entry.host_class if measured else entry.expected) in ("heavy", "gpu")
 
 
-def stands(table: nodes.Table, entries: list[plan.Entry]) -> list[plan.Entry]:
-    """The nodes whose refusal stands, which no build runs again; the narration's, which no build
-    runs, is the narration's to answer."""
-    return [e for e in entries if e.refused is not None and table.node(e.key)[0].run is not None]
+def standing(entries: list[plan.Entry]) -> list[plan.Entry]:
+    """The nodes whose refusal stands (`plan.Entry.standing`), which no build runs again."""
+    return [entry for entry in entries if entry.standing is not None]
 
 
 def will_run(table: nodes.Table, entries: list[plan.Entry]) -> list[plan.Entry]:
     """The work a build of the closure will run, as the plan judged it: each node stale or behind,
     but a node whose refusal stands and every node downstream of it."""
-    standing_keys = {entry.key for entry in stands(table, entries)}
+    standing_keys = {entry.key for entry in standing(entries)}
     return [
         entry
         for entry in entries
@@ -221,9 +221,9 @@ def build(table: nodes.Table, targets: Iterable[str] = ()) -> Built:
             stopped.add(key)
             built.held.append(key)
             continue
-        if entry.refused is not None:
+        if entry.standing is not None:
             stopped.add(key)
-            built.refused.append(standing(key, entry.refused))
+            built.refused.append(standing_line(key, entry.standing))
             continue
         status, said = run_node(table, key)
         built.ran.append(key)

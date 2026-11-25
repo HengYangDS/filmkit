@@ -207,12 +207,13 @@ def test_plan_prints_each_node_of_the_sound_chain_as_json(sound_chain, capsys):
     # of the chain is fresh by its own record and waits for it.
     assert list(found) == ["check", *chain]
     fields = {"node", "state", "reasons", "class", "expected", "seconds", "ready", "waits"}
+    fields.add("standing")
     assert all(set(entry) == fields for entry in found.values())
     assert (found["check"]["state"], found["check"]["class"]) == ("stale", "unmeasured")
     for key in chain:
         entry = found[key]
         assert (entry["state"], entry["reasons"], entry["ready"]) == ("waiting", [], False)
-        assert entry["waits"] == [{"node": "check", "state": "stale"}]
+        assert (entry["waits"], entry["standing"]) == ([{"node": "check", "state": "stale"}], None)
         assert entry["seconds"] > 0
     assert (found["narrate:zh"]["class"], found["narrate:zh"]["expected"]) == ("gpu", "gpu")
     assert found["check-sound:zh"]["class"] == "light"
