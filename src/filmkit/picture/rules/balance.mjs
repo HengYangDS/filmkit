@@ -203,3 +203,89 @@ export function reviewedRuns(step) {
     },
   };
 }
+
+/** Balance on the content, as the fused DDWG film's rule 3 sets it (its design, §14; the owner's D-69 and D-70 of 25
+ * November 2026): the lit picture's mass may stand more than 90 px off x 960 for less than 1.5 s, moving or not, and
+ * a still box more than 50 px off y 510 for less than 2 s. The mass is the mean centre of a frame's lit cells, which a
+ * frame of fewer than 40 has not (`balance79.py`'s floor); the mass audit samples every `step` seconds. A still box
+ * keeps its four edges within 4 px of where they stood when it began. */
+export const MASS = { px: 90, seconds: 1.5, cells: 40, step: 0.1 },
+  VERTICAL = { px: 50, seconds: 2, still: 4 };
+
+/* Whether a run of samples, each one step long, from `start` to `end` lasts `least` seconds. */
+const lasts = (run, least) => run.end - run.start >= least - 1e-9;
+/* Whether the frame at t follows the run's last sample, of the same scene, with no gap. */
+const continues = (run, t, scene, step) =>
+  run !== null && run.scene === scene && Math.abs(run.end - t) < step * 1.5;
+
+/** Joins frames sampled every `step` seconds into runs of the mass off x 960. `frame(t, scene, centre)` takes the
+ * scene drawn in the frame, its ids joined by "+" when it draws several, or null when it draws none, and the frame's
+ * mass centre, or null when it has none; a frame of another scene, one without a mass and a gap in the samples each end
+ * a run. `finish()` returns each run of `MASS.seconds` or more with its scene, start, end and largest signed offset in
+ * px. A step must divide both of rule 3's limits, 1.5 s and 2 s, into whole steps, so that a lean as long as a limit
+ * always counts: at 0.2 s, 1.5 s falls between seven and eight steps and a lean of up to 1.6 s could pass. */
+export function massRuns(step) {
+  for (const limit of [MASS.seconds, VERTICAL.seconds]) {
+    const steps = limit / step;
+    if (!(step > 0) || Math.abs(steps - Math.round(steps)) > 1e-9)
+      throw RangeError(`A step of ${step} s divides ${limit} s into no whole number of steps`);
+  }
+  const runs = [];
+  let open = null;
+  const close = () => {
+    if (open && lasts(open, MASS.seconds)) runs.push(open);
+    open = null;
+  };
+  return {
+    frame(t, scene, centre) {
+      const dx = centre ? centre[0] - CONTENT_CENTRE[0] : 0;
+      if (!scene || !centre || Math.abs(dx) <= MASS.px) return close();
+      if (continues(open, t, scene, step)) {
+        open.end = t + step;
+        if (Math.abs(dx) > Math.abs(open.worst)) open.worst = dx;
+      } else {
+        close();
+        open = { scene, start: t, end: t + step, worst: dx };
+      }
+    },
+    finish() {
+      close();
+      return runs;
+    },
+  };
+}
+
+/** Joins frames sampled every `step` seconds into still states off y 510. `frame(t, scene, box, cut)` takes the scene
+ * drawn in the frame, the box of that scene's lit paints, or null when nothing of it is lit, and whether a stage cut
+ * the composition declares for the scene falls since the previous sample. A run holds while its box keeps each edge
+ * within `VERTICAL.still` px of where it stood at the run's first frame and its centre stands more than `VERTICAL.px`
+ * off y 510; a stage cut, another scene, a frame without a box and a gap in the samples each end it. It is timed from
+ * its first still frame. `finish()` returns each run of `VERTICAL.seconds` or more with its scene, start, end and
+ * largest signed offset in px, positive below the centre. */
+export function verticalRuns(step) {
+  const runs = [];
+  let open = null;
+  const close = () => {
+    if (open && lasts(open, VERTICAL.seconds))
+      runs.push({ scene: open.scene, start: open.start, end: open.end, worst: open.worst });
+    open = null;
+  };
+  const still = (run, box) => box.every((edge, k) => Math.abs(edge - run.box[k]) <= VERTICAL.still);
+  return {
+    frame(t, scene, box, cut = false) {
+      const dy = box ? (box[1] + box[3]) / 2 - CONTENT_CENTRE[1] : 0;
+      if (!scene || !box || Math.abs(dy) <= VERTICAL.px) return close();
+      if (!cut && continues(open, t, scene, step) && still(open, box)) {
+        open.end = t + step;
+        if (Math.abs(dy) > Math.abs(open.worst)) open.worst = dy;
+      } else {
+        close();
+        open = { scene, start: t, end: t + step, worst: dy, box: box.slice() };
+      }
+    },
+    finish() {
+      close();
+      return runs;
+    },
+  };
+}
