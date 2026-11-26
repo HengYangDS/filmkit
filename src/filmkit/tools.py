@@ -75,6 +75,8 @@ TOOLS = {
     "frame-audit": Tool("picture/frame-audit.mjs", measures=True),
     "motion-audit": Tool("picture/motion-audit.mjs", measures=True),
     "detail-audit": Tool("picture/detail-audit.mjs", measures=True),
+    # The mass audit draws the uncaptioned stage with the stage's own faces, as the renderer does.
+    "mass-audit": Tool("picture/mass-audit.mjs"),
     "caption-equivalence": Tool("picture/caption-equivalence.mjs", measures=True),
     "band-audit": Tool("picture/band-audit.mjs", measures=True),
     "player-check": Tool("delivery/player-check.mjs", browses=True),

@@ -78,3 +78,35 @@ export function litAtFullSize(palette) {
     );
   };
 }
+
+/** Lit for the mass, as the fused film's prototype read its previews (`balance79.py`: FFmpeg's `format=gray` of each
+ * frame at 480x270, above 60) and as the reviewers' grey thresholds at 60: a cell is the 4x4 pixels of a 1920x1080
+ * frame, its grey the full-range BT.709 luma (0-255) of their mean colour, and it is lit above MASS_LIT_GRAY.
+ * `massLit(pixels, width, [top, bottom])` reads a frame's RGBA pixels, `width` pixels a row, over the cell rows that
+ * cover pixel rows `top` to `bottom`, and returns the lit cells' count and the sums of their centres, in the frame's
+ * own pixels. */
+export const MASS_LIT_GRAY = 60;
+export function massLit(pixels, width, [top, bottom]) {
+  // The luma in ten-thousandths, summed over a cell's sixteen pixels, against the threshold at that scale.
+  const [wr, wg, wb] = [2126, 7152, 722],
+    threshold = MASS_LIT_GRAY * 16 * 10000,
+    columns = width / 4,
+    sums = new Float64Array(columns);
+  let cells = 0,
+    x = 0,
+    y = 0;
+  for (let row = Math.floor(top / 4); row <= Math.floor(bottom / 4); row++) {
+    sums.fill(0);
+    for (let line = row * 4; line < row * 4 + 4; line++)
+      for (let at = line * width * 4, column = 0; column < columns; column++)
+        for (let k = 0; k < 4; k++, at += 4)
+          sums[column] += wr * pixels[at] + wg * pixels[at + 1] + wb * pixels[at + 2];
+    for (let column = 0; column < columns; column++)
+      if (sums[column] > threshold) {
+        cells++;
+        x += column * 4 + 2;
+        y += row * 4 + 2;
+      }
+  }
+  return { cells, x, y };
+}

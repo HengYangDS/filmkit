@@ -206,6 +206,7 @@ def test_the_engine_names_each_tool_by_its_module():
         "detail-audit",
         "frame-audit",
         "geometry-check",
+        "mass-audit",
         "motion-audit",
         "player-check",
         "whole-turns",

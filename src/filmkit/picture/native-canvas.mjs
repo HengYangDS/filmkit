@@ -114,8 +114,11 @@ function loadedLibrary() {
   };
 }
 
-/** Open a stage's picture: its record, its canvas and the composition's `renderFrame`. */
-function openPicture(stage, textRenderer) {
+/** Open a stage's picture: its record, its canvas, the composition's `window` and its `renderFrame`. The canvas is
+ * `width` wide, the record's own width unless another is given, and as tall as the record's ratio makes it; the
+ * composition scales its picture by that width, as it does in a browser. The mass audit opens a stage at 1920
+ * (mass-audit.mjs). */
+export function openPicture(stage, textRenderer, width = null) {
   const record = JSON.parse(readFileSync(join(stage, RECORD), "utf8"));
   if (!Array.isArray(record.faces) || typeof record.language !== "string")
     throw Error(`The record of ${stage} names no faces or no language; stage the picture again`);
@@ -131,18 +134,17 @@ function openPicture(stage, textRenderer) {
     throw Error(`The stage ${stage} holds ${unregistered.join(", ")}, which no face registers`);
   // The text renderer is set once, before any canvas exists.
   setTextRenderer(textRenderer);
-  const canvas = createCanvas(record.width, record.height);
+  const wide = width ?? record.width;
+  const canvas = createCanvas(wide, Math.round((wide * record.height) / record.width));
   const context = canvas.getContext("2d", { alpha: false });
   // The language is the staged document's; the canvas's default follows the host's.
   context.lang = record.language;
   const window = { FILM: JSON.parse(readFileSync(join(stage, "film.json"), "utf8")) };
   const composition = join(stage, "film.js");
-  vm.runInContext(
-    readFileSync(composition, "utf8"),
-    compositionScope(window, context, record.width),
-    { filename: composition },
-  );
-  return { record, canvas, renderFrame: (seconds) => window.renderFrame(seconds) };
+  vm.runInContext(readFileSync(composition, "utf8"), compositionScope(window, context, wide), {
+    filename: composition,
+  });
+  return { record, canvas, window, renderFrame: (seconds) => window.renderFrame(seconds) };
 }
 
 /** A child's end: its exit status, the signal that ended it, or why it could not start. */
