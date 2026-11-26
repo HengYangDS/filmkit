@@ -320,7 +320,7 @@ def test_the_geometry_check_binds_the_timeline_whose_runtime_its_record_must_cov
 
 def test_the_picture_gate_reads_the_uncaptioned_stage_its_mass_audit_draws():
     node, edition = chain.table().node("check-picture:zh")
-    assert node.inputs(edition)["stage"] == Folder(edition.rendered(False).stage, "**/*")
+    assert node.inputs(edition)["stage"] == Folder(edition.rendered(captions=False).stage, "**/*")
     up = chain.table().upstream("check-picture:zh")
     assert nodes.key("stage-picture-uncaptioned", "zh") in up
 

@@ -172,8 +172,10 @@ def gated_findings(frame: dict, sync: dict, motion: dict) -> list[str]:
 
 
 def mass_findings(mass: dict) -> list[str]:
-    """The mass audit's gated findings: each run through which a scene's mass stands more than
-    90 px off x 960, by its scene, span and largest signed offset."""
+    """The mass audit's gated findings, one for each run of a scene's mass off x 960.
+
+    A run is one of 1.5 s or more beyond 90 px, named by its scene, span and largest signed offset.
+    """
     return [
         f"mass off_centre_mass {scene}: {run}"
         for scene, runs in sorted(mass["off_centre_mass"].items())
@@ -431,13 +433,13 @@ def bound_inputs(edition: Edition) -> dict[str, Path]:
         "composition_sha256": repository.ROOT / COMPOSITION_SCRIPT,
         "timeline_sha256": edition.timeline,
         "declaration_sha256": repository.ROOT / repository.DECLARATION,
-        "uncaptioned_stage_sha256": edition.rendered(False).stage / STAGE_RECORD,
+        "uncaptioned_stage_sha256": edition.rendered(captions=False).stage / STAGE_RECORD,
     }
 
 
 def require_uncaptioned_stage(edition: Edition) -> Path:
     """The uncaptioned stage the mass audit draws, refused where it has no record yet."""
-    stage = edition.rendered(False).stage
+    stage = edition.rendered(captions=False).stage
     if not (stage / STAGE_RECORD).is_file():
         msg = (
             f"No staged picture document and record in {repository.relative(stage)}; run "
@@ -483,7 +485,7 @@ def run_audit(tool: str, arguments: list[str], out: Path, environment: dict | No
 def check_picture(edition: Edition) -> dict:
     """Audit the edition's current picture, write its gate record and refuse a gated finding."""
     anchors.require_placed(repository.read(edition.timeline), edition.code)
-    stage = require_uncaptioned_stage(edition)
+    # The bindings refuse an uncaptioned stage without a record, before any audit starts.
     work = repository.ROOT / WORK / edition.code
     work.mkdir(parents=True, exist_ok=True)
     bound = current_bindings(edition)
@@ -505,7 +507,6 @@ def check_picture(edition: Edition) -> dict:
     frame_faces = {**traces, WRAPPING_VARIABLE: str(rules), **faces}
     motion = [timeline, str(MOTION_FPS), "--out", str(motion_path)]
     detail = [timeline, "--out", str(detail_path)]
-    mass = [str(stage), "--text-renderer", renderer.TEXT_RENDERER]
     # The frame, motion and detail audits read the composition and the timeline, the mass audit
     # the uncaptioned stage, and each writes files of its own.
     try:
@@ -514,7 +515,16 @@ def check_picture(edition: Edition) -> dict:
                 ("frame-audit", [timeline, f"{FRAME_STEP:.7f}"], frame_path, frame_faces),
                 ("motion-audit", motion, work / "motion-summary.json", faces),
                 ("detail-audit", detail, work / "detail-summary.json", faces),
-                ("mass-audit", mass, mass_path, None),
+                (
+                    "mass-audit",
+                    [
+                        str(edition.rendered(captions=False).stage),
+                        "--text-renderer",
+                        renderer.TEXT_RENDERER,
+                    ],
+                    mass_path,
+                    None,
+                ),
             ]
         )
     except PictureError as error:

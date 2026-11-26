@@ -90,8 +90,7 @@ class FilmRoot:
         put(edition.timeline, {**timeline, "captions": list(captions)})
 
     def checked(self, edition: Edition) -> None:
-        """Record that check-picture passed the edition's current picture: every binding the gate
-        records, its uncaptioned stage's among them (`picture_gates.current_bindings`)."""
+        """Record that check-picture passed the edition's current picture, by its bindings."""
         put(edition.picture_gates, {**picture_gates.current_bindings(edition), "verdict": "pass"})
 
     def staged(self, edition: Edition) -> None:

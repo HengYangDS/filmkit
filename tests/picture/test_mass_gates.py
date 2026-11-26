@@ -1,7 +1,9 @@
-"""The picture gate on the content's balance: each run of the mass audit and each vertical run of
-the frame audit refused by its scene, span and offset, a role error refused with the frame
-audit's errors, the summaries recorded, and the uncaptioned stage the mass audit draws bound by
-the gate record."""
+"""The picture gate on the content's balance.
+
+Each run of the mass audit and each vertical run of the frame audit is refused by its scene, span
+and offset, a role error with the frame audit's errors; the summaries stand in the bound reports,
+and the gate record binds the uncaptioned stage the mass audit draws.
+"""
 
 import pytest
 import test_gates
@@ -23,7 +25,8 @@ def frame(**found):
     return {**CLEAN, "frame": {**CLEAN["frame"], **found}}
 
 
-def test_a_mass_run_is_refused_by_its_scene_span_and_offset(film, monkeypatch):
+@pytest.mark.usefixtures("film")
+def test_a_mass_run_is_refused_by_its_scene_span_and_offset(monkeypatch):
     mass = {**CLEAN["mass"], "off_centre_mass": {"03": ["0.50-2.20 -120.0 px"]}}
     calls = audits(monkeypatch, {**CLEAN, "mass": mass})
     with pytest.raises(PictureError, match="1 gated findings"):
@@ -32,7 +35,7 @@ def test_a_mass_run_is_refused_by_its_scene_span_and_offset(film, monkeypatch):
     assert record["verdict"] == "refuse"
     assert record["gated_findings"] == ["mass off_centre_mass 03: 0.50-2.20 -120.0 px"]
     # The mass audit draws the uncaptioned stage with the renderer's text renderer.
-    stage = Edition("zh").rendered(False).stage
+    stage = Edition("zh").rendered(captions=False).stage
     by_tool = {call[0]: call for call in calls}
     assert by_tool["mass-audit"][1] == [str(stage), "--text-renderer", renderer.TEXT_RENDERER]
 
@@ -50,7 +53,8 @@ def test_a_mass_run_is_refused_by_its_scene_span_and_offset(film, monkeypatch):
         ),
     ],
 )
-def test_a_vertical_run_and_a_role_error_are_refused(film, monkeypatch, found, named):
+@pytest.mark.usefixtures("film")
+def test_a_vertical_run_and_a_role_error_are_refused(monkeypatch, found, named):
     audits(monkeypatch, frame(**found))
     with pytest.raises(PictureError, match="1 gated findings"):
         gates.check_picture(Edition("zh"))
@@ -64,12 +68,13 @@ def test_summaries_and_declared_frames_alone_pass_and_the_record_binds_the_stage
     declared = {"declared_frames": {"03": {"strokes": 2, "box": [198, 118, 1722, 921]}}}
     audits(monkeypatch, {**frame(**declared), "mass": mass})
     record = gates.check_picture(edition)
-    assert record["verdict"] == "pass" and record["gated_findings"] == []
+    assert record["verdict"] == "pass"
+    assert record["gated_findings"] == []
     assert repository.read(film / record["reports"]["mass"]["path"]) == mass
     assert record["reports"]["mass"]["sha256"] == repository.sha(
         film / record["reports"]["mass"]["path"]
     )
-    stage = edition.rendered(False).stage / STAGE_RECORD
+    stage = edition.rendered(captions=False).stage / STAGE_RECORD
     assert record["uncaptioned_stage_sha256"] == repository.sha(stage)
     rendering.require_passing_gates(edition)
     # The stage staged again with other bytes after the check: the render waits for the check.
@@ -80,11 +85,12 @@ def test_summaries_and_declared_frames_alone_pass_and_the_record_binds_the_stage
         rendering.require_passing_gates(edition)
 
 
-def test_an_uncaptioned_stage_not_yet_staged_is_refused_before_any_audit(film, monkeypatch):
+@pytest.mark.usefixtures("film")
+def test_an_uncaptioned_stage_not_yet_staged_is_refused_before_any_audit(monkeypatch):
     edition = Edition("zh")
     calls = audits(monkeypatch, CLEAN)
     gates.check_picture(edition)
-    (edition.rendered(False).stage / STAGE_RECORD).unlink()
+    (edition.rendered(captions=False).stage / STAGE_RECORD).unlink()
     edition.picture_gates.unlink()
     calls.clear()
     words = (
@@ -93,7 +99,8 @@ def test_an_uncaptioned_stage_not_yet_staged_is_refused_before_any_audit(film, m
     )
     with pytest.raises(PictureError, match=words):
         gates.check_picture(edition)
-    assert calls == [] and not edition.picture_gates.exists()
+    assert calls == []
+    assert not edition.picture_gates.exists()
     audits(monkeypatch, CLEAN)
     put(edition.picture_gates, {"verdict": "pass"})
     with pytest.raises(PictureError, match=words):

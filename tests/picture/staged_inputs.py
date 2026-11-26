@@ -59,15 +59,13 @@ def root(tmp_path, monkeypatch):
 
 
 def passing_gates(edition, **changes):
-    """A gate record that check-picture passed for the edition's current picture, with every
-    binding the gate records (`picture_gates.current_bindings`), changed as `changes` says."""
+    """A gate record that check-picture passed for the edition's current picture, with `changes`."""
     record = {**picture_gates.current_bindings(edition), "verdict": "pass", **changes}
     put(edition.picture_gates, record)
 
 
 def staged():
-    """The Chinese edition, both its pictures staged complete at the UHD frame, its picture
-    checked."""
+    """The Chinese edition, both its pictures staged complete at the UHD frame and checked."""
     edition = Edition("zh")
     for captions in (True, False):
         picture_rendering.stage_picture(edition, None, RUNTIME, 3840, 2160, captions=captions)
