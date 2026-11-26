@@ -212,6 +212,11 @@ On the edition's current composition and timeline, `check-picture` SHALL run the
 - **WHEN** the edition's uncaptioned stage has no record and `check-picture` runs
 - **THEN** `check-picture` refuses before any audit starts, naming the stage and `stage-picture-uncaptioned`, and writes no record
 
+#### Scenario: A stale uncaptioned stage
+
+- **WHEN** the composition changed after the uncaptioned stage was staged, and only the captioned picture was staged again
+- **THEN** `check-picture` refuses before any audit starts, naming what differs, and writes no record
+
 #### Scenario: The record binds the mass audit's report and its stage
 
 - **WHEN** `check-picture` passes

@@ -6,6 +6,7 @@ and the gate record binds the uncaptioned stage the mass audit draws.
 """
 
 import pytest
+import staged_inputs
 import test_gates
 from test_gates import CLEAN, audits, put
 
@@ -13,7 +14,7 @@ import filmkit.picture.gates as gates
 import filmkit.picture.rendering as rendering
 import filmkit.repository as repository
 from filmkit.picture import renderer
-from filmkit.picture.rendering import PictureError
+from filmkit.picture.rendering import COMPOSITION_SCRIPT, PictureError
 from filmkit.production import STAGE_RECORD, Edition
 
 # The gate's film root, as the gate's own tests build it.
@@ -105,3 +106,25 @@ def test_an_uncaptioned_stage_not_yet_staged_is_refused_before_any_audit(monkeyp
     put(edition.picture_gates, {"verdict": "pass"})
     with pytest.raises(PictureError, match=words):
         rendering.require_passing_gates(edition)
+
+
+@pytest.fixture
+def staged(tmp_path, monkeypatch):
+    """The Chinese edition with the real composition, both its pictures staged and checked."""
+    staged_inputs.root(tmp_path, monkeypatch)
+    return staged_inputs.staged()
+
+
+def test_a_stale_uncaptioned_stage_is_refused_before_any_audit(staged, monkeypatch):
+    # The composition changes and only the captioned picture is staged again: the mass audit would
+    # measure the old picture beside a frame audit of the new one.
+    calls = []
+    monkeypatch.setattr(gates.tools, "run", lambda tool, *_, **__: calls.append(tool) or 0)
+    script = repository.ROOT / COMPOSITION_SCRIPT
+    script.write_text(script.read_text() + "\n// changed after staging\n")
+    rendering.stage_picture(staged, None, staged_inputs.RUNTIME, 3840, 2160)
+    staged.picture_gates.unlink()
+    with pytest.raises(PictureError, match="differs"):
+        gates.check_picture(staged)
+    assert calls == []
+    assert not staged.picture_gates.exists()

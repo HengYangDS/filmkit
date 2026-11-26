@@ -74,6 +74,9 @@ function weighOnly(context, window) {
 export function measureMass(stage, textRenderer) {
   const picture = openPicture(stage, textRenderer, WIDTH),
     { canvas, record, window } = picture;
+  // A record without a duration would give no frame and so no finding.
+  if (!(Number(record.duration) > 0))
+    throw Error(`The record of ${stage} names no duration; stage the picture again`);
   const weighed = weighOnly(canvas.getContext("2d", { alpha: false }), window);
   const [cx, cy] = CONTENT_CENTRE,
     runs = massRuns(MASS.step),

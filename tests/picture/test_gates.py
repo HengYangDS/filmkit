@@ -51,7 +51,9 @@ def film(tmp_path, monkeypatch):
         shutil.copyfile(SAMPLE / path, root / path)
     segment = {"id": "01", "words": [{"text": "构建", "start": 2.0, "end": 2.4}]}
     put(Edition("zh").timeline, {"title": "示例影片", "segments": [segment], "captions": []})
+    # A stage record alone: whether a stage is current is the stage's own test (test_mass_gates).
     put(Edition("zh").rendered(captions=False).stage / STAGE_RECORD, {"picture": "uncaptioned"})
+    monkeypatch.setattr(rendering, "require_current_stage", lambda *_, **__: {})
     return root
 
 

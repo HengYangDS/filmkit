@@ -56,6 +56,14 @@ async function measured(body, { seconds = 2, record = {} } = {}) {
 }
 const near = (a, b, within) => Math.abs(a - b) <= within;
 
+test("a stage record that names no duration is refused, not measured as empty", async () => {
+  const folder = await stage("en", {
+    script: composition("box(200, 400, 600, 600);"),
+    record: { duration: null },
+  });
+  assert.throws(() => measureMass(folder, "system"), /names no duration; stage the picture again/);
+});
+
 test("a cell is lit when the full-range luma of its mean colour is above 60", async () => {
   // A square of grey 61 from x 200 to 600 and one of grey 59 from x 1300 to 1700.
   const report = await measured(

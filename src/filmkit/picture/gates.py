@@ -42,8 +42,10 @@ edition's uncaptioned stage as the renderer draws it, with the renderer's text r
 run through which the mass of a scene's lit paints stands more than 90 px off x 960 is gated by its
 scene, span and offset, as is each still state the frame audit finds more than 50 px off y 510
 (`off_centre_vertical`); each scene's mass summary and the declared frame strokes stand in the
-reports the record binds and refuse nothing. The record binds the uncaptioned stage by its
-record's SHA-256, and a check whose stage has no record refuses before any audit starts.
+reports the record binds and refuse nothing. A check refuses, before any audit starts, an
+uncaptioned stage that is not the complete current one (`rendering.require_current_stage`), and
+the record binds the stage by its record's SHA-256, so that a render refuses a stage staged again
+after the check.
 `render-picture` reads the record before it starts the renderer
 (`filmkit.picture.rendering.require_passing_gates`).
 
@@ -66,7 +68,7 @@ import filmkit.tools as tools
 from filmkit.film import FILM
 from filmkit.graph import target
 from filmkit.narration import anchors
-from filmkit.picture import anchor_reads, metrics, renderer, sync_audit, text_trace
+from filmkit.picture import anchor_reads, metrics, renderer, rendering, sync_audit, text_trace
 from filmkit.picture.detail_gates import detail_findings
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, PictureError, face_bindings
 from filmkit.production import STAGE_RECORD
@@ -485,7 +487,10 @@ def run_audit(tool: str, arguments: list[str], out: Path, environment: dict | No
 def check_picture(edition: Edition) -> dict:
     """Audit the edition's current picture, write its gate record and refuse a gated finding."""
     anchors.require_placed(repository.read(edition.timeline), edition.code)
-    # The bindings refuse an uncaptioned stage without a record, before any audit starts.
+    # The mass audit measures the uncaptioned stage, so it must be the complete current one, as a
+    # render requires its stage: a stage without a record, a stale one or another picture's is
+    # refused before any audit starts. The record's binding below then holds it until the render.
+    rendering.require_current_stage(edition, require_uncaptioned_stage(edition), captions=False)
     work = repository.ROOT / WORK / edition.code
     work.mkdir(parents=True, exist_ok=True)
     bound = current_bindings(edition)
