@@ -1,10 +1,13 @@
-/** What the picture tests share: the sample film's folder, a timeline staged from its scripts, and scratch folders. */
+/** What the picture tests share: the sample film's folder, a timeline staged from its scripts, a stage for the
+ * renderer and scratch folders. */
 import { after } from "node:test";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { RECORD } from "../../src/filmkit/picture/stage-contract.mjs";
 
 // The headless runtime reads picture/film.js below the folder it runs in, as the audits run below their film.
 export const SAMPLE = fileURLToPath(new URL("../../examples/sample-film/", import.meta.url));
@@ -103,4 +106,28 @@ export async function authoredTimeline(code) {
     render_offset: 0,
   };
   return withAnchors(timeline, code);
+}
+
+// The sample film's faces as a stage record names them.
+export const FACES = [
+  { family: "Sample", path: "fonts/noto-sans-cjk-sc-subset-regular.otf" },
+  { family: "SampleBold", path: "fonts/noto-sans-cjk-sc-subset-bold.otf" },
+  { family: "SampleLatin", path: "fonts/ibm-plex-sans-regular.ttf" },
+  { family: "SampleLatinBold", path: "fonts/ibm-plex-sans-bold.ttf" },
+];
+
+/* A stage as the engine writes it for the renderer, of the sample film's composition and an authored timeline: two
+ * seconds at 1920x1080, with the record's faces and language. `record` changes the record, `script` the composition. */
+export async function stage(code, { record = {}, script = null } = {}) {
+  const folder = join(await scratchFolder(), "stage");
+  await mkdir(join(folder, "fonts"), { recursive: true });
+  await cp(join(SAMPLE, "picture/film.js"), join(folder, "film.js"));
+  if (script !== null) await writeFile(join(folder, "film.js"), script);
+  // A stage holds the declared fonts and nothing beside them.
+  for (const { path } of FACES) await cp(join(SAMPLE, "assets", path), join(folder, path));
+  await writeFile(join(folder, "film.json"), JSON.stringify(await authoredTimeline(code)));
+  const language = code === "en" ? "en" : "zh-CN";
+  const whole = { duration: 2, fps: 30, width: 1920, height: 1080, edition: code, language };
+  await writeFile(join(folder, RECORD), JSON.stringify({ ...whole, faces: FACES, ...record }));
+  return folder;
 }

@@ -5,14 +5,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { execFile, execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmod, cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { encoderArguments, planSpans } from "../../src/filmkit/picture/native-canvas.mjs";
-import { RECORD } from "../../src/filmkit/picture/stage-contract.mjs";
-import { authoredTimeline, SAMPLE, scratchFolder } from "./sample-film.mjs";
+import { FACES, stage } from "./sample-film.mjs";
 
 const run = promisify(execFile);
 const MODULE = fileURLToPath(
@@ -22,13 +21,6 @@ const MODULE = fileURLToPath(
 const ENCODER = [
   ...["-c:v", "libx264", "-preset", "veryfast", "-crf", "12", "-g", "15", "-keyint_min", "15"],
   ...["-sc_threshold", "0", "-bf", "0", "-pix_fmt", "yuv420p"],
-];
-// The sample film's faces as a stage record names them.
-const FACES = [
-  { family: "Sample", path: "fonts/noto-sans-cjk-sc-subset-regular.otf" },
-  { family: "SampleBold", path: "fonts/noto-sans-cjk-sc-subset-bold.otf" },
-  { family: "SampleLatin", path: "fonts/ibm-plex-sans-regular.ttf" },
-  { family: "SampleLatinBold", path: "fonts/ibm-plex-sans-bold.ttf" },
 ];
 const found = (tool) => spawnSync(tool, ["-version"], { stdio: "ignore" }).status === 0;
 // A render needs the host's FFmpeg and FFprobe, which the locked toolchain does not supply.
@@ -79,22 +71,6 @@ test("the encoder takes raw frames, converts them to BT.709 and encodes by the o
   const span = encoderArguments({ ...settings, threads: 2, faststart: false });
   assert.ok(flag(span, "-threads") === "2" && !span.includes("+faststart"));
 });
-
-/* A stage as the engine writes it for the renderer, of the sample film's composition and an authored timeline: two
- * seconds at 1920x1080, with the record's faces and language. `record` changes the record, `script` the composition. */
-async function stage(code, { record = {}, script = null } = {}) {
-  const folder = join(await scratchFolder(), "stage");
-  await mkdir(join(folder, "fonts"), { recursive: true });
-  await cp(join(SAMPLE, "picture/film.js"), join(folder, "film.js"));
-  if (script !== null) await writeFile(join(folder, "film.js"), script);
-  // A stage holds the declared fonts and nothing beside them.
-  for (const { path } of FACES) await cp(join(SAMPLE, "assets", path), join(folder, path));
-  await writeFile(join(folder, "film.json"), JSON.stringify(await authoredTimeline(code)));
-  const language = code === "en" ? "en" : "zh-CN";
-  const whole = { duration: 2, fps: 30, width: 1920, height: 1080, edition: code, language };
-  await writeFile(join(folder, RECORD), JSON.stringify({ ...whole, faces: FACES, ...record }));
-  return folder;
-}
 
 const settings = (output, ...more) => [
   ...["--output", output, "--fps", "30", "--group", "15"],
@@ -171,6 +147,42 @@ test("the English edition draws other frames than the Chinese one", rendering, a
     en = await render(await stage("en"), "en", 1);
   assert.notEqual(zh.report.drawn_sha256, en.report.drawn_sha256);
 });
+
+/* A composition of two rails and a name, the rails stroked under the frame role when `declared`. */
+const railed = (
+  declared,
+) => `const ctx = document.getElementById("picture").getContext("2d", { alpha: false });
+window.renderFrame = (t) => {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#0F1519";
+  ctx.fillRect(0, 0, 1920, 1080);
+  window.__sceneId = "01";
+  window.__paintRole = ${declared ? '"frame"' : "null"};
+  ctx.strokeStyle = "#63758B";
+  ctx.lineWidth = 4;
+  for (const x of [200, 1720]) {
+    ctx.beginPath();
+    ctx.moveTo(x, 120);
+    ctx.lineTo(x, 120 + 400 * t);
+    ctx.stroke();
+  }
+  window.__paintRole = null;
+  ctx.fillStyle = "#ECE8DF";
+  ctx.font = "38px SampleLatin";
+  ctx.fillText("Sources", 810, 500);
+  window.__sceneId = null;
+};`;
+
+test(
+  "a stage draws the same frames with its rails declared as frames and without",
+  rendering,
+  async () => {
+    const declared = await render(await stage("en", { script: railed(true) }), "declared", 1),
+      undeclared = await render(await stage("en", { script: railed(false) }), "undeclared", 1);
+    assert.match(declared.report.drawn_sha256, /^[0-9a-f]{64}$/);
+    assert.equal(declared.report.drawn_sha256, undeclared.report.drawn_sha256);
+  },
+);
 
 test("a known colour is encoded as BT.709 in limited range", rendering, async () => {
   const script = `window.renderFrame = () => {
