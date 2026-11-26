@@ -4,6 +4,8 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-11-26
+
 ### Changed
 
 - **Breaking: check-picture measures balance on the content, and may refuse a picture it passed** (OpenSpec Change `measure-balance-on-content`, from the owner's decisions of 25 November 2026 on the fused DDWG film's rule 3). It refuses each run of 1.5 s or more through which the mass of the scene drawn stands more than 90 px off x 960, moving or not (`mass off_centre_mass`), and each still state of 2 s or more whose box, of the scene drawn, stands more than 50 px above or below y 510 (`frame off_centre_vertical`). Exactly 90 px and 50 px pass.
@@ -771,7 +773,8 @@ This breaks a film packaged by an earlier release: the verifier refuses its film
 - ETHOS governance, with the portable proof projected into GitHub Actions and GitLab CI.
 - The MIT License for the code, with the sample film's recordings and fonts and the third-party software in `NOTICE`.
 
-[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.34.2...HEAD
+[Unreleased]: https://github.com/HengYangDS/filmkit/compare/v0.35.0...HEAD
+[0.35.0]: https://github.com/HengYangDS/filmkit/compare/v0.34.2...v0.35.0
 [0.34.2]: https://github.com/HengYangDS/filmkit/compare/v0.34.1...v0.34.2
 [0.34.1]: https://github.com/HengYangDS/filmkit/compare/v0.34.0...v0.34.1
 [0.34.0]: https://github.com/HengYangDS/filmkit/compare/v0.33.0...v0.34.0
