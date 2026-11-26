@@ -181,3 +181,47 @@ test("a declared stage cut, another scene and a frame without a box each end a v
   );
   assert.deepEqual(dark, []);
 });
+
+/* Frames at the given sample numbers only, as an audit that skipped some would give them. */
+function sampledAt(runs, step, numbers, valueAt, scene = "05") {
+  for (const k of numbers) runs.frame(k * step, scene, valueAt(k * step));
+  return runs.finish();
+}
+const range = (from, to) => Array.from({ length: to - from }, (_, k) => from + k);
+// The step the gate gives the frame audit: gates.py passes 0.0333333 s, at which 60 samples span 1.999998 s.
+const FRAME_STEP = 0.0333333;
+
+test("a still box held for exactly 60 frames, the 2 s of rule 3 at the gate step, is a vertical run; 59 frames are not", () => {
+  const held = (frames) =>
+    sampledAt(verticalRuns(FRAME_STEP), FRAME_STEP, range(0, frames), () => boxAt(590), "02");
+  const [run, ...more] = held(60);
+  assert.deepEqual(more, []);
+  assert.deepEqual([run.scene, run.worst], ["02", 80]);
+  assert.deepEqual(held(59), []);
+  assert.equal(held(61).length, 1);
+});
+
+test("a gap in the samples ends a lean of the mass: the leans on either side are judged alone", () => {
+  const leans = (gap) =>
+    sampledAt(massRuns(MASS.step), MASS.step, [...range(0, 4), ...range(4 + gap, 8 + gap)], () =>
+      massAt(-120),
+    );
+  // With no gap the two leans of 1 s are one lean of 2 s.
+  const [joined] = leans(0);
+  assert.deepEqual([leans(0).length, joined.start, joined.end], [1, 0, 2]);
+  for (const gap of [1, 2, 5]) assert.deepEqual(leans(gap), [], `${gap} samples missing`);
+});
+
+test("a gap in the samples ends a still box off y 510: the states on either side are judged alone", () => {
+  const states = (gap) =>
+    sampledAt(
+      verticalRuns(FRAME_STEP),
+      FRAME_STEP,
+      [...range(0, 45), ...range(45 + gap, 90 + gap)],
+      () => boxAt(590),
+      "02",
+    );
+  // With no gap the two states of 1.5 s are one of 3 s.
+  assert.equal(states(0).length, 1);
+  for (const gap of [1, 2, 5]) assert.deepEqual(states(gap), [], `${gap} samples missing`);
+});

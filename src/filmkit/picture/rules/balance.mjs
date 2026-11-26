@@ -214,11 +214,14 @@ export function reviewedRuns(step) {
 export const MASS = { px: 90, seconds: 1.5, cells: 40, step: 0.25 },
   VERTICAL = { px: 50, seconds: 2, still: 4 };
 
-/* Whether a run of samples, each one step long, from `start` to `end` lasts `least` seconds. */
-const lasts = (run, least) => run.end - run.start >= least - 1e-9;
-/* Whether the frame at t follows the run's last sample, of the same scene, with no gap. */
+/* Whether a run of `samples` samples lasts `limit` seconds: it holds as many as the limit makes at this step, to the
+ * nearest whole sample. They are counted, not timed from the first to the last, because the frame audit's step of
+ * 0.0333333 s makes 60 samples 1.999998 s, short of the 2 s that they span. */
+const lasts = (run, limit, step) => run.samples >= Math.round(limit / step);
+/* Whether the frame at t is the sample right after the run's last, of the same scene: a gap of even one sample ends
+ * the run. */
 const continues = (run, t, scene, step) =>
-  run !== null && run.scene === scene && Math.abs(run.end - t) < step * 1.5;
+  run !== null && run.scene === scene && Math.abs(run.end - t) < step / 2;
 
 /** Joins frames sampled every `step` seconds into runs of the mass off x 960. `frame(t, scene, centre)` takes the
  * scene drawn in the frame, its ids joined by "+" when it draws several, or null when it draws none, and the frame's
@@ -235,7 +238,8 @@ export function massRuns(step) {
   const runs = [];
   let open = null;
   const close = () => {
-    if (open && lasts(open, MASS.seconds)) runs.push(open);
+    if (open && lasts(open, MASS.seconds, step))
+      runs.push({ scene: open.scene, start: open.start, end: open.end, worst: open.worst });
     open = null;
   };
   return {
@@ -244,10 +248,11 @@ export function massRuns(step) {
       if (!scene || !centre || Math.abs(dx) <= MASS.px) return close();
       if (continues(open, t, scene, step)) {
         open.end = t + step;
+        open.samples++;
         if (Math.abs(dx) > Math.abs(open.worst)) open.worst = dx;
       } else {
         close();
-        open = { scene, start: t, end: t + step, worst: dx };
+        open = { scene, start: t, end: t + step, worst: dx, samples: 1 };
       }
     },
     finish() {
@@ -268,7 +273,7 @@ export function verticalRuns(step) {
   const runs = [];
   let open = null;
   const close = () => {
-    if (open && lasts(open, VERTICAL.seconds))
+    if (open && lasts(open, VERTICAL.seconds, step))
       runs.push({ scene: open.scene, start: open.start, end: open.end, worst: open.worst });
     open = null;
   };
@@ -279,10 +284,11 @@ export function verticalRuns(step) {
       if (!scene || !box || Math.abs(dy) <= VERTICAL.px) return close();
       if (!cut && continues(open, t, scene, step) && still(open, box)) {
         open.end = t + step;
+        open.samples++;
         if (Math.abs(dy) > Math.abs(open.worst)) open.worst = dy;
       } else {
         close();
-        open = { scene, start: t, end: t + step, worst: dy, box: box.slice() };
+        open = { scene, start: t, end: t + step, worst: dy, samples: 1, box: box.slice() };
       }
     },
     finish() {
