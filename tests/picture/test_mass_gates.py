@@ -41,25 +41,31 @@ def test_a_mass_run_is_refused_by_its_scene_span_and_offset(monkeypatch):
     assert by_tool["mass-audit"][1] == [str(stage), "--text-renderer", renderer.TEXT_RENDERER]
 
 
-@pytest.mark.parametrize(
-    ("found", "named"),
-    [
-        (
-            {"off_centre_vertical": {"02": ["0.50-3.00 80.0 px"]}},
-            'frame off_centre_vertical: {"02": ["0.50-3.00 80.0 px"]}',
-        ),
-        (
-            {"errors": [{"message": 'window.__paintRole is "frmae"', "t": 1.0}]},
-            'frame errors: [{"message": "window.__paintRole is \\"frmae\\"", "t": 1.0}]',
-        ),
-    ],
-)
 @pytest.mark.usefixtures("film")
-def test_a_vertical_run_and_a_role_error_are_refused(monkeypatch, found, named):
-    audits(monkeypatch, frame(**found))
+def test_a_vertical_run_is_refused_by_its_scene_span_and_offset(monkeypatch):
+    audits(monkeypatch, frame(off_centre_vertical={"02": ["0.50-3.00 80.0 px"]}))
     with pytest.raises(PictureError, match="1 gated findings"):
         gates.check_picture(Edition("zh"))
-    assert repository.read(Edition("zh").picture_gates)["gated_findings"] == [named]
+    assert repository.read(Edition("zh").picture_gates)["gated_findings"] == [
+        'frame off_centre_vertical: {"02": ["0.50-3.00 80.0 px"]}'
+    ]
+
+
+@pytest.mark.usefixtures("film")
+def test_a_role_error_is_refused_where_the_frame_audit_ends_with_it(monkeypatch):
+    """A misspelt role ends the frame audit with status 1 and the error in its report
+    (frame-role.test.mjs): the gate refuses there and writes no record."""
+    audits(monkeypatch, frame(errors=[{"message": 'window.__paintRole is "frmae"', "t": 1.0}]))
+    stub = gates.tools.run
+
+    def run(tool, arguments, **options):
+        status = stub(tool, arguments, **options)
+        return 1 if tool == "frame-audit" else status
+
+    monkeypatch.setattr(gates.tools, "run", run)
+    with pytest.raises(PictureError, match="The frame-audit exited with status 1; its report is "):
+        gates.check_picture(Edition("zh"))
+    assert not Edition("zh").picture_gates.exists()
 
 
 def test_summaries_and_declared_frames_alone_pass_and_the_record_binds_the_stage(film, monkeypatch):

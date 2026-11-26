@@ -89,6 +89,23 @@ test("a lean of the outgoing scene drawn into the next segment is one run of tha
   );
 });
 
+test("a lean of exactly 1.5 s counts wherever it starts between two samples, and one of 1.25 s nowhere", () => {
+  // From 25 starting points a hundredth of a second apart, 1.5 s always holds six samples and 1.25 s five.
+  const leanFrom = (seconds, from) =>
+    stepped(
+      massRuns(MASS.step),
+      MASS.step,
+      0,
+      4,
+      () => "05",
+      (t) => massAt(t >= from - 1e-9 && t < from + seconds - 1e-9 ? -120 : 0),
+    );
+  for (let k = 0; k < 25; k++) {
+    assert.equal(leanFrom(1.5, 1 + k / 100).length, 1, `1.5 s from ${1 + k / 100} s`);
+    assert.deepEqual(leanFrom(1.25, 1 + k / 100), [], `1.25 s from ${1 + k / 100} s`);
+  }
+});
+
 test("the mass's step must divide both of rule 3's limits into whole steps", () => {
   assert.equal(MASS.step, 0.25);
   for (const step of [0.1, 0.25]) assert.doesNotThrow(() => massRuns(step));
