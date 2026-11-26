@@ -73,6 +73,7 @@ export function frameReport({
   offCentreSettled,
   offCentreFinished,
   offCentreFar,
+  declaredFrames,
   thinRuns,
   underfilled,
   textLayout,
@@ -222,6 +223,14 @@ export function frameReport({
     off_centre_finished: pxRunsByScene(offCentreFinished),
     /* Runs of 0.5 s or more whose full-size lit box stands more than 400 px off x 960 on one side, per scene. */
     off_centre_far: pxRunsByScene(offCentreFar),
+    /* The declared frame strokes the reviewers' box left out, per scene: the most in one frame and the box they span,
+     * which no gate refuses. */
+    declared_frames: Object.fromEntries(
+      Object.entries(declaredFrames).map(([id, v]) => [
+        id,
+        { strokes: v.strokes, box: v.box.map(Math.round) },
+      ]),
+    ),
     thin_runs: runsByScene(thinRuns),
     /* Thoughts whose lit picture covers less than the reviewers' share of the band at one of their instants, with the
      * instant and the share. */

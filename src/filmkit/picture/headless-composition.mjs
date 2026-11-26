@@ -10,7 +10,8 @@
  * holds a whole turn the checks' browser may paint without ink (wholeTurnAtRisk) carries each such arc in `turns`,
  * its exact start and end angles and the line of film.js that drew it, which whole-turns.mjs draws in that browser. The
  * stand-in measures a text's width by the advances of the film's declared faces when it is given them
- * (readTextMetrics), and otherwise by an estimate; geometry-check.mjs measures real metrics.
+ * (readTextMetrics), and otherwise by an estimate; geometry-check.mjs measures real metrics. Each paint also carries
+ * the role film.js declares for it, `window.__paintRole`, as `paintRole` (recordPaint).
  *
  * The composition reads each segment's `anchors` (filmkit.narration.anchors) through a recorder of the ids it reads:
  * one the timeline marks there is given as the timeline holds it, and one it does not mark is given a stand-in at the
@@ -131,11 +132,25 @@ export function wholeTurnAtRisk(a0, a1, anticlockwise = false) {
   return !anticlockwise && a1 - a0 >= turn - TURN_SHORT && Math.min(off, turn - off) > TURN_START;
 }
 
+/** The one role a composition may declare for a paint, by setting `window.__paintRole` while it paints and `null`
+ * after: a stroke drawn only to frame a stage. The balance measures leave such a stroke out (frame-audit/composition.mjs,
+ * mass-audit.mjs); the renderer draws it as any other. Seat marks' FRAME is another notion, a container's size. */
+export const DECLARED_FRAME_ROLE = "frame";
+
+/** Record on a paint the scene film.js says it is drawing and the role it declares, as the paint is handed over. It
+ * judges nothing and never throws, so every audit that shares the delivery runs as before; the composition's handle
+ * finds the role errors (openComposition's `roleErrors`). */
+export function recordPaint(paint, window) {
+  paint.scene = window.__sceneId ?? null;
+  paint.paintRole = window.__paintRole ?? null;
+  return paint;
+}
+
 /** The 2D context film.js draws on: exactly the members it uses, each refusing any other. `deliver` receives each
  * stroke, fill and text as a paint, called directly by the method painting it, so a paint can be traced into film.js.
- * fillRect lays the ground under each frame, which no audit counts as a mark, so it paints nothing. `turned()`, called
- * as an arc at risk (wholeTurnAtRisk) is drawn, names the line that drew it. */
-export function canvasStandIn(deliver, faces = null, turned = () => null) {
+ * fillRect lays the ground under each frame, which no audit counts as a mark, so it paints nothing; `filled()` is
+ * called as it is. `turned()`, called as an arc at risk (wholeTurnAtRisk) is drawn, names the line that drew it. */
+export function canvasStandIn(deliver, faces = null, turned = () => null, filled = () => {}) {
   let m = [1, 0, 0, 1, 0, 0],
     state = { ...STATE, dash: [] };
   const stack = [];
@@ -305,7 +320,9 @@ export function canvasStandIn(deliver, faces = null, turned = () => null) {
         }),
       );
     },
-    fillRect() {},
+    fillRect() {
+      filled();
+    },
   };
   return new Proxy(members, {
     get(target, key) {
@@ -333,7 +350,10 @@ export function canvasStandIn(deliver, faces = null, turned = () => null) {
  * `stageCuts` map of scene to the times of its cuts, as a Map of sets, empty for a composition that keeps none;
  * `anchorReads()`, each id read from a segment's anchors so far, once, as its segment, id, whether the timeline marks
  * it there and the scene that read it; `drawn()`, the reads of the last frame rendered, a frame that threw included;
- * and `scene()`, the scene film.js says it is drawing, which after a frame that threw is the scene that threw.
+ * `scene()`, the scene film.js says it is drawing, which after a frame that threw is the scene that threw; and
+ * `roleErrors()`, the role errors of the frame last rendered, each in words: a paint whose role is neither
+ * DECLARED_FRAME_ROLE nor null, a fill or a text under that role, and a fillRect called while any role is set, since
+ * only a stroke can be a declared frame stroke.
  *
  * The origin is the innermost line of a scene's own code on the call stack, rather than a helper that scenes share:
  * a line in a scene's body, `scenes["NN"] = function`, or in a module the bundle places in a folder below `scenes/`,
@@ -414,11 +434,27 @@ export function openComposition(timeline, { faces = null } = {}) {
     : {};
   const window = { FILM: { ...timeline, ...segments } };
   // Paints reach the caller only while it renders a frame, not while film.js paints its first frame on loading.
-  let onPaint = null;
+  let onPaint = null,
+    roleErrors = [];
+  const CALLS = { stroke: "stroke", fill: "fill", text: "fillText" };
+  const roleError = (role, call, scene) => {
+    const where = `while ${call} paints${scene ? ` in scene ${scene}` : ""}`;
+    roleErrors.push(
+      role === DECLARED_FRAME_ROLE
+        ? `window.__paintRole is "${role}" ${where}; only a stroke can be a declared frame stroke`
+        : `window.__paintRole is ${JSON.stringify(role)} ${where}; a paint's role is "${DECLARED_FRAME_ROLE}" or null`,
+    );
+  };
   function deliver(paint) {
     if (!onPaint) return;
-    paint.scene = window.__sceneId ?? null;
+    const { kind, paintRole, scene } = recordPaint(paint, window);
+    if (paintRole !== null && (paintRole !== DECLARED_FRAME_ROLE || kind !== "stroke"))
+      roleError(paintRole, CALLS[kind], scene);
     onPaint(paint);
+  }
+  function filled() {
+    if (onPaint && (window.__paintRole ?? null) !== null)
+      roleError(window.__paintRole, "fillRect", window.__sceneId ?? null);
   }
   // The line that drew an arc at risk: the innermost line of film.js below the stand-in's arc.
   function turned() {
@@ -430,7 +466,7 @@ export function openComposition(timeline, { faces = null } = {}) {
     const line = /film\.js:(\d+):\d+/.exec(trace.stack)?.[1];
     return line ? `film.js:${line}` : null;
   }
-  const context = compositionScope(window, canvasStandIn(deliver, faces, turned), 1920);
+  const context = compositionScope(window, canvasStandIn(deliver, faces, turned, filled), 1920);
   vm.runInContext(source, context, { filename: composition });
   const palette = Object.freeze({ ...vm.runInContext("P", context) });
   const framed = vm.runInContext('typeof cameraOf === "function"', context);
@@ -441,6 +477,7 @@ export function openComposition(timeline, { faces = null } = {}) {
     render(t, paints = () => {}) {
       onPaint = paints;
       drawn = [];
+      roleErrors = [];
       try {
         window.renderFrame(t);
       } finally {
@@ -449,6 +486,7 @@ export function openComposition(timeline, { faces = null } = {}) {
       return window.__filmLayout;
     },
     anchorReads: () => [...reads.values()],
+    roleErrors: () => roleErrors.slice(),
     drawn: () => drawn.slice(),
     scene: () => window.__sceneId ?? null,
     camera(segment, t) {

@@ -428,6 +428,9 @@ for (const t of frameTimes()) {
     const key = String(error.message);
     if (!errors.has(key)) errors.set(key, t);
     continue;
+  } finally {
+    // The roles film.js declared wrongly in the frame, a frame that threw included (headless-composition.mjs).
+    for (const key of film.roleErrors()) if (!errors.has(key)) errors.set(key, t);
   }
   for (const measure of measures) measure(frame);
 }
@@ -486,6 +489,7 @@ const report = frameReport({
   offCentreSettled: composition.offCentreSettled,
   offCentreFinished: composition.offCentreFinished,
   offCentreFar: composition.offCentreFar,
+  declaredFrames: composition.declaredFrames,
   thinRuns: composition.thinRuns,
   underfilled: composition.underfilled,
   textLayout: typography.finish(),

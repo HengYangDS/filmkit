@@ -9,6 +9,7 @@ import {
   REVIEWED_BAND,
   reviewedRuns,
 } from "../rules/balance.mjs";
+import { DECLARED_FRAME_ROLE } from "../headless-composition.mjs";
 import { fillShare, litAtFullSize, litLevel, strokeShare } from "../rules/ink.mjs";
 import { containerFill, FRAME, seatMarks } from "../seat-marks.mjs";
 import { emptyBox, growBox, HEAD, inHead, pointsOf, spanOf, VISIBLE } from "./marks.mjs";
@@ -170,16 +171,20 @@ export function compositionMeasures({ film, step, thoughts }) {
    * size whose extent reaches rows 120-919, a text by its box, a stroke by its path widened by half its width and a
    * fill by its path, joined per scene, the timeline segment the frame falls in, into off-centre build-ups and still
    * runs: held ones, which the next frame grows from, finished ones, which a stage cut the composition declares for
-   * the scene, or the next scene, replaces, and settled ones (rules/balance.mjs). */
+   * the scene, or the next scene, replaces, and settled ones (rules/balance.mjs). A declared frame stroke, a stroke
+   * film.js paints under DECLARED_FRAME_ROLE (headless-composition.mjs), is left out of the box and kept per scene of
+   * the paint: the most left out of one frame and the box they span (`declaredFrames`). */
   const reviewed = reviewedRuns(step),
     isLitAtFullSize = litAtFullSize(film.palette),
     offCentreBuilds = [],
     offCentreHeld = [],
     offCentreSettled = [],
     offCentreFinished = [],
-    offCentreFar = [];
+    offCentreFar = [],
+    declaredFrames = {};
   function reviewedBalance(f) {
-    const box = emptyBox();
+    const box = emptyBox(),
+      framed = new Map();
     for (const p of f.paints) {
       if (!isLitAtFullSize(p.color, p.alpha)) continue;
       if (p.kind === "text" && !p.text.trim()) continue;
@@ -188,6 +193,15 @@ export function compositionMeasures({ film, step, thoughts }) {
       const half = p.kind === "stroke" ? (p.lineWidth * p.scale) / 2 : 0,
         [x0, y0, x1, y1] = spanOf(points);
       if (Math.min(y1 + half, REVIEWED_BAND[1]) < Math.max(y0 - half, REVIEWED_BAND[0])) continue;
+      if (p.kind === "stroke" && p.paintRole === DECLARED_FRAME_ROLE) {
+        const scene = p.scene ?? "none",
+          seen = (declaredFrames[scene] ??= { strokes: 0, box: emptyBox() });
+        framed.set(scene, (framed.get(scene) ?? 0) + 1);
+        seen.strokes = Math.max(seen.strokes, framed.get(scene));
+        growBox(seen.box, [x0 - half, y0 - half]);
+        growBox(seen.box, [x1 + half, y1 + half]);
+        continue;
+      }
       growBox(box, [x0 - half, Math.max(y0 - half, REVIEWED_BAND[0])]);
       growBox(box, [x1 + half, Math.min(y1 + half, REVIEWED_BAND[1])]);
     }
@@ -315,6 +329,7 @@ export function compositionMeasures({ film, step, thoughts }) {
     offCentreSettled,
     offCentreFinished,
     offCentreFar,
+    declaredFrames,
     thinRuns,
     underfilled,
   };

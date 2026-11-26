@@ -22,6 +22,7 @@ import {
   canvasStandIn,
   openComposition as openHeadless,
   readTextMetrics,
+  recordPaint,
 } from "./headless-composition.mjs";
 
 /* The film's Python, as its environment holds the engine: uv's environment of the film, used as it stands. */
@@ -59,8 +60,7 @@ export async function openModules(code, timeline, entry) {
   let onPaint = null;
   const context = canvasStandIn((paint) => {
     if (!onPaint) return;
-    paint.scene = globalThis.window.__sceneId ?? null;
-    onPaint(paint);
+    onPaint(recordPaint(paint, globalThis.window));
   });
   const elements = { picture: { getContext: () => context }, film: { dataset: { width: "1920" } } };
   globalThis.window = { FILM: editionOf(code, timeline) };
