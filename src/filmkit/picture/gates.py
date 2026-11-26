@@ -37,6 +37,13 @@ line or module and its kind records it with the exception's reason instead; an
 exception that matches no finding of the edition is gated as stale.
 The detail audit's findings and the frame audit's runs far off centre are gated and declared as
 `filmkit.picture.detail_gates` states.
+Balance is also measured on the content (measure-balance-on-content): the mass audit draws the
+edition's uncaptioned stage as the renderer draws it, with the renderer's text renderer, and each
+run through which the mass of a scene's lit paints stands more than 90 px off x 960 is gated by its
+scene, span and offset, as is each still state the frame audit finds more than 50 px off y 510
+(`off_centre_vertical`); each scene's mass summary and the declared frame strokes stand in the
+reports the record binds and refuse nothing. The record binds the uncaptioned stage by its
+record's SHA-256, and a check whose stage has no record refuses before any audit starts.
 `render-picture` reads the record before it starts the renderer
 (`filmkit.picture.rendering.require_passing_gates`).
 
@@ -57,10 +64,12 @@ import filmkit.released as released
 import filmkit.repository as repository
 import filmkit.tools as tools
 from filmkit.film import FILM
+from filmkit.graph import target
 from filmkit.narration import anchors
-from filmkit.picture import anchor_reads, metrics, sync_audit, text_trace
+from filmkit.picture import anchor_reads, metrics, renderer, sync_audit, text_trace
 from filmkit.picture.detail_gates import detail_findings
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, PictureError, face_bindings
+from filmkit.production import STAGE_RECORD
 
 if TYPE_CHECKING:
     from filmkit.film import Motion, Wrapping
@@ -96,6 +105,8 @@ FRAME_GATES = (
     "off_centre_held",
     "off_centre_settled",
     "off_centre_finished",
+    # Rule 3 of the fused DDWG film: a still state of the scene drawn more than 50 px off y 510.
+    "off_centre_vertical",
     "sparse_runs",
     "thin_lit",
     "thin_runs",
@@ -158,6 +169,16 @@ def gated_findings(frame: dict, sync: dict, motion: dict) -> list[str]:
         if run["seconds"] > STILL_LIMIT
     ]
     return findings
+
+
+def mass_findings(mass: dict) -> list[str]:
+    """The mass audit's gated findings: each run through which a scene's mass stands more than
+    90 px off x 960, by its scene, span and largest signed offset."""
+    return [
+        f"mass off_centre_mass {scene}: {run}"
+        for scene, runs in sorted(mass["off_centre_mass"].items())
+        for run in runs
+    ]
 
 
 def text_findings(texts: dict) -> list[str]:
@@ -403,19 +424,35 @@ def motion_findings(motion: dict, policy: Motion, code: str) -> tuple[list[str],
 
 def bound_inputs(edition: Edition) -> dict[str, Path]:
     """The inputs a gate record binds besides the faces, by the key of each one's SHA-256: the
-    composition, the timeline, and the film's declaration, whose wrapping, motion and detail
-    exceptions the gates apply."""
+    composition, the timeline, the film's declaration, whose wrapping, motion and detail
+    exceptions the gates apply, and the record of the uncaptioned stage the mass audit draws,
+    which binds the stage's inputs and each member it copies."""
     return {
         "composition_sha256": repository.ROOT / COMPOSITION_SCRIPT,
         "timeline_sha256": edition.timeline,
         "declaration_sha256": repository.ROOT / repository.DECLARATION,
+        "uncaptioned_stage_sha256": edition.rendered(False).stage / STAGE_RECORD,
     }
+
+
+def require_uncaptioned_stage(edition: Edition) -> Path:
+    """The uncaptioned stage the mass audit draws, refused where it has no record yet."""
+    stage = edition.rendered(False).stage
+    if not (stage / STAGE_RECORD).is_file():
+        msg = (
+            f"No staged picture document and record in {repository.relative(stage)}; run "
+            f"{target('stage-picture-uncaptioned', edition.code)}"
+        )
+        raise PictureError(msg)
+    return stage
 
 
 def current_bindings(edition: Edition) -> dict:
     """What a gate record binds: each input's SHA-256 (`bound_inputs`), the engine version, and
     the stylesheet and fonts from which the audits measure text. The render's check reads this
-    function (`filmkit.picture.rendering.require_passing_gates`)."""
+    function (`filmkit.picture.rendering.require_passing_gates`). An uncaptioned stage without a
+    record is refused (`require_uncaptioned_stage`)."""
+    require_uncaptioned_stage(edition)
     digests = {key: repository.sha(path) for key, path in bound_inputs(edition).items()}
     return {**digests, "engine_version": released.version(), **face_bindings()}
 
@@ -446,13 +483,14 @@ def run_audit(tool: str, arguments: list[str], out: Path, environment: dict | No
 def check_picture(edition: Edition) -> dict:
     """Audit the edition's current picture, write its gate record and refuse a gated finding."""
     anchors.require_placed(repository.read(edition.timeline), edition.code)
+    stage = require_uncaptioned_stage(edition)
     work = repository.ROOT / WORK / edition.code
     work.mkdir(parents=True, exist_ok=True)
     bound = current_bindings(edition)
     timeline = str(edition.timeline)
     frame_path, trace, marks = work / "frame.json", work / "trace.tsv", work / "marks.tsv"
     sync_path, motion_path = work / "sync.json", work / "motion.json"
-    detail_path = work / "detail.json"
+    detail_path, mass_path = work / "detail.json", work / "mass.json"
     texts_trace, texts_path = work / "texts.tsv", work / "texts.json"
     turns_path, painted_path = work / "turns.json", work / "whole-turns.json"
     faces = {metrics.VARIABLE: str(metrics.current_table())}
@@ -467,13 +505,16 @@ def check_picture(edition: Edition) -> dict:
     frame_faces = {**traces, WRAPPING_VARIABLE: str(rules), **faces}
     motion = [timeline, str(MOTION_FPS), "--out", str(motion_path)]
     detail = [timeline, "--out", str(detail_path)]
-    # The three audits read the composition and the timeline and write files of their own.
+    mass = [str(stage), "--text-renderer", renderer.TEXT_RENDERER]
+    # The frame, motion and detail audits read the composition and the timeline, the mass audit
+    # the uncaptioned stage, and each writes files of its own.
     try:
         run_audits(
             [
                 ("frame-audit", [timeline, f"{FRAME_STEP:.7f}"], frame_path, frame_faces),
                 ("motion-audit", motion, work / "motion-summary.json", faces),
                 ("detail-audit", detail, work / "detail-summary.json", faces),
+                ("mass-audit", mass, mass_path, None),
             ]
         )
     except PictureError as error:
@@ -497,7 +538,7 @@ def check_picture(edition: Edition) -> dict:
     texts = text_trace.report(repository.read(edition.timeline), lines, FRAME_STEP)
     repository.write(texts_path, texts)
     if current_bindings(edition) != bound:
-        msg = "The composition or the timeline changed while it was checked"
+        msg = "The composition, the timeline or the uncaptioned stage changed while it was checked"
         raise PictureError(msg)
     frame, motion = repository.read(frame_path), repository.read(motion_path)
     wrapped, declared = wrapping_findings(frame, wrapping, edition.code)
@@ -511,13 +552,14 @@ def check_picture(edition: Edition) -> dict:
         edition.code,
     )
     findings = gated_findings(frame, sync, motion) + turned + text_findings(texts)
-    findings += wrapped + moved + detailed + unread
+    findings += wrapped + moved + detailed + mass_findings(repository.read(mass_path)) + unread
     reports = [
         ("frame", frame_path),
         ("sync", sync_path),
         ("texts", texts_path),
         ("motion", motion_path),
         ("detail", detail_path),
+        ("mass", mass_path),
     ]
     reports += [("whole_turns", painted_path)] if draws else []
     record = {

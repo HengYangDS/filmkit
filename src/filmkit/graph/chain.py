@@ -300,7 +300,15 @@ TABLE = (
     ),
     Node(
         "check-picture",
-        {"default": lambda e: pictured(e) | named(picture_gates.bound_inputs(e)) | faces()},
+        # The mass audit draws the uncaptioned stage, so the check follows its staging.
+        {
+            "default": lambda e: (
+                pictured(e)
+                | named(picture_gates.bound_inputs(e))
+                | faces()
+                | stage(e, captions=False)
+            )
+        },
         lambda e: {
             "picture_gates": e.picture_gates,
             "reports": Folder(work("picture-gates/{code}")(e), "*"),

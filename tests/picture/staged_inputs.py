@@ -5,9 +5,9 @@ staging (`test_staging.py`) and rendering (`test_rendering.py`), which register 
 import json
 import shutil
 
+import filmkit.picture.gates as picture_gates
 import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
-import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.production import Edition
 
@@ -59,23 +59,17 @@ def root(tmp_path, monkeypatch):
 
 
 def passing_gates(edition, **changes):
-    """A gate record that check-picture passed for the edition's current picture."""
-    composition = repository.ROOT / picture_rendering.COMPOSITION_SCRIPT
-    record = {
-        "composition_sha256": repository.sha(composition),
-        "timeline_sha256": repository.sha(edition.timeline),
-        "declaration_sha256": repository.sha(repository.ROOT / repository.DECLARATION),
-        "engine_version": released.version(),
-        **picture_rendering.face_bindings(),
-        "verdict": "pass",
-        **changes,
-    }
+    """A gate record that check-picture passed for the edition's current picture, with every
+    binding the gate records (`picture_gates.current_bindings`), changed as `changes` says."""
+    record = {**picture_gates.current_bindings(edition), "verdict": "pass", **changes}
     put(edition.picture_gates, record)
 
 
 def staged():
-    """The Chinese edition, staged complete at the UHD frame, its picture checked."""
+    """The Chinese edition, both its pictures staged complete at the UHD frame, its picture
+    checked."""
     edition = Edition("zh")
-    picture_rendering.stage_picture(edition, None, RUNTIME, 3840, 2160)
+    for captions in (True, False):
+        picture_rendering.stage_picture(edition, None, RUNTIME, 3840, 2160, captions=captions)
     passing_gates(edition)
     return edition

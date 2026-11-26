@@ -44,6 +44,24 @@ CLEAN = {
         "rails": [],
     },
     "texts": opening("示例影片", 2.0),
+    # The mass audit's report of a picture whose weight stands within 90 px of x 960 throughout.
+    "mass": {
+        "canvas": [1920, 1080],
+        "step": 0.1,
+        "frames": [],
+        "off_centre_mass": {},
+        "mass_balance": {
+            "03": {
+                "frames": 30,
+                "faint": 0,
+                "declared": 0,
+                "median_dx": -12.0,
+                "median_dy": 4.0,
+                "within": 1.0,
+            }
+        },
+        "outside_scenes": 0,
+    },
 }
 # A caption cue that labels drawn during it repeat, as the sync audit lists it.
 ECHO = {

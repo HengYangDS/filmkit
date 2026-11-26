@@ -16,9 +16,9 @@ from pathlib import Path
 
 import pytest
 
+import filmkit.picture.gates as picture_gates
 import filmkit.picture.renderer as picture_renderer
 import filmkit.picture.rendering as picture_rendering
-import filmkit.released as released
 import filmkit.repository as repository
 from filmkit.production import Edition
 
@@ -90,16 +90,9 @@ class FilmRoot:
         put(edition.timeline, {**timeline, "captions": list(captions)})
 
     def checked(self, edition: Edition) -> None:
-        """Record that check-picture passed the edition's current picture."""
-        record = {
-            "composition_sha256": repository.sha(self.path / picture_rendering.COMPOSITION_SCRIPT),
-            "timeline_sha256": repository.sha(edition.timeline),
-            "declaration_sha256": repository.sha(self.path / repository.DECLARATION),
-            "engine_version": released.version(),
-            **picture_rendering.face_bindings(),
-            "verdict": "pass",
-        }
-        put(edition.picture_gates, record)
+        """Record that check-picture passed the edition's current picture: every binding the gate
+        records, its uncaptioned stage's among them (`picture_gates.current_bindings`)."""
+        put(edition.picture_gates, {**picture_gates.current_bindings(edition), "verdict": "pass"})
 
     def staged(self, edition: Edition) -> None:
         """Stage both of the edition's pictures complete and record their passing check."""

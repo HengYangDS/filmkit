@@ -26,7 +26,7 @@ import filmkit.repository as repository
 from filmkit.film import FILM, Motion, Wrapping
 from filmkit.picture.metrics import VARIABLE
 from filmkit.picture.rendering import COMPOSITION_SCRIPT, STYLE, PictureError
-from filmkit.production import Edition
+from filmkit.production import STAGE_RECORD, Edition
 
 # The sample film, whose stylesheet and fonts the gate's film declares.
 SAMPLE = Path(__file__).resolve().parents[2] / "examples/sample-film"
@@ -41,7 +41,7 @@ def put(path, data):
 @pytest.fixture
 def film(tmp_path, monkeypatch):
     """A film root with a composition, the sample film's stylesheet and fonts, and the Chinese
-    edition's timeline."""
+    edition's timeline and uncaptioned stage record."""
     root = tmp_path.resolve()
     monkeypatch.setattr(repository, "ROOT", root)
     put(root / COMPOSITION_SCRIPT, "scenes = {};\n")
@@ -51,6 +51,7 @@ def film(tmp_path, monkeypatch):
         shutil.copyfile(SAMPLE / path, root / path)
     segment = {"id": "01", "words": [{"text": "构建", "start": 2.0, "end": 2.4}]}
     put(Edition("zh").timeline, {"title": "示例影片", "segments": [segment], "captions": []})
+    put(Edition("zh").rendered(False).stage / STAGE_RECORD, {"picture": "uncaptioned"})
     return root
 
 
@@ -73,6 +74,8 @@ def audits(monkeypatch, reports, *, change=None):
         elif tool == "whole-turns":
             assert repository.read(Path(arguments[0])) == {"draws": reports["turns"]}
             put(stdout, reports["painted"])
+        elif tool == "mass-audit":
+            put(stdout, reports["mass"])
         else:
             put(stdout, {"summary": True})
             report = reports["detail" if tool == "detail-audit" else "motion"]
@@ -115,14 +118,14 @@ def test_a_clean_picture_writes_a_passing_record_of_what_it_checked(film, monkey
         font: repository.sha(film / font) for font in FILM.picture.fonts
     }
     assert record["frames_checked"] == 301
-    assert sorted(record["reports"]) == ["detail", "frame", "motion", "sync", "texts"]
+    assert sorted(record["reports"]) == ["detail", "frame", "mass", "motion", "sync", "texts"]
     for report in record["reports"].values():
         assert report["sha256"] == repository.sha(film / report["path"])
     # The frame audit runs at one thirtieth of a second with its traces, the motion audit at
     # 30 frames per second and the detail audit at its own rate, each on the edition's timeline.
-    # The three audits run at the same time, so their calls arrive in any order.
+    # The four audits run at the same time, so their calls arrive in any order.
     by_tool = {call[0]: call for call in calls}
-    assert sorted(by_tool) == ["detail-audit", "frame-audit", "motion-audit"]
+    assert sorted(by_tool) == ["detail-audit", "frame-audit", "mass-audit", "motion-audit"]
     (frame_tool, frame_args, frame_env), (motion_tool, motion_args, motion_env), detail = (
         by_tool[tool] for tool in ("frame-audit", "motion-audit", "detail-audit")
     )
@@ -536,7 +539,8 @@ def test_the_browser_draws_each_whole_turn_once_and_a_start_without_ink_refuses(
         " browser from 1 of its 1 starts; draw it as ellipse(x, y, r, r, start, 0, 2 * Math.PI)"
     ]
     # The browser draws the whole turns once the frame audit, which lists them, has ended.
-    assert sorted(call[0] for call in calls[:3]) == ["detail-audit", "frame-audit", "motion-audit"]
-    assert calls[3][0] == "whole-turns"
-    reports = ["detail", "frame", "motion", "sync", "texts", "whole_turns"]
+    audited = ["detail-audit", "frame-audit", "mass-audit", "motion-audit"]
+    assert sorted(call[0] for call in calls[:4]) == audited
+    assert calls[4][0] == "whole-turns"
+    reports = ["detail", "frame", "mass", "motion", "sync", "texts", "whole_turns"]
     assert sorted(record["reports"]) == reports

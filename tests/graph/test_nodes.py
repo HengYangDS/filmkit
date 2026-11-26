@@ -318,6 +318,13 @@ def test_the_geometry_check_binds_the_timeline_whose_runtime_its_record_must_cov
     assert node.inputs(edition)["timeline"] == edition.timeline
 
 
+def test_the_picture_gate_reads_the_uncaptioned_stage_its_mass_audit_draws():
+    node, edition = chain.table().node("check-picture:zh")
+    assert node.inputs(edition)["stage"] == Folder(edition.rendered(False).stage, "**/*")
+    up = chain.table().upstream("check-picture:zh")
+    assert nodes.key("stage-picture-uncaptioned", "zh") in up
+
+
 @pytest.mark.parametrize("name", ["render-picture", "render-picture-uncaptioned"])
 def test_a_render_reads_the_declaration_aside_and_does_not_bind_it(name):
     # Task 10.2's recorder found each render reading content/film.toml: it holds the picture

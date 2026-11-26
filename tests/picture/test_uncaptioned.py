@@ -121,6 +121,10 @@ def test_a_stage_record_that_names_no_picture_is_the_captioned_one(edition):
 
 def test_the_uncaptioned_picture_renders_to_its_own_file_and_receipt(edition):
     picture_rendering.stage_picture(edition, None, edition.runtime, 3840, 2160, captions=False)
+    # The check binds the stage it measured: the record gains it once the stage exists.
+    record = repository.read(edition.picture_gates)
+    stage = repository.sha(edition.rendered(False).stage / STAGE_RECORD)
+    put(edition.picture_gates, {**record, "uncaptioned_stage_sha256": stage})
     picture_rendering.render_picture(edition, 60, captions=False)
     rendered = edition.rendered(False)
     receipt = repository.read(rendered.receipt)
