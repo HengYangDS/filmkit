@@ -163,7 +163,7 @@ const SOURCES = [
 ];
 
 function sourcesScene(s, t, alpha) {
-  text(L("一部影片的源文件", "A film’s sources"), 960, 330, {
+  text(L("一部影片的源文件", "A film’s sources"), 960, 382, {
     size: NOTE,
     color: P.muted,
     alpha,
@@ -172,12 +172,12 @@ function sourcesScene(s, t, alpha) {
   SOURCES.forEach(([name, nameId, note, noteId, kind], i) => {
     const x = 350 + i * 440;
     const here = alpha * (i === 1 ? 1 : shown(t, cue(s, "film")));
-    card(x, 420, 340, 170, here);
-    outline(x, 420, 340, 170, lit, P.accent);
+    card(x, 472, 340, 170, here);
+    outline(x, 472, 340, 170, lit, P.accent);
     const named = shown(t, cue(s, nameId));
-    tag(kind, x, 420, here * (1 - named));
-    text(name, x + 170, 495, { size: LABEL, alpha: alpha * named });
-    text(note, x + 170, 550, {
+    tag(kind, x, 472, here * (1 - named));
+    text(name, x + 170, 547, { size: LABEL, alpha: alpha * named });
+    text(note, x + 170, 602, {
       size: NOTE,
       color: P.muted,
       alpha: alpha * shown(t, cue(s, noteId)),
@@ -197,36 +197,36 @@ const STAGES = [
  * named already, those up to `to` are named as the narration names them, and the rest are named in the next scene. The
  * first scene shows what keeps a rebuild's voice the same, the second that the build stays offline. */
 function buildScene(s, t, alpha, from, to) {
-  text(L("构建的步骤", "Build steps"), 960, 330, { size: NOTE, color: P.muted, alpha });
+  text(L("构建的步骤", "Build steps"), 960, 382, { size: NOTE, color: P.muted, alpha });
   STAGES.forEach(([name, id], i) => {
     const x = 206 + i * 312;
-    card(x, 440, 260, 140, alpha);
+    card(x, 492, 260, 140, alpha);
     const named = i < from ? 1 : i < to ? shown(t, cue(s, id)) : 0;
-    tag(L(`步骤 ${i + 1}`, `Step ${i + 1}`), x, 440, alpha * (1 - named));
-    text(name, x + 130, 524, { size: LABEL, alpha: alpha * named });
+    tag(L(`步骤 ${i + 1}`, `Step ${i + 1}`), x, 492, alpha * (1 - named));
+    text(name, x + 130, 576, { size: LABEL, alpha: alpha * named });
   });
   if (from === 0) {
     const seed = alpha * shown(t, cue(s, "fixed-seed"));
-    text(L("固定的种子", "A fixed seed"), 336, 630, { size: NOTE, color: P.muted, alpha: seed });
+    text(L("固定的种子", "A fixed seed"), 336, 682, { size: NOTE, color: P.muted, alpha: seed });
     const same = alpha * shown(t, cue(s, "same-voice"));
-    text(L("声音都一样", "The same voice"), 336, 680, { size: NOTE, color: P.done, alpha: same });
+    text(L("声音都一样", "The same voice"), 336, 732, { size: NOTE, color: P.done, alpha: same });
     return;
   }
   const offline = alpha * shown(t, cue(s, "offline"));
   line(
     [
-      [176, 400],
-      [1744, 400],
-      [1744, 620],
-      [176, 620],
-      [176, 400],
+      [176, 452],
+      [1744, 452],
+      [1744, 672],
+      [176, 672],
+      [176, 452],
     ],
     offline,
     { color: P.accent, width: 2, dash: [14, 10] },
   );
-  text(L("不联网", "Offline"), 960, 385, { size: NOTE, color: P.accent, alpha: offline });
+  text(L("不联网", "Offline"), 960, 437, { size: NOTE, color: P.accent, alpha: offline });
   const kept = alpha * shown(t, cue(s, "build-folder"));
-  text(L("所有文件都留在构建目录", "Everything stays in the build folder"), 960, 680, {
+  text(L("所有文件都留在构建目录", "Everything stays in the build folder"), 960, 732, {
     size: NOTE,
     color: P.muted,
     alpha: kept,
@@ -249,21 +249,21 @@ const ITEM_LEFT = CHECK_RIGHT + 26;
 /* Each film beside its sources, and between them what the check covers; each item is marked as it is said to match,
  * and the check completes when everything does. */
 function checkScene(s, t, alpha) {
-  text(L("核对成片", "Checking the films"), 960, 330, { size: NOTE, color: P.muted, alpha });
+  text(L("核对成片", "Checking the films"), 960, 382, { size: NOTE, color: P.muted, alpha });
   const complete = alpha * shown(t, cue(s, "everything"));
   for (const [x, kind, name, id] of [
     [330, ".mp4", L("成片", "Films"), "film"],
     [1290, ".json .wav .js", L("源文件", "Sources"), "sources"],
   ]) {
-    card(x, 425, 300, 170, alpha);
-    outline(x, 425, 300, 170, complete, P.done);
+    card(x, 477, 300, 170, alpha);
+    outline(x, 477, 300, 170, complete, P.done);
     const named = shown(t, cue(s, id));
-    tag(kind, x, 425, alpha * (1 - named));
-    text(name, x + 150, 523, { size: LABEL, alpha: alpha * named });
+    tag(kind, x, 477, alpha * (1 - named));
+    text(name, x + 150, 575, { size: LABEL, alpha: alpha * named });
   }
   const matched = alpha * shown(t, cue(s, "match"));
   CHECKED.forEach(([name, id], i) => {
-    const y = 440 + i * 45;
+    const y = 492 + i * 45;
     text(name, ITEM_LEFT, y, {
       size: NOTE,
       align: "left",
@@ -279,7 +279,7 @@ function checkScene(s, t, alpha) {
       { color: P.done, width: 4 },
     );
   });
-  text(L("完成", "Complete"), 960, 700, {
+  text(L("完成", "Complete"), 960, 752, {
     size: LABEL,
     color: P.done,
     alpha: alpha * shown(t, cue(s, "complete")),
