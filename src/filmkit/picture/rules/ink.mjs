@@ -87,22 +87,29 @@ export function litAtFullSize(palette) {
  * own pixels. */
 export const MASS_LIT_GRAY = 60;
 export function massLit(pixels, width, [top, bottom]) {
-  // The luma in ten-thousandths, summed over a cell's sixteen pixels, against the threshold at that scale.
-  const [wr, wg, wb] = [2126, 7152, 722],
-    threshold = MASS_LIT_GRAY * 16 * 10000,
+  // Each channel is summed over a cell's sixteen pixels; the luma of the sums, in ten-thousandths, is sixteen times
+  // the luma of the mean colour, and is compared with the threshold at that scale.
+  const threshold = MASS_LIT_GRAY * 16 * 10000,
     columns = width / 4,
-    sums = new Float64Array(columns);
+    red = new Uint32Array(columns),
+    green = new Uint32Array(columns),
+    blue = new Uint32Array(columns);
   let cells = 0,
     x = 0,
     y = 0;
   for (let row = Math.floor(top / 4); row <= Math.floor(bottom / 4); row++) {
-    sums.fill(0);
+    red.fill(0);
+    green.fill(0);
+    blue.fill(0);
     for (let line = row * 4; line < row * 4 + 4; line++)
       for (let at = line * width * 4, column = 0; column < columns; column++)
-        for (let k = 0; k < 4; k++, at += 4)
-          sums[column] += wr * pixels[at] + wg * pixels[at + 1] + wb * pixels[at + 2];
+        for (let k = 0; k < 4; k++, at += 4) {
+          red[column] += pixels[at];
+          green[column] += pixels[at + 1];
+          blue[column] += pixels[at + 2];
+        }
     for (let column = 0; column < columns; column++)
-      if (sums[column] > threshold) {
+      if (2126 * red[column] + 7152 * green[column] + 722 * blue[column] > threshold) {
         cells++;
         x += column * 4 + 2;
         y += row * 4 + 2;
