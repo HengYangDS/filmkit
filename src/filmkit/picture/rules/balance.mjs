@@ -1,12 +1,17 @@
-/** Balance as the reviewers measure it: the content band runs from 120 to 900 px, so a picture's box stands off the
- * content centre (960, 510) by these shares of the frame's width and height. A thought's picture may stand at most 12%
- * off two seconds into the thought and at most 8% off 70% through it, and its box must cover at least 5% and 10% of
- * the band at those instants. */
+/** The content centre, from which the reviewers and the fused film's rule 3 measure a picture's balance: x 960, the
+ * frame's middle, and y 510, the middle of the content band from 120 to 900 px. The offsets, the reviewers' runs, the
+ * mass and the vertical runs read it here; a thought's union box keeps its own centre (frame-audit/report.mjs). */
+export const CONTENT_CENTRE = [960, 510];
+
+/** Balance as the reviewers measure it: a picture's box stands off the content centre by these shares of the frame's
+ * width and height. A thought's picture may stand at most 12% off two seconds into the thought and at most 8% off 70%
+ * through it, and its box must cover at least 5% and 10% of the band at those instants. */
 export const BALANCE_BAND = [120, 900],
   BALANCE_LIMITS = { two: 0.12, late: 0.08 },
   COVER_LIMITS = { two: 0.05, late: 0.1 };
 export function pictureOffset([x0, y0, x1, y1]) {
-  return [((x0 + x1) / 2 - 960) / 1920, ((y0 + y1) / 2 - 510) / 1080];
+  const [cx, cy] = CONTENT_CENTRE;
+  return [((x0 + x1) / 2 - cx) / 1920, ((y0 + y1) / 2 - cy) / 1080];
 }
 export function bandCover([x0, y0, x1, y1]) {
   const [top, bottom] = BALANCE_BAND;
@@ -145,7 +150,7 @@ export function reviewedRuns(step) {
   };
   return {
     frame(t, scene, box, cut = false) {
-      const dx = box ? (box[0] + box[2]) / 2 - 960 : 0,
+      const dx = box ? (box[0] + box[2]) / 2 - CONTENT_CENTRE[0] : 0,
         far = Boolean(box) && Math.abs(dx) > REVIEWED_SETTLED.px,
         last = trail.at(-1);
       if (box && Math.abs(dx) > REVIEWED_BUILD.px) {
