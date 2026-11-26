@@ -53,7 +53,7 @@ The mass audit SHALL reduce each frame it draws to a 480 × 270 grey, each cell 
 
 ### Requirement: The mass audit weighs each frame's lit scene paints
 
-The mass audit SHALL draw the edition's uncaptioned stage on the renderer's native canvas at 1920 × 1080 every 0.1 s with the renderer's text renderer, drawing the ground the composition lays with `fillRect` and every paint of the scene being drawn, and leaving out every paint of no scene and every declared frame stroke. A frame of 40 lit cells or more SHALL have a mass centre, the mean of its lit cells' centres; one of fewer has none.
+The mass audit SHALL draw the edition's uncaptioned stage on the renderer's native canvas at 1920 × 1080 every 0.25 s with the renderer's text renderer, drawing the ground the composition lays with `fillRect` and every paint of the scene being drawn, and leaving out every paint of no scene and every declared frame stroke. A frame of 40 lit cells or more SHALL have a mass centre, the mean of its lit cells' centres; one of fewer has none.
 
 #### Scenario: A thin line over the ground
 
@@ -111,12 +111,12 @@ The mass audit SHALL report per scene drawn each run of 1.5 s or more through wh
 
 #### Scenario: The outgoing scene drawn into the next segment
 
-- **WHEN** the next segment's timeline starts while the composition still draws the outgoing scene for 1.2 s, until the incoming scene's cut, and the outgoing scene's mass stands 120 px left from 0.5 s before the segment starts to its cut
-- **THEN** the mass audit reports one run for the outgoing scene, 1.7 s long, spanning the segment's start
+- **WHEN** the next segment's timeline starts while the composition still draws the outgoing scene for 1.25 s, until the incoming scene's cut, and the outgoing scene's mass stands 120 px left from 0.5 s before the segment starts to its cut
+- **THEN** the mass audit reports one run for the outgoing scene, 1.75 s long, spanning the segment's start
 
 #### Scenario: A brief lean is not a run
 
-- **WHEN** the mass stands 120 px left for 1.4 s and then within 90 px
+- **WHEN** the mass stands 120 px left for 1.2 s and then within 90 px
 - **THEN** the mass audit reports no run
 
 #### Scenario: A lean of exactly 90 px
@@ -126,7 +126,7 @@ The mass audit SHALL report per scene drawn each run of 1.5 s or more through wh
 
 #### Scenario: A frame without a mass inside a lean
 
-- **WHEN** a frame without a mass centre falls 1.2 s into 2.4 s through which the mass stands 120 px left
+- **WHEN** a frame without a mass centre falls 1.25 s into 2.5 s through which the mass stands 120 px left
 - **THEN** the mass audit reports no run, since neither part lasts 1.5 s
 
 ### Requirement: The mass audit summarises each scene's weight

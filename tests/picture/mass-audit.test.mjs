@@ -150,22 +150,23 @@ test("names leaning left between rails make a mass run, declared or not; centred
   assert.deepEqual((await measured(LEANING(true, 960), { seconds: 3 })).off_centre_mass, {});
   // Each scene's summary: the frames it was measured in, the median offsets and the share within 90 px.
   const summary = declared.mass_balance["01"];
-  assert.equal(summary.frames, 30);
+  // Three seconds at the audit's step of 0.25 s.
+  assert.equal(summary.frames, 12);
   assert.equal(summary.faint, 0);
   assert.ok(near(summary.median_dx, -150, 4) && near(summary.median_dy, 0, 4));
   assert.equal(summary.within, 0);
 });
 
 test("the outgoing scene drawn into the next segment keeps its run past the segment's start", async () => {
-  // The next segment starts at 0.5 s, and the composition draws scene 03 until the incoming scene's cut at 1.7 s,
-  // 1.2 s into it, its mass 120 px left from 0 s; then scene 04 stands centred. The audit reads no segment: the run is
-  // the scene drawn's, one of 1.7 s across the segment's start.
+  // The next segment starts at 0.5 s, and the composition draws scene 03 until the incoming scene's cut at 1.75 s,
+  // 1.25 s into it, its mass 120 px left from 0 s; then scene 04 stands centred. The audit reads no segment: the run
+  // is the scene drawn's, one of 1.75 s across the segment's start.
   const report = await measured(
-    'if (t < 1.65) { window.__sceneId = "03"; box(680, 470, 1000, 550); }' +
+    'if (t < 1.7) { window.__sceneId = "03"; box(680, 470, 1000, 550); }' +
       ' else { window.__sceneId = "04"; box(800, 470, 1120, 550); }',
     { seconds: 3 },
   );
-  assert.deepEqual(report.off_centre_mass, { "03": ["0.00-1.70 -120.0 px"] });
+  assert.deepEqual(report.off_centre_mass, { "03": ["0.00-1.75 -120.0 px"] });
   // Every frame is accounted for: weighed in a scene, too faint to weigh, or drawn outside every scene.
   const counted = Object.values(report.mass_balance).reduce((n, v) => n + v.frames + v.faint, 0);
   assert.equal(counted + report.outside_scenes, report.frames.length);

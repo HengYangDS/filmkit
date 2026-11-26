@@ -207,9 +207,11 @@ export function reviewedRuns(step) {
 /** Balance on the content, as the fused DDWG film's rule 3 sets it (its design, §14; the owner's D-69 and D-70 of 25
  * November 2026): the lit picture's mass may stand more than 90 px off x 960 for less than 1.5 s, moving or not, and
  * a still box more than 50 px off y 510 for less than 2 s. The mass is the mean centre of a frame's lit cells, which a
- * frame of fewer than 40 has not (`balance79.py`'s floor); the mass audit samples every `step` seconds. A still box
- * keeps its four edges within 4 px of where they stood when it began. */
-export const MASS = { px: 90, seconds: 1.5, cells: 40, step: 0.1 },
+ * frame of fewer than 40 has not (`balance79.py`'s floor). The mass audit samples every `step` seconds: at 0.25 s six
+ * samples make exactly 1.5 s, so a lean as long as the limit always counts, and on a film of 713 s the audit stays
+ * inside the frame audit's time (measure-balance-on-content, design decision 1). A still box keeps its four edges
+ * within 4 px of where they stood when it began. */
+export const MASS = { px: 90, seconds: 1.5, cells: 40, step: 0.25 },
   VERTICAL = { px: 50, seconds: 2, still: 4 };
 
 /* Whether a run of samples, each one step long, from `start` to `end` lasts `least` seconds. */

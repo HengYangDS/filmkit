@@ -47,7 +47,7 @@ CLEAN = {
     # The mass audit's report of a picture whose weight stands within 90 px of x 960 throughout.
     "mass": {
         "canvas": [1920, 1080],
-        "step": 0.1,
+        "step": 0.25,
         "frames": [],
         "off_centre_mass": {},
         "mass_balance": {
