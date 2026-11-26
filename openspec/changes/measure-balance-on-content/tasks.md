@@ -65,7 +65,7 @@ Shown by the new `tests/picture/test_mass_gates.py`, by `tests/picture/test_gate
 
 ## 9. The words
 
-- [ ] 9.1 Add the release's entry under `Unreleased` in `CHANGELOG.md`, under `Changed` and marked **Breaking:**, as design decision 11 states it, naming each sample stage task 6.4 recomposed and saying, for a film that adopts, that a declared frame still counts toward cover and that a stage without its frame meets the cover gates at its opening (design decision 7). Done when `mise run check`'s Markdown check passes.
+- [x] 9.1 Add the release's entry under `Unreleased` in `CHANGELOG.md`, under `Changed` and marked **Breaking:**, as design decision 11 states it, naming each sample stage task 6.4 recomposed and saying, for a film that adopts, that a declared frame still counts toward cover and that a stage without its frame meets the cover gates at its opening (design decision 7). Done when `mise run check`'s Markdown check passes.
 
 ## 10. The size gate
 
