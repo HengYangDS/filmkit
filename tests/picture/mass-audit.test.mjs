@@ -61,7 +61,31 @@ test("a stage record that names no duration is refused, not measured as empty", 
     script: composition("box(200, 400, 600, 600);"),
     record: { duration: null },
   });
-  assert.throws(() => measureMass(folder, "system"), /names no duration; stage the picture again/);
+  await assert.rejects(
+    async () => measureMass(folder, "system"),
+    /names no duration; stage the picture again/,
+  );
+});
+
+test("the audit lets the event loop turn while it draws, so each frame's readback is freed as it goes", async () => {
+  // A frame's readback is native memory that Node frees only when its event loop turns (engine finding 11). On a
+  // stage of 120 frames the audit yields at least twice: a task queued before it runs while it draws.
+  const folder = await stage("en", {
+    script: composition("box(200, 400, 600, 600);"),
+    record: { duration: 30 },
+  });
+  let turns = 0,
+    drawing = true;
+  const turn = () => {
+    if (!drawing) return;
+    turns++;
+    setImmediate(turn);
+  };
+  setImmediate(turn);
+  const report = await measureMass(folder, "system");
+  drawing = false;
+  assert.equal(report.frames.length, 120);
+  assert.ok(turns >= 2, `the event loop turned ${turns} times while the audit drew 120 frames`);
 });
 
 test("a cell is lit when the full-range luma of its mean colour is above 60", async () => {

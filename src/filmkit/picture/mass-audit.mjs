@@ -14,7 +14,9 @@
  * every scene are not weighed; a title drawn inside a scene is. Each frame is read by `massLit` (rules/ink.mjs) over
  * the content band, rows 120 to 919 (REVIEWED_BAND), which leaves out the head band and the chip; the stage holds no
  * caption. A frame of MASS.cells lit cells or more has a mass centre, the mean of their centres, and the frames are
- * joined per scene drawn by `massRuns` (rules/balance.mjs).
+ * joined per scene drawn by `massRuns` (rules/balance.mjs). The audit lets the event loop turn every YIELD_EVERY
+ * frames: each frame's readback is native memory that Node frees only then, and a loop that never turned kept every one
+ * of them, 8.29 MB a frame (34 GiB over the 4,356 frames of an English edition of 1,089 s; engine finding 11).
  *
  * The report states the canvas and the step; each frame, with its time, the scene drawn (its ids joined by "+" where
  * a frame draws several), its lit cells and its mass centre; `off_centre_mass`, each run per scene with its span and
@@ -32,6 +34,8 @@ import { CONTENT_CENTRE, MASS, massRuns, REVIEWED_BAND } from "./rules/balance.m
 import { massLit } from "./rules/ink.mjs";
 
 const SELF = fileURLToPath(import.meta.url);
+// The frames drawn between two turns of the event loop, which frees the readbacks of the frames before.
+const YIELD_EVERY = 50;
 const USAGE = "Usage: node mass-audit.mjs <stage> --text-renderer <name>";
 
 const median = (values) => {
@@ -95,8 +99,8 @@ function weighOnly(context, window) {
   };
 }
 
-/** Measure the mass of every frame of the stage in `stage`, drawn with `textRenderer`: the report. */
-export function measureMass(stage, textRenderer) {
+/** Measure the mass of every frame of the stage in `stage`, drawn with `textRenderer`: a promise of the report. */
+export async function measureMass(stage, textRenderer) {
   const picture = openPicture(stage, textRenderer, COMPOSITION_WIDTH),
     { canvas, record, window } = picture;
   // A record without a duration would give no frame and so no finding.
@@ -109,6 +113,7 @@ export function measureMass(stage, textRenderer) {
     scenes = {};
   let outside = 0;
   for (let k = 0; k * MASS.step < record.duration - 1e-9; k++) {
+    if (k > 0 && k % YIELD_EVERY === 0) await new Promise((turned) => setImmediate(turned));
     const t = k * MASS.step;
     picture.renderFrame(t);
     const { scene, declared, ungrounded } = weighed.take();
@@ -186,5 +191,5 @@ if (process.argv[1] && realpathSync(process.argv[1]) === SELF) {
     console.error(USAGE);
     process.exit(2);
   }
-  console.log(JSON.stringify(measureMass(positionals[0], values["text-renderer"])));
+  console.log(JSON.stringify(await measureMass(positionals[0], values["text-renderer"])));
 }
