@@ -6,9 +6,11 @@
  * It opens the stage as the renderer opens it (native-canvas.mjs, `openPicture`), with the text renderer it is given,
  * at the composition's own frame of 1920x1080, so that each cell of the reviewers' 480x270 grey is 4x4 pixels, and
  * draws it every MASS.step seconds; it encodes nothing. A wrapper of the context's paint methods, which only this
- * audit uses, draws `fillRect` always, so each frame stands on the composition's own ground and not on the canvas's
- * starting black, and `stroke`, `fill` and `fillText` only while `window.__sceneId` names a scene; a stroke painted
- * under DECLARED_FRAME_ROLE (headless-composition.mjs) is left out. Titles, chapter cards and credits drawn outside
+ * audit uses, draws the ground, a `fillRect` over the whole canvas at full opacity, so that each frame stands on the
+ * composition's own ground and not on the frame before it, and the paints of the scene being drawn: `stroke`, `fill`,
+ * `fillText` and `fillRect` while `window.__sceneId` names a scene. A stroke painted under DECLARED_FRAME_ROLE
+ * (headless-composition.mjs) is counted for its scene and not drawn. A frame that paints a scene before it lays the
+ * ground is refused: the canvas would still hold the frame before. Titles, chapter cards and credits drawn outside
  * every scene are not weighed; a title drawn inside a scene is. Each frame is read by `massLit` (rules/ink.mjs) over
  * the content band, rows 120 to 919 (REVIEWED_BAND), which leaves out the head band and the chip; the stage holds no
  * caption. A frame of MASS.cells lit cells or more has a mass centre, the mean of their centres, and the frames are
@@ -42,29 +44,54 @@ const median = (values) => {
 };
 const rounded = (value, places = 2) => (value === null ? null : +value.toFixed(places));
 
-/* Wrap the context's paint methods so that a frame draws only what the mass weighs, and the ground. `take()` gives
- * the scenes the frame last drawn painted in, joined by "+", or null, and the declared frame strokes it left out. */
+/* Whether a fillRect(x, y, w, h) lays the ground: it covers the whole canvas at full opacity, under a transform that
+ * only scales and moves. */
+function laysGround(context, [x, y, w, h]) {
+  const { a, b, c, d, e, f } = context.getTransform(),
+    xs = [a * x + e, a * (x + w) + e],
+    ys = [d * y + f, d * (y + h) + f];
+  return (
+    b === 0 &&
+    c === 0 &&
+    context.globalAlpha === 1 &&
+    Math.min(...xs) <= 0 &&
+    Math.max(...xs) >= context.canvas.width &&
+    Math.min(...ys) <= 0 &&
+    Math.max(...ys) >= context.canvas.height
+  );
+}
+
+/* Wrap the context's paint methods so that a frame draws only the ground and what the mass weighs. `take()` gives the
+ * scenes the frame last drawn painted in, joined by "+", or null; the declared frame strokes it left out; and the
+ * first paint of a scene it drew before laying the ground, or null. */
 function weighOnly(context, window) {
   let scenes = new Set(),
-    declared = 0;
+    declared = 0,
+    grounded = false,
+    ungrounded = null;
   for (const name of ["stroke", "fill", "fillText", "fillRect"]) {
     const paint = context[name];
     context[name] = (...args) => {
-      const scene = window.__sceneId ?? null;
-      if (scene === null && name !== "fillRect") return undefined;
+      const scene = window.__sceneId ?? null,
+        ground = name === "fillRect" && laysGround(context, args);
+      grounded ||= ground;
+      if (scene === null) return ground ? paint.apply(context, args) : undefined;
+      scenes.add(scene);
       if (name === "stroke" && window.__paintRole === DECLARED_FRAME_ROLE) {
         declared++;
         return undefined;
       }
-      if (scene !== null) scenes.add(scene);
+      if (!grounded) ungrounded ??= `${name} in scene ${scene}`;
       return paint.apply(context, args);
     };
   }
   return {
     take() {
-      const taken = { scene: [...scenes].sort().join("+") || null, declared };
+      const taken = { scene: [...scenes].sort().join("+") || null, declared, ungrounded };
       scenes = new Set();
       declared = 0;
+      grounded = false;
+      ungrounded = null;
       return taken;
     },
   };
@@ -86,7 +113,12 @@ export function measureMass(stage, textRenderer) {
   for (let k = 0; k * MASS.step < record.duration - 1e-9; k++) {
     const t = k * MASS.step;
     picture.renderFrame(t);
-    const { scene, declared } = weighed.take();
+    const { scene, declared, ungrounded } = weighed.take();
+    if (ungrounded)
+      throw Error(
+        `The frame at ${rounded(t, 3)} s of ${stage} lays no ground over the whole canvas with fillRect before it ` +
+          `paints (${ungrounded}); the mass audit cannot clear the frame before it`,
+      );
     const lit = massLit(canvas.data(), canvas.width, REVIEWED_BAND);
     const centre =
       scene !== null && lit.cells >= MASS.cells ? [lit.x / lit.cells, lit.y / lit.cells] : null;

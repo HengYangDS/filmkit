@@ -53,7 +53,7 @@ The mass audit SHALL reduce each frame it draws to a 480 × 270 grey, each cell 
 
 ### Requirement: The mass audit weighs each frame's lit scene paints
 
-The mass audit SHALL draw the edition's uncaptioned stage on the renderer's native canvas at 1920 × 1080 every 0.25 s with the renderer's text renderer, drawing the ground the composition lays with `fillRect` and every paint of the scene being drawn, and leaving out every paint of no scene and every declared frame stroke. A frame of 40 lit cells or more SHALL have a mass centre, the mean of its lit cells' centres; one of fewer has none.
+The mass audit SHALL draw the edition's uncaptioned stage on the renderer's native canvas at 1920 × 1080 every 0.25 s with the renderer's text renderer, drawing the ground the composition lays with `fillRect` and every paint of the scene being drawn, and leaving out every other paint of no scene and every declared frame stroke. A frame of 40 lit cells or more SHALL have a mass centre, the mean of its lit cells' centres; one of fewer has none.
 
 #### Scenario: A thin line over the ground
 
@@ -75,6 +75,11 @@ The mass audit SHALL draw the edition's uncaptioned stage on the renderer's nati
 - **WHEN** the credits are drawn with no scene for 3 s
 - **THEN** those frames have no mass centre and the mass audit reports no run for them
 
+#### Scenario: A frame of declared frame strokes alone
+
+- **WHEN** a scene paints only strokes declared as frames
+- **THEN** the frame is that scene's, has no mass centre and counts its declared frame strokes
+
 #### Scenario: A picture too faint to weigh
 
 - **WHEN** a frame has 39 lit cells
@@ -89,6 +94,15 @@ The mass audit SHALL draw the edition's uncaptioned stage on the renderer's nati
 
 - **WHEN** the same rail at x 1720 is not declared
 - **THEN** the rail's lit cells count, and the mass centre moves toward it
+
+### Requirement: The mass audit refuses a frame without its ground
+
+The mass audit SHALL refuse, naming the frame, a frame that paints a scene before it lays its ground, a `fillRect` over the whole canvas at full opacity, so that no frame is weighed on the frame before it.
+
+#### Scenario: A frame without its ground
+
+- **WHEN** a frame lays its ground with a path fill, or with a `fillRect` that does not cover the canvas, or not at all, before it paints a scene
+- **THEN** the mass audit refuses it, naming the frame, and weighs nothing on the frame before it
 
 ### Requirement: The mass audit reports where the weight leans
 

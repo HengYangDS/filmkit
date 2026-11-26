@@ -8,10 +8,11 @@ import { createCanvas, GlobalFonts } from "@napi-rs/canvas";
 import { measureMass } from "../../src/filmkit/picture/mass-audit.mjs";
 import { SAMPLE, stage } from "./sample-film.mjs";
 
-/* A composition that lays the sample's ground and draws, at each t, what `body` draws: `body` is JavaScript run with
- * `t`, the context `ctx`, the helpers `box(x0, y0, x1, y1, colour)` and `rail(x, declared)`, and the scene set to
- * "01" unless `body` sets another. The picture scales by the film element's width, as the sample's does. */
-const composition = (body) => `"use strict";
+/* A composition that lays the sample's ground, by `ground`, and draws, at each t, what `body` draws: `body` is JavaScript
+ * run with `t`, the context `ctx`, the helpers `box(x0, y0, x1, y1, colour)` and `rail(x, declared)`, and the scene
+ * set to "01" unless `body` sets another. The picture scales by the film element's width, as the sample's does. */
+const FILL_RECT = "ctx.fillStyle = P.ground; ctx.fillRect(0, 0, 1920, 1080);";
+const composition = (body, ground = FILL_RECT) => `"use strict";
 const ctx = document.getElementById("picture").getContext("2d", { alpha: false });
 const resolution = Number(document.getElementById("film").dataset.width) / 1920;
 const P = { ground: "#0F1519", line: "#63758B", ink: "#ECE8DF" };
@@ -38,8 +39,7 @@ function rail(x, declared) {
 window.renderFrame = (t) => {
   ctx.setTransform(resolution, 0, 0, resolution, 0, 0);
   ctx.globalAlpha = 1;
-  ctx.fillStyle = P.ground;
-  ctx.fillRect(0, 0, 1920, 1080);
+  ${ground}
   window.__sceneId = "01";
   ${body}
   window.__sceneId = null;
@@ -47,9 +47,9 @@ window.renderFrame = (t) => {
 `;
 
 /* The mass report of a stage of `seconds` drawing `body`, at the renderer's frame unless `record` says otherwise. */
-async function measured(body, { seconds = 2, record = {} } = {}) {
+async function measured(body, { seconds = 2, record = {}, ground = FILL_RECT } = {}) {
   const folder = await stage("en", {
-    script: composition(body),
+    script: composition(body, ground),
     record: { duration: seconds, ...record },
   });
   return measureMass(folder, "system");
@@ -178,4 +178,38 @@ test("the outgoing scene drawn into the next segment keeps its run past the segm
   // Every frame is accounted for: weighed in a scene, too faint to weigh, or drawn outside every scene.
   const counted = Object.values(report.mass_balance).reduce((n, v) => n + v.frames + v.faint, 0);
   assert.equal(counted + report.outside_scenes, report.frames.length);
+});
+
+test("a frame that lays no ground over the whole canvas is refused, never weighed on the last one", async () => {
+  // A ground laid by a path fill outside every scene, or none: the canvas would keep the frame before.
+  for (const ground of [
+    "box(0, 0, 1920, 1080, P.ground);",
+    "",
+    "ctx.fillStyle = P.ground; ctx.fillRect(0, 0, 960, 1080);",
+  ])
+    await assert.rejects(
+      measured("box(200 + 100 * t, 400, 600 + 100 * t, 600);", { ground }),
+      /lays no ground over the whole canvas with fillRect before it paints/,
+    );
+  // A translucent ground does not clear the canvas either.
+  await assert.rejects(
+    measured("box(200, 400, 600, 600);", {
+      ground: "ctx.globalAlpha = 0.5; " + FILL_RECT + " ctx.globalAlpha = 1;",
+    }),
+    /lays no ground/,
+  );
+});
+
+test("a frame that paints only declared frame strokes is the scene's, and a fillRect outside a scene is not weighed", async () => {
+  const framed = await measured("rail(200, true); rail(1720, true);");
+  assert.ok(framed.frames.every((frame) => frame.scene === "01" && frame.centre === null));
+  assert.deepEqual(framed.mass_balance["01"].declared, 2 * framed.frames.length);
+  assert.equal(framed.mass_balance["01"].faint, framed.frames.length);
+  assert.equal(framed.outside_scenes, 0);
+  // A mark drawn with fillRect outside every scene is no ground and no scene's paint.
+  const outside = await measured(
+    "window.__sceneId = null; ctx.fillStyle = P.ink; ctx.fillRect(1300, 400, 400, 200); " +
+      'window.__sceneId = "01"; box(200, 400, 600, 600);',
+  );
+  assert.ok(near(outside.frames[0].centre[0], 400, 4), String(outside.frames[0].centre));
 });
