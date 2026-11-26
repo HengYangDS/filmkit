@@ -451,14 +451,16 @@ SHARED = {
 # research.md); and a read that holds a gate's record to what the gate binds, which the node
 # binds through the gate's record and its wait for the gate, not by the bytes. The check of each
 # run's opens allows them and reports each as an exemption.
-# A render holds the picture gate's record to the declaration as it stands
-# (`rendering.require_passing_gates`); the gate binds the declaration whole, the render binds the
-# gate's record and waits for it, so the declaration's bytes are no input of the render. Once
-# `key-outputs-by-their-inputs` drops the gate's whole binding, this read narrows with it: the
-# recorder then reports each table the render reads.
+# A render holds the picture gate's record to what the gate binds and the render does not read
+# itself (`rendering.require_passing_gates`): the declaration, which the gate binds whole, and the
+# uncaptioned stage's record, on which the mass audit measured. The render binds the gate's record
+# and waits for it, so their bytes are no input of the render. Once `key-outputs-by-their-inputs`
+# drops the gate's input digests, these reads go with them.
+GATE_ASIDE = {"declaration_sha256": "declaration", "uncaptioned_stage_sha256": "uncaptioned_stage"}
 GATE_BINDING = (
-    "a render holds the picture gate's record to the declaration, which the gate binds whole",
-    lambda e: {"declaration": root(repository.DECLARATION)},
+    "a render holds the picture gate's record to the declaration, which the gate binds whole, "
+    "and to the uncaptioned stage's record",
+    lambda e: {name: picture_gates.bound_inputs(e)[key] for key, name in GATE_ASIDE.items()},
 )
 ASIDE: dict[str, tuple[str, Callable[[Edition], Places]]] = {
     "package-metadata": (

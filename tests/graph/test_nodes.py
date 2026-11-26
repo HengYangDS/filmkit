@@ -18,7 +18,7 @@ from filmkit.graph import bindings, build, chain, nodes, opens, plan, records, r
 from filmkit.graph.records import Folder
 from filmkit.narration import converge, readings
 from filmkit.narration import narrate as narration_narrate
-from filmkit.production import Edition
+from filmkit.production import STAGE_RECORD, Edition
 from filmkit.review import set_aside
 
 
@@ -329,10 +329,22 @@ def test_the_picture_gate_reads_the_uncaptioned_stage_its_mass_audit_draws():
 def test_a_render_reads_the_declaration_aside_and_does_not_bind_it(name):
     # Task 10.2's recorder found each render reading content/film.toml: it holds the picture
     # gate's record to it, which the gate binds whole; the render's own inputs stay its tables.
+    # Since measure-balance-on-content the gate also binds the uncaptioned stage's record.
     node, edition = chain.table().node(f"{name}:zh")
     declaration = repository.ROOT / repository.DECLARATION
-    assert chain.aside(name, edition) == {"declaration": declaration}
+    record = edition.rendered(captions=False).stage / STAGE_RECORD
+    assert chain.aside(name, edition) == {"declaration": declaration, "uncaptioned_stage": record}
     assert declaration not in node.inputs(edition).values()
+
+
+def test_a_captioned_render_s_read_of_the_uncaptioned_stage_record_is_aside():
+    # The review of 26 November: the captioned render reads that record through the gate's
+    # bindings, and no input of its own covers it.
+    edition = Edition("zh")
+    judged = opens._Judged(chain.table(), "render-picture:zh")
+    record = edition.rendered(captions=False).stage / STAGE_RECORD
+    assert not opens.covered(record, judged.reads)
+    assert opens.covered(record, judged.aside)
 
 
 @pytest.mark.parametrize("gaps", [False, True])

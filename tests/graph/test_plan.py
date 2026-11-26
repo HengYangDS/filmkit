@@ -408,7 +408,7 @@ def test_an_edit_the_renders_do_not_bind_holds_them_until_the_picture_gate_has_j
         for name in ("render-picture", "render-picture-uncaptioned"):
             node, edition = table.node(f"{name}:{code}")
             assert "declaration" not in node.inputs(edition), name
-            assert engine_chain.aside(name, edition) == {"declaration": node_declaration()}
+            assert engine_chain.aside(name, edition)["declaration"] == node_declaration()
             # The gate's record, or for a derived picture the captioned one, rendered after it.
             assert {"picture_gates", "captioned_picture"} & set(node.inputs(edition)), name
             render = found[f"{name}:{code}"]
