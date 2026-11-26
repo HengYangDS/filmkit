@@ -8,6 +8,7 @@ import {
   pictureOffset,
   REVIEWED_BAND,
   reviewedRuns,
+  verticalRuns,
 } from "../rules/balance.mjs";
 import { DECLARED_FRAME_ROLE } from "../headless-composition.mjs";
 import { fillShare, litAtFullSize, litLevel, strokeShare } from "../rules/ink.mjs";
@@ -173,7 +174,9 @@ export function compositionMeasures({ film, step, thoughts }) {
    * runs: held ones, which the next frame grows from, finished ones, which a stage cut the composition declares for
    * the scene, or the next scene, replaces, and settled ones (rules/balance.mjs). A declared frame stroke, a stroke
    * film.js paints under DECLARED_FRAME_ROLE (headless-composition.mjs), is left out of the box and kept per scene of
-   * the paint: the most left out of one frame and the box they span (`declaredFrames`). */
+   * the paint: the most left out of one frame and the box they span (`declaredFrames`). The same frame's paints of
+   * the scene drawn, declared frame strokes and paints of no scene left out, give the box of the vertical runs, keyed
+   * by that scene, its ids joined by "+" when a frame draws several, and its own declared stage cuts. */
   const reviewed = reviewedRuns(step),
     isLitAtFullSize = litAtFullSize(film.palette),
     offCentreBuilds = [],
@@ -181,10 +184,21 @@ export function compositionMeasures({ film, step, thoughts }) {
     offCentreSettled = [],
     offCentreFinished = [],
     offCentreFar = [],
-    declaredFrames = {};
+    declaredFrames = {},
+    vertical = verticalRuns(step),
+    offCentreVertical = [];
+  // Whether a stage cut the composition declares for any of `scenes` falls since the previous sample.
+  const cutSince = (t, scenes) =>
+    scenes.some((scene) =>
+      [...(film.declaredCuts().get(scene) ?? [])].some(
+        (at) => at > t - step + 1e-9 && at <= t + 1e-9,
+      ),
+    );
   function reviewedBalance(f) {
     const box = emptyBox(),
-      framed = new Map();
+      framed = new Map(),
+      drawn = emptyBox(),
+      scenes = new Set();
     for (const p of f.paints) {
       if (!isLitAtFullSize(p.color, p.alpha)) continue;
       if (p.kind === "text" && !p.text.trim()) continue;
@@ -202,13 +216,29 @@ export function compositionMeasures({ film, step, thoughts }) {
         growBox(seen.box, [x1 + half, y1 + half]);
         continue;
       }
-      growBox(box, [x0 - half, Math.max(y0 - half, REVIEWED_BAND[0])]);
-      growBox(box, [x1 + half, Math.min(y1 + half, REVIEWED_BAND[1])]);
+      const lower = [x0 - half, Math.max(y0 - half, REVIEWED_BAND[0])],
+        upper = [x1 + half, Math.min(y1 + half, REVIEWED_BAND[1])];
+      growBox(box, lower);
+      growBox(box, upper);
+      if (p.scene === null) continue;
+      scenes.add(p.scene);
+      growBox(drawn, lower);
+      growBox(drawn, upper);
     }
-    const scene = f.seg?.id ?? null,
-      cuts = scene === null ? undefined : film.declaredCuts().get(scene),
-      cut = [...(cuts ?? [])].some((at) => at > f.t - step + 1e-9 && at <= f.t + 1e-9);
-    reviewed.frame(f.t, scene, box[2] > box[0] ? box : null, cut);
+    const scene = f.seg?.id ?? null;
+    reviewed.frame(
+      f.t,
+      scene,
+      box[2] > box[0] ? box : null,
+      scene !== null && cutSince(f.t, [scene]),
+    );
+    const ids = [...scenes].sort();
+    vertical.frame(
+      f.t,
+      ids.join("+") || null,
+      drawn[2] > drawn[0] ? drawn : null,
+      cutSince(f.t, ids),
+    );
   }
   /* Sparse runs, as the Chinese review measured them: the box around every mark of visible ink in the content band,
    * through each voiced frame; a run of 1.5 s or more of speech whose box covers less than 4% of the band is reported per
@@ -303,6 +333,7 @@ export function compositionMeasures({ film, step, thoughts }) {
     const { off, thin } = runs.finish();
     offCentreRuns.push(...off);
     thinRuns.push(...thin);
+    offCentreVertical.push(...vertical.finish());
     const { builds, held, settled, finished, far } = reviewed.finish();
     offCentreFar.push(...far);
     offCentreBuilds.push(...builds);
@@ -330,6 +361,7 @@ export function compositionMeasures({ film, step, thoughts }) {
     offCentreFinished,
     offCentreFar,
     declaredFrames,
+    offCentreVertical,
     thinRuns,
     underfilled,
   };

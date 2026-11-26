@@ -34,8 +34,8 @@ Shown by the new `tests/picture/frame-role.test.mjs` and by `tests/picture/nativ
 
 Shown by the new `tests/picture/vertical-runs.test.mjs`.
 
-- [ ] 4.1 Write `tests/picture/vertical-runs.test.mjs`, running the frame audit on compositions in a scratch folder for the specification's vertical scenarios: a box still at y 590 for 2.5 s, the same at y 530, a row of names at y 600 that grows sideways for 3 s, one that grows downward, one that a declared stage cut splits, credits drawn with no scene whose box centre stands at y 584 for 3 s, and an outgoing scene still drawn, low, 1.2 s into the next segment, whose run runs on past the segment's start. Done when the new tests fail because the frame report has no `off_centre_vertical`, and the rest of the suite passes.
-- [ ] 4.2 Feed `verticalRuns` from the box of the paints of the scene being drawn that `reviewedBalance` takes, keyed by that scene, declared frame strokes and paints of no scene left out, and report `off_centre_vertical` per scene with each run's span and offset in px (`frame-audit/report.mjs`). Done when `tests/picture/vertical-runs.test.mjs` passes.
+- [x] 4.1 Write `tests/picture/vertical-runs.test.mjs`, running the frame audit on compositions in a scratch folder for the specification's vertical scenarios: a box still at y 590 for 2.5 s, the same at y 530, a row of names at y 600 that grows sideways for 3 s, one that grows downward, one that a declared stage cut splits, credits drawn with no scene whose box centre stands at y 584 for 3 s, and an outgoing scene still drawn, low, 1.2 s into the next segment, whose run runs on past the segment's start. Done when the new tests fail because the frame report has no `off_centre_vertical`, and the rest of the suite passes.
+- [x] 4.2 Feed `verticalRuns` from the box of the paints of the scene being drawn that `reviewedBalance` takes, keyed by that scene, declared frame strokes and paints of no scene left out, and report `off_centre_vertical` per scene with each run's span and offset in px (`frame-audit/report.mjs`). Done when `tests/picture/vertical-runs.test.mjs` passes.
 
 ## 5. The mass audit
 

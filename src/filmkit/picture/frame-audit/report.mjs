@@ -74,6 +74,7 @@ export function frameReport({
   offCentreFinished,
   offCentreFar,
   declaredFrames,
+  offCentreVertical,
   thinRuns,
   underfilled,
   textLayout,
@@ -223,6 +224,9 @@ export function frameReport({
     off_centre_finished: pxRunsByScene(offCentreFinished),
     /* Runs of 0.5 s or more whose full-size lit box stands more than 400 px off x 960 on one side, per scene. */
     off_centre_far: pxRunsByScene(offCentreFar),
+    /* Still states of 2 s or more, the box of the scene drawn steady within 4 px, more than 50 px above or below y 510,
+     * per scene drawn, with their span and the largest offset in px, positive below (rules/balance.mjs verticalRuns). */
+    off_centre_vertical: pxRunsByScene(offCentreVertical),
     /* The declared frame strokes the reviewers' box left out, per scene: the most in one frame and the box they span,
      * which no gate refuses. */
     declared_frames: Object.fromEntries(
