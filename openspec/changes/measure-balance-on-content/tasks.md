@@ -11,7 +11,7 @@ The release runs these checks on every planned commit and at the archived head:
 
 ## 1. The base
 
-- [ ] 1.1 Confirm on the lane's base, `5462d65` (tag `v0.34.2`) or a later released head, every site the design cites, and measure each file of design decision 10 with the pre-commit hook's own `effective_lines`. Done when `research.md` names the base and states each site as found, with any line that moved, and each file's effective lines and headroom under 500.
+- [x] 1.1 Confirm on the lane's base, `5462d65` (tag `v0.34.2`) or a later released head, every site the design cites, and measure each file of design decision 10 with the pre-commit hook's own `effective_lines`. Done when `research.md` names the base and states each site as found, with any line that moved, and each file's effective lines and headroom under 500.
 - [ ] 1.2 Before any code changes, take the baseline on the lane's base in the sample film's folder: `mise run sample:supply` (the one step that reaches the network), `mise run sample:check`, `mise run sample:narrate` as the child of its own ticket (GPU work), and then `filmkit build check-picture:zh check-picture:en`, running the light build it names first outside any ticket and each heavy invocation it names as the child of its own ticket. Done when the sample's run records hold `check-picture` of both editions by the base's engine, and `sample.md` states each one's seconds and host class.
 
 ## 2. The rules
