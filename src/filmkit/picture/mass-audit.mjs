@@ -4,11 +4,11 @@
  * Its usage is `USAGE`, which it prints when it is invoked wrongly.
  *
  * It opens the stage as the renderer opens it (native-canvas.mjs, `openPicture`), with the text renderer it is given,
- * at the composition's own frame of 1920x1080, so that each cell of the reviewers' 480x270 grey is 4x4 pixels, and
- * draws it every MASS.step seconds; it encodes nothing. A wrapper of the context's paint methods, which only this
- * audit uses, draws the ground, a `fillRect` over the whole canvas at full opacity, so that each frame stands on the
- * composition's own ground and not on the frame before it, and the paints of the scene being drawn: `stroke`, `fill`,
- * `fillText` and `fillRect` while `window.__sceneId` names a scene. A stroke painted under DECLARED_FRAME_ROLE
+ * at the composition's own frame, COMPOSITION_WIDTH wide, so that each cell of the reviewers' 480x270 grey is 4x4
+ * pixels, and draws it every MASS.step seconds; it encodes nothing. A wrapper of the context's paint methods, which
+ * only this audit uses, draws the ground, a `fillRect` over the whole canvas at full opacity, so that each frame stands
+ * on the composition's own ground and not on the frame before it, and the paints of the scene being drawn: `stroke`,
+ * `fill`, `fillText` and `fillRect` while `window.__sceneId` names a scene. A stroke painted under DECLARED_FRAME_ROLE
  * (headless-composition.mjs) is counted for its scene and not drawn. A frame that paints a scene before it lays the
  * ground is refused: the canvas would still hold the frame before. Titles, chapter cards and credits drawn outside
  * every scene are not weighed; a title drawn inside a scene is. Each frame is read by `massLit` (rules/ink.mjs) over
@@ -26,15 +26,13 @@ import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
-import { DECLARED_FRAME_ROLE } from "./headless-composition.mjs";
+import { COMPOSITION_WIDTH, DECLARED_FRAME_ROLE } from "./headless-composition.mjs";
 import { openPicture } from "./native-canvas.mjs";
 import { CONTENT_CENTRE, MASS, massRuns, REVIEWED_BAND } from "./rules/balance.mjs";
 import { massLit } from "./rules/ink.mjs";
 
 const SELF = fileURLToPath(import.meta.url);
 const USAGE = "Usage: node mass-audit.mjs <stage> --text-renderer <name>";
-// The composition's own frame width, at which every coordinate of a composition is its own.
-const WIDTH = 1920;
 
 const median = (values) => {
   if (!values.length) return null;
@@ -99,7 +97,7 @@ function weighOnly(context, window) {
 
 /** Measure the mass of every frame of the stage in `stage`, drawn with `textRenderer`: the report. */
 export function measureMass(stage, textRenderer) {
-  const picture = openPicture(stage, textRenderer, WIDTH),
+  const picture = openPicture(stage, textRenderer, COMPOSITION_WIDTH),
     { canvas, record, window } = picture;
   // A record without a duration would give no frame and so no finding.
   if (!(Number(record.duration) > 0))

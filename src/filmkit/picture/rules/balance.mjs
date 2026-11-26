@@ -205,14 +205,14 @@ export function reviewedRuns(step) {
 }
 
 /** Balance on the content, as the fused DDWG film's rule 3 sets it (its design, §14; the owner's D-69 and D-70 of 25
- * November 2026): the lit picture's mass may stand more than 90 px off x 960 for less than 1.5 s, moving or not, and
- * a still box more than 50 px off y 510 for less than 2 s. The mass is the mean centre of a frame's lit cells, which a
- * frame of fewer than 40 has not (`balance79.py`'s floor). The mass audit samples every `step` seconds: at 0.25 s six
- * samples make exactly 1.5 s, so a lean as long as the limit always counts, and on a film of 713 s the audit stays
- * inside the frame audit's time (measure-balance-on-content, design decision 1). A still box keeps its four edges
- * within 4 px of where they stood when it began. */
-export const MASS = { px: 90, seconds: 1.5, cells: 40, step: 0.25 },
-  VERTICAL = { px: 50, seconds: 2, still: 4 };
+ * November 2026). Its limits are the reviewers' (measure-balance-on-content, design decision 7), read from them here:
+ * the lit picture's mass may stand more than REVIEWED_BUILD.px off x 960 for less than REVIEWED_BUILD.seconds, moving
+ * or not, and a still box, its four edges within REVIEWED_SETTLED.steady px of where they stood when it began, more
+ * than REVIEWED_SETTLED.px off y 510 for less than REVIEWED_SETTLED.seconds. The mass is the mean centre of a frame's
+ * lit cells, which a frame of fewer than 40 has not (`balance79.py`'s floor). The mass audit samples every `step`
+ * seconds: at 0.25 s six samples make exactly 1.5 s, so a lean as long as the limit always counts, and on a film of
+ * 713 s the audit stays inside the frame audit's time (design decision 1). */
+export const MASS = { ...REVIEWED_BUILD, cells: 40, step: 0.25 };
 
 /* Whether a run of `samples` samples lasts `limit` seconds: it holds as many as the limit makes at this step, to the
  * nearest whole sample. They are counted, not timed from the first to the last, because the frame audit's step of
@@ -230,7 +230,7 @@ const continues = (run, t, scene, step) =>
  * px. A step must divide both of rule 3's limits, 1.5 s and 2 s, into whole steps, so that a lean as long as a limit
  * always counts: at 0.2 s, 1.5 s falls between seven and eight steps and a lean of up to 1.6 s could pass. */
 export function massRuns(step) {
-  for (const limit of [MASS.seconds, VERTICAL.seconds]) {
+  for (const limit of [MASS.seconds, REVIEWED_SETTLED.seconds]) {
     const steps = limit / step;
     if (!(step > 0) || Math.abs(steps - Math.round(steps)) > 1e-9)
       throw RangeError(`A step of ${step} s divides ${limit} s into no whole number of steps`);
@@ -265,23 +265,24 @@ export function massRuns(step) {
 /** Joins frames sampled every `step` seconds into still states off y 510. `frame(t, scene, box, cut)` takes the scene
  * drawn in the frame, the box of that scene's lit paints, or null when nothing of it is lit, and whether a stage cut
  * the composition declares for the scene falls since the previous sample. A run holds while its box keeps each edge
- * within `VERTICAL.still` px of where it stood at the run's first frame and its centre stands more than `VERTICAL.px`
- * off y 510; a stage cut, another scene, a frame without a box and a gap in the samples each end it. It is timed from
- * its first still frame. `finish()` returns each run of `VERTICAL.seconds` or more with its scene, start, end and
- * largest signed offset in px, positive below the centre. */
+ * within `REVIEWED_SETTLED.steady` px of where it stood at the run's first frame and its centre stands more than
+ * `REVIEWED_SETTLED.px` off y 510; a stage cut, another scene, a frame without a box and a gap in the samples each end
+ * it. It is timed from its first still frame. `finish()` returns each run of `REVIEWED_SETTLED.seconds` or more with
+ * its scene, start, end and largest signed offset in px, positive below the centre. */
 export function verticalRuns(step) {
-  const runs = [];
+  const { px: PX, seconds: SECONDS, steady: STEADY } = REVIEWED_SETTLED,
+    runs = [];
   let open = null;
   const close = () => {
-    if (open && lasts(open, VERTICAL.seconds, step))
+    if (open && lasts(open, SECONDS, step))
       runs.push({ scene: open.scene, start: open.start, end: open.end, worst: open.worst });
     open = null;
   };
-  const still = (run, box) => box.every((edge, k) => Math.abs(edge - run.box[k]) <= VERTICAL.still);
+  const still = (run, box) => box.every((edge, k) => Math.abs(edge - run.box[k]) <= STEADY);
   return {
     frame(t, scene, box, cut = false) {
       const dy = box ? (box[1] + box[3]) / 2 - CONTENT_CENTRE[1] : 0;
-      if (!scene || !box || Math.abs(dy) <= VERTICAL.px) return close();
+      if (!scene || !box || Math.abs(dy) <= PX) return close();
       if (!cut && continues(open, t, scene, step) && still(open, box)) {
         open.end = t + step;
         open.samples++;

@@ -133,9 +133,14 @@ export function wholeTurnAtRisk(a0, a1, anticlockwise = false) {
 }
 
 /** The one role a composition may declare for a paint, by setting `window.__paintRole` while it paints and `null`
- * after: a stroke drawn only to frame a stage. The balance measures leave such a stroke out (frame-audit/composition.mjs,
- * mass-audit.mjs); the renderer draws it as any other. Seat marks' FRAME is another notion, a container's size. */
+ * after: a stroke drawn only to frame a stage. The balance measures leave such a stroke out
+ * (frame-audit/composition.mjs, mass-audit.mjs); the renderer draws it as any other. Seat marks' FRAME is another
+ * notion, a container's size. */
 export const DECLARED_FRAME_ROLE = "frame";
+
+/** The width of the frame a composition draws in: film.js gives every coordinate in pixels of a frame 1920 wide, and
+ * scales its picture to the canvas it is given by this width. */
+export const COMPOSITION_WIDTH = 1920;
 
 /** Record on a paint the scene film.js says it is drawing and the role it declares, as the paint is handed over. It
  * judges nothing and never throws, so every audit that shares the delivery runs as before; the composition's handle
@@ -466,7 +471,11 @@ export function openComposition(timeline, { faces = null } = {}) {
     const line = /film\.js:(\d+):\d+/.exec(trace.stack)?.[1];
     return line ? `film.js:${line}` : null;
   }
-  const context = compositionScope(window, canvasStandIn(deliver, faces, turned, filled), 1920);
+  const context = compositionScope(
+    window,
+    canvasStandIn(deliver, faces, turned, filled),
+    COMPOSITION_WIDTH,
+  );
   vm.runInContext(source, context, { filename: composition });
   const palette = Object.freeze({ ...vm.runInContext("P", context) });
   const framed = vm.runInContext('typeof cameraOf === "function"', context);
