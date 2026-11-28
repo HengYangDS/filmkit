@@ -58,6 +58,12 @@ owner's words).
       count of Node and Python tests is recorded here.
       At `76fb2f8`, as the child of one host ticket that held 289 s, `mise run check` passes: 296
       Node tests pass, the Markdown check is clean, and 2,627 Python tests pass with 1 skipped.
+- [x] 1.7 Restate the comment over `lockfile_platforms` in `.config/mise/config.toml` as the shared
+      rules record a decision: who chose each platform set, by role, and the date. Done when the
+      comment names the owner and ETHOS's governance with 25 November 2026, and no session and no
+      clock time.
+      The comment names the owner for Apple-silicon macOS and ETHOS's governance for the lock's
+      Linux platforms, both on 2026-11-25; it names no session and no clock time.
 
 ## Workflow follow-up
 
