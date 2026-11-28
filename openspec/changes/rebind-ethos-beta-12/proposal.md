@@ -2,14 +2,15 @@
 
 The repository declares and runs ETHOS 0.2.0-beta.11. The owner asked that every governed repository
 run the latest ETHOS release, as the 0.2.0-beta.11 rebind records. 0.2.0-beta.12 was published on 27
-November 2026 at 17:19 UTC and upgrades directly from 0.2.0-beta.11: its release binding at the tag
+November 2026 and upgrades directly from 0.2.0-beta.11: its release binding at the tag
 records `"0.2.0-beta.11" = "attested-main"` under `[release.upgrade_from]`, and its hosted journey
 upgrades from 0.2.0-beta.11 on macOS arm64, Linux x64 and Linux arm64. It publishes its own Mise
 declaration as the release asset `ethos-0.2.0-beta.12.mise.toml`, one row for each published
 platform: `linux-arm64`, `linux-x64`, `macos-arm64`, `windows-arm64` and `windows-x64`. The
 repository takes the three rows that are not Windows, as its pin has held since 0.34.1. The lane
-binds the release on 29 November 2026 from 01:27 (UTC+8), once it has passed its 24-hour release
-age, and reads the checksums from the release's `SHA256SUMS` then.
+binds the release once it is published and read back, with no release age: on 28 November 2026 the
+owner exempted every repository ETHOS governs from the 24-hour hold for ETHOS's own releases, while
+third-party supply keeps it. The checksums are read from the release's `SHA256SUMS`.
 
 What 0.2.0-beta.12 asks of a repository that 0.2.0-beta.11 did not. The entry marks no item
 Breaking.
