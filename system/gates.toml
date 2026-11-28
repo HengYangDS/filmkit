@@ -11,7 +11,7 @@ full = ["native-static", "native-behavior", "source-integrity"]
 [[gates]]
 id = "native-static"
 kind = "lint"
-providers = ["ethos.adapters.gates.code_quality:static_report"]
+providers = ["provider.code-static"]
 policy = "required"
 profile = "repository"
 toolchain = "ethos"
@@ -28,7 +28,7 @@ version_source = "product"
 [[gates]]
 id = "native-behavior"
 kind = "test"
-providers = ["ethos.adapters.gates.code_quality:behavior_report"]
+providers = ["provider.code-behavior"]
 policy = "required"
 profile = "repository"
 toolchain = "ethos"
@@ -45,7 +45,7 @@ version_source = "product"
 [[gates]]
 id = "source-integrity"
 kind = "integrity"
-providers = ["ethos.adapters.gates.provenance.observation:integrity_report"]
+providers = ["provider.source-integrity"]
 policy = "required"
 profile = "repository"
 toolchain = "ethos"

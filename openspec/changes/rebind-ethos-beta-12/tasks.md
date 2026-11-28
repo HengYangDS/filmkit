@@ -40,12 +40,15 @@ session that builds ETHOS, relayed to this one:
       read before any patch is applied.
       At `3b6ada1` the check reports both projections conforming, two outputs and no edit, and
       neither file changed.
-- [ ] 1.4 Name the providers of `system/gates.toml` by catalog ID: `provider.code-static` for
+- [x] 1.4 Name the providers of `system/gates.toml` by catalog ID: `provider.code-static` for
       `native-static`, `provider.code-behavior` for `native-behavior` and
       `provider.source-integrity` for `source-integrity`. Done when `system/gates.toml` names no
       `ethos.<module>:<callable>` provider and `ethos prove --root <lane> --json` reports no
       required gap; the note `gate_provider_legacy_name`, which a provider gate raises when it runs,
       is read absent in the full proof at the archived head.
+      The registry names the three IDs and no other provider. With the rename in the work tree at
+      `e86d116`, the proof preview under 0.2.0-beta.12 reports `pass`, state `ready`, no required
+      gap, 11 planned gates; both runtimes' catalogs map the three IDs to the former names.
 - [ ] 1.5 Record under `Changed` in the Changelog's `Unreleased` section that the repository runs
       ETHOS 0.2.0-beta.12 instead of 0.2.0-beta.11 and that its gate registry names ETHOS's
       providers by catalog ID. Done when `npm run format:markdown:check` passes.
