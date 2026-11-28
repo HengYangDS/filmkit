@@ -84,7 +84,7 @@ python = "3.12.16"
 uv = "0.13.9"
 "github:vale-cli/vale" = "3.27.0"
 
-# The ETHOS release declaration published with v0.2.0-beta.12, without its two Windows rows.
+# The ETHOS release declaration published with v0.2.0-beta.12: its linux-arm64, linux-x64 and macos-arm64 rows.
 [tools."http:ethos"]
 version = "0.2.0-beta.12"
 
