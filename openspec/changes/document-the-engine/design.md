@@ -94,6 +94,39 @@ ETHOS's base itself (ETHOS's).
    `docs/**/*.md` beside the root files, so `mise run fix` and `mise run check` format and check the pages as ETHOS's
    `markdown-lint` gate does.
 
+## The four gates (task 1.1)
+
+Each gate ran alone, `ethos prove --host --execute --gate <id> --json` on ETHOS 0.2.0-beta.11 at nice 15: before on
+`8ef48f3`, after on the commit before this record, whose tree holds every file the Change adds or changes and differs
+from the Change's last commit only in this record and the ticks of `tasks.md`. Wall and CPU time (user and system,
+every descendant waited for) are `/usr/bin/time -p`'s. The first column is each gate's time inside the full local proof
+of `8ef48f3`, run beside the proof's other gates [S6].
+
+| Gate             | In the proof of `8ef48f3` | Before, alone                           | After, alone                            |
+| ---------------- | ------------------------- | --------------------------------------- | --------------------------------------- |
+| `docs-registry`  | pass, 0.32 s, no page     | pass, no page, 0.66 s wall, 0.70 s CPU  | pass, 6 pages, 0.99 s wall, 0.91 s CPU  |
+| `markdown-links` | pass, 3.04 s, 38 files    | pass, 38 files, 1.12 s wall, 0.97 s CPU | pass, 48 files, 1.39 s wall, 1.35 s CPU |
+| `markdown-lint`  | pass, 8.23 s, 38 files    | pass, 38 files, 3.08 s wall, 3.54 s CPU | pass, 48 files, 6.62 s wall, 7.31 s CPU |
+| `prose`          | pass, 6.07 s, 38 files    | pass, 38 files, 1.73 s wall, 1.89 s CPU | pass, 48 files, 3.11 s wall, 3.27 s CPU |
+
+No run used more than 1.15 cores on average (CPU over wall), so each is light. After the move the registry reads the six
+pages and reports no gap: no missing metadata, no invalid role or state, every relation's target found; the other
+three read the ten Markdown files the Change adds (six pages and four artifacts) beside the 38 they read before. The
+record is filmkit's `build/evidence/document-the-engine/gates.txt`, SHA-256
+`15670c8f664901aef06f3374be17ebb4a8b95cd7984c462ca2900c3eb08d10a3`, with the raw output of each run in `runs/` beside
+it.
+
+## The films' links (task 2.4)
+
+On 28 November each film's tracked files (`git grep` in `ddwg-film` at `9228482`, `ethos-film` at `a98515f` and
+`ddwg-essentials-film` at `d962d40`) link to filmkit only at the repository's root, from `README.md` and
+`CONTRIBUTING.md`; none names filmkit's README or a section of it, so no link is left for a film's lane. The other hits
+of the search are the commit after `#` in the pinned Git source of `uv.lock` and `tests/test_film.py`. In filmkit, the
+one link to the README outside the immutable archive was the route for a film's maintainer in `CONTRIBUTING.md`, which
+now leads to `docs/README.md`; no tracked file, the archive included, links to a section of the README. The record is
+filmkit's `build/evidence/document-the-engine/links.txt`, SHA-256
+`10b52127b08bc54db12ae9263f1a67c9e2b99bda0fe9c2ba05c5189e2609199a`.
+
 ## Open questions
 
 None at `v0.2.0-beta.11`. At `v0.2.0-beta.12` the registry's code, the profile's roots and `select_gate_declaration`
@@ -103,8 +136,7 @@ in the same way, and its full check runs them again.
 ## Risks / Trade-offs
 
 - A sentence lost in the move: answered by task 2.1's map before any deletion.
-- A film's link into the README would break: none was found in the three films' tracked files on 28 November
-  (`rg` for links to filmkit's README in each repository); task 2.4 searches again at the Change's base.
+- A film's link into the README would break: none of the three films links to it (task 2.4, above).
 - The release step rewrote the pin's tag in the README: from 0.36.0 it must rewrite `docs/install.md`. The
   maintainer's release tool outside the tracked tree finds the file that holds the pin in the tree since 28 November.
 - ETHOS decides later what it has only drafted (the root README's size limits, the scaffold, folder names; its draft's
