@@ -25,15 +25,21 @@ session that builds ETHOS, relayed to this one:
       `mise lock http:ethos` kept `lockfile_version = 3`, changed only `http:ethos`, and holds
       0.2.0-beta.12 for the same five platform entries, with no 0.2.0-beta.11 entry and no
       `windows-*` table.
-- [ ] 1.2 Install the locked supply with `mise install --locked` and bind the repository to the
+- [x] 1.2 Install the locked supply with `mise install --locked` and bind the repository to the
       0.2.0-beta.12 runtime with the locked console's `hook install`, keeping 0.2.0-beta.11 as the
       rollback. Done when CURRENT names the 0.2.0-beta.12 runtime and ROLLBACK the 0.2.0-beta.11
       runtime, and `ethos status --json` in the lane reports the lane ready with `summary.runtime`
       naming 0.2.0-beta.12.
-- [ ] 1.3 Check both pipelines against the 0.2.0-beta.12 projection with
+      `mise install --locked` found every locked tool installed; the 0.2.0-beta.12 console's
+      `hook install` bound the family. CURRENT names the 0.2.0-beta.12 runtime `3e6b10f2…` and
+      ROLLBACK the 0.2.0-beta.11 runtime `8c663b10…`; at `3b6ada1`, with this Change named,
+      `ethos status --json` reports the lane ready and `summary.runtime` names 0.2.0-beta.12.
+- [x] 1.3 Check both pipelines against the 0.2.0-beta.12 projection with
       `ethos lane project --check --json`. Done when it reports both projections conforming and
       neither `.github/workflows/ci.yml` nor `.gitlab-ci.yml` changes; a drift stops the task and is
       read before any patch is applied.
+      At `3b6ada1` the check reports both projections conforming, two outputs and no edit, and
+      neither file changed.
 - [ ] 1.4 Name the providers of `system/gates.toml` by catalog ID: `provider.code-static` for
       `native-static`, `provider.code-behavior` for `native-behavior` and
       `provider.source-integrity` for `source-integrity`. Done when `system/gates.toml` names no
