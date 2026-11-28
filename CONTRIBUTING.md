@@ -1,6 +1,6 @@
 # Contributing
 
-This guide is for maintainers who change, verify or release filmkit. A film that uses the engine needs only the [README](README.md); Agents start at the [Agent entry](AGENTS.md).
+This guide is for maintainers who change, verify or release filmkit. A film that uses the engine needs only the [documentation](docs/README.md); Agents start at the [Agent entry](AGENTS.md).
 
 | Your task                 | Read next                               |
 | ------------------------- | --------------------------------------- |
