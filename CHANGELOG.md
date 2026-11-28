@@ -4,6 +4,10 @@ All notable changes to filmkit are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+
+- The repository runs ETHOS 0.2.0-beta.12 instead of 0.2.0-beta.11, pinned by the release's three rows that are not Windows, and its gate registry names ETHOS's three providers by catalog ID (`provider.code-static`, `provider.code-behavior` and `provider.source-integrity`) instead of by module path.
+
 ## [0.35.0] - 2026-11-26
 
 ### Changed

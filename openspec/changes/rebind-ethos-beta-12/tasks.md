@@ -49,9 +49,12 @@ session that builds ETHOS, relayed to this one:
       The registry names the three IDs and no other provider. With the rename in the work tree at
       `e86d116`, the proof preview under 0.2.0-beta.12 reports `pass`, state `ready`, no required
       gap, 11 planned gates; both runtimes' catalogs map the three IDs to the former names.
-- [ ] 1.5 Record under `Changed` in the Changelog's `Unreleased` section that the repository runs
+- [x] 1.5 Record under `Changed` in the Changelog's `Unreleased` section that the repository runs
       ETHOS 0.2.0-beta.12 instead of 0.2.0-beta.11 and that its gate registry names ETHOS's
       providers by catalog ID. Done when `npm run format:markdown:check` passes.
+      The `Unreleased` section holds one `Changed` item for both; after the lane's environments
+      were synced from the frozen locks offline (`uv sync --frozen --offline`,
+      `npm ci --offline`), `mise run check:dependencies` and `npm run format:markdown:check` pass.
 - [ ] 1.6 Run the repository's check on the lane head. Done when `mise run check` passes, and the
       count of Node and Python tests is recorded here.
 
