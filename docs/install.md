@@ -26,7 +26,7 @@ A film pins a release tag in its Python project and locks it:
 dependencies = ["filmkit"]
 
 [tool.uv.sources]
-filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.35.0" }
+filmkit = { git = "https://github.com/HengYangDS/filmkit", tag = "v0.36.0" }
 ```
 
 ## Declare the npm packages
