@@ -84,11 +84,11 @@ python = "3.12.16"
 uv = "0.13.9"
 "github:vale-cli/vale" = "3.27.0"
 
-# The ETHOS release declaration as published with v0.2.0-beta.11.
+# The ETHOS release declaration published with v0.2.0-beta.12, without its two Windows rows.
 [tools."http:ethos"]
-version = "0.2.0-beta.11"
+version = "0.2.0-beta.12"
 
 [tools."http:ethos".platforms]
-linux-arm64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.11/ethos-0.2.0-beta.11-linux-arm64.tar.gz", checksum = "sha256:d619560f9cd7812303d550721722afa200b2bc152639ec5ac3ab68ef2d50b292", bin_path = "ethos/bin" }
-linux-x64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.11/ethos-0.2.0-beta.11-linux-x64.tar.gz", checksum = "sha256:d8eb1d563015d624fee5d4fbf3b3f50e952e8e9cf603262bbd5d337ff808c30d", bin_path = "ethos/bin" }
-macos-arm64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.11/ethos-0.2.0-beta.11-macos-arm64.tar.gz", checksum = "sha256:59a2b154e82b9fb5a5f94f12cba6eb5825102235a7e4e802b60bafe82f8b966e", bin_path = "ethos/bin" }
+linux-arm64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.12/ethos-0.2.0-beta.12-linux-arm64.tar.gz", checksum = "sha256:b7eb93ada12f82f9c755562429367a5e2792a1a2c96013598382fc08a16c873d", bin_path = "ethos/bin" }
+linux-x64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.12/ethos-0.2.0-beta.12-linux-x64.tar.gz", checksum = "sha256:e5e4a390c9a7616067522606160dc0cc63ee8725acd54b30ab3df89b6cf286f0", bin_path = "ethos/bin" }
+macos-arm64 = { url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.12/ethos-0.2.0-beta.12-macos-arm64.tar.gz", checksum = "sha256:71929b950100188c39a76026e4ff6a6d2d7a35a8fda608483e1e9b2a18729f59", bin_path = "ethos/bin" }

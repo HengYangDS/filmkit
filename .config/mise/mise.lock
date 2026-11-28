@@ -38,29 +38,29 @@ url_api = "https://api.github.com/repos/vale-cli/vale/releases/assets/740781550"
 provenance = "github-attestations"
 
 [[tools."http:ethos"]]
-version = "0.2.0-beta.11"
+version = "0.2.0-beta.12"
 backend = "http:ethos"
-specifiers = ["0.2.0-beta.11"]
+specifiers = ["0.2.0-beta.12"]
 
 [tools."http:ethos"."platforms.linux-arm64"]
-checksum = "sha256:d619560f9cd7812303d550721722afa200b2bc152639ec5ac3ab68ef2d50b292"
-url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.11/ethos-0.2.0-beta.11-linux-arm64.tar.gz"
+checksum = "sha256:b7eb93ada12f82f9c755562429367a5e2792a1a2c96013598382fc08a16c873d"
+url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.12/ethos-0.2.0-beta.12-linux-arm64.tar.gz"
 
 [tools."http:ethos"."platforms.linux-arm64-musl"]
-checksum = "sha256:d619560f9cd7812303d550721722afa200b2bc152639ec5ac3ab68ef2d50b292"
-url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.11/ethos-0.2.0-beta.11-linux-arm64.tar.gz"
+checksum = "sha256:b7eb93ada12f82f9c755562429367a5e2792a1a2c96013598382fc08a16c873d"
+url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.12/ethos-0.2.0-beta.12-linux-arm64.tar.gz"
 
 [tools."http:ethos"."platforms.linux-x64"]
-checksum = "sha256:d8eb1d563015d624fee5d4fbf3b3f50e952e8e9cf603262bbd5d337ff808c30d"
-url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.11/ethos-0.2.0-beta.11-linux-x64.tar.gz"
+checksum = "sha256:e5e4a390c9a7616067522606160dc0cc63ee8725acd54b30ab3df89b6cf286f0"
+url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.12/ethos-0.2.0-beta.12-linux-x64.tar.gz"
 
 [tools."http:ethos"."platforms.linux-x64-musl"]
-checksum = "sha256:d8eb1d563015d624fee5d4fbf3b3f50e952e8e9cf603262bbd5d337ff808c30d"
-url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.11/ethos-0.2.0-beta.11-linux-x64.tar.gz"
+checksum = "sha256:e5e4a390c9a7616067522606160dc0cc63ee8725acd54b30ab3df89b6cf286f0"
+url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.12/ethos-0.2.0-beta.12-linux-x64.tar.gz"
 
 [tools."http:ethos"."platforms.macos-arm64"]
-checksum = "sha256:59a2b154e82b9fb5a5f94f12cba6eb5825102235a7e4e802b60bafe82f8b966e"
-url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.11/ethos-0.2.0-beta.11-macos-arm64.tar.gz"
+checksum = "sha256:71929b950100188c39a76026e4ff6a6d2d7a35a8fda608483e1e9b2a18729f59"
+url = "https://github.com/HengYangDS/ethos/releases/download/v0.2.0-beta.12/ethos-0.2.0-beta.12-macos-arm64.tar.gz"
 
 [[tools.node]]
 version = "26.13.1"

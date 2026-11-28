@@ -3,12 +3,15 @@ Every command named here is light, except the repository's check where a measure
 of a host ticket, `ethos host run --wait 14400 --root <lane> -- <command>`, queued under host rules
 2, 8 and 9. Until task 1.2 binds the release, an ETHOS preview runs with the new runtime's
 interpreter, `<runtime>/python/bin/python -B -I -m ethos.cli`, and is read by its `summary.runtime`;
-that interpreter never runs without `-B` (design, known open defects). No task starts before 29
-November 2026 at 01:27 (UTC+8).
+that interpreter never runs without `-B` (design, known open defects). The tasks start once the
+release is published and read back: on 28 November 2026, shortly after 08:00 (UTC+8), the owner
+exempted every repository that ETHOS governs from ETHOS's own 24-hour release age, in words to the
+session that builds ETHOS, relayed to this one:
+`「而且所有 ethos 纳管仓库应该豁免 ethos 自身的 24 小时冷却期」`.
 
 ## 1. Runtime
 
-- [ ] 1.1 Replace the 0.2.0-beta.11 declaration in `.config/mise/config.toml` with the rows
+- [x] 1.1 Replace the 0.2.0-beta.11 declaration in `.config/mise/config.toml` with the rows
       `linux-arm64`, `linux-x64` and `macos-arm64` of the declaration published with 0.2.0-beta.12
       (`ethos-0.2.0-beta.12.mise.toml`), each checksum read from the release's `SHA256SUMS` and
       checked against the asset's published digest, under a comment that names the release and the
@@ -16,6 +19,12 @@ November 2026 at 01:27 (UTC+8).
       the published row byte for byte, the lock holds 0.2.0-beta.12 for the same five platform
       entries for which it held 0.2.0-beta.11, no 0.2.0-beta.11 entry and no `windows-*` table
       remains, the lock's diff changes only `http:ethos`, and the lock keeps `lockfile_version = 3`.
+      The three rows equal those of the published declaration (sha256 `094105e2…`) byte for byte,
+      and each checksum equals the release's `SHA256SUMS` (sha256 `7579c21f…`); the films session
+      read both files back on 28 November 2026 and found each equal to its published digest.
+      `mise lock http:ethos` kept `lockfile_version = 3`, changed only `http:ethos`, and holds
+      0.2.0-beta.12 for the same five platform entries, with no 0.2.0-beta.11 entry and no
+      `windows-*` table.
 - [ ] 1.2 Install the locked supply with `mise install --locked` and bind the repository to the
       0.2.0-beta.12 runtime with the locked console's `hook install`, keeping 0.2.0-beta.11 as the
       rollback. Done when CURRENT names the 0.2.0-beta.12 runtime and ROLLBACK the 0.2.0-beta.11
