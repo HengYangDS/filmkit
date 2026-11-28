@@ -67,17 +67,17 @@ ETHOS's base itself (ETHOS's).
    the engine does and that it carries no film's content, routes to `docs/`, `openspec/specs/`, the Changelog and
    the contribution guide, and says how to start by three routes: install the engine as `docs/install.md` states, lay
    out and declare the film as `docs/film-layout.md` states, and build it as `docs/build-a-film.md` states. It restates
-   nothing those pages hold, the index's table of questions included. The films session's reading of the owner's
-   request, which the owner confirmed on 23 November at 14:29 (item G-2), names these three: what it is, where each kind
+   nothing those pages hold, the index's table of questions included. The maintainer's reading of the owner's request,
+   which the owner confirmed on 23 November (item G-2), names these three: what it is, where each kind
    of document lives and how to start; ETHOS's draft design of 23 November reads the owner's words the same way (its
    first section, item 2) [S5]. `docs/README.md` states the root's purpose and routes to each page with one line on the
    question it answers.
 4. **The requirement moves with the content.** `engine-distribution` names the documentation as the carrier; its
-   Purpose sentence, which no delta carries, is edited by hand before the archive, under this Change. Its first scenario keeps its name, "A new film follows the README",
-   and its WHEN names the README's "How to start" routes to the pages on installing the engine and on a film's layout:
+   Purpose sentence, which no delta carries, is edited by hand before the archive, under this Change. Its first
+   scenario keeps its name, "A new film follows the README", and its WHEN names the README's "How to start" routes to the pages on installing the engine and on a film's layout:
    OpenSpec 2.0.0 and 2.2.0 refuse a MODIFIED block that drops a current scenario's name
    (`findMissingCurrentScenarios`, its `validator.js`), and a REMOVED and ADDED pair would change the requirement's
-   identity for a name (the films session's decision, 28 November). The requirement's text is 454 characters, under
+   identity for a name (the maintainer's decision, 28 November). The requirement's text is 454 characters, under
    OpenSpec's limit of 500, and `openspec validate --strict` passes.
 5. **ETHOS's defaults stand undeclared.** The pages sit under `docs/`, the root ETHOS reads where the profile declares
    none, so the profile does not change: ETHOS writes a profile without its defaults (`render_repository_profile`,
@@ -136,8 +136,8 @@ commits were unsigned, is answered by the landing: every commit of the Change wa
 (`9209382` to the head). The five others are answered in the round that landed: the README routes to the page on
 building a film instead of restating its order or the index's table, and that page states that `filmkit supply` runs
 first (2); the gates' record names the commit it ran on (3); the evidence stands in filmkit's own `build/evidence/` (4);
-the four points of prose are rewritten (5); the requirement's text is 454 characters (6). The record is the films
-session's `build-docs/review-document-the-engine.md`, outside the tracked tree.
+the four points of prose are rewritten (5); the requirement's text is 454 characters (6). The review's own record stays in the
+maintainer's local evidence, outside the tracked tree.
 
 ## Open questions
 
