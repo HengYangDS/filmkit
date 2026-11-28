@@ -19,5 +19,5 @@ Every command named here is light and runs at nice 15; a gate whose run alone us
 
 ## 4. Acceptance
 
-- [ ] 4.1 The repository's full check on the landed head, through its host ticket. Done when it passes.
+- [x] 4.1 The repository's full check on the landed head, through its host ticket. Done when it passes. Verified by the release's whole check of `1ea3741` under its ticket, the host's FFmpeg present (check-full passed head 1ea3741 20:13:17).
 - [x] 4.2 One independent review of the whole change by a reader that has not seen it; its findings answered in the text or the design. Done when the review's verdict is recorded.
