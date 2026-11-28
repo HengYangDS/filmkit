@@ -55,8 +55,10 @@ session that builds ETHOS, relayed to this one:
       The `Unreleased` section holds one `Changed` item for both; after the lane's environments
       were synced from the frozen locks offline (`uv sync --frozen --offline`,
       `npm ci --offline`), `mise run check:dependencies` and `npm run format:markdown:check` pass.
-- [ ] 1.6 Run the repository's check on the lane head. Done when `mise run check` passes, and the
+- [x] 1.6 Run the repository's check on the lane head. Done when `mise run check` passes, and the
       count of Node and Python tests is recorded here.
+      At `76fb2f8`, as the child of one host ticket that held 289 s, `mise run check` passes: 296
+      Node tests pass, the Markdown check is clean, and 2,627 Python tests pass with 1 skipped.
 
 ## Workflow follow-up
 
