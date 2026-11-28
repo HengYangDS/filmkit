@@ -14,10 +14,10 @@ Every command named here is light and runs at nice 15; a gate whose run alone us
 
 ## 3. The requirement and the record
 
-- [ ] 3.1 Apply this Change's delta to `engine-distribution` at archive, and edit its Purpose sentence by hand in the same commit (the delta does not carry the Purpose). Done when `openspec validate --strict` passes and the Purpose names the documentation.
+- [x] 3.1 Edit `engine-distribution`'s Purpose sentence by hand before the archive, since no delta carries the Purpose and ETHOS's archive writes only the delta; the archive then applies this Change's delta. Done when the Purpose names the documentation and `openspec validate --strict` passes.
 - [x] 3.2 Record the change under `Changed` in the Changelog's `Unreleased` section, with what a film changes to adopt the same form. Done when the Markdown gates pass.
 
 ## 4. Acceptance
 
 - [ ] 4.1 The repository's full check on the landed head, through its host ticket. Done when it passes.
-- [ ] 4.2 One independent review of the whole change by a reader that has not seen it; its findings answered in the text or the design. Done when the review's verdict is recorded.
+- [x] 4.2 One independent review of the whole change by a reader that has not seen it; its findings answered in the text or the design. Done when the review's verdict is recorded.

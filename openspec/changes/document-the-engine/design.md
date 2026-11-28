@@ -73,7 +73,7 @@ ETHOS's base itself (ETHOS's).
    first section, item 2) [S5]. `docs/README.md` states the root's purpose and routes to each page with one line on the
    question it answers.
 4. **The requirement moves with the content.** `engine-distribution` names the documentation as the carrier; its
-   Purpose sentence changes with it at archive. Its first scenario keeps its name, "A new film follows the README",
+   Purpose sentence, which no delta carries, is edited by hand before the archive, under this Change. Its first scenario keeps its name, "A new film follows the README",
    and its WHEN names the README's "How to start" routes to the pages on installing the engine and on a film's layout:
    OpenSpec 2.0.0 and 2.2.0 refuse a MODIFIED block that drops a current scenario's name
    (`findMissingCurrentScenarios`, its `validator.js`), and a REMOVED and ADDED pair would change the requirement's
@@ -126,6 +126,18 @@ one link to the README outside the immutable archive was the route for a film's 
 now leads to `docs/README.md`; no tracked file, the archive included, links to a section of the README. The record is
 filmkit's `build/evidence/document-the-engine/links.txt`, SHA-256
 `10b52127b08bc54db12ae9263f1a67c9e2b99bda0fe9c2ba05c5189e2609199a`.
+
+## The review (task 4.2)
+
+On 28 November an independent reader, an agent that had not seen the change being made, read the six commits of its
+first round in their clone (`8ef48f3..60c26c1`) against the owner's words of 23 November, ETHOS's base and the shared
+definition of 信、达、雅. Its verdict: one blocking finding and five not blocking. The blocking one, that the clone's
+commits were unsigned, is answered by the landing: every commit of the Change was made in the lane and signed
+(`9209382` to the head). The five others are answered in the round that landed: the README routes to the page on
+building a film instead of restating its order or the index's table, and that page states that `filmkit supply` runs
+first (2); the gates' record names the commit it ran on (3); the evidence stands in filmkit's own `build/evidence/` (4);
+the four points of prose are rewritten (5); the requirement's text is 454 characters (6). The record is the films
+session's `build-docs/review-document-the-engine.md`, outside the tracked tree.
 
 ## Open questions
 
