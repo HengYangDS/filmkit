@@ -27,20 +27,41 @@ ETHOS's base itself (ETHOS's).
 1. **A flat `docs/`.** Five pages and an index sit directly under `docs/`: two how-to pages and three references are
    too few for subfolders, and a folder with two children would need its own README (ETHOS's entrypoint rule). Pages
    are split by the reader's task, not by length.
-2. **The map, section by section** (the sentence-level map is task 2.1):
+2. **The map, sentence by sentence** (task 2.1). The README at `8ef48f3` holds 32 sentences (R1 to R32, in order),
+   three tables (T1 to T3) and one code block (C1). Each goes to one place with its words unchanged, but for these: a
+   link on a page starts from `docs/`; R2's subject, "It", names Film Kit on its new page, and R12's, "Its", names a
+   film's `package.json` under its new heading; and R29 and R30 become routes in the README's list "Where to read",
+   each naming what its target holds as the sentence did:
 
-   | README section at `8ef48f3`  | Goes to                                                             | Role      |
-   | ---------------------------- | ------------------------------------------------------------------- | --------- |
-   | Opening two paragraphs       | three sentences stay in the README; the others go to two pages      | index     |
-   | Requirements                 | `docs/install.md` (host tools and network)                          | how-to    |
-   | Installing the engine        | `docs/install.md`                                                   | how-to    |
-   | A film's layout              | `docs/film-layout.md`                                               | reference |
-   | The verbs                    | `docs/verbs.md` (verbs, targets, exit codes)                        | reference |
-   | Its last paragraph (a build) | `docs/build-a-film.md`, which the README's "How to start" routes to | how-to    |
-   | A film's tests               | `docs/film-tests.md`, with the sample film                          | reference |
-   | The sample film              | `docs/film-tests.md`                                                | reference |
-   | Specifications and changes   | stays in the README as routes                                       | index     |
-   | License                      | stays in the README                                                 | index     |
+   | README at `8ef48f3`                                                                           | Section                    | Goes to                                                             | Role      |
+   | --------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------- | --------- |
+   | R1 "Film Kit rebuilds a narrated explainer film, …"                                           | Opening                    | README, first sentence                                              | index     |
+   | R2 "It narrates each script with a local speech model, …"; R3 "After one supply step …"       | Opening                    | `docs/build-a-film.md`, opening                                     | how-to    |
+   | R4 "The engine carries no film's content."                                                    | Opening                    | README, second sentence                                             | index     |
+   | R5 "Each film's repository holds its scripts, …"                                              | Opening                    | `docs/film-layout.md`, opening                                      | reference |
+   | R6 "The DDWG introduction films are built with it."                                           | Opening                    | README, third sentence                                              | index     |
+   | R7 to R10, the four host requirements                                                         | Requirements               | `docs/install.md`, "Prepare the host"                               | how-to    |
+   | R11 "A film pins a release tag …" and C1                                                      | Installing the engine      | `docs/install.md`, "Pin a release"                                  | how-to    |
+   | R12 "Its `package.json` declares the npm packages …"                                          | Installing the engine      | `docs/install.md`, "Declare the npm packages"                       | how-to    |
+   | R13 "A film is the folder …", R14 "The engine builds the film …" and T1                       | A film's layout            | `docs/film-layout.md`                                               | reference |
+   | R15 "The declaration states …", T2 and R16 "The fields and their refusals …"                  | A film's layout            | `docs/film-layout.md`, "The declaration"                            | reference |
+   | R17 "Run in a film's folder.", R18 and R19 (exit 1 and exit 2) and T3                         | The verbs                  | `docs/verbs.md`                                                     | reference |
+   | R20 "A target is …" and R21 "Every node's run writes its run record …"                        | The verbs                  | `docs/verbs.md`, "Targets and run records"                          | reference |
+   | R22 "A film is built by …", R23 "The narration is GPU work.", R24 and R25 (the build's order) | The verbs                  | `docs/build-a-film.md`, "The steps", which "How to start" routes to | how-to    |
+   | R26 "A film's tests import only `filmkit.api` …"                                              | A film's tests             | `docs/film-tests.md`                                                | reference |
+   | R27 "`examples/sample-film` is a film of two editions …" and R28 "Its tasks run the verbs …"  | The sample film            | `docs/film-tests.md`, "The sample film"                             | reference |
+   | R29 (the specifications and the changes) and R30 (the Changelog and CONTRIBUTING.md)          | Specifications and changes | README, "Where to read", as routes                                  | index     |
+   | R31 and R32 (the license and NOTICE)                                                          | License                    | README, "License"                                                   | index     |
+
+   The move adds one fact, at the head of "The steps" in `docs/build-a-film.md`: a build reads what `filmkit supply`
+   installs and checks, the pinned browser build, dictionary and speech models, so it runs first. The README at
+   `8ef48f3` named the supply only in R3 and R10, and its build order (R22) began at `filmkit check`. The fact is the
+   engine's: `filmkit supply` is the one step that reaches the network (`src/filmkit/graph/cli.py`), it checks each
+   supply against its pins so that the build after it reads only checked inputs and runs offline
+   (`src/filmkit/supply.py`), and narration refuses, naming `filmkit supply`, where the dictionary it places is missing
+   (`narration-convergence`); `filmkit supply --help` states only its usage. Every other sentence the move adds routes
+   or orients and states no content: the README's routes, the index's purpose and its table of questions, the opening
+   line of `docs/install.md` and the route from `docs/build-a-film.md` to `docs/verbs.md`.
 
 3. **The README routes; `docs/README.md` indexes.** The root README names the repository, says in one sentence what
    the engine does and that it carries no film's content, routes to `docs/`, `openspec/specs/`, the Changelog and
