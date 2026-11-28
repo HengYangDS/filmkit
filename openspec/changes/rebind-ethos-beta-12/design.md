@@ -21,7 +21,7 @@ takes three of them; on 29 November it reads as below, each checksum read from `
 checked against the asset's published digest:
 
 ```toml
-# The ETHOS release declaration published with v0.2.0-beta.12, without its two Windows rows.
+# The ETHOS release declaration published with v0.2.0-beta.12: its linux-arm64, linux-x64 and macos-arm64 rows.
 [tools."http:ethos"]
 version = "0.2.0-beta.12"
 
@@ -74,7 +74,7 @@ its recorded workaround:
 
 - Copy the three rows of the published declaration that are not Windows, unchanged, into the
   `[tools."http:ethos"]` table, the form the repository holds, with a comment that names the release
-  and the rows left out, and lock with native `mise lock` after checking each checksum against
+  and the rows it takes, and lock with native `mise lock` after checking each checksum against
   `SHA256SUMS` and the published asset digest. The lock keeps `lockfile_version = 3`, and
   `lockfile_platforms` stays as 0.34.1 declared it, so the lock holds the same five platform entries
   for ETHOS as before and no Windows table.

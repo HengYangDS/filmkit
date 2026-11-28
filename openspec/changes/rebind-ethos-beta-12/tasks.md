@@ -15,7 +15,7 @@ session that builds ETHOS, relayed to this one:
       `linux-arm64`, `linux-x64` and `macos-arm64` of the declaration published with 0.2.0-beta.12
       (`ethos-0.2.0-beta.12.mise.toml`), each checksum read from the release's `SHA256SUMS` and
       checked against the asset's published digest, under a comment that names the release and the
-      two Windows rows left out; then lock again with native `mise lock`. Done when each row equals
+      rows it takes; then lock again with native `mise lock`. Done when each row equals
       the published row byte for byte, the lock holds 0.2.0-beta.12 for the same five platform
       entries for which it held 0.2.0-beta.11, no 0.2.0-beta.11 entry and no `windows-*` table
       remains, the lock's diff changes only `http:ethos`, and the lock keeps `lockfile_version = 3`.
